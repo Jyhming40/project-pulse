@@ -2,12 +2,35 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Settings as SettingsIcon, Users, Database, Shield } from 'lucide-react';
+import { useDriveAuth } from '@/hooks/useDriveAuth';
+import { 
+  Settings as SettingsIcon, 
+  Users, 
+  Database, 
+  Shield, 
+  FolderOpen, 
+  Link, 
+  Unlink, 
+  CheckCircle2,
+  Loader2
+} from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import type { Database as DB } from '@/integrations/supabase/types';
 
@@ -16,6 +39,14 @@ type AppRole = DB['public']['Enums']['app_role'];
 export default function Settings() {
   const { isAdmin, user } = useAuth();
   const queryClient = useQueryClient();
+  const { 
+    isAuthorized: isDriveAuthorized, 
+    isLoading: isDriveLoading, 
+    authorize: authorizeDrive, 
+    revoke: revokeDrive,
+    isAuthorizing 
+  } = useDriveAuth();
+  const [isRevoking, setIsRevoking] = useState(false);
 
   const { data: users = [] } = useQuery({
     queryKey: ['all-users'],
@@ -26,6 +57,7 @@ export default function Settings() {
       if (error) throw error;
       return data;
     },
+    enabled: isAdmin,
   });
 
   const updateRoleMutation = useMutation({
@@ -76,69 +108,196 @@ export default function Settings() {
     },
   });
 
-  if (!isAdmin) return <div className="text-center py-12 text-muted-foreground">權限不足</div>;
+  const handleAuthorizeDrive = async () => {
+    try {
+      await authorizeDrive();
+    } catch (err) {
+      toast.error('Google Drive 授權失敗');
+    }
+  };
+
+  const handleRevokeDrive = async () => {
+    setIsRevoking(true);
+    try {
+      await revokeDrive();
+      toast.success('已取消 Google Drive 授權');
+    } catch (err) {
+      toast.error('取消授權失敗');
+    } finally {
+      setIsRevoking(false);
+    }
+  };
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-display font-bold">系統設定</h1>
-        <p className="text-muted-foreground mt-1">管理使用者權限與系統設定</p>
+        <p className="text-muted-foreground mt-1">管理個人設定與系統配置</p>
       </div>
 
+      {/* Google Drive Authorization Card - Available to all users */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> 使用者管理</CardTitle>
-          <CardDescription>管理系統使用者角色</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <FolderOpen className="w-5 h-5" /> 
+            Google Drive 連結
+          </CardTitle>
+          <CardDescription>
+            連結您的 Google Drive 帳戶以自動建立案場資料夾
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>姓名</TableHead>
-                <TableHead>角色</TableHead>
-                <TableHead>操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map(u => (
-                <TableRow key={u.id}>
-                  <TableCell>{u.email}</TableCell>
-                  <TableCell>{u.full_name || '-'}</TableCell>
-                  <TableCell>
-                    <Badge variant="secondary">{(u.user_roles as any)?.[0]?.role || 'viewer'}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Select
-                      defaultValue={(u.user_roles as any)?.[0]?.role || 'viewer'}
-                      onValueChange={(role) => updateRoleMutation.mutate({ userId: u.id, role: role as AppRole })}
-                      disabled={u.id === user?.id}
-                    >
-                      <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="admin">管理員</SelectItem>
-                        <SelectItem value="staff">員工</SelectItem>
-                        <SelectItem value="viewer">檢視者</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        <CardContent className="space-y-4">
+          {isDriveLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>檢查授權狀態...</span>
+            </div>
+          ) : isDriveAuthorized ? (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-success/10 border border-success/20">
+                <CheckCircle2 className="w-5 h-5 text-success" />
+                <div className="flex-1">
+                  <p className="font-medium text-success">已連結 Google Drive</p>
+                  <p className="text-sm text-muted-foreground">
+                    您可以在案場詳情頁建立 Drive 資料夾
+                  </p>
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">取消授權</p>
+                  <p className="text-sm text-muted-foreground">
+                    取消後將無法自動建立 Drive 資料夾
+                  </p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                      <Unlink className="w-4 h-4 mr-2" />
+                      取消授權
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>確定要取消 Google Drive 授權？</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        取消授權後，您將無法自動建立案場資料夾。已建立的資料夾不會受到影響。
+                        如需重新使用此功能，需要重新授權。
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>取消</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={handleRevokeDrive}
+                        disabled={isRevoking}
+                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      >
+                        {isRevoking ? (
+                          <>
+                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                            處理中...
+                          </>
+                        ) : (
+                          '確定取消授權'
+                        )}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-lg bg-muted/50 border border-border">
+                <Link className="w-5 h-5 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="font-medium">尚未連結 Google Drive</p>
+                  <p className="text-sm text-muted-foreground">
+                    連結後可在新增案場時自動建立 Drive 資料夾
+                  </p>
+                </div>
+              </div>
+              
+              <Button onClick={handleAuthorizeDrive} disabled={isAuthorizing}>
+                {isAuthorizing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    授權中...
+                  </>
+                ) : (
+                  <>
+                    <Link className="w-4 h-4 mr-2" />
+                    連結 Google Drive
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2"><Database className="w-5 h-5" /> 資料管理</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={() => seedDataMutation.mutate()} disabled={seedDataMutation.isPending}>
-            匯入範例資料
-          </Button>
-        </CardContent>
-      </Card>
+      {/* Admin-only sections */}
+      {isAdmin && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> 使用者管理</CardTitle>
+              <CardDescription>管理系統使用者角色</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Email</TableHead>
+                    <TableHead>姓名</TableHead>
+                    <TableHead>角色</TableHead>
+                    <TableHead>操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map(u => (
+                    <TableRow key={u.id}>
+                      <TableCell>{u.email}</TableCell>
+                      <TableCell>{u.full_name || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant="secondary">{(u.user_roles as any)?.[0]?.role || 'viewer'}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          defaultValue={(u.user_roles as any)?.[0]?.role || 'viewer'}
+                          onValueChange={(role) => updateRoleMutation.mutate({ userId: u.id, role: role as AppRole })}
+                          disabled={u.id === user?.id}
+                        >
+                          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">管理員</SelectItem>
+                            <SelectItem value="staff">員工</SelectItem>
+                            <SelectItem value="viewer">檢視者</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2"><Database className="w-5 h-5" /> 資料管理</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={() => seedDataMutation.mutate()} disabled={seedDataMutation.isPending}>
+                匯入範例資料
+              </Button>
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }
