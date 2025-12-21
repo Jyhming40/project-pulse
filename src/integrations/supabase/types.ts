@@ -229,8 +229,12 @@ export type Database = {
           created_at: string
           created_by: string | null
           district: string | null
+          drive_folder_id: string | null
+          drive_folder_url: string | null
           feeder_code: string | null
           fiscal_year: number | null
+          folder_error: string | null
+          folder_status: Database["public"]["Enums"]["folder_status"] | null
           id: string
           investor_id: string | null
           land_owner: string | null
@@ -251,8 +255,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           district?: string | null
+          drive_folder_id?: string | null
+          drive_folder_url?: string | null
           feeder_code?: string | null
           fiscal_year?: number | null
+          folder_error?: string | null
+          folder_status?: Database["public"]["Enums"]["folder_status"] | null
           id?: string
           investor_id?: string | null
           land_owner?: string | null
@@ -273,8 +281,12 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           district?: string | null
+          drive_folder_id?: string | null
+          drive_folder_url?: string | null
           feeder_code?: string | null
           fiscal_year?: number | null
+          folder_error?: string | null
+          folder_status?: Database["public"]["Enums"]["folder_status"] | null
           id?: string
           investor_id?: string | null
           land_owner?: string | null
@@ -352,6 +364,7 @@ export type Database = {
         | "設備登記"
         | "土地契約"
         | "其他"
+      folder_status: "pending" | "created" | "failed"
       project_status:
         | "開發中"
         | "土地確認"
@@ -505,6 +518,7 @@ export const Constants = {
         "土地契約",
         "其他",
       ],
+      folder_status: ["pending", "created", "failed"],
       project_status: [
         "開發中",
         "土地確認",
