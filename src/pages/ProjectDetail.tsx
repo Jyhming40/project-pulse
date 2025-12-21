@@ -20,7 +20,12 @@ import {
   Download,
   Trash2,
   Edit,
-  X
+  X,
+  FolderOpen,
+  ExternalLink,
+  RefreshCw,
+  AlertCircle,
+  CheckCircle2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -115,6 +120,7 @@ export default function ProjectDetail() {
     status?: ProjectStatus;
     note?: string;
   }>({});
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   // Fetch project
   const { data: project, isLoading } = useQuery({
@@ -253,6 +259,25 @@ export default function ProjectDetail() {
       setDocForm({});
     },
   });
+
+  // Create Drive folder handler
+  const handleCreateDriveFolder = async () => {
+    if (!id) return;
+    setIsCreatingFolder(true);
+    try {
+      const { error } = await supabase.functions.invoke('create-drive-folder', {
+        body: { projectId: id },
+      });
+      if (error) throw new Error(error.message);
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      toast.success('Google Drive 資料夾已建立');
+    } catch (err) {
+      const error = err as Error;
+      toast.error('建立資料夾失敗', { description: error.message });
+    } finally {
+      setIsCreatingFolder(false);
+    }
+  };
 
   if (isLoading || !project) {
     return (
@@ -427,6 +452,74 @@ export default function ProjectDetail() {
                   <div>
                     <p className="text-sm text-muted-foreground">備註</p>
                     <p className="text-sm whitespace-pre-wrap">{project.note}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Google Drive Folder Card */}
+            <Card className="lg:col-span-2">
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <FolderOpen className="w-5 h-5 text-primary" />
+                  Google Drive 資料夾
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {(project as any).folder_status === 'created' && (project as any).drive_folder_url ? (
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-success">
+                      <CheckCircle2 className="w-5 h-5" />
+                      <span>資料夾已建立</span>
+                    </div>
+                    <Button variant="outline" size="sm" asChild>
+                      <a 
+                        href={(project as any).drive_folder_url} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                      >
+                        <ExternalLink className="w-4 h-4 mr-2" />
+                        開啟 Drive 資料夾
+                      </a>
+                    </Button>
+                  </div>
+                ) : (project as any).folder_status === 'failed' ? (
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 text-destructive">
+                      <AlertCircle className="w-5 h-5" />
+                      <span>建立失敗</span>
+                    </div>
+                    {(project as any).folder_error && (
+                      <span className="text-sm text-muted-foreground">
+                        {(project as any).folder_error}
+                      </span>
+                    )}
+                    {canEdit && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleCreateDriveFolder}
+                        disabled={isCreatingFolder}
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-2 ${isCreatingFolder ? 'animate-spin' : ''}`} />
+                        重新建立
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4">
+                    <span className="text-muted-foreground">尚未建立資料夾</span>
+                    {canEdit && (
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleCreateDriveFolder}
+                        disabled={isCreatingFolder}
+                      >
+                        <RefreshCw className={`w-4 h-4 mr-2 ${isCreatingFolder ? 'animate-spin' : ''}`} />
+                        {isCreatingFolder ? '建立中...' : '建立資料夾'}
+                      </Button>
+                    )}
                   </div>
                 )}
               </CardContent>

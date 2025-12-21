@@ -129,14 +129,37 @@ export default function Projects() {
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async (data: ProjectInsert) => {
-      const { error } = await supabase.from('projects').insert(data);
+      const { data: newProject, error } = await supabase
+        .from('projects')
+        .insert(data)
+        .select('id')
+        .single();
       if (error) throw error;
+      return newProject;
     },
-    onSuccess: () => {
+    onSuccess: async (newProject) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('案場建立成功');
       setIsCreateOpen(false);
       setFormData({});
+      
+      // Trigger Drive folder creation
+      if (newProject?.id) {
+        try {
+          const { error } = await supabase.functions.invoke('create-drive-folder', {
+            body: { projectId: newProject.id },
+          });
+          if (error) {
+            console.error('Drive folder creation failed:', error);
+            toast.error('案場已建立，但 Drive 資料夾建立失敗', { description: '可稍後在案場詳情頁重試' });
+          } else {
+            toast.success('Google Drive 資料夾已建立');
+            queryClient.invalidateQueries({ queryKey: ['projects'] });
+          }
+        } catch (err) {
+          console.error('Drive folder creation error:', err);
+        }
+      }
     },
     onError: (error: Error) => {
       toast.error('建立失敗', { description: error.message });
