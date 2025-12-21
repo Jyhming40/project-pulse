@@ -1,1 +1,4 @@
 project_id = "mcvgtsoheayabjpdplcr"
+
+[functions.create-drive-folder]
+verify_jwt = true
