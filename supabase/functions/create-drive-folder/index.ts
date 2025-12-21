@@ -19,87 +19,93 @@ const SUBFOLDER_TEMPLATE = [
 
 // Sanitize folder name - remove illegal characters for Google Drive
 function sanitizeFolderName(name: string): string {
-  // Remove characters not allowed in Drive folder names: / \ : * ? " < > |
   return name.replace(/[\/\\:*?"<>|]/g, '_').trim();
 }
 
-// Get Google access token from service account
-async function getAccessToken(serviceAccountKey: string): Promise<string> {
-  const key = JSON.parse(serviceAccountKey);
-  
-  const header = {
-    alg: 'RS256',
-    typ: 'JWT',
-  };
+// Refresh access token using refresh token
+async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; expiresIn: number }> {
+  const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
 
-  const now = Math.floor(Date.now() / 1000);
-  const claim = {
-    iss: key.client_email,
-    scope: 'https://www.googleapis.com/auth/drive',
-    aud: 'https://oauth2.googleapis.com/token',
-    exp: now + 3600,
-    iat: now,
-  };
+  if (!clientId || !clientSecret) {
+    throw new Error('未設定 Google OAuth 憑證');
+  }
 
-  // Base64url encode
-  const base64UrlEncode = (obj: object) => {
-    const json = JSON.stringify(obj);
-    const base64 = btoa(json);
-    return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-  };
-
-  const headerEncoded = base64UrlEncode(header);
-  const claimEncoded = base64UrlEncode(claim);
-  const signatureInput = `${headerEncoded}.${claimEncoded}`;
-
-  // Import private key and sign
-  const privateKeyPem = key.private_key;
-  const pemContents = privateKeyPem
-    .replace(/-----BEGIN PRIVATE KEY-----/, '')
-    .replace(/-----END PRIVATE KEY-----/, '')
-    .replace(/\s/g, '');
-  
-  const binaryDer = Uint8Array.from(atob(pemContents), c => c.charCodeAt(0));
-  
-  const cryptoKey = await crypto.subtle.importKey(
-    'pkcs8',
-    binaryDer,
-    { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  const signature = await crypto.subtle.sign(
-    'RSASSA-PKCS1-v1_5',
-    cryptoKey,
-    new TextEncoder().encode(signatureInput)
-  );
-
-  const signatureEncoded = btoa(String.fromCharCode(...new Uint8Array(signature)))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-
-  const jwt = `${signatureInput}.${signatureEncoded}`;
-
-  // Exchange JWT for access token
-  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+  const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
+      client_id: clientId,
+      client_secret: clientSecret,
+      refresh_token: refreshToken,
+      grant_type: 'refresh_token',
     }),
   });
 
-  if (!tokenResponse.ok) {
-    const errorText = await tokenResponse.text();
-    console.error('Token exchange failed:', errorText);
-    throw new Error(`Failed to get access token: ${errorText}`);
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Token refresh failed:', errorText);
+    throw new Error('Token 刷新失敗，請重新授權 Google Drive');
   }
 
-  const tokenData = await tokenResponse.json();
-  return tokenData.access_token;
+  const data = await response.json();
+  return { accessToken: data.access_token, expiresIn: data.expires_in };
+}
+
+interface DriveToken {
+  user_id: string;
+  access_token: string;
+  refresh_token: string;
+  token_expires_at: string;
+}
+
+// Get valid access token for user
+async function getValidAccessToken(
+  supabaseUrl: string,
+  supabaseServiceKey: string,
+  userId: string
+): Promise<string> {
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+  
+  // Fetch user's tokens
+  const { data, error: tokenError } = await supabase
+    .from('user_drive_tokens')
+    .select('*')
+    .eq('user_id', userId)
+    .single();
+
+  if (tokenError || !data) {
+    throw new Error('NEED_AUTH'); // Special error to indicate user needs to authorize
+  }
+
+  const tokenData = data as unknown as DriveToken;
+
+  // Check if token is expired (with 5 minute buffer)
+  const expiresAt = new Date(tokenData.token_expires_at);
+  const now = new Date();
+  const bufferMs = 5 * 60 * 1000;
+
+  if (expiresAt.getTime() - now.getTime() > bufferMs) {
+    // Token still valid
+    return tokenData.access_token;
+  }
+
+  // Token expired, refresh it
+  console.log('Token expired, refreshing...');
+  const { accessToken, expiresIn } = await refreshAccessToken(tokenData.refresh_token);
+  
+  // Update token in database
+  const newExpiresAt = new Date(Date.now() + expiresIn * 1000);
+  await supabase
+    .from('user_drive_tokens')
+    .update({
+      access_token: accessToken,
+      token_expires_at: newExpiresAt.toISOString(),
+      updated_at: new Date().toISOString(),
+    } as Record<string, unknown>)
+    .eq('user_id', userId);
+
+  return accessToken;
 }
 
 // Create a folder in Google Drive
@@ -132,7 +138,7 @@ async function createFolder(
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Create folder failed:', errorText);
-    throw new Error(`Failed to create folder: ${errorText}`);
+    throw new Error(`建立資料夾失敗: ${errorText}`);
   }
 
   return response.json();
@@ -145,7 +151,7 @@ serve(async (req) => {
   }
 
   try {
-    const { projectId } = await req.json();
+    const { projectId, userId } = await req.json();
 
     if (!projectId) {
       return new Response(
@@ -154,18 +160,14 @@ serve(async (req) => {
       );
     }
 
-    // Get service account key and root folder ID from env
-    const serviceAccountKey = Deno.env.get('GOOGLE_SERVICE_ACCOUNT_KEY');
-    const rootFolderId = Deno.env.get('GOOGLE_DRIVE_ROOT_FOLDER_ID');
-
-    if (!serviceAccountKey) {
-      console.error('Missing GOOGLE_SERVICE_ACCOUNT_KEY');
+    if (!userId) {
       return new Response(
-        JSON.stringify({ error: '未設定 Google Service Account 憑證' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: '缺少 userId 參數' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const rootFolderId = Deno.env.get('GOOGLE_DRIVE_ROOT_FOLDER_ID');
     if (!rootFolderId) {
       console.error('Missing GOOGLE_DRIVE_ROOT_FOLDER_ID');
       return new Response(
@@ -174,7 +176,7 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client
+    // Initialize Supabase client with service role
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -206,9 +208,20 @@ serve(async (req) => {
       );
     }
 
-    // Get access token
-    console.log('Getting access token...');
-    const accessToken = await getAccessToken(serviceAccountKey);
+    // Get access token for user
+    let accessToken: string;
+    try {
+      accessToken = await getValidAccessToken(supabaseUrl, supabaseServiceKey, userId);
+    } catch (err) {
+      const error = err as Error;
+      if (error.message === 'NEED_AUTH') {
+        return new Response(
+          JSON.stringify({ error: 'NEED_AUTH', message: '請先授權 Google Drive' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      throw err;
+    }
 
     // Create main project folder
     const folderName = sanitizeFolderName(`${project.project_code}_${project.project_name}`);
