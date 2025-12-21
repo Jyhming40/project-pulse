@@ -12,7 +12,11 @@ import {
   Link, 
   Unlink, 
   CheckCircle2,
-  Loader2
+  Loader2,
+  Copy,
+  AlertCircle,
+  TestTube,
+  ExternalLink
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,6 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -44,9 +49,16 @@ export default function Settings() {
     isLoading: isDriveLoading, 
     authorize: authorizeDrive, 
     revoke: revokeDrive,
-    isAuthorizing 
+    testConnection,
+    isAuthorizing,
+    callbackUrl,
+    tokenInfo,
+    authError,
+    clearError
   } = useDriveAuth();
   const [isRevoking, setIsRevoking] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message?: string; files?: any[] } | null>(null);
 
   const { data: users = [] } = useQuery({
     queryKey: ['all-users'],
@@ -75,7 +87,6 @@ export default function Settings() {
 
   const seedDataMutation = useMutation({
     mutationFn: async () => {
-      // Create sample investors
       const { data: inv1 } = await supabase.from('investors').insert({
         investor_code: 'INV-001', company_name: '永沛投資股份有限公司',
         tax_id: '12345678', contact_person: '王大明', phone: '02-1234-5678',
@@ -88,7 +99,6 @@ export default function Settings() {
         email: 'info@mingqun.com', address: '台中市西屯區台灣大道四段1號'
       }).select().single();
 
-      // Create sample projects
       await supabase.from('projects').insert([
         { project_code: 'PRJ-2024-001', project_name: '台南永康太陽能案', investor_id: inv1?.id,
           status: '同意備案', capacity_kwp: 499.5, city: '台南市', district: '永康區',
@@ -121,12 +131,43 @@ export default function Settings() {
     try {
       await revokeDrive();
       toast.success('已取消 Google Drive 授權');
+      setTestResult(null);
     } catch (err) {
       toast.error('取消授權失敗');
     } finally {
       setIsRevoking(false);
     }
   };
+
+  const handleTestConnection = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const result = await testConnection();
+      setTestResult(result);
+      if (result.success) {
+        toast.success('連線測試成功！');
+      } else {
+        toast.error(result.error || '連線測試失敗');
+      }
+    } catch (err) {
+      const error = err as Error;
+      setTestResult({ success: false, message: error.message });
+      toast.error(error.message);
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
+  const handleCopyCallbackUrl = () => {
+    navigator.clipboard.writeText(callbackUrl);
+    toast.success('已複製 Callback URL');
+  };
+
+  const scopes = [
+    'https://www.googleapis.com/auth/drive',
+    'https://www.googleapis.com/auth/userinfo.email',
+  ];
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -135,7 +176,7 @@ export default function Settings() {
         <p className="text-muted-foreground mt-1">管理個人設定與系統配置</p>
       </div>
 
-      {/* Google Drive Authorization Card - Available to all users */}
+      {/* Google Drive Authorization Card */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -147,6 +188,44 @@ export default function Settings() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {/* OAuth Callback URL Info */}
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>設定 Google OAuth</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p>請將以下 Redirect URI 加入到 Google Cloud Console 的 OAuth 設定中：</p>
+              <div className="flex items-center gap-2 mt-2">
+                <code className="flex-1 bg-muted px-3 py-2 rounded text-sm break-all">
+                  {callbackUrl}
+                </code>
+                <Button variant="outline" size="sm" onClick={handleCopyCallbackUrl}>
+                  <Copy className="w-4 h-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                使用的 Scopes: {scopes.join(', ')}
+              </p>
+            </AlertDescription>
+          </Alert>
+
+          {/* Error Display */}
+          {(authError || tokenInfo?.google_error) && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>授權錯誤</AlertTitle>
+              <AlertDescription>
+                {authError || tokenInfo?.google_error}
+                <Button 
+                  variant="link" 
+                  className="p-0 h-auto ml-2 text-destructive-foreground underline"
+                  onClick={clearError}
+                >
+                  關閉
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {isDriveLoading ? (
             <div className="flex items-center gap-2 text-muted-foreground">
               <Loader2 className="w-4 h-4 animate-spin" />
@@ -158,11 +237,65 @@ export default function Settings() {
                 <CheckCircle2 className="w-5 h-5 text-success" />
                 <div className="flex-1">
                   <p className="font-medium text-success">已連結 Google Drive</p>
-                  <p className="text-sm text-muted-foreground">
-                    您可以在案場詳情頁建立 Drive 資料夾
-                  </p>
+                  {tokenInfo?.google_email && (
+                    <p className="text-sm text-muted-foreground">
+                      連結帳號: {tokenInfo.google_email}
+                    </p>
+                  )}
+                  {tokenInfo?.updated_at && (
+                    <p className="text-xs text-muted-foreground">
+                      上次更新: {new Date(tokenInfo.updated_at).toLocaleString('zh-TW')}
+                    </p>
+                  )}
                 </div>
               </div>
+
+              {/* Test Connection */}
+              <div className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={handleTestConnection} 
+                  disabled={isTesting}
+                >
+                  {isTesting ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <TestTube className="w-4 h-4 mr-2" />
+                  )}
+                  測試連線
+                </Button>
+              </div>
+
+              {/* Test Result */}
+              {testResult && (
+                <Alert variant={testResult.success ? "default" : "destructive"}>
+                  {testResult.success ? (
+                    <CheckCircle2 className="h-4 w-4" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4" />
+                  )}
+                  <AlertTitle>{testResult.success ? '連線成功' : '連線失敗'}</AlertTitle>
+                  <AlertDescription>
+                    {testResult.success ? (
+                      <div>
+                        <p>成功存取 Google Drive！</p>
+                        {testResult.files && testResult.files.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-sm font-medium">找到的檔案/資料夾：</p>
+                            <ul className="text-sm list-disc list-inside">
+                              {testResult.files.slice(0, 5).map((file: any) => (
+                                <li key={file.id}>{file.name}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      testResult.message
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
               
               <Separator />
               
@@ -185,7 +318,6 @@ export default function Settings() {
                       <AlertDialogTitle>確定要取消 Google Drive 授權？</AlertDialogTitle>
                       <AlertDialogDescription>
                         取消授權後，您將無法自動建立案場資料夾。已建立的資料夾不會受到影響。
-                        如需重新使用此功能，需要重新授權。
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
