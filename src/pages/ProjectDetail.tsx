@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import {
@@ -25,7 +26,8 @@ import {
   ExternalLink,
   RefreshCw,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Link
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -104,6 +106,7 @@ export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { canEdit, isAdmin, user } = useAuth();
+  const { isAuthorized: isDriveAuthorized, isLoading: isDriveLoading, authorize: authorizeDrive, isAuthorizing } = useDriveAuth();
   const queryClient = useQueryClient();
 
   const [isAddDocOpen, setIsAddDocOpen] = useState(false);
@@ -262,13 +265,36 @@ export default function ProjectDetail() {
 
   // Create Drive folder handler
   const handleCreateDriveFolder = async () => {
-    if (!id) return;
+    if (!id || !user) return;
+    
+    // Check if user has authorized Drive
+    if (!isDriveAuthorized) {
+      try {
+        await authorizeDrive();
+      } catch (err) {
+        toast.error('Google Drive 授權失敗');
+      }
+      return;
+    }
+    
     setIsCreatingFolder(true);
     try {
-      const { error } = await supabase.functions.invoke('create-drive-folder', {
-        body: { projectId: id },
+      const { data, error } = await supabase.functions.invoke('create-drive-folder', {
+        body: { projectId: id, userId: user.id },
       });
+      
       if (error) throw new Error(error.message);
+      
+      // Check if response indicates need for auth
+      if (data?.error === 'NEED_AUTH') {
+        try {
+          await authorizeDrive();
+        } catch (err) {
+          toast.error('Google Drive 授權失敗');
+        }
+        return;
+      }
+      
       queryClient.invalidateQueries({ queryKey: ['project', id] });
       toast.success('Google Drive 資料夾已建立');
     } catch (err) {
@@ -276,6 +302,15 @@ export default function ProjectDetail() {
       toast.error('建立資料夾失敗', { description: error.message });
     } finally {
       setIsCreatingFolder(false);
+    }
+  };
+  
+  // Handle Drive authorization
+  const handleAuthorizeDrive = async () => {
+    try {
+      await authorizeDrive();
+    } catch (err) {
+      toast.error('Google Drive 授權失敗');
     }
   };
 
@@ -465,7 +500,37 @@ export default function ProjectDetail() {
                   Google Drive 資料夾
                 </CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-4">
+                {/* Drive Authorization Status */}
+                {canEdit && !isDriveLoading && (
+                  <div className="flex items-center gap-4 p-3 rounded-lg bg-muted/50">
+                    {isDriveAuthorized ? (
+                      <>
+                        <div className="flex items-center gap-2 text-success">
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span className="text-sm">已連結 Google Drive</span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Link className="w-4 h-4" />
+                          <span className="text-sm">尚未連結 Google Drive</span>
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={handleAuthorizeDrive}
+                          disabled={isAuthorizing}
+                        >
+                          {isAuthorizing ? '授權中...' : '連結 Google Drive'}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Folder Status */}
                 {(project as any).folder_status === 'created' && (project as any).drive_folder_url ? (
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-success">
@@ -494,7 +559,7 @@ export default function ProjectDetail() {
                         {(project as any).folder_error}
                       </span>
                     )}
-                    {canEdit && (
+                    {canEdit && isDriveAuthorized && (
                       <Button 
                         variant="outline" 
                         size="sm"
@@ -509,7 +574,7 @@ export default function ProjectDetail() {
                 ) : (
                   <div className="flex items-center gap-4">
                     <span className="text-muted-foreground">尚未建立資料夾</span>
-                    {canEdit && (
+                    {canEdit && isDriveAuthorized && (
                       <Button 
                         variant="outline" 
                         size="sm"

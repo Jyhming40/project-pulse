@@ -2,3 +2,9 @@ project_id = "mcvgtsoheayabjpdplcr"
 
 [functions.create-drive-folder]
 verify_jwt = true
+
+[functions.drive-auth-callback]
+verify_jwt = false
+
+[functions.drive-auth-url]
+verify_jwt = true

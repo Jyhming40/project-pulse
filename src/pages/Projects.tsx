@@ -143,22 +143,9 @@ export default function Projects() {
       setIsCreateOpen(false);
       setFormData({});
       
-      // Trigger Drive folder creation
+      // Navigate to project detail for Drive folder creation (now requires OAuth)
       if (newProject?.id) {
-        try {
-          const { error } = await supabase.functions.invoke('create-drive-folder', {
-            body: { projectId: newProject.id },
-          });
-          if (error) {
-            console.error('Drive folder creation failed:', error);
-            toast.error('案場已建立，但 Drive 資料夾建立失敗', { description: '可稍後在案場詳情頁重試' });
-          } else {
-            toast.success('Google Drive 資料夾已建立');
-            queryClient.invalidateQueries({ queryKey: ['projects'] });
-          }
-        } catch (err) {
-          console.error('Drive folder creation error:', err);
-        }
+        toast.info('請至案場詳情頁連結 Google Drive 並建立資料夾');
       }
     },
     onError: (error: Error) => {
