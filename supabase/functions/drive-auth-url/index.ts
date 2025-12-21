@@ -35,24 +35,27 @@ serve(async (req) => {
     // Create state with user info
     const state = btoa(JSON.stringify({ userId, redirectUrl }));
 
-    // Build OAuth URL
+    // Build OAuth URL with all required parameters
     const callbackUrl = `${supabaseUrl}/functions/v1/drive-auth-callback`;
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: callbackUrl,
       response_type: 'code',
-      scope: 'https://www.googleapis.com/auth/drive.file',
+      scope: 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/userinfo.email',
       access_type: 'offline',
-      prompt: 'consent', // Force consent to get refresh token
+      prompt: 'consent',
+      include_granted_scopes: 'true',
       state,
     });
 
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 
     console.log('Generated auth URL for user:', userId);
+    console.log('Callback URL:', callbackUrl);
+    console.log('Scopes:', 'drive, userinfo.email');
 
     return new Response(
-      JSON.stringify({ authUrl }),
+      JSON.stringify({ authUrl, callbackUrl }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
