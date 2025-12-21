@@ -123,8 +123,9 @@ async function createFolder(
     metadata.parents = [parentId];
   }
 
+  // Add supportsAllDrives for Shared Drive compatibility
   const response = await fetch(
-    'https://www.googleapis.com/drive/v3/files?fields=id,webViewLink',
+    'https://www.googleapis.com/drive/v3/files?fields=id,webViewLink&supportsAllDrives=true',
     {
       method: 'POST',
       headers: {
