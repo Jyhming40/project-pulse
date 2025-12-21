@@ -88,10 +88,16 @@ serve(async (req) => {
     // Get valid access token
     const accessToken = await getValidAccessToken(supabase, userId);
 
-    // Try to list files in root to test connection
+    // Try to list files in root to test connection (with Shared Drive support)
     console.log('Testing Drive connection...');
+    const params = new URLSearchParams({
+      pageSize: '5',
+      fields: 'files(id,name,mimeType)',
+      supportsAllDrives: 'true',
+      includeItemsFromAllDrives: 'true',
+    });
     const driveResponse = await fetch(
-      'https://www.googleapis.com/drive/v3/files?pageSize=5&fields=files(id,name,mimeType)',
+      `https://www.googleapis.com/drive/v3/files?${params.toString()}`,
       {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       }
