@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
+import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import {
@@ -66,41 +67,35 @@ type ProjectStatus = Database['public']['Enums']['project_status'];
 type DocType = Database['public']['Enums']['doc_type'];
 type DocStatus = Database['public']['Enums']['doc_status'];
 
-const statusColors: Record<ProjectStatus, string> = {
-  '開發中': 'bg-info/15 text-info',
-  '土地確認': 'bg-warning/15 text-warning',
-  '結構簽證': 'bg-primary/15 text-primary',
-  '台電送件': 'bg-info/15 text-info',
-  '台電審查': 'bg-warning/15 text-warning',
-  '能源局送件': 'bg-info/15 text-info',
-  '同意備案': 'bg-success/15 text-success',
-  '工程施工': 'bg-primary/15 text-primary',
-  '報竣掛表': 'bg-info/15 text-info',
-  '設備登記': 'bg-success/15 text-success',
-  '運維中': 'bg-success/15 text-success',
-  '暫停': 'bg-muted text-muted-foreground',
-  '取消': 'bg-destructive/15 text-destructive',
+// Dynamic status color mapping
+const getStatusColor = (status: string) => {
+  const statusColorMap: Record<string, string> = {
+    '開發中': 'bg-info/15 text-info',
+    '土地確認': 'bg-warning/15 text-warning',
+    '結構簽證': 'bg-primary/15 text-primary',
+    '台電送件': 'bg-info/15 text-info',
+    '台電審查': 'bg-warning/15 text-warning',
+    '能源局送件': 'bg-info/15 text-info',
+    '同意備案': 'bg-success/15 text-success',
+    '工程施工': 'bg-primary/15 text-primary',
+    '報竣掛表': 'bg-info/15 text-info',
+    '設備登記': 'bg-success/15 text-success',
+    '運維中': 'bg-success/15 text-success',
+    '暫停': 'bg-muted text-muted-foreground',
+    '取消': 'bg-destructive/15 text-destructive',
+  };
+  return statusColorMap[status] || 'bg-muted text-muted-foreground';
 };
 
-const docStatusColors: Record<DocStatus, string> = {
-  '未開始': 'bg-muted text-muted-foreground',
-  '進行中': 'bg-info/15 text-info',
-  '已完成': 'bg-success/15 text-success',
-  '退件補正': 'bg-warning/15 text-warning',
+const getDocStatusColor = (status: string) => {
+  const docStatusColorMap: Record<string, string> = {
+    '未開始': 'bg-muted text-muted-foreground',
+    '進行中': 'bg-info/15 text-info',
+    '已完成': 'bg-success/15 text-success',
+    '退件補正': 'bg-warning/15 text-warning',
+  };
+  return docStatusColorMap[status] || 'bg-muted text-muted-foreground';
 };
-
-const statusOptions: ProjectStatus[] = [
-  '開發中', '土地確認', '結構簽證', '台電送件', '台電審查',
-  '能源局送件', '同意備案', '工程施工', '報竣掛表', '設備登記',
-  '運維中', '暫停', '取消'
-];
-
-const docTypeOptions: DocType[] = [
-  '台電審查意見書', '能源局同意備案', '結構簽證', '躉售合約',
-  '報竣掛表', '設備登記', '土地契約', '其他'
-];
-
-const docStatusOptions: DocStatus[] = ['未開始', '進行中', '已完成', '退件補正'];
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -108,6 +103,11 @@ export default function ProjectDetail() {
   const { canEdit, isAdmin, user } = useAuth();
   const { isAuthorized: isDriveAuthorized, isLoading: isDriveLoading, authorize: authorizeDrive, isAuthorizing } = useDriveAuth();
   const queryClient = useQueryClient();
+
+  // Fetch dynamic options
+  const { options: statusOptions } = useOptionsForCategory('project_status');
+  const { options: docTypeOptions } = useOptionsForCategory('doc_type');
+  const { options: docStatusOptions } = useOptionsForCategory('doc_status');
 
   const [isAddDocOpen, setIsAddDocOpen] = useState(false);
   const [isAddStatusOpen, setIsAddStatusOpen] = useState(false);
@@ -336,7 +336,7 @@ export default function ProjectDetail() {
             <h1 className="text-2xl font-display font-bold text-foreground">
               {project.project_name}
             </h1>
-            <Badge className={statusColors[project.status]} variant="secondary">
+            <Badge className={getStatusColor(project.status)} variant="secondary">
               {project.status}
             </Badge>
           </div>
@@ -613,7 +613,7 @@ export default function ProjectDetail() {
                         <div className="absolute left-2.5 w-3 h-3 rounded-full bg-primary border-2 border-background" />
                         <div className="bg-muted/50 rounded-lg p-4">
                           <div className="flex items-center gap-3 mb-2">
-                            <Badge className={statusColors[history.status]} variant="secondary">
+                            <Badge className={getStatusColor(history.status)} variant="secondary">
                               {history.status}
                             </Badge>
                             <span className="text-sm text-muted-foreground">
@@ -671,7 +671,7 @@ export default function ProjectDetail() {
                       <TableRow key={doc.id}>
                         <TableCell className="font-medium">{doc.doc_type}</TableCell>
                         <TableCell>
-                          <Badge className={docStatusColors[doc.doc_status]} variant="secondary">
+                          <Badge className={getDocStatusColor(doc.doc_status)} variant="secondary">
                             {doc.doc_status}
                           </Badge>
                         </TableCell>
@@ -715,8 +715,8 @@ export default function ProjectDetail() {
                   <SelectValue placeholder="選擇狀態" />
                 </SelectTrigger>
                 <SelectContent>
-                  {statusOptions.map(s => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  {statusOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -760,8 +760,8 @@ export default function ProjectDetail() {
                   <SelectValue placeholder="選擇文件類型" />
                 </SelectTrigger>
                 <SelectContent>
-                  {docTypeOptions.map(t => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  {docTypeOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -776,8 +776,8 @@ export default function ProjectDetail() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {docStatusOptions.map(s => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  {docStatusOptions.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
