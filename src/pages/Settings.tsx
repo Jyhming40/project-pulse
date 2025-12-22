@@ -498,6 +498,20 @@ export default function Settings() {
                   </p>
                 </div>
               </div>
+
+              {/* Debug Info - Always Show */}
+              <div className="p-4 border rounded-lg bg-muted/30">
+                <p className="text-sm font-medium mb-2">🔧 目前環境資訊（除錯用）</p>
+                <div className="space-y-1 text-xs font-mono">
+                  <p><strong>目前登入 User ID：</strong>{user?.id || '(未登入)'}</p>
+                  <p><strong>目前登入 Email：</strong>{user?.email || '(未登入)'}</p>
+                  <p><strong>google_email (DB)：</strong>{tokenInfo?.google_email || '(尚未授權)'}</p>
+                  <p><strong>Callback URL：</strong>{callbackUrl}</p>
+                  <p className="text-muted-foreground mt-2">
+                    * GOOGLE_DRIVE_ROOT_FOLDER_ID 為後端 secret，需透過測試連線查看
+                  </p>
+                </div>
+              </div>
               
               <Button onClick={handleAuthorizeDrive} disabled={isAuthorizing}>
                 {isAuthorizing ? (
