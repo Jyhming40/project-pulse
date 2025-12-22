@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { 
   Plus, 
   Search, 
@@ -60,27 +61,25 @@ type ProjectInsert = Database['public']['Tables']['projects']['Insert'];
 type ProjectStatus = Database['public']['Enums']['project_status'];
 type Investor = Database['public']['Tables']['investors']['Row'];
 
-const statusColors: Record<ProjectStatus, string> = {
-  '開發中': 'bg-info/15 text-info',
-  '土地確認': 'bg-warning/15 text-warning',
-  '結構簽證': 'bg-primary/15 text-primary',
-  '台電送件': 'bg-info/15 text-info',
-  '台電審查': 'bg-warning/15 text-warning',
-  '能源局送件': 'bg-info/15 text-info',
-  '同意備案': 'bg-success/15 text-success',
-  '工程施工': 'bg-primary/15 text-primary',
-  '報竣掛表': 'bg-info/15 text-info',
-  '設備登記': 'bg-success/15 text-success',
-  '運維中': 'bg-success/15 text-success',
-  '暫停': 'bg-muted text-muted-foreground',
-  '取消': 'bg-destructive/15 text-destructive',
+// Dynamic status color mapping - fallback to default style if not found
+const getStatusColor = (status: string) => {
+  const statusColorMap: Record<string, string> = {
+    '開發中': 'bg-info/15 text-info',
+    '土地確認': 'bg-warning/15 text-warning',
+    '結構簽證': 'bg-primary/15 text-primary',
+    '台電送件': 'bg-info/15 text-info',
+    '台電審查': 'bg-warning/15 text-warning',
+    '能源局送件': 'bg-info/15 text-info',
+    '同意備案': 'bg-success/15 text-success',
+    '工程施工': 'bg-primary/15 text-primary',
+    '報竣掛表': 'bg-info/15 text-info',
+    '設備登記': 'bg-success/15 text-success',
+    '運維中': 'bg-success/15 text-success',
+    '暫停': 'bg-muted text-muted-foreground',
+    '取消': 'bg-destructive/15 text-destructive',
+  };
+  return statusColorMap[status] || 'bg-muted text-muted-foreground';
 };
-
-const statusOptions: ProjectStatus[] = [
-  '開發中', '土地確認', '結構簽證', '台電送件', '台電審查',
-  '能源局送件', '同意備案', '工程施工', '報竣掛表', '設備登記',
-  '運維中', '暫停', '取消'
-];
 
 const cities = [
   '台北市', '新北市', '桃園市', '台中市', '台南市', '高雄市',
@@ -93,6 +92,9 @@ export default function Projects() {
   const navigate = useNavigate();
   const { canEdit, isAdmin, user } = useAuth();
   const queryClient = useQueryClient();
+  
+  // Fetch dynamic status options
+  const { options: statusOptions } = useOptionsForCategory('project_status');
   
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -283,8 +285,8 @@ export default function Projects() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">全部狀態</SelectItem>
-            {statusOptions.map(status => (
-              <SelectItem key={status} value={status}>{status}</SelectItem>
+            {statusOptions.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -333,7 +335,7 @@ export default function Projects() {
                   <TableCell className="font-medium">{project.project_name}</TableCell>
                   <TableCell>{(project.investors as any)?.company_name || '-'}</TableCell>
                   <TableCell>
-                    <Badge className={statusColors[project.status]} variant="secondary">
+                    <Badge className={getStatusColor(project.status)} variant="secondary">
                       {project.status}
                     </Badge>
                   </TableCell>
@@ -444,8 +446,8 @@ export default function Projects() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {statusOptions.map(status => (
-                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    {statusOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { format, isWithinInterval, subDays } from 'date-fns';
 import { 
   Search, 
@@ -39,24 +40,26 @@ import type { Database } from '@/integrations/supabase/types';
 type DocType = Database['public']['Enums']['doc_type'];
 type DocStatus = Database['public']['Enums']['doc_status'];
 
-const docStatusColors: Record<DocStatus, string> = {
-  '未開始': 'bg-muted text-muted-foreground',
-  '進行中': 'bg-info/15 text-info',
-  '已完成': 'bg-success/15 text-success',
-  '退件補正': 'bg-warning/15 text-warning',
+// Dynamic status color mapping
+const getDocStatusColor = (status: string) => {
+  const docStatusColorMap: Record<string, string> = {
+    '未開始': 'bg-muted text-muted-foreground',
+    '進行中': 'bg-info/15 text-info',
+    '已完成': 'bg-success/15 text-success',
+    '退件補正': 'bg-warning/15 text-warning',
+  };
+  return docStatusColorMap[status] || 'bg-muted text-muted-foreground';
 };
-
-const docTypeOptions: DocType[] = [
-  '台電審查意見書', '能源局同意備案', '結構簽證', '躉售合約',
-  '報竣掛表', '設備登記', '土地契約', '其他'
-];
-
-const docStatusOptions: DocStatus[] = ['未開始', '進行中', '已完成', '退件補正'];
 
 export default function Documents() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { canEdit } = useAuth();
+  
+  // Fetch dynamic options
+  const { options: docTypeOptions } = useOptionsForCategory('doc_type');
+  const { options: docStatusOptions } = useOptionsForCategory('doc_status');
+  
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -183,8 +186,8 @@ export default function Documents() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">全部類型</SelectItem>
-            {docTypeOptions.map(type => (
-              <SelectItem key={type} value={type}>{type}</SelectItem>
+            {docTypeOptions.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -194,8 +197,8 @@ export default function Documents() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">全部狀態</SelectItem>
-            {docStatusOptions.map(status => (
-              <SelectItem key={status} value={status}>{status}</SelectItem>
+            {docStatusOptions.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -250,7 +253,7 @@ export default function Documents() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className={docStatusColors[doc.doc_status]} variant="secondary">
+                      <Badge className={getDocStatusColor(doc.doc_status)} variant="secondary">
                         {doc.doc_status}
                       </Badge>
                     </TableCell>
