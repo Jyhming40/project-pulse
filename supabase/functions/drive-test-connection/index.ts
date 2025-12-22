@@ -30,7 +30,7 @@ async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: 
   return { accessToken: data.access_token, expiresIn: data.expires_in };
 }
 
-async function getValidAccessToken(supabase: any, userId: string): Promise<string> {
+async function getValidAccessToken(supabase: any, userId: string): Promise<{ accessToken: string; googleEmail: string | null }> {
   const { data: tokenData, error } = await supabase
     .from('user_drive_tokens')
     .select('*')
@@ -44,13 +44,16 @@ async function getValidAccessToken(supabase: any, userId: string): Promise<strin
   const expiresAt = new Date(tokenData.token_expires_at);
   const now = new Date();
 
+  let accessToken = tokenData.access_token;
+
   // If token expires in less than 5 minutes, refresh it
   if (expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
     console.log('Token expired or expiring soon, refreshing...');
-    const { accessToken, expiresIn } = await refreshAccessToken(tokenData.refresh_token);
+    const refreshed = await refreshAccessToken(tokenData.refresh_token);
+    accessToken = refreshed.accessToken;
     
     // Update token in database
-    const newExpiresAt = new Date(Date.now() + expiresIn * 1000);
+    const newExpiresAt = new Date(Date.now() + refreshed.expiresIn * 1000);
     await supabase
       .from('user_drive_tokens')
       .update({
@@ -59,11 +62,25 @@ async function getValidAccessToken(supabase: any, userId: string): Promise<strin
         updated_at: new Date().toISOString(),
       })
       .eq('user_id', userId);
-
-    return accessToken;
   }
 
-  return tokenData.access_token;
+  return { accessToken, googleEmail: tokenData.google_email };
+}
+
+// Fetch user's Google email using userinfo API
+async function fetchGoogleEmail(accessToken: string): Promise<string | null> {
+  try {
+    const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return data.email || null;
+    }
+  } catch (err) {
+    console.error('Failed to fetch Google email:', err);
+  }
+  return null;
 }
 
 serve(async (req) => {
@@ -83,58 +100,158 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const rootFolderId = Deno.env.get('GOOGLE_DRIVE_ROOT_FOLDER_ID');
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Get valid access token
-    const accessToken = await getValidAccessToken(supabase, userId);
+    // Log environment configuration
+    console.log('=== Drive Test Connection ===');
+    console.log('Root Folder ID from env:', rootFolderId || '(NOT SET)');
 
-    // Try to list files in root to test connection (with Shared Drive support)
-    console.log('Testing Drive connection...');
-    const params = new URLSearchParams({
+    // Get valid access token and email
+    const { accessToken, googleEmail } = await getValidAccessToken(supabase, userId);
+
+    // Fetch actual email from Google if not stored
+    let actualEmail = googleEmail;
+    if (!actualEmail) {
+      actualEmail = await fetchGoogleEmail(accessToken);
+      console.log('Fetched Google email from API:', actualEmail);
+      
+      // Update email in database
+      if (actualEmail) {
+        await supabase
+          .from('user_drive_tokens')
+          .update({ google_email: actualEmail })
+          .eq('user_id', userId);
+      }
+    }
+
+    console.log('=== OAuth Info ===');
+    console.log('Authorized Google Email:', actualEmail || '(Unknown)');
+    console.log('User ID:', userId);
+
+    // Test 1: List files in root (general access test)
+    console.log('=== Test 1: List files (general) ===');
+    const listParams = {
       pageSize: '5',
       fields: 'files(id,name,mimeType)',
       supportsAllDrives: 'true',
       includeItemsFromAllDrives: 'true',
-    });
-    const driveResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files?${params.toString()}`,
+    };
+    console.log('API Params:', JSON.stringify(listParams));
+    
+    const listResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files?${new URLSearchParams(listParams).toString()}`,
       {
         headers: { 'Authorization': `Bearer ${accessToken}` },
       }
     );
 
-    if (!driveResponse.ok) {
-      const errorText = await driveResponse.text();
-      console.error('Drive API error:', errorText);
+    if (!listResponse.ok) {
+      const errorText = await listResponse.text();
+      console.error('Drive API list error:', errorText);
       
-      // Update error in database
       await supabase
         .from('user_drive_tokens')
         .update({ google_error: errorText })
         .eq('user_id', userId);
 
       return new Response(
-        JSON.stringify({ success: false, error: `Drive API 錯誤: ${errorText}` }),
+        JSON.stringify({ 
+          success: false, 
+          error: `Drive API 錯誤: ${errorText}`,
+          googleEmail: actualEmail,
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const driveData = await driveResponse.json();
-    console.log('Drive connection successful, files:', driveData.files?.length || 0);
+    const listData = await listResponse.json();
+    console.log('List files result:', listData.files?.length || 0, 'files');
 
-    // Clear any previous error
+    // Test 2: Access root folder specifically (if configured)
+    let rootFolderAccess = false;
+    let rootFolderError = null;
+    
+    if (rootFolderId) {
+      console.log('=== Test 2: Access Root Folder ===');
+      console.log('Testing access to folder ID:', rootFolderId);
+      
+      const getParams = {
+        supportsAllDrives: 'true',
+        fields: 'id,name,mimeType,capabilities',
+      };
+      console.log('API Params:', JSON.stringify(getParams));
+      
+      const getResponse = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${rootFolderId}?${new URLSearchParams(getParams).toString()}`,
+        {
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+        }
+      );
+
+      if (getResponse.ok) {
+        const folderData = await getResponse.json();
+        console.log('Root folder info:', JSON.stringify(folderData));
+        rootFolderAccess = true;
+        
+        // Test 3: List files in root folder
+        console.log('=== Test 3: List files in Root Folder ===');
+        const listInFolderParams = {
+          q: `'${rootFolderId}' in parents`,
+          pageSize: '10',
+          fields: 'files(id,name,mimeType)',
+          supportsAllDrives: 'true',
+          includeItemsFromAllDrives: 'true',
+        };
+        console.log('API Params:', JSON.stringify(listInFolderParams));
+        
+        const listInFolderResponse = await fetch(
+          `https://www.googleapis.com/drive/v3/files?${new URLSearchParams(listInFolderParams).toString()}`,
+          {
+            headers: { 'Authorization': `Bearer ${accessToken}` },
+          }
+        );
+
+        if (listInFolderResponse.ok) {
+          const folderFiles = await listInFolderResponse.json();
+          console.log('Files in root folder:', folderFiles.files?.length || 0);
+        } else {
+          const folderListError = await listInFolderResponse.text();
+          console.error('List in folder error:', folderListError);
+        }
+      } else {
+        rootFolderError = await getResponse.text();
+        console.error('Root folder access error:', rootFolderError);
+        console.error('Status:', getResponse.status);
+      }
+    }
+
+    // Clear any previous error on success
     await supabase
       .from('user_drive_tokens')
       .update({ google_error: null })
       .eq('user_id', userId);
 
+    const result = {
+      success: true,
+      message: rootFolderAccess ? '連線成功！已驗證 Root Folder 存取權限' : '連線成功（一般 Drive 存取）',
+      googleEmail: actualEmail,
+      rootFolderId: rootFolderId || null,
+      rootFolderAccess,
+      rootFolderError,
+      files: listData.files || [],
+      fileCount: listData.files?.length || 0,
+    };
+
+    console.log('=== Test Result ===');
+    console.log('Success:', result.success);
+    console.log('Root Folder Access:', result.rootFolderAccess);
+    if (result.rootFolderError) {
+      console.log('Root Folder Error:', result.rootFolderError);
+    }
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: '連線成功！',
-        files: driveData.files || [],
-        fileCount: driveData.files?.length || 0
-      }),
+      JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 

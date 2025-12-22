@@ -58,7 +58,15 @@ export default function Settings() {
   } = useDriveAuth();
   const [isRevoking, setIsRevoking] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [testResult, setTestResult] = useState<{ success: boolean; message?: string; files?: any[] } | null>(null);
+  const [testResult, setTestResult] = useState<{ 
+    success: boolean; 
+    message?: string; 
+    files?: any[]; 
+    googleEmail?: string;
+    rootFolderId?: string;
+    rootFolderAccess?: boolean;
+    rootFolderError?: string;
+  } | null>(null);
 
   const { data: users = [] } = useQuery({
     queryKey: ['all-users'],
@@ -183,19 +191,36 @@ export default function Settings() {
             <FolderOpen className="w-5 h-5" /> 
             Google Drive 連結
           </CardTitle>
-          <CardDescription>
+        <CardDescription>
             連結您的 Google Drive 帳戶以自動建立案場資料夾
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* OAuth Callback URL Info */}
+          {/* Important Notice for Shared Drive */}
           <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>重要提示：Shared Drive 權限</AlertTitle>
+            <AlertDescription className="space-y-2">
+              <p>如果根資料夾位於「共用雲端硬碟（Shared Drive）」，您用來授權的 Google 帳號必須對該 Shared Drive 具備以下權限之一：</p>
+              <ul className="list-disc list-inside text-sm mt-1 space-y-1">
+                <li><strong>Content Manager</strong>（內容管理員）</li>
+                <li><strong>Manager</strong>（管理員）</li>
+                <li><strong>Contributor</strong>（協作者）- 可建立資料夾</li>
+              </ul>
+              <p className="text-xs text-muted-foreground mt-2">
+                如果權限不足，建立資料夾時會出現 403 錯誤。請確認授權帳號的 Shared Drive 權限設定。
+              </p>
+            </AlertDescription>
+          </Alert>
+
+          {/* OAuth Callback URL Info */}
+          <Alert variant="default" className="bg-muted/50">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>設定 Google OAuth</AlertTitle>
             <AlertDescription className="space-y-2">
               <p>請將以下 Redirect URI 加入到 Google Cloud Console 的 OAuth 設定中：</p>
               <div className="flex items-center gap-2 mt-2">
-                <code className="flex-1 bg-muted px-3 py-2 rounded text-sm break-all">
+                <code className="flex-1 bg-background px-3 py-2 rounded text-sm break-all border">
                   {callbackUrl}
                 </code>
                 <Button variant="outline" size="sm" onClick={handleCopyCallbackUrl}>
@@ -268,17 +293,61 @@ export default function Settings() {
 
               {/* Test Result */}
               {testResult && (
-                <Alert variant={testResult.success ? "default" : "destructive"}>
+                <Alert variant={testResult.success && testResult.rootFolderAccess ? "default" : testResult.success ? "default" : "destructive"}>
                   {testResult.success ? (
                     <CheckCircle2 className="h-4 w-4" />
                   ) : (
                     <AlertCircle className="h-4 w-4" />
                   )}
-                  <AlertTitle>{testResult.success ? '連線成功' : '連線失敗'}</AlertTitle>
+                  <AlertTitle>
+                    {testResult.success 
+                      ? (testResult.rootFolderAccess ? '連線成功 - Root Folder 存取正常' : '連線成功（一般存取）')
+                      : '連線失敗'}
+                  </AlertTitle>
                   <AlertDescription>
                     {testResult.success ? (
-                      <div>
+                      <div className="space-y-2">
                         <p>成功存取 Google Drive！</p>
+                        
+                        {/* OAuth Account Info */}
+                        {testResult.googleEmail && (
+                          <p className="text-sm">
+                            <strong>授權帳號：</strong>{testResult.googleEmail}
+                          </p>
+                        )}
+                        
+                        {/* Root Folder Status */}
+                        {testResult.rootFolderId && (
+                          <div className="mt-2 p-2 bg-muted/50 rounded text-sm">
+                            <p><strong>Root Folder ID：</strong>{testResult.rootFolderId}</p>
+                            <p>
+                              <strong>Root Folder 存取：</strong>
+                              {testResult.rootFolderAccess ? (
+                                <span className="text-success ml-1">✓ 可存取</span>
+                              ) : (
+                                <span className="text-destructive ml-1">✗ 無法存取</span>
+                              )}
+                            </p>
+                            {testResult.rootFolderError && (
+                              <p className="text-destructive text-xs mt-1">
+                                錯誤：{testResult.rootFolderError}
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Warning if root folder not accessible */}
+                        {testResult.rootFolderId && !testResult.rootFolderAccess && (
+                          <Alert variant="destructive" className="mt-2">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>Root Folder 存取失敗</AlertTitle>
+                            <AlertDescription>
+                              授權帳號 ({testResult.googleEmail}) 無法存取設定的 Root Folder。
+                              請確認該帳號對 Shared Drive 具有 Content Manager 或以上權限。
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        
                         {testResult.files && testResult.files.length > 0 && (
                           <div className="mt-2">
                             <p className="text-sm font-medium">找到的檔案/資料夾：</p>
@@ -291,7 +360,12 @@ export default function Settings() {
                         )}
                       </div>
                     ) : (
-                      testResult.message
+                      <div>
+                        <p>{testResult.message}</p>
+                        {testResult.googleEmail && (
+                          <p className="mt-2 text-sm">授權帳號：{testResult.googleEmail}</p>
+                        )}
+                      </div>
                     )}
                   </AlertDescription>
                 </Alert>
