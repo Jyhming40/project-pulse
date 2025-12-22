@@ -6,6 +6,16 @@ interface DriveTokenInfo {
   google_email: string | null;
   google_error: string | null;
   updated_at: string | null;
+  hasToken: boolean;
+}
+
+interface OAuthCallbackParams {
+  drive_auth: string | null;
+  error: string | null;
+  error_description: string | null;
+  state: string | null;
+  scope: string | null;
+  code: string | null;
 }
 
 export function useDriveAuth() {
@@ -16,6 +26,7 @@ export function useDriveAuth() {
   const [callbackUrl, setCallbackUrl] = useState<string | null>(null);
   const [tokenInfo, setTokenInfo] = useState<DriveTokenInfo | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [oauthCallbackParams, setOauthCallbackParams] = useState<OAuthCallbackParams | null>(null);
 
   // Check if user has authorized Google Drive
   const checkAuthorization = useCallback(async () => {
@@ -35,15 +46,15 @@ export function useDriveAuth() {
       if (error) {
         console.error('Error checking drive auth:', error);
         setIsAuthorized(false);
+        setTokenInfo({ google_email: null, google_error: null, updated_at: null, hasToken: false });
       } else {
         setIsAuthorized(!!data);
-        if (data) {
-          setTokenInfo({
-            google_email: (data as any).google_email,
-            google_error: (data as any).google_error,
-            updated_at: data.updated_at,
-          });
-        }
+        setTokenInfo({
+          google_email: (data as any)?.google_email || null,
+          google_error: (data as any)?.google_error || null,
+          updated_at: data?.updated_at || null,
+          hasToken: !!data,
+        });
       }
     } catch (err) {
       console.error('Error checking drive auth:', err);
@@ -58,10 +69,26 @@ export function useDriveAuth() {
     checkAuthorization();
   }, [checkAuthorization]);
 
-  // Check URL for drive_auth result
+  // Check URL for drive_auth result and capture all OAuth params
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const authResult = params.get('drive_auth');
+    
+    // Capture all OAuth callback params for debugging
+    const callbackParams: OAuthCallbackParams = {
+      drive_auth: authResult,
+      error: params.get('error'),
+      error_description: params.get('error_description'),
+      state: params.get('state'),
+      scope: params.get('scope'),
+      code: params.get('code') ? '(present)' : null, // Don't expose actual code
+    };
+    
+    // Only set if there are any OAuth-related params
+    if (authResult || callbackParams.error || callbackParams.state || callbackParams.scope) {
+      setOauthCallbackParams(callbackParams);
+      console.log('[OAuth Callback] Params received:', callbackParams);
+    }
     
     if (authResult === 'success') {
       // Clean up URL
@@ -72,7 +99,8 @@ export function useDriveAuth() {
       checkAuthorization();
     } else if (authResult === 'error') {
       const error = params.get('error');
-      setAuthError(error || '授權失敗');
+      const errorDesc = params.get('error_description');
+      setAuthError(errorDesc || error || '授權失敗');
       // Clean up URL
       const newUrl = window.location.pathname;
       window.history.replaceState({}, '', newUrl);
@@ -161,5 +189,7 @@ export function useDriveAuth() {
     tokenInfo,
     authError,
     clearError: () => setAuthError(null),
+    oauthCallbackParams,
+    clearOauthParams: () => setOauthCallbackParams(null),
   };
 }

@@ -54,7 +54,9 @@ export default function Settings() {
     callbackUrl,
     tokenInfo,
     authError,
-    clearError
+    clearError,
+    oauthCallbackParams,
+    clearOauthParams
   } = useDriveAuth();
   const [isRevoking, setIsRevoking] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
@@ -67,11 +69,15 @@ export default function Settings() {
     files?: any[]; 
     googleEmail?: string;
     rootFolderId?: string;
+    rootFolderName?: string;
+    sharedDriveId?: string;
     rootFolderAccess?: boolean;
     rootFolderError?: any;
     debug?: {
       authorizedEmail?: string;
       rootFolderId?: string;
+      rootFolderName?: string;
+      sharedDriveId?: string;
       apiCalls?: Array<{
         endpoint: string;
         params: any;
@@ -247,6 +253,29 @@ export default function Settings() {
             </AlertDescription>
           </Alert>
 
+          {/* OAuth Callback Debug - Show if there are any callback params */}
+          {oauthCallbackParams && (
+            <Alert variant="default" className="bg-blue-50 border-blue-200 dark:bg-blue-950/30 dark:border-blue-800">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle className="flex items-center justify-between">
+                <span>OAuth Callback 參數（除錯用）</span>
+                <Button variant="ghost" size="sm" onClick={clearOauthParams} className="h-6 px-2 text-xs">
+                  清除
+                </Button>
+              </AlertTitle>
+              <AlertDescription>
+                <div className="text-xs font-mono space-y-1 mt-2">
+                  <p><strong>drive_auth：</strong>{oauthCallbackParams.drive_auth || '(null)'}</p>
+                  <p><strong>error：</strong>{oauthCallbackParams.error || '(null)'}</p>
+                  <p><strong>error_description：</strong>{oauthCallbackParams.error_description || '(null)'}</p>
+                  <p><strong>state：</strong>{oauthCallbackParams.state ? '(present)' : '(null)'}</p>
+                  <p><strong>scope：</strong>{oauthCallbackParams.scope || '(null)'}</p>
+                  <p><strong>code：</strong>{oauthCallbackParams.code || '(null)'}</p>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Error Display */}
           {(authError || tokenInfo?.google_error) && (
             <Alert variant="destructive">
@@ -289,12 +318,31 @@ export default function Settings() {
                 </div>
               </div>
 
+              {/* Token Status Display */}
+              <div className="p-3 border rounded-lg bg-muted/30">
+                <p className="text-sm font-medium mb-1">🗄️ Token 狀態</p>
+                <div className="text-xs font-mono">
+                  <p>
+                    <strong>user_drive_tokens row：</strong>
+                    {tokenInfo?.hasToken ? (
+                      <span className="text-success ml-1">✓ 存在</span>
+                    ) : (
+                      <span className="text-destructive ml-1">✗ 不存在</span>
+                    )}
+                  </p>
+                  {tokenInfo?.hasToken && tokenInfo?.google_email && (
+                    <p><strong>google_email：</strong>{tokenInfo.google_email}</p>
+                  )}
+                </div>
+              </div>
+
               {/* Test Connection */}
               <div className="flex items-center gap-2">
                 <Button 
                   variant="outline" 
                   onClick={handleTestConnection} 
-                  disabled={isTesting}
+                  disabled={isTesting || !tokenInfo?.hasToken}
+                  title={!tokenInfo?.hasToken ? '未授權，未取得 token' : undefined}
                 >
                   {isTesting ? (
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -303,6 +351,9 @@ export default function Settings() {
                   )}
                   測試連線
                 </Button>
+                {!tokenInfo?.hasToken && (
+                  <span className="text-xs text-destructive">未授權，未取得 token</span>
+                )}
               </div>
 
               {/* Test Result */}
@@ -335,6 +386,12 @@ export default function Settings() {
                           {testResult.rootFolderId && (
                             <div className="mt-2 p-2 bg-muted/50 rounded text-sm">
                               <p><strong>Root Folder ID：</strong>{testResult.rootFolderId}</p>
+                              {testResult.rootFolderName && (
+                                <p><strong>Root Folder 名稱：</strong>{testResult.rootFolderName}</p>
+                              )}
+                              {testResult.sharedDriveId && (
+                                <p><strong>Shared Drive ID：</strong>{testResult.sharedDriveId}</p>
+                              )}
                               <p>
                                 <strong>Root Folder 存取：</strong>
                                 {testResult.rootFolderAccess ? (
@@ -410,6 +467,8 @@ export default function Settings() {
                       <div className="space-y-2 text-xs">
                         <p><strong>授權帳號 (google_email)：</strong>{testResult.debug.authorizedEmail || '(未知)'}</p>
                         <p><strong>Root Folder ID (env)：</strong>{testResult.debug.rootFolderId || '(未設定)'}</p>
+                        <p><strong>Root Folder 名稱：</strong>{testResult.debug.rootFolderName || '(未知)'}</p>
+                        <p><strong>Shared Drive ID：</strong>{testResult.debug.sharedDriveId || '(非 Shared Drive)'}</p>
                         
                         {testResult.debug.apiCalls && testResult.debug.apiCalls.length > 0 && (
                           <div className="mt-3">
@@ -505,6 +564,14 @@ export default function Settings() {
                 <div className="space-y-1 text-xs font-mono">
                   <p><strong>目前登入 User ID：</strong>{user?.id || '(未登入)'}</p>
                   <p><strong>目前登入 Email：</strong>{user?.email || '(未登入)'}</p>
+                  <p>
+                    <strong>user_drive_tokens row：</strong>
+                    {tokenInfo?.hasToken ? (
+                      <span className="text-success ml-1">✓ 存在</span>
+                    ) : (
+                      <span className="text-destructive ml-1">✗ 不存在</span>
+                    )}
+                  </p>
                   <p><strong>google_email (DB)：</strong>{tokenInfo?.google_email || '(尚未授權)'}</p>
                   <p><strong>Callback URL：</strong>{callbackUrl}</p>
                   <p className="text-muted-foreground mt-2">
