@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { format, isWithinInterval, subDays } from 'date-fns';
 import { 
   Search, 
@@ -8,9 +9,12 @@ import {
   AlertTriangle,
   Clock,
   CheckCircle2,
-  XCircle
+  XCircle,
+  FileDown
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ImportExportDialog } from '@/components/ImportExportDialog';
 import { 
   Select, 
   SelectContent, 
@@ -29,6 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Database } from '@/integrations/supabase/types';
 
 type DocType = Database['public']['Enums']['doc_type'];
@@ -50,9 +55,12 @@ const docStatusOptions: DocStatus[] = ['未開始', '進行中', '已完成', '�
 
 export default function Documents() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const { canEdit } = useAuth();
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
 
   // Fetch documents with project info
   const { data: documents = [], isLoading } = useQuery({
@@ -97,9 +105,17 @@ export default function Documents() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-display font-bold text-foreground">文件管理</h1>
-        <p className="text-muted-foreground mt-1">所有案場文件總覽</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-foreground">文件管理</h1>
+          <p className="text-muted-foreground mt-1">所有案場文件總覽</p>
+        </div>
+        {canEdit && (
+          <Button variant="outline" onClick={() => setIsImportExportOpen(true)}>
+            <FileDown className="w-4 h-4 mr-2" />
+            匯入/匯出
+          </Button>
+        )}
       </div>
 
       {/* Stats */}
@@ -260,6 +276,15 @@ export default function Documents() {
           </TableBody>
         </Table>
       </div>
+
+      {/* Import/Export Dialog */}
+      <ImportExportDialog
+        open={isImportExportOpen}
+        onOpenChange={setIsImportExportOpen}
+        type="documents"
+        data={documents as any}
+        onImportComplete={() => queryClient.invalidateQueries({ queryKey: ['all-documents'] })}
+      />
     </div>
   );
 }

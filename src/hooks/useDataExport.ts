@@ -7,6 +7,10 @@ type Project = Database['public']['Tables']['projects']['Row'] & {
   investors?: { company_name: string } | null;
 };
 type Investor = Database['public']['Tables']['investors']['Row'];
+type Document = Database['public']['Tables']['documents']['Row'] & {
+  projects?: { project_name: string; project_code: string } | null;
+  profiles?: { full_name: string } | null;
+};
 
 type ExportFormat = 'xlsx' | 'csv';
 
@@ -38,6 +42,18 @@ const investorColumns = [
   { key: 'phone', label: '電話' },
   { key: 'email', label: 'Email' },
   { key: 'address', label: '地址' },
+  { key: 'note', label: '備註' },
+];
+
+const documentColumns = [
+  { key: 'project_code', label: '案場編號' },
+  { key: 'project_name', label: '案場名稱' },
+  { key: 'doc_type', label: '文件類型' },
+  { key: 'doc_status', label: '狀態' },
+  { key: 'submitted_at', label: '送件日' },
+  { key: 'issued_at', label: '核發日' },
+  { key: 'due_at', label: '到期日' },
+  { key: 'owner_name', label: '負責人' },
   { key: 'note', label: '備註' },
 ];
 
@@ -132,9 +148,47 @@ export function useDataExport() {
     }
   }, []);
 
-  const downloadTemplate = useCallback((type: 'projects' | 'investors', format: ExportFormat) => {
+  const exportDocuments = useCallback((documents: Document[], format: ExportFormat) => {
     try {
-      const columns = type === 'projects' ? projectColumns : investorColumns;
+      // Transform documents to include project info
+      const transformedDocuments = documents.map(doc => ({
+        ...doc,
+        project_code: doc.projects?.project_code || '',
+        project_name: doc.projects?.project_name || '',
+        owner_name: doc.profiles?.full_name || '',
+      }));
+      
+      const formattedData = formatDataForExport(transformedDocuments, documentColumns);
+      const worksheet = XLSX.utils.json_to_sheet(formattedData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, '文件列表');
+
+      // Set column widths
+      worksheet['!cols'] = documentColumns.map(col => ({ wch: col.label.length * 2 + 10 }));
+
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const filename = `文件資料_${timestamp}`;
+
+      if (format === 'xlsx') {
+        const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        downloadFile(blob, `${filename}.xlsx`);
+      } else {
+        const csv = XLSX.utils.sheet_to_csv(worksheet);
+        const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
+        downloadFile(blob, `${filename}.csv`);
+      }
+
+      toast.success(`已匯出 ${documents.length} 筆文件資料`);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('匯出失敗', { description: error instanceof Error ? error.message : '未知錯誤' });
+    }
+  }, []);
+
+  const downloadTemplate = useCallback((type: 'projects' | 'investors' | 'documents', format: ExportFormat) => {
+    try {
+      const columns = type === 'projects' ? projectColumns : type === 'investors' ? investorColumns : documentColumns;
       const headers: Record<string, string> = {};
       columns.forEach(col => {
         headers[col.label] = '';
@@ -142,12 +196,12 @@ export function useDataExport() {
 
       const worksheet = XLSX.utils.json_to_sheet([headers]);
       const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, type === 'projects' ? '案場範本' : '投資方範本');
+      XLSX.utils.book_append_sheet(workbook, worksheet, type === 'projects' ? '案場範本' : type === 'investors' ? '投資方範本' : '文件範本');
 
       // Set column widths
       worksheet['!cols'] = columns.map(col => ({ wch: col.label.length * 2 + 10 }));
 
-      const filename = type === 'projects' ? '案場匯入範本' : '投資方匯入範本';
+      const filename = type === 'projects' ? '案場匯入範本' : type === 'investors' ? '投資方匯入範本' : '文件匯入範本';
 
       if (format === 'xlsx') {
         const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
@@ -169,8 +223,10 @@ export function useDataExport() {
   return {
     exportProjects,
     exportInvestors,
+    exportDocuments,
     downloadTemplate,
     projectColumns,
     investorColumns,
+    documentColumns,
   };
 }
