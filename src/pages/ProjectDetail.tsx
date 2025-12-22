@@ -406,7 +406,7 @@ export default function ProjectDetail() {
             )}
           </div>
           <p className="text-muted-foreground mt-1">
-            {project.project_code} • {project.city} {project.district}
+            {(project as any).site_code_display || project.project_code} • {project.city} {project.district}
           </p>
         </div>
         {canEdit && (
@@ -442,7 +442,13 @@ export default function ProjectDetail() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-muted-foreground">案場編號</p>
-                    <p className="font-mono">{project.project_code}</p>
+                    <p className="font-mono text-lg font-semibold text-primary">
+                      {(project as any).site_code_display || project.project_code}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">進件年度</p>
+                    <p>{(project as any).intake_year || '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">容量 (kWp)</p>
@@ -463,6 +469,10 @@ export default function ProjectDetail() {
                   <div>
                     <p className="text-sm text-muted-foreground">裝置類型</p>
                     <p>{(project as any).installation_type || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">同意備案日期</p>
+                    <p>{(project as any).approval_date || '-'}</p>
                   </div>
                 </div>
                 <div>
