@@ -7,6 +7,7 @@ import {
   Users, 
   FileText, 
   Settings, 
+  Settings2,
   LogOut,
   Zap,
   ChevronLeft,
@@ -88,16 +89,28 @@ export default function Layout({ children }: LayoutProps) {
           })}
 
           {isAdmin && (
-            <NavLink
-              to="/settings"
-              className={cn(
-                "sidebar-link",
-                location.pathname === '/settings' && "sidebar-link-active"
-              )}
-            >
-              <Settings className="w-5 h-5 flex-shrink-0" />
-              {!collapsed && <span className="animate-fade-in">系統設定</span>}
-            </NavLink>
+            <>
+              <NavLink
+                to="/system-options"
+                className={cn(
+                  "sidebar-link",
+                  location.pathname === '/system-options' && "sidebar-link-active"
+                )}
+              >
+                <Settings2 className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span className="animate-fade-in">選項設定</span>}
+              </NavLink>
+              <NavLink
+                to="/settings"
+                className={cn(
+                  "sidebar-link",
+                  location.pathname === '/settings' && "sidebar-link-active"
+                )}
+              >
+                <Settings className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span className="animate-fade-in">系統設定</span>}
+              </NavLink>
+            </>
           )}
         </nav>
 
