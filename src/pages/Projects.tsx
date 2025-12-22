@@ -368,6 +368,8 @@ export default function Projects() {
               <TableHead>投資方</TableHead>
               <TableHead>狀態</TableHead>
               <TableHead>施工狀態</TableHead>
+              <TableHead>裝置類型</TableHead>
+              <TableHead>台電 PV 編號</TableHead>
               <TableHead>容量 (kWp)</TableHead>
               <TableHead>縣市</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -376,7 +378,7 @@ export default function Projects() {
           <TableBody>
             {filteredProjects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={10} className="text-center py-12 text-muted-foreground">
                   {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
@@ -402,6 +404,8 @@ export default function Projects() {
                       </Badge>
                     ) : '-'}
                   </TableCell>
+                  <TableCell className="text-sm">{(project as any).installation_type || '-'}</TableCell>
+                  <TableCell className="font-mono text-sm">{(project as any).taipower_pv_id || '-'}</TableCell>
                   <TableCell>{project.capacity_kwp || '-'}</TableCell>
                   <TableCell>{project.city || '-'}</TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>

@@ -183,6 +183,21 @@ export default function ProjectDetail() {
     enabled: !!id,
   });
 
+  // Fetch construction status history
+  const { data: constructionHistory = [] } = useQuery({
+    queryKey: ['construction-status-history', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('construction_status_history')
+        .select('*, profiles:changed_by(full_name, email)')
+        .eq('project_id', id)
+        .order('changed_at', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!id,
+  });
+
   // Fetch documents
   const { data: documents = [] } = useQuery({
     queryKey: ['project-documents', id],
@@ -278,6 +293,7 @@ export default function ProjectDetail() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['construction-status-history', id] });
       toast.success('施工狀態已更新');
       setIsEditConstructionOpen(false);
     },
@@ -708,7 +724,7 @@ export default function ProjectDetail() {
                 </Button>
               )}
             </CardHeader>
-            <CardContent>
+            <CardContent className="space-y-6">
               <div className="flex items-center gap-4">
                 <span className="text-muted-foreground">目前施工狀態：</span>
                 {(project as any).construction_status ? (
@@ -717,6 +733,44 @@ export default function ProjectDetail() {
                   </Badge>
                 ) : (
                   <span className="text-muted-foreground">尚未設定</span>
+                )}
+              </div>
+
+              {/* Construction Status History */}
+              <div>
+                <h4 className="font-medium mb-4 flex items-center gap-2">
+                  <History className="w-4 h-4 text-muted-foreground" />
+                  施工狀態變更紀錄
+                </h4>
+                {constructionHistory.length === 0 ? (
+                  <p className="text-center py-4 text-muted-foreground text-sm">暫無紀錄</p>
+                ) : (
+                  <div className="relative">
+                    <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
+                    <div className="space-y-4">
+                      {constructionHistory.map((history: any) => (
+                        <div key={history.id} className="relative pl-10">
+                          <div className="absolute left-2.5 w-3 h-3 rounded-full bg-primary border-2 border-background" />
+                          <div className="bg-muted/50 rounded-lg p-3">
+                            <div className="flex items-center gap-3 mb-1">
+                              <Badge className={getConstructionStatusColor(history.status)} variant="secondary">
+                                {history.status}
+                              </Badge>
+                              <span className="text-sm text-muted-foreground">
+                                {format(new Date(history.changed_at), 'yyyy/MM/dd HH:mm', { locale: zhTW })}
+                              </span>
+                            </div>
+                            {history.note && (
+                              <p className="text-sm text-foreground">{history.note}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground mt-1">
+                              變更人：{history.profiles?.full_name || history.profiles?.email || '系統'}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             </CardContent>
