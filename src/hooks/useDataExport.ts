@@ -3,7 +3,9 @@ import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 
-type Project = Database['public']['Tables']['projects']['Row'];
+type Project = Database['public']['Tables']['projects']['Row'] & {
+  investors?: { company_name: string } | null;
+};
 type Investor = Database['public']['Tables']['investors']['Row'];
 
 type ExportFormat = 'xlsx' | 'csv';
@@ -12,6 +14,7 @@ type ExportFormat = 'xlsx' | 'csv';
 const projectColumns = [
   { key: 'project_code', label: '案場編號' },
   { key: 'project_name', label: '案場名稱' },
+  { key: 'investor_name', label: '投資方' },
   { key: 'status', label: '狀態' },
   { key: 'capacity_kwp', label: '容量(kWp)' },
   { key: 'feeder_code', label: '饋線代號' },
@@ -65,7 +68,13 @@ function downloadFile(blob: Blob, filename: string) {
 export function useDataExport() {
   const exportProjects = useCallback((projects: Project[], format: ExportFormat) => {
     try {
-      const formattedData = formatDataForExport(projects, projectColumns);
+      // Transform projects to include investor_name
+      const transformedProjects = projects.map(project => ({
+        ...project,
+        investor_name: project.investors?.company_name || '',
+      }));
+      
+      const formattedData = formatDataForExport(transformedProjects, projectColumns);
       const worksheet = XLSX.utils.json_to_sheet(formattedData);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, '案場列表');
