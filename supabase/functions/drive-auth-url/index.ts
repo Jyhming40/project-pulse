@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,9 +13,37 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, redirectUrl } = await req.json();
+    // Extract userId from JWT token instead of request body
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: '未授權：缺少認證標頭' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    if (!userId || !redirectUrl) {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify the JWT and get the user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: '未授權：無效的認證令牌' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = user.id;
+
+    // Get redirectUrl from request body (this is safe - it's where the user will be redirected)
+    const { redirectUrl } = await req.json();
+
+    if (!redirectUrl) {
       return new Response(
         JSON.stringify({ error: '缺少必要參數' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -22,7 +51,6 @@ serve(async (req) => {
     }
 
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 
     if (!clientId) {
       console.error('Missing GOOGLE_CLIENT_ID');
@@ -51,8 +79,6 @@ serve(async (req) => {
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 
     console.log('Generated auth URL for user:', userId);
-    console.log('Callback URL:', callbackUrl);
-    console.log('Scopes:', 'drive, userinfo.email');
 
     return new Response(
       JSON.stringify({ authUrl, callbackUrl }),

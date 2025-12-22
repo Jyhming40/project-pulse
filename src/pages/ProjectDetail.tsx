@@ -280,7 +280,7 @@ export default function ProjectDetail() {
     setIsCreatingFolder(true);
     try {
       const { data, error } = await supabase.functions.invoke('create-drive-folder', {
-        body: { projectId: id, userId: user.id },
+        body: { projectId: id },
       });
       
       if (error) throw new Error(error.message);
