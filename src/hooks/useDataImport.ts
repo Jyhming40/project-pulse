@@ -17,10 +17,14 @@ export interface ImportPreview<T> {
   duplicates: { row: number; existingId: string; code: string }[];
 }
 
+// Extended type to include investor_name for import mapping
+type ProjectInsertWithInvestor = ProjectInsert & { investor_name?: string };
+
 // Column mapping from Chinese to English keys
-const projectColumnMap: Record<string, keyof ProjectInsert> = {
+const projectColumnMap: Record<string, keyof ProjectInsertWithInvestor> = {
   '案場編號': 'project_code',
   '案場名稱': 'project_name',
+  '投資方': 'investor_name',
   '狀態': 'status',
   '容量(kWp)': 'capacity_kwp',
   '饋線代號': 'feeder_code',
@@ -47,12 +51,6 @@ const investorColumnMap: Record<string, keyof InvestorInsert> = {
   '備註': 'note',
 };
 
-const validStatuses: ProjectStatus[] = [
-  '開發中', '土地確認', '結構簽證', '台電送件', '台電審查',
-  '能源局送件', '同意備案', '工程施工', '報竣掛表', '設備登記',
-  '運維中', '暫停', '取消'
-];
-
 function parseFile(file: File): Promise<Record<string, any>[]> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -73,8 +71,8 @@ function parseFile(file: File): Promise<Record<string, any>[]> {
   });
 }
 
-function mapRowToProject(row: Record<string, any>): Partial<ProjectInsert> {
-  const mapped: Partial<ProjectInsert> = {};
+function mapRowToProject(row: Record<string, any>): Partial<ProjectInsertWithInvestor> {
+  const mapped: Partial<ProjectInsertWithInvestor> = {};
   
   Object.entries(row).forEach(([key, value]) => {
     const mappedKey = projectColumnMap[key.trim()];
@@ -106,10 +104,14 @@ function mapRowToInvestor(row: Record<string, any>): Partial<InvestorInsert> {
   return mapped;
 }
 
-function validateProject(data: Partial<ProjectInsert>, rowIndex: number): string | null {
+function validateProject(
+  data: Partial<ProjectInsertWithInvestor>, 
+  rowIndex: number,
+  validStatuses: string[]
+): string | null {
   if (!data.project_code) return `第 ${rowIndex} 行：缺少案場編號`;
   if (!data.project_name) return `第 ${rowIndex} 行：缺少案場名稱`;
-  if (data.status && !validStatuses.includes(data.status as ProjectStatus)) {
+  if (data.status && validStatuses.length > 0 && !validStatuses.includes(data.status as string)) {
     return `第 ${rowIndex} 行：無效的狀態「${data.status}」`;
   }
   return null;
@@ -124,10 +126,10 @@ function validateInvestor(data: Partial<InvestorInsert>, rowIndex: number): stri
 export function useDataImport() {
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
-  const [projectPreview, setProjectPreview] = useState<ImportPreview<Partial<ProjectInsert>> | null>(null);
+  const [projectPreview, setProjectPreview] = useState<ImportPreview<Partial<ProjectInsertWithInvestor>> | null>(null);
   const [investorPreview, setInvestorPreview] = useState<ImportPreview<Partial<InvestorInsert>> | null>(null);
 
-  const previewProjects = useCallback(async (file: File): Promise<ImportPreview<Partial<ProjectInsert>>> => {
+  const previewProjects = useCallback(async (file: File): Promise<ImportPreview<Partial<ProjectInsertWithInvestor>>> => {
     setIsProcessing(true);
     try {
       const rawData = await parseFile(file);
@@ -136,15 +138,41 @@ export function useDataImport() {
         throw new Error('檔案中沒有資料');
       }
 
-      const mappedData: Partial<ProjectInsert>[] = [];
+      // Fetch valid statuses from system_options
+      const { data: statusOptions } = await supabase
+        .from('system_options')
+        .select('value')
+        .eq('category', 'project_status')
+        .eq('is_active', true);
+      
+      const validStatuses = statusOptions?.map(opt => opt.value) || [];
+
+      // Fetch investors for name-to-id mapping
+      const { data: investors } = await supabase
+        .from('investors')
+        .select('id, company_name');
+      
+      const investorMap = new Map(investors?.map(inv => [inv.company_name, inv.id]) || []);
+
+      const mappedData: Partial<ProjectInsertWithInvestor>[] = [];
       const errors: { row: number; message: string }[] = [];
 
       rawData.forEach((row, index) => {
         const mapped = mapRowToProject(row);
-        const error = validateProject(mapped, index + 2); // +2 for header row and 1-based index
+        const error = validateProject(mapped, index + 2, validStatuses); // +2 for header row and 1-based index
         if (error) {
           errors.push({ row: index + 2, message: error });
         } else {
+          // Map investor_name to investor_id
+          if (mapped.investor_name) {
+            const investorId = investorMap.get(mapped.investor_name);
+            if (investorId) {
+              mapped.investor_id = investorId;
+            } else {
+              errors.push({ row: index + 2, message: `第 ${index + 2} 行：找不到投資方「${mapped.investor_name}」` });
+              return;
+            }
+          }
           mappedData.push(mapped);
         }
       });
@@ -220,7 +248,7 @@ export function useDataImport() {
   }, []);
 
   const importProjects = useCallback(async (
-    data: Partial<ProjectInsert>[],
+    data: Partial<ProjectInsertWithInvestor>[],
     strategy: ImportStrategy,
     duplicates: { row: number; existingId: string; code: string }[]
   ): Promise<{ inserted: number; updated: number }> => {
@@ -235,11 +263,15 @@ export function useDataImport() {
 
       // Insert new records
       if (newRecords.length > 0) {
-        const toInsert = newRecords.map(record => ({
-          ...record,
-          created_by: user?.id,
-          status: (record.status as ProjectStatus) || '開發中',
-        })) as ProjectInsert[];
+        const toInsert = newRecords.map(record => {
+          // Remove investor_name before insert as it's not a DB column
+          const { investor_name, ...dbRecord } = record;
+          return {
+            ...dbRecord,
+            created_by: user?.id,
+            status: (dbRecord.status as ProjectStatus) || '開發中',
+          };
+        }) as ProjectInsert[];
 
         const { error } = await supabase.from('projects').insert(toInsert);
         if (error) throw error;
@@ -251,9 +283,11 @@ export function useDataImport() {
         for (const record of existingRecords) {
           const existing = duplicates.find(d => d.code === record.project_code);
           if (existing) {
+            // Remove investor_name before update
+            const { investor_name, ...dbRecord } = record;
             const { error } = await supabase
               .from('projects')
-              .update(record)
+              .update(dbRecord)
               .eq('id', existing.existingId);
             if (error) throw error;
             updated++;

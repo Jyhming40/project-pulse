@@ -33,7 +33,9 @@ import { useDataImport, ImportStrategy, ImportPreview } from '@/hooks/useDataImp
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 
-type Project = Database['public']['Tables']['projects']['Row'];
+type Project = Database['public']['Tables']['projects']['Row'] & {
+  investors?: { company_name: string } | null;
+};
 type Investor = Database['public']['Tables']['investors']['Row'];
 
 interface ImportExportDialogProps {
