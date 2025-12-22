@@ -399,13 +399,18 @@ export default function Investors() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="investor_code">投資方編號 *</Label>
+                <Label htmlFor="investor_code">投資方代碼 *</Label>
                 <Input
                   id="investor_code"
                   value={formData.investor_code || ''}
-                  onChange={(e) => setFormData({ ...formData, investor_code: e.target.value })}
-                  placeholder="例：INV-001"
+                  onChange={(e) => setFormData({ ...formData, investor_code: e.target.value.toUpperCase() })}
+                  placeholder="例：YP（2-5碼英數大寫）"
+                  maxLength={5}
+                  className="uppercase"
                 />
+                <p className="text-xs text-muted-foreground">
+                  代碼用於自動生成案場編號，一旦使用後請勿任意更動
+                </p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="company_name">公司名稱 *</Label>

@@ -140,8 +140,14 @@ export default function Projects() {
     construction_status?: string;
   }>({});
   
+  // Selected investor code (for display)
+  const [selectedInvestorCode, setSelectedInvestorCode] = useState<string>('');
+  
   // Import/Export dialog
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+  
+  // Creating state for Edge Function call
+  const [isCreating, setIsCreating] = useState(false);
 
   // Fetch projects with investor info
   const { data: projects = [], isLoading } = useQuery({
@@ -169,32 +175,75 @@ export default function Projects() {
     },
   });
 
-  // Create mutation
-  const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const { data: newProject, error } = await supabase
-        .from('projects')
-        .insert(data)
-        .select('id')
-        .single();
-      if (error) throw error;
-      return newProject;
-    },
-    onSuccess: async (newProject) => {
+  // Create project via Edge Function (for atomic sequence generation)
+  const handleCreateProject = async () => {
+    if (!formData.investor_id) {
+      toast.error('請選擇投資方');
+      return;
+    }
+    if (!formData.project_name) {
+      toast.error('請填寫案場名稱');
+      return;
+    }
+    
+    // Check if investor has a code
+    const selectedInvestor = investors.find(inv => inv.id === formData.investor_id);
+    if (!selectedInvestor?.investor_code) {
+      toast.error('投資方尚未設定代碼', { description: '請先在投資方資料補齊代碼' });
+      return;
+    }
+    
+    setIsCreating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-project-with-seq', {
+        body: {
+          project_name: formData.project_name,
+          investor_id: formData.investor_id,
+          status: formData.status,
+          capacity_kwp: formData.capacity_kwp,
+          feeder_code: formData.feeder_code,
+          city: formData.city,
+          district: formData.district,
+          address: formData.address,
+          coordinates: formData.coordinates,
+          land_owner: formData.land_owner,
+          land_owner_contact: formData.land_owner_contact,
+          contact_person: formData.contact_person,
+          contact_phone: formData.contact_phone,
+          note: formData.note,
+          installation_type: formData.installation_type,
+          actual_installed_capacity: formData.actual_installed_capacity,
+          taipower_pv_id: formData.taipower_pv_id,
+          grid_connection_type: formData.grid_connection_type,
+          power_phase_type: formData.power_phase_type,
+          power_voltage: formData.power_voltage,
+          pole_status: formData.pole_status,
+          construction_status: formData.construction_status,
+        },
+      });
+      
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+      
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success('案場建立成功');
+      toast.success('案場建立成功', { 
+        description: `案場編號：${data.project?.site_code_display || data.project?.project_code}` 
+      });
       setIsCreateOpen(false);
       setFormData({});
+      setSelectedInvestorCode('');
       
-      // Navigate to project detail for Drive folder creation (now requires OAuth)
-      if (newProject?.id) {
+      // Navigate to project detail for Drive folder creation
+      if (data.project?.id) {
         toast.info('請至案場詳情頁連結 Google Drive 並建立資料夾');
       }
-    },
-    onError: (error: Error) => {
+    } catch (err) {
+      const error = err as Error;
       toast.error('建立失敗', { description: error.message });
-    },
-  });
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   // Update mutation
   const updateMutation = useMutation({
@@ -233,6 +282,7 @@ export default function Projects() {
     const matchesSearch = 
       project.project_name.toLowerCase().includes(search.toLowerCase()) ||
       project.project_code.toLowerCase().includes(search.toLowerCase()) ||
+      ((project as any).site_code_display || '').toLowerCase().includes(search.toLowerCase()) ||
       project.address?.toLowerCase().includes(search.toLowerCase()) ||
       (project.investors as any)?.company_name?.toLowerCase().includes(search.toLowerCase());
     
@@ -243,15 +293,11 @@ export default function Projects() {
     return matchesSearch && matchesStatus && matchesCity && matchesConstruction;
   });
 
-  const handleCreate = () => {
-    if (!formData.project_code || !formData.project_name) {
-      toast.error('請填寫必填欄位');
-      return;
-    }
-    createMutation.mutate({
-      ...formData,
-      created_by: user?.id,
-    });
+  // Handle investor selection - auto-fill investor code
+  const handleInvestorChange = (investorId: string) => {
+    const investor = investors.find(inv => inv.id === investorId);
+    setFormData({ ...formData, investor_id: investorId });
+    setSelectedInvestorCode(investor?.investor_code || '');
   };
 
   const handleUpdate = () => {
@@ -389,7 +435,7 @@ export default function Projects() {
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => navigate(`/projects/${project.id}`)}
                 >
-                  <TableCell className="font-mono text-sm">{project.project_code}</TableCell>
+                  <TableCell className="font-mono text-sm">{(project as any).site_code_display || project.project_code}</TableCell>
                   <TableCell className="font-medium">{project.project_name}</TableCell>
                   <TableCell>{(project.investors as any)?.company_name || '-'}</TableCell>
                   <TableCell>
@@ -467,61 +513,138 @@ export default function Projects() {
           <div className="grid gap-4 py-4">
             {/* Basic Info Section */}
             <h3 className="font-semibold text-foreground border-b pb-2">基本資料</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="project_code">案場編號 *</Label>
-                <Input
-                  id="project_code"
-                  value={formData.project_code || ''}
-                  onChange={(e) => setFormData({ ...formData, project_code: e.target.value })}
-                  placeholder="例：PRJ-2024-001"
-                />
+            
+            {/* New project: auto-generate code, Edit: show existing code */}
+            {editingProject ? (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="project_code">案場編號</Label>
+                  <Input
+                    id="project_code"
+                    value={formData.project_code || ''}
+                    disabled
+                    className="bg-muted"
+                  />
+                  <p className="text-xs text-muted-foreground">案場編號不可修改</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="project_name">案場名稱 *</Label>
+                  <Input
+                    id="project_name"
+                    value={formData.project_name || ''}
+                    onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}
+                    placeholder="例：台南永康案"
+                  />
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="project_name">案場名稱 *</Label>
-                <Input
-                  id="project_name"
-                  value={formData.project_name || ''}
-                  onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}
-                  placeholder="例：台南永康案"
-                />
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="investor_id">投資方 *</Label>
+                  <Select 
+                    value={formData.investor_id || ''} 
+                    onValueChange={handleInvestorChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="選擇投資方" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {investors.map(inv => (
+                        <SelectItem key={inv.id} value={inv.id}>
+                          {inv.company_name} {inv.investor_code ? `(${inv.investor_code})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {selectedInvestorCode && (
+                    <p className="text-xs text-primary">投資方代碼：{selectedInvestorCode}</p>
+                  )}
+                  {formData.investor_id && !selectedInvestorCode && (
+                    <p className="text-xs text-destructive">⚠️ 此投資方尚未設定代碼</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="project_name">案場名稱 *</Label>
+                  <Input
+                    id="project_name"
+                    value={formData.project_name || ''}
+                    onChange={(e) => setFormData({ ...formData, project_name: e.target.value })}
+                    placeholder="例：台南永康案"
+                  />
+                </div>
               </div>
-            </div>
+            )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="investor_id">投資方</Label>
-                <Select 
-                  value={formData.investor_id || ''} 
-                  onValueChange={(value) => setFormData({ ...formData, investor_id: value })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="選擇投資方" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {investors.map(inv => (
-                      <SelectItem key={inv.id} value={inv.id}>{inv.company_name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {/* For new projects, show auto-generate info */}
+            {!editingProject && (
+              <div className="p-3 rounded-lg bg-muted/50 border">
+                <p className="text-sm text-muted-foreground">
+                  📋 案場編號將依據規則自動生成：<span className="font-mono">{new Date().getFullYear()}{selectedInvestorCode || '??'}XXXX</span>
+                </p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="status">狀態</Label>
-                <Select 
-                  value={formData.status || '開發中'} 
-                  onValueChange={(value) => setFormData({ ...formData, status: value as ProjectStatus })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {statusOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            )}
+
+            {/* For editing, show investor selection */}
+            {editingProject && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="investor_id">投資方</Label>
+                  <Select 
+                    value={formData.investor_id || ''} 
+                    onValueChange={(value) => setFormData({ ...formData, investor_id: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="選擇投資方" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {investors.map(inv => (
+                        <SelectItem key={inv.id} value={inv.id}>
+                          {inv.company_name} {inv.investor_code ? `(${inv.investor_code})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">狀態</Label>
+                  <Select 
+                    value={formData.status || '開發中'} 
+                    onValueChange={(value) => setFormData({ ...formData, status: value as ProjectStatus })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Status for new projects */}
+            {!editingProject && (
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="status">狀態</Label>
+                  <Select 
+                    value={formData.status || '開發中'} 
+                    onValueChange={(value) => setFormData({ ...formData, status: value as ProjectStatus })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {statusOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
@@ -772,8 +895,8 @@ export default function Projects() {
               取消
             </Button>
             <Button 
-              onClick={editingProject ? handleUpdate : handleCreate}
-              disabled={createMutation.isPending || updateMutation.isPending}
+              onClick={editingProject ? handleUpdate : handleCreateProject}
+              disabled={isCreating || updateMutation.isPending}
             >
               {editingProject ? '更新' : '建立'}
             </Button>
