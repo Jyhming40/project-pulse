@@ -117,7 +117,6 @@ export function useDriveAuth() {
     try {
       const { data, error } = await supabase.functions.invoke('drive-auth-url', {
         body: {
-          userId: user.id,
           redirectUrl: window.location.href.split('?')[0],
         },
       });
@@ -165,7 +164,7 @@ export function useDriveAuth() {
     if (!user) throw new Error('未登入');
 
     const { data, error } = await supabase.functions.invoke('drive-test-connection', {
-      body: { userId: user.id },
+      body: {},
     });
 
     if (error) throw new Error(error.message);

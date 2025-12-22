@@ -158,11 +158,7 @@ async function createFolder(
     supportsAllDrives: 'true',
   });
 
-  console.log('=== Create Folder API Call ===');
-  console.log('Folder Name:', name);
-  console.log('Parent ID:', parentId || '(root)');
-  console.log('API Params:', params.toString());
-  console.log('Metadata:', JSON.stringify(metadata));
+  console.log('Creating folder:', name);
 
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files?${params.toString()}`,
@@ -179,12 +175,11 @@ async function createFolder(
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Create folder failed:', errorText);
-    console.error('Status:', response.status);
     throw new Error(`建立資料夾失敗: ${errorText}`);
   }
 
   const result = await response.json();
-  console.log('Folder created successfully:', result.id);
+  console.log('Folder created:', result.id);
   return result;
 }
 
@@ -194,10 +189,6 @@ async function verifyRootFolderAccess(accessToken: string, folderId: string): Pr
     supportsAllDrives: 'true',
     fields: 'id,name,mimeType,capabilities',
   });
-
-  console.log('=== Verify Root Folder Access ===');
-  console.log('Folder ID:', folderId);
-  console.log('API Params:', params.toString());
 
   const response = await fetch(
     `https://www.googleapis.com/drive/v3/files/${folderId}?${params.toString()}`,
@@ -213,7 +204,6 @@ async function verifyRootFolderAccess(accessToken: string, folderId: string): Pr
   }
 
   const data = await response.json();
-  console.log('Root folder info:', JSON.stringify(data));
   return { success: true, folderName: data.name };
 }
 
@@ -224,18 +214,53 @@ serve(async (req) => {
   }
 
   try {
-    const { projectId, userId } = await req.json();
+    // Extract userId from JWT token instead of request body
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: '未授權：缺少認證標頭' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify the JWT and get the user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      return new Response(
+        JSON.stringify({ error: '未授權：無效的認證令牌' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const userId = user.id;
+
+    // Authorization check: Only admin and staff can create drive folders
+    const { data: userRole } = await supabase
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', userId)
+      .single();
+
+    if (!userRole || !['admin', 'staff'].includes(userRole.role)) {
+      return new Response(
+        JSON.stringify({ error: '權限不足：只有管理員和員工可以建立資料夾' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get projectId from request body (safe - we've verified the user)
+    const { projectId } = await req.json();
 
     if (!projectId) {
       return new Response(
         JSON.stringify({ error: '缺少 projectId 參數' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    if (!userId) {
-      return new Response(
-        JSON.stringify({ error: '缺少 userId 參數' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -249,15 +274,7 @@ serve(async (req) => {
       );
     }
 
-    // Initialize Supabase client with service role
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    console.log('=== Create Drive Folder Request ===');
-    console.log('Project ID:', projectId);
-    console.log('User ID:', userId);
-    console.log('Root Folder ID:', rootFolderId);
+    console.log('Creating Drive folder for project:', projectId, 'by user:', userId);
 
     // Fetch project info
     const { data: project, error: projectError } = await supabase
@@ -273,8 +290,6 @@ serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    console.log('Project:', project.project_code, '-', project.project_name);
 
     // If folder already exists, return it
     if (project.drive_folder_id) {
@@ -306,8 +321,7 @@ serve(async (req) => {
       throw err;
     }
 
-    console.log('=== OAuth Info ===');
-    console.log('Authorized Google Email:', googleEmail || '(Unknown)');
+    console.log('Using Google account:', googleEmail);
 
     // Verify root folder access first
     const rootAccess = await verifyRootFolderAccess(accessToken, rootFolderId);
@@ -334,18 +348,15 @@ serve(async (req) => {
       );
     }
 
-    console.log('Root folder access verified:', rootAccess.folderName);
-
     // Create main project folder
     const folderName = sanitizeFolderName(`${project.project_code}_${project.project_name}`);
     console.log('Creating main folder:', folderName);
     
     const mainFolder = await createFolder(accessToken, folderName, rootFolderId);
-    console.log('Main folder created:', mainFolder.id, mainFolder.webViewLink);
+    console.log('Main folder created:', mainFolder.id);
 
     // Create subfolders
     for (const subfolderName of SUBFOLDER_TEMPLATE) {
-      console.log('Creating subfolder:', subfolderName);
       await createFolder(accessToken, subfolderName, mainFolder.id);
     }
 
@@ -365,10 +376,7 @@ serve(async (req) => {
       throw new Error('資料夾建立成功，但更新資料庫失敗');
     }
 
-    console.log('=== Success ===');
     console.log('Project folder created successfully');
-    console.log('Folder ID:', mainFolder.id);
-    console.log('Folder URL:', mainFolder.webViewLink);
 
     return new Response(
       JSON.stringify({
