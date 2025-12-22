@@ -61,11 +61,25 @@ export default function Settings() {
   const [testResult, setTestResult] = useState<{ 
     success: boolean; 
     message?: string; 
+    error?: string;
+    errorStatus?: number;
+    errorResponse?: any;
     files?: any[]; 
     googleEmail?: string;
     rootFolderId?: string;
     rootFolderAccess?: boolean;
-    rootFolderError?: string;
+    rootFolderError?: any;
+    debug?: {
+      authorizedEmail?: string;
+      rootFolderId?: string;
+      apiCalls?: Array<{
+        endpoint: string;
+        params: any;
+        status: number;
+        response: string;
+        folderId?: string;
+      }>;
+    };
   } | null>(null);
 
   const { data: users = [] } = useQuery({
@@ -293,82 +307,140 @@ export default function Settings() {
 
               {/* Test Result */}
               {testResult && (
-                <Alert variant={testResult.success && testResult.rootFolderAccess ? "default" : testResult.success ? "default" : "destructive"}>
-                  {testResult.success ? (
-                    <CheckCircle2 className="h-4 w-4" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4" />
-                  )}
-                  <AlertTitle>
-                    {testResult.success 
-                      ? (testResult.rootFolderAccess ? '連線成功 - Root Folder 存取正常' : '連線成功（一般存取）')
-                      : '連線失敗'}
-                  </AlertTitle>
-                  <AlertDescription>
+                <div className="space-y-4">
+                  <Alert variant={testResult.success && testResult.rootFolderAccess ? "default" : testResult.success ? "default" : "destructive"}>
                     {testResult.success ? (
-                      <div className="space-y-2">
-                        <p>成功存取 Google Drive！</p>
-                        
-                        {/* OAuth Account Info */}
-                        {testResult.googleEmail && (
-                          <p className="text-sm">
-                            <strong>授權帳號：</strong>{testResult.googleEmail}
-                          </p>
-                        )}
-                        
-                        {/* Root Folder Status */}
-                        {testResult.rootFolderId && (
-                          <div className="mt-2 p-2 bg-muted/50 rounded text-sm">
-                            <p><strong>Root Folder ID：</strong>{testResult.rootFolderId}</p>
-                            <p>
-                              <strong>Root Folder 存取：</strong>
-                              {testResult.rootFolderAccess ? (
-                                <span className="text-success ml-1">✓ 可存取</span>
-                              ) : (
-                                <span className="text-destructive ml-1">✗ 無法存取</span>
-                              )}
-                            </p>
-                            {testResult.rootFolderError && (
-                              <p className="text-destructive text-xs mt-1">
-                                錯誤：{testResult.rootFolderError}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Warning if root folder not accessible */}
-                        {testResult.rootFolderId && !testResult.rootFolderAccess && (
-                          <Alert variant="destructive" className="mt-2">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>Root Folder 存取失敗</AlertTitle>
-                            <AlertDescription>
-                              授權帳號 ({testResult.googleEmail}) 無法存取設定的 Root Folder。
-                              請確認該帳號對 Shared Drive 具有 Content Manager 或以上權限。
-                            </AlertDescription>
-                          </Alert>
-                        )}
-                        
-                        {testResult.files && testResult.files.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-sm font-medium">找到的檔案/資料夾：</p>
-                            <ul className="text-sm list-disc list-inside">
-                              {testResult.files.slice(0, 5).map((file: any) => (
-                                <li key={file.id}>{file.name}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
+                      <CheckCircle2 className="h-4 w-4" />
                     ) : (
-                      <div>
-                        <p>{testResult.message}</p>
-                        {testResult.googleEmail && (
-                          <p className="mt-2 text-sm">授權帳號：{testResult.googleEmail}</p>
+                      <AlertCircle className="h-4 w-4" />
+                    )}
+                    <AlertTitle>
+                      {testResult.success 
+                        ? (testResult.rootFolderAccess ? '連線成功 - Root Folder 存取正常' : '連線成功（一般存取）')
+                        : '連線失敗'}
+                    </AlertTitle>
+                    <AlertDescription>
+                      {testResult.success ? (
+                        <div className="space-y-2">
+                          <p>成功存取 Google Drive！</p>
+                          
+                          {/* OAuth Account Info */}
+                          {testResult.googleEmail && (
+                            <p className="text-sm">
+                              <strong>授權帳號：</strong>{testResult.googleEmail}
+                            </p>
+                          )}
+                          
+                          {/* Root Folder Status */}
+                          {testResult.rootFolderId && (
+                            <div className="mt-2 p-2 bg-muted/50 rounded text-sm">
+                              <p><strong>Root Folder ID：</strong>{testResult.rootFolderId}</p>
+                              <p>
+                                <strong>Root Folder 存取：</strong>
+                                {testResult.rootFolderAccess ? (
+                                  <span className="text-success ml-1">✓ 可存取</span>
+                                ) : (
+                                  <span className="text-destructive ml-1">✗ 無法存取</span>
+                                )}
+                              </p>
+                              {testResult.rootFolderError && (
+                                <div className="text-destructive text-xs mt-1">
+                                  <p className="font-medium">錯誤詳情：</p>
+                                  <pre className="mt-1 p-2 bg-destructive/10 rounded overflow-auto max-h-40 whitespace-pre-wrap">
+                                    {typeof testResult.rootFolderError === 'object' 
+                                      ? JSON.stringify(testResult.rootFolderError, null, 2) 
+                                      : testResult.rootFolderError}
+                                  </pre>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Warning if root folder not accessible */}
+                          {testResult.rootFolderId && !testResult.rootFolderAccess && (
+                            <Alert variant="destructive" className="mt-2">
+                              <AlertCircle className="h-4 w-4" />
+                              <AlertTitle>Root Folder 存取失敗</AlertTitle>
+                              <AlertDescription>
+                                授權帳號 ({testResult.googleEmail}) 無法存取設定的 Root Folder。
+                                請確認該帳號對 Shared Drive 具有 Content Manager 或以上權限。
+                              </AlertDescription>
+                            </Alert>
+                          )}
+                          
+                          {testResult.files && testResult.files.length > 0 && (
+                            <div className="mt-2">
+                              <p className="text-sm font-medium">找到的檔案/資料夾：</p>
+                              <ul className="text-sm list-disc list-inside">
+                                {testResult.files.slice(0, 5).map((file: any) => (
+                                  <li key={file.id}>{file.name}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <p>{testResult.message || testResult.error}</p>
+                          {testResult.googleEmail && (
+                            <p className="text-sm">授權帳號：{testResult.googleEmail}</p>
+                          )}
+                          {testResult.errorStatus && (
+                            <p className="text-sm"><strong>HTTP Status:</strong> {testResult.errorStatus}</p>
+                          )}
+                          {testResult.errorResponse && (
+                            <div className="mt-2">
+                              <p className="text-sm font-medium">錯誤回應 (完整 JSON)：</p>
+                              <pre className="mt-1 p-2 bg-destructive/10 rounded text-xs overflow-auto max-h-60 whitespace-pre-wrap">
+                                {typeof testResult.errorResponse === 'object' 
+                                  ? JSON.stringify(testResult.errorResponse, null, 2) 
+                                  : testResult.errorResponse}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </AlertDescription>
+                  </Alert>
+
+                  {/* Debug Info Section */}
+                  {testResult.debug && (
+                    <div className="p-4 border rounded-lg bg-muted/30">
+                      <p className="text-sm font-medium mb-2">🔍 Debug 資訊（供除錯用）</p>
+                      <div className="space-y-2 text-xs">
+                        <p><strong>授權帳號 (google_email)：</strong>{testResult.debug.authorizedEmail || '(未知)'}</p>
+                        <p><strong>Root Folder ID (env)：</strong>{testResult.debug.rootFolderId || '(未設定)'}</p>
+                        
+                        {testResult.debug.apiCalls && testResult.debug.apiCalls.length > 0 && (
+                          <div className="mt-3">
+                            <p className="font-medium mb-1">API 呼叫紀錄：</p>
+                            {testResult.debug.apiCalls.map((call, idx) => (
+                              <div key={idx} className="mt-2 p-2 bg-background rounded border">
+                                <p><strong>#{idx + 1} Endpoint：</strong>{call.endpoint}</p>
+                                {call.folderId && <p><strong>Folder ID：</strong>{call.folderId}</p>}
+                                <p><strong>HTTP Status：</strong>{call.status}</p>
+                                <p><strong>參數：</strong></p>
+                                <pre className="p-1 bg-muted rounded overflow-auto whitespace-pre-wrap">
+                                  {JSON.stringify(call.params, null, 2)}
+                                </pre>
+                                <p className="mt-1"><strong>回應：</strong></p>
+                                <pre className="p-1 bg-muted rounded overflow-auto max-h-32 whitespace-pre-wrap">
+                                  {(() => {
+                                    try {
+                                      return JSON.stringify(JSON.parse(call.response), null, 2);
+                                    } catch {
+                                      return call.response;
+                                    }
+                                  })()}
+                                </pre>
+                              </div>
+                            ))}
+                          </div>
                         )}
                       </div>
-                    )}
-                  </AlertDescription>
-                </Alert>
+                    </div>
+                  )}
+                </div>
               )}
               
               <Separator />
