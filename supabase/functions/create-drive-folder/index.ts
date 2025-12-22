@@ -57,6 +57,23 @@ interface DriveToken {
   access_token: string;
   refresh_token: string;
   token_expires_at: string;
+  google_email: string | null;
+}
+
+// Fetch user's Google email using userinfo API
+async function fetchGoogleEmail(accessToken: string): Promise<string | null> {
+  try {
+    const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    if (response.ok) {
+      const data = await response.json();
+      return data.email || null;
+    }
+  } catch (err) {
+    console.error('Failed to fetch Google email:', err);
+  }
+  return null;
 }
 
 // Get valid access token for user
@@ -64,7 +81,7 @@ async function getValidAccessToken(
   supabaseUrl: string,
   supabaseServiceKey: string,
   userId: string
-): Promise<string> {
+): Promise<{ accessToken: string; googleEmail: string | null }> {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
   
   // Fetch user's tokens
@@ -85,30 +102,42 @@ async function getValidAccessToken(
   const now = new Date();
   const bufferMs = 5 * 60 * 1000;
 
-  if (expiresAt.getTime() - now.getTime() > bufferMs) {
-    // Token still valid
-    return tokenData.access_token;
+  let accessToken = tokenData.access_token;
+
+  if (expiresAt.getTime() - now.getTime() <= bufferMs) {
+    // Token expired, refresh it
+    console.log('Token expired, refreshing...');
+    const { accessToken: newToken, expiresIn } = await refreshAccessToken(tokenData.refresh_token);
+    accessToken = newToken;
+    
+    // Update token in database
+    const newExpiresAt = new Date(Date.now() + expiresIn * 1000);
+    await supabase
+      .from('user_drive_tokens')
+      .update({
+        access_token: accessToken,
+        token_expires_at: newExpiresAt.toISOString(),
+        updated_at: new Date().toISOString(),
+      } as Record<string, unknown>)
+      .eq('user_id', userId);
   }
 
-  // Token expired, refresh it
-  console.log('Token expired, refreshing...');
-  const { accessToken, expiresIn } = await refreshAccessToken(tokenData.refresh_token);
-  
-  // Update token in database
-  const newExpiresAt = new Date(Date.now() + expiresIn * 1000);
-  await supabase
-    .from('user_drive_tokens')
-    .update({
-      access_token: accessToken,
-      token_expires_at: newExpiresAt.toISOString(),
-      updated_at: new Date().toISOString(),
-    } as Record<string, unknown>)
-    .eq('user_id', userId);
+  // Fetch email if not stored
+  let googleEmail = tokenData.google_email;
+  if (!googleEmail) {
+    googleEmail = await fetchGoogleEmail(accessToken);
+    if (googleEmail) {
+      await supabase
+        .from('user_drive_tokens')
+        .update({ google_email: googleEmail })
+        .eq('user_id', userId);
+    }
+  }
 
-  return accessToken;
+  return { accessToken, googleEmail };
 }
 
-// Create a folder in Google Drive
+// Create a folder in Google Drive with full Shared Drive support
 async function createFolder(
   accessToken: string,
   name: string,
@@ -123,9 +152,20 @@ async function createFolder(
     metadata.parents = [parentId];
   }
 
-  // Add supportsAllDrives for Shared Drive compatibility
+  // Full Shared Drive support parameters
+  const params = new URLSearchParams({
+    fields: 'id,webViewLink',
+    supportsAllDrives: 'true',
+  });
+
+  console.log('=== Create Folder API Call ===');
+  console.log('Folder Name:', name);
+  console.log('Parent ID:', parentId || '(root)');
+  console.log('API Params:', params.toString());
+  console.log('Metadata:', JSON.stringify(metadata));
+
   const response = await fetch(
-    'https://www.googleapis.com/drive/v3/files?fields=id,webViewLink&supportsAllDrives=true',
+    `https://www.googleapis.com/drive/v3/files?${params.toString()}`,
     {
       method: 'POST',
       headers: {
@@ -139,10 +179,42 @@ async function createFolder(
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Create folder failed:', errorText);
+    console.error('Status:', response.status);
     throw new Error(`建立資料夾失敗: ${errorText}`);
   }
 
-  return response.json();
+  const result = await response.json();
+  console.log('Folder created successfully:', result.id);
+  return result;
+}
+
+// Verify access to root folder
+async function verifyRootFolderAccess(accessToken: string, folderId: string): Promise<{ success: boolean; error?: string; folderName?: string }> {
+  const params = new URLSearchParams({
+    supportsAllDrives: 'true',
+    fields: 'id,name,mimeType,capabilities',
+  });
+
+  console.log('=== Verify Root Folder Access ===');
+  console.log('Folder ID:', folderId);
+  console.log('API Params:', params.toString());
+
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${folderId}?${params.toString()}`,
+    {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Root folder access failed:', errorText);
+    return { success: false, error: errorText };
+  }
+
+  const data = await response.json();
+  console.log('Root folder info:', JSON.stringify(data));
+  return { success: true, folderName: data.name };
 }
 
 serve(async (req) => {
@@ -182,6 +254,11 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    console.log('=== Create Drive Folder Request ===');
+    console.log('Project ID:', projectId);
+    console.log('User ID:', userId);
+    console.log('Root Folder ID:', rootFolderId);
+
     // Fetch project info
     const { data: project, error: projectError } = await supabase
       .from('projects')
@@ -197,6 +274,8 @@ serve(async (req) => {
       );
     }
 
+    console.log('Project:', project.project_code, '-', project.project_name);
+
     // If folder already exists, return it
     if (project.drive_folder_id) {
       console.log('Folder already exists:', project.drive_folder_id);
@@ -211,8 +290,11 @@ serve(async (req) => {
 
     // Get access token for user
     let accessToken: string;
+    let googleEmail: string | null;
     try {
-      accessToken = await getValidAccessToken(supabaseUrl, supabaseServiceKey, userId);
+      const tokenResult = await getValidAccessToken(supabaseUrl, supabaseServiceKey, userId);
+      accessToken = tokenResult.accessToken;
+      googleEmail = tokenResult.googleEmail;
     } catch (err) {
       const error = err as Error;
       if (error.message === 'NEED_AUTH') {
@@ -224,12 +306,42 @@ serve(async (req) => {
       throw err;
     }
 
+    console.log('=== OAuth Info ===');
+    console.log('Authorized Google Email:', googleEmail || '(Unknown)');
+
+    // Verify root folder access first
+    const rootAccess = await verifyRootFolderAccess(accessToken, rootFolderId);
+    if (!rootAccess.success) {
+      const errorMsg = `無法存取根資料夾。請確認授權帳號 (${googleEmail || 'Unknown'}) 對 Shared Drive 具有 Content Manager 或以上權限。錯誤: ${rootAccess.error}`;
+      console.error(errorMsg);
+      
+      // Update project with error
+      await supabase
+        .from('projects')
+        .update({
+          folder_status: 'failed',
+          folder_error: errorMsg,
+        })
+        .eq('id', projectId);
+
+      return new Response(
+        JSON.stringify({ 
+          error: errorMsg,
+          googleEmail,
+          rootFolderId,
+        }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    console.log('Root folder access verified:', rootAccess.folderName);
+
     // Create main project folder
     const folderName = sanitizeFolderName(`${project.project_code}_${project.project_name}`);
     console.log('Creating main folder:', folderName);
     
     const mainFolder = await createFolder(accessToken, folderName, rootFolderId);
-    console.log('Main folder created:', mainFolder.id);
+    console.log('Main folder created:', mainFolder.id, mainFolder.webViewLink);
 
     // Create subfolders
     for (const subfolderName of SUBFOLDER_TEMPLATE) {
@@ -253,12 +365,17 @@ serve(async (req) => {
       throw new Error('資料夾建立成功，但更新資料庫失敗');
     }
 
+    console.log('=== Success ===');
     console.log('Project folder created successfully');
+    console.log('Folder ID:', mainFolder.id);
+    console.log('Folder URL:', mainFolder.webViewLink);
+
     return new Response(
       JSON.stringify({
         success: true,
         folderId: mainFolder.id,
         folderUrl: mainFolder.webViewLink,
+        googleEmail,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
