@@ -12,10 +12,12 @@ import {
   Edit,
   Trash2,
   Phone,
-  Mail
+  Mail,
+  FileDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ImportExportDialog } from '@/components/ImportExportDialog';
 import { 
   Table, 
   TableBody, 
@@ -59,6 +61,9 @@ export default function Investors() {
 
   // Form state
   const [formData, setFormData] = useState<Partial<InvestorInsert>>({});
+  
+  // Import/Export dialog
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
 
   // Fetch investors
   const { data: investors = [], isLoading } = useQuery({
@@ -194,12 +199,20 @@ export default function Investors() {
           <h1 className="text-2xl font-display font-bold text-foreground">投資方管理</h1>
           <p className="text-muted-foreground mt-1">共 {investors.length} 個投資方</p>
         </div>
-        {canEdit && (
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            新增投資方
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canEdit && (
+            <Button variant="outline" onClick={() => setIsImportExportOpen(true)}>
+              <FileDown className="w-4 h-4 mr-2" />
+              匯入/匯出
+            </Button>
+          )}
+          {canEdit && (
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              新增投資方
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Search */}
@@ -485,6 +498,15 @@ export default function Investors() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import/Export Dialog */}
+      <ImportExportDialog
+        open={isImportExportOpen}
+        onOpenChange={setIsImportExportOpen}
+        type="investors"
+        data={investors}
+        onImportComplete={() => queryClient.invalidateQueries({ queryKey: ['investors'] })}
+      />
     </div>
   );
 }

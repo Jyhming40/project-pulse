@@ -12,10 +12,13 @@ import {
   MoreHorizontal,
   Eye,
   Edit,
-  Trash2
+  Trash2,
+  FileDown,
+  FileUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ImportExportDialog } from '@/components/ImportExportDialog';
 import { 
   Select, 
   SelectContent, 
@@ -99,6 +102,9 @@ export default function Projects() {
 
   // Form state
   const [formData, setFormData] = useState<Partial<ProjectInsert>>({});
+  
+  // Import/Export dialog
+  const [isImportExportOpen, setIsImportExportOpen] = useState(false);
 
   // Fetch projects with investor info
   const { data: projects = [], isLoading } = useQuery({
@@ -244,12 +250,20 @@ export default function Projects() {
           <h1 className="text-2xl font-display font-bold text-foreground">案場管理</h1>
           <p className="text-muted-foreground mt-1">共 {projects.length} 個案場</p>
         </div>
-        {canEdit && (
-          <Button onClick={() => setIsCreateOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            新增案場
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {canEdit && (
+            <Button variant="outline" onClick={() => setIsImportExportOpen(true)}>
+              <FileDown className="w-4 h-4 mr-2" />
+              匯入/匯出
+            </Button>
+          )}
+          {canEdit && (
+            <Button onClick={() => setIsCreateOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              新增案場
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
@@ -568,6 +582,15 @@ export default function Projects() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Import/Export Dialog */}
+      <ImportExportDialog
+        open={isImportExportOpen}
+        onOpenChange={setIsImportExportOpen}
+        type="projects"
+        data={projects}
+        onImportComplete={() => queryClient.invalidateQueries({ queryKey: ['projects'] })}
+      />
     </div>
   );
 }
