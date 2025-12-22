@@ -37,12 +37,16 @@ type Project = Database['public']['Tables']['projects']['Row'] & {
   investors?: { company_name: string } | null;
 };
 type Investor = Database['public']['Tables']['investors']['Row'];
+type Document = Database['public']['Tables']['documents']['Row'] & {
+  projects?: { project_name: string; project_code: string } | null;
+  profiles?: { full_name: string } | null;
+};
 
 interface ImportExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  type: 'projects' | 'investors';
-  data: Project[] | Investor[];
+  type: 'projects' | 'investors' | 'documents';
+  data: Project[] | Investor[] | Document[];
   onImportComplete: () => void;
 }
 
@@ -58,26 +62,31 @@ export function ImportExportDialog({
   const [importStrategy, setImportStrategy] = useState<ImportStrategy>('skip');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const { exportProjects, exportInvestors, downloadTemplate } = useDataExport();
+  const { exportProjects, exportInvestors, exportDocuments, downloadTemplate } = useDataExport();
   const { 
     isProcessing, 
     projectPreview, 
     investorPreview,
+    documentPreview,
     previewProjects,
     previewInvestors,
+    previewDocuments,
     importProjects,
     importInvestors,
+    importDocuments,
     clearPreview,
   } = useDataImport();
 
-  const preview = type === 'projects' ? projectPreview : investorPreview;
-  const title = type === 'projects' ? '案場' : '投資方';
+  const preview = type === 'projects' ? projectPreview : type === 'investors' ? investorPreview : documentPreview;
+  const title = type === 'projects' ? '案場' : type === 'investors' ? '投資方' : '文件';
 
   const handleExport = () => {
     if (type === 'projects') {
       exportProjects(data as Project[], exportFormat);
-    } else {
+    } else if (type === 'investors') {
       exportInvestors(data as Investor[], exportFormat);
+    } else {
+      exportDocuments(data as Document[], exportFormat);
     }
     onOpenChange(false);
   };
@@ -91,8 +100,10 @@ export function ImportExportDialog({
     try {
       if (type === 'projects') {
         await previewProjects(file);
-      } else {
+      } else if (type === 'investors') {
         await previewInvestors(file);
+      } else {
+        await previewDocuments(file);
       }
     } catch (error) {
       toast.error('檔案解析失敗', { 
@@ -108,8 +119,10 @@ export function ImportExportDialog({
       let result;
       if (type === 'projects' && projectPreview) {
         result = await importProjects(projectPreview.data, importStrategy, projectPreview.duplicates);
-      } else if (investorPreview) {
+      } else if (type === 'investors' && investorPreview) {
         result = await importInvestors(investorPreview.data, importStrategy, investorPreview.duplicates);
+      } else if (documentPreview) {
+        result = await importDocuments(documentPreview.data, importStrategy, documentPreview.duplicates);
       }
 
       if (result) {
