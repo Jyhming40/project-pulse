@@ -138,6 +138,8 @@ export default function ProjectDetail() {
   const [isAddDocOpen, setIsAddDocOpen] = useState(false);
   const [isAddStatusOpen, setIsAddStatusOpen] = useState(false);
   const [isEditConstructionOpen, setIsEditConstructionOpen] = useState(false);
+  const [isEditApprovalDateOpen, setIsEditApprovalDateOpen] = useState(false);
+  const [approvalDateForm, setApprovalDateForm] = useState('');
   const [docForm, setDocForm] = useState<{
     doc_type?: DocType;
     doc_status?: DocStatus;
@@ -296,6 +298,26 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['construction-status-history', id] });
       toast.success('施工狀態已更新');
       setIsEditConstructionOpen(false);
+    },
+  });
+
+  // Update approval date mutation - triggers site_code_display auto-update
+  const updateApprovalDateMutation = useMutation({
+    mutationFn: async (newDate: string | null) => {
+      const { error } = await supabase
+        .from('projects')
+        .update({ approval_date: newDate })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast.success('同意備案日期已更新，案場編號已自動更新');
+      setIsEditApprovalDateOpen(false);
+    },
+    onError: (error: Error) => {
+      toast.error('更新失敗', { description: error.message });
     },
   });
 
@@ -472,7 +494,22 @@ export default function ProjectDetail() {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">同意備案日期</p>
-                    <p>{(project as any).approval_date || '-'}</p>
+                    <div className="flex items-center gap-2">
+                      <p>{(project as any).approval_date || '-'}</p>
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2"
+                          onClick={() => {
+                            setApprovalDateForm((project as any).approval_date || '');
+                            setIsEditApprovalDateOpen(true);
+                          }}
+                        >
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </div>
                 <div>
@@ -1047,6 +1084,57 @@ export default function ProjectDetail() {
               disabled={!docForm.doc_type || addDocumentMutation.isPending}
             >
               新增
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Approval Date Dialog */}
+      <Dialog open={isEditApprovalDateOpen} onOpenChange={setIsEditApprovalDateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" />
+              編輯同意備案日期
+            </DialogTitle>
+            <DialogDescription>
+              設定同意備案日期後，案場編號將自動加上年份後綴（例：2025YP0001-2026）
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>同意備案日期</Label>
+              <Input
+                type="date"
+                value={approvalDateForm}
+                onChange={(e) => setApprovalDateForm(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                清空日期可移除案場編號的年份後綴
+              </p>
+            </div>
+            {approvalDateForm && (
+              <div className="p-3 rounded-lg bg-success/10 border border-success/20">
+                <p className="text-sm text-success">
+                  案場編號將更新為：{(project as any).intake_year || ''}{(project?.investor_id ? '' : '')}{(project as any).seq ? String((project as any).seq).padStart(4, '0') : ''}-{new Date(approvalDateForm).getFullYear()}
+                </p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditApprovalDateOpen(false)}>取消</Button>
+            <Button
+              variant="destructive"
+              onClick={() => updateApprovalDateMutation.mutate(null)}
+              disabled={!approvalDateForm || updateApprovalDateMutation.isPending}
+            >
+              清除日期
+            </Button>
+            <Button
+              onClick={() => updateApprovalDateMutation.mutate(approvalDateForm || null)}
+              disabled={updateApprovalDateMutation.isPending}
+            >
+              儲存
             </Button>
           </DialogFooter>
         </DialogContent>

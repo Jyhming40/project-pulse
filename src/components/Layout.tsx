@@ -11,7 +11,8 @@ import {
   LogOut,
   Zap,
   ChevronLeft,
-  Menu
+  Menu,
+  BookOpen
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -26,6 +27,7 @@ const navItems = [
   { to: '/', icon: LayoutDashboard, label: '儀表板' },
   { to: '/projects', icon: Building2, label: '案場管理' },
   { to: '/investors', icon: Users, label: '投資方' },
+  { to: '/investor-codes', icon: BookOpen, label: '代碼對照表' },
   { to: '/documents', icon: FileText, label: '文件管理' },
 ];
 
