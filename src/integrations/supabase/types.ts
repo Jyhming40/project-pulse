@@ -143,6 +143,33 @@ export type Database = {
           },
         ]
       }
+      investor_year_counters: {
+        Row: {
+          created_at: string
+          id: string
+          investor_code: string
+          last_seq: number
+          updated_at: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          investor_code: string
+          last_seq?: number
+          updated_at?: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          investor_code?: string
+          last_seq?: number
+          updated_at?: string
+          year?: number
+        }
+        Relationships: []
+      }
       investors: {
         Row: {
           address: string | null
@@ -257,6 +284,7 @@ export type Database = {
         Row: {
           actual_installed_capacity: number | null
           address: string | null
+          approval_date: string | null
           capacity_kwp: number | null
           city: string | null
           construction_status:
@@ -281,6 +309,7 @@ export type Database = {
           installation_type:
             | Database["public"]["Enums"]["installation_type"]
             | null
+          intake_year: number | null
           investor_id: string | null
           land_owner: string | null
           land_owner_contact: string | null
@@ -292,6 +321,8 @@ export type Database = {
           power_voltage: Database["public"]["Enums"]["power_voltage"] | null
           project_code: string
           project_name: string
+          seq: number | null
+          site_code_display: string | null
           status: Database["public"]["Enums"]["project_status"]
           taipower_pv_id: string | null
           updated_at: string
@@ -299,6 +330,7 @@ export type Database = {
         Insert: {
           actual_installed_capacity?: number | null
           address?: string | null
+          approval_date?: string | null
           capacity_kwp?: number | null
           city?: string | null
           construction_status?:
@@ -323,6 +355,7 @@ export type Database = {
           installation_type?:
             | Database["public"]["Enums"]["installation_type"]
             | null
+          intake_year?: number | null
           investor_id?: string | null
           land_owner?: string | null
           land_owner_contact?: string | null
@@ -334,6 +367,8 @@ export type Database = {
           power_voltage?: Database["public"]["Enums"]["power_voltage"] | null
           project_code: string
           project_name: string
+          seq?: number | null
+          site_code_display?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           taipower_pv_id?: string | null
           updated_at?: string
@@ -341,6 +376,7 @@ export type Database = {
         Update: {
           actual_installed_capacity?: number | null
           address?: string | null
+          approval_date?: string | null
           capacity_kwp?: number | null
           city?: string | null
           construction_status?:
@@ -365,6 +401,7 @@ export type Database = {
           installation_type?:
             | Database["public"]["Enums"]["installation_type"]
             | null
+          intake_year?: number | null
           investor_id?: string | null
           land_owner?: string | null
           land_owner_contact?: string | null
@@ -376,6 +413,8 @@ export type Database = {
           power_voltage?: Database["public"]["Enums"]["power_voltage"] | null
           project_code?: string
           project_name?: string
+          seq?: number | null
+          site_code_display?: string | null
           status?: Database["public"]["Enums"]["project_status"]
           taipower_pv_id?: string | null
           updated_at?: string
@@ -488,6 +527,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_site_code_display: {
+        Args: {
+          p_approval_date: string
+          p_intake_year: number
+          p_investor_code: string
+          p_seq: number
+        }
+        Returns: string
+      }
+      get_next_project_seq: {
+        Args: { p_investor_code: string; p_year: number }
+        Returns: number
+      }
       get_user_role: {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
