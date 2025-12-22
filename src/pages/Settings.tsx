@@ -272,6 +272,26 @@ export default function Settings() {
                   <p><strong>scope：</strong>{oauthCallbackParams.scope || '(null)'}</p>
                   <p><strong>code：</strong>{oauthCallbackParams.code || '(null)'}</p>
                 </div>
+                
+                {/* Scope mismatch warning */}
+                {oauthCallbackParams.scope && !oauthCallbackParams.scope.includes('drive') && (
+                  <Alert variant="destructive" className="mt-3">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>⚠️ OAuth Scope 不足</AlertTitle>
+                    <AlertDescription className="text-xs space-y-2">
+                      <p><strong>已授權 Scope：</strong>{oauthCallbackParams.scope}</p>
+                      <p><strong>需要 Scope：</strong>https://www.googleapis.com/auth/drive</p>
+                      <Separator className="my-2" />
+                      <p className="font-medium">解決方法：</p>
+                      <ol className="list-decimal list-inside space-y-1">
+                        <li>到 Google Cloud Console → APIs & Services → OAuth consent screen</li>
+                        <li>點選「Edit App」→「Scopes」</li>
+                        <li>新增 scope: <code className="bg-muted px-1 rounded">https://www.googleapis.com/auth/drive</code></li>
+                        <li>儲存後，取消目前授權並重新點選「連結 Google Drive」</li>
+                      </ol>
+                    </AlertDescription>
+                  </Alert>
+                )}
               </AlertDescription>
             </Alert>
           )}
