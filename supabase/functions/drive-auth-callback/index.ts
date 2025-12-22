@@ -7,15 +7,37 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // FIRST LINE LOG - Prove callback was hit
+  const callbackHitTime = new Date().toISOString();
+  console.log('');
+  console.log('##############################################');
+  console.log('### CALLBACK HIT ###', callbackHitTime);
+  console.log('##############################################');
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
+    console.log('[CORS] OPTIONS preflight request - returning early');
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Extract query params IMMEDIATELY for logging
+  const url = new URL(req.url);
+  const codePresent = !!url.searchParams.get('code');
+  const statePresent = !!url.searchParams.get('state');
+  const errorParam = url.searchParams.get('error');
+  const errorDesc = url.searchParams.get('error_description');
+  const scope = url.searchParams.get('scope');
+  
   console.log('');
   console.log('==========================================');
   console.log('=== DRIVE AUTH CALLBACK DEBUG START ===');
   console.log('==========================================');
+  console.log('[HIT] callback hit at:', callbackHitTime);
+  console.log('[HIT] code_present:', codePresent);
+  console.log('[HIT] state_present:', statePresent);
+  console.log('[HIT] error:', errorParam || '(none)');
+  console.log('[HIT] error_description:', errorDesc || '(none)');
+  console.log('[HIT] scope:', scope || '(none)');
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -26,17 +48,14 @@ serve(async (req) => {
   console.log('[ENV] GOOGLE_DRIVE_ROOT_FOLDER_ID:', rootFolderId || '(NOT SET)');
 
   try {
-    const url = new URL(req.url);
+    // Use already-extracted params from above
     const code = url.searchParams.get('code');
     const state = url.searchParams.get('state');
-    const error = url.searchParams.get('error');
-    const errorDescription = url.searchParams.get('error_description');
+    const error = errorParam;
+    const errorDescription = errorDesc;
 
-    console.log('[OAUTH] Callback received:');
-    console.log('  - has code:', !!code);
-    console.log('  - has state:', !!state);
-    console.log('  - error:', error || '(none)');
-    console.log('  - error_description:', errorDescription || '(none)');
+    console.log('[OAUTH] Full query string:', url.search);
+    console.log('[OAUTH] All params:', Object.fromEntries(url.searchParams.entries()));
 
     if (error) {
       console.error('[OAUTH ERROR]:', error, errorDescription);

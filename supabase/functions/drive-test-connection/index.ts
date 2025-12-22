@@ -233,13 +233,15 @@ serve(async (req) => {
     let rootFolderAccess = false;
     let rootFolderError = null;
     let rootFolderErrorJson = null;
+    let rootFolderData: any = null;
+    let sharedDriveId: string | null = null;
     
     if (rootFolderId) {
       console.log('=== TEST 2: files.get (root folder) ===');
       
       const getParams = {
         supportsAllDrives: 'true',
-        fields: 'id,name,mimeType,capabilities',
+        fields: 'id,name,mimeType,capabilities,driveId,parents',
       };
       const getUrl = `https://www.googleapis.com/drive/v3/files/${rootFolderId}?${new URLSearchParams(getParams).toString()}`;
       
@@ -259,7 +261,7 @@ serve(async (req) => {
       console.log('[API] Response Body:', getResponseText);
 
       debugInfo.apiCalls.push({
-        endpoint: 'files.get',
+        endpoint: 'files.get (root folder)',
         folderId: rootFolderId,
         params: getParams,
         status: getResponse.status,
@@ -267,31 +269,54 @@ serve(async (req) => {
       });
 
       if (getResponse.ok) {
-        const folderData = JSON.parse(getResponseText);
+        rootFolderData = JSON.parse(getResponseText);
         console.log('[API] files.get SUCCESS');
-        console.log('[API] Folder Name:', folderData.name);
-        console.log('[API] Folder Capabilities:', JSON.stringify(folderData.capabilities));
+        console.log('[API] Folder Name:', rootFolderData.name);
+        console.log('[API] Folder driveId (Shared Drive):', rootFolderData.driveId || '(NOT in Shared Drive)');
+        console.log('[API] Folder Capabilities:', JSON.stringify(rootFolderData.capabilities));
         rootFolderAccess = true;
         
-        // Test 3: List files in root folder
+        // Check if it's in a Shared Drive
+        if (rootFolderData.driveId) {
+          sharedDriveId = rootFolderData.driveId;
+          console.log('[SHARED DRIVE] Detected Shared Drive ID:', sharedDriveId);
+        }
+        
+        // Test 3: List files in root folder (with Shared Drive params if applicable)
         console.log('');
         console.log('=== TEST 3: files.list (in root folder) ===');
-        const listInFolderParams = {
-          q: `'${rootFolderId}' in parents`,
-          pageSize: '10',
-          fields: 'files(id,name,mimeType)',
-          supportsAllDrives: 'true',
-          includeItemsFromAllDrives: 'true',
-        };
+        
+        let listInFolderParams: Record<string, string>;
+        
+        if (sharedDriveId) {
+          // Use Shared Drive specific params
+          listInFolderParams = {
+            q: `'${rootFolderId}' in parents`,
+            pageSize: '10',
+            fields: 'files(id,name,mimeType,driveId)',
+            supportsAllDrives: 'true',
+            includeItemsFromAllDrives: 'true',
+            corpora: 'drive',
+            driveId: sharedDriveId,
+          };
+          console.log('[API] Using Shared Drive params');
+        } else {
+          // Regular My Drive params
+          listInFolderParams = {
+            q: `'${rootFolderId}' in parents`,
+            pageSize: '10',
+            fields: 'files(id,name,mimeType)',
+            supportsAllDrives: 'true',
+            includeItemsFromAllDrives: 'true',
+          };
+          console.log('[API] Using regular Drive params');
+        }
+        
         const listInFolderUrl = `https://www.googleapis.com/drive/v3/files?${new URLSearchParams(listInFolderParams).toString()}`;
         
         console.log('[API] Endpoint: files.list');
         console.log('[API] Full URL:', listInFolderUrl);
-        console.log('[API] Parameters:');
-        console.log('  - q:', listInFolderParams.q);
-        console.log('  - pageSize:', listInFolderParams.pageSize);
-        console.log('  - supportsAllDrives:', listInFolderParams.supportsAllDrives);
-        console.log('  - includeItemsFromAllDrives:', listInFolderParams.includeItemsFromAllDrives);
+        console.log('[API] Parameters:', JSON.stringify(listInFolderParams, null, 2));
         
         const listInFolderResponse = await fetch(listInFolderUrl, {
           headers: { 'Authorization': `Bearer ${accessToken}` },
@@ -302,7 +327,7 @@ serve(async (req) => {
         console.log('[API] Response Body:', listInFolderText);
 
         debugInfo.apiCalls.push({
-          endpoint: 'files.list (in folder)',
+          endpoint: 'files.list (in root folder)',
           folderId: rootFolderId,
           params: listInFolderParams,
           status: listInFolderResponse.status,
@@ -314,6 +339,11 @@ serve(async (req) => {
           console.log('[API] files.list in folder SUCCESS - found', folderFiles.files?.length || 0, 'files');
         } else {
           console.error('[ERROR] files.list in folder FAILED');
+          // Parse and log the error
+          try {
+            const listError = JSON.parse(listInFolderText);
+            console.error('[ERROR] List Error JSON:', JSON.stringify(listError, null, 2));
+          } catch {}
         }
       } else {
         console.error('[ERROR] files.get FAILED for root folder!');
@@ -338,6 +368,7 @@ serve(async (req) => {
     console.log('=== TEST SUMMARY ===');
     console.log('Authorized Email:', actualEmail);
     console.log('Root Folder ID:', rootFolderId || '(NOT SET)');
+    console.log('Shared Drive ID:', sharedDriveId || '(Not in Shared Drive)');
     console.log('General Drive Access: SUCCESS');
     console.log('Root Folder Access:', rootFolderAccess ? 'SUCCESS' : (rootFolderId ? 'FAILED' : 'SKIPPED'));
     if (rootFolderError) {
@@ -354,12 +385,18 @@ serve(async (req) => {
       .update({ google_error: rootFolderError || null })
       .eq('user_id', userId);
 
+    // Add Shared Drive info to debug
+    debugInfo.sharedDriveId = sharedDriveId;
+    debugInfo.rootFolderName = rootFolderData?.name || null;
+
     const result = {
       success: true,
       message: rootFolderAccess ? '連線成功！已驗證 Root Folder 存取權限' : 
                (rootFolderId ? '連線成功，但無法存取 Root Folder' : '連線成功（一般 Drive 存取）'),
       googleEmail: actualEmail,
       rootFolderId: rootFolderId || null,
+      rootFolderName: rootFolderData?.name || null,
+      sharedDriveId,
       rootFolderAccess,
       rootFolderError: rootFolderErrorJson || rootFolderError,
       files: listData?.files || [],
