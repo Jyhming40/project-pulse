@@ -1,6 +1,23 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSystemOptions, OptionCategory, SystemOption } from '@/hooks/useSystemOptions';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { 
   Settings2, 
   Plus, 
@@ -66,10 +83,85 @@ const categoryConfig: Record<OptionCategory, { label: string; icon: typeof Activ
   },
 };
 
+// Sortable row component
+interface SortableRowProps {
+  option: SystemOption;
+  onEdit: (option: SystemOption) => void;
+  onDelete: (option: SystemOption) => void;
+  onToggleActive: (option: SystemOption) => void;
+}
+
+function SortableRow({ option, onEdit, onDelete, onToggleActive }: SortableRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: option.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <TableRow 
+      ref={setNodeRef} 
+      style={style} 
+      className={`${!option.is_active ? 'opacity-50' : ''} ${isDragging ? 'bg-muted' : ''}`}
+    >
+      <TableCell>
+        <div 
+          {...attributes} 
+          {...listeners}
+          className="cursor-grab active:cursor-grabbing p-2 -m-2 touch-none"
+        >
+          <GripVertical className="w-4 h-4 text-muted-foreground" />
+        </div>
+      </TableCell>
+      <TableCell className="font-mono text-sm">{option.value}</TableCell>
+      <TableCell>{option.label}</TableCell>
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <Switch
+            checked={option.is_active}
+            onCheckedChange={() => onToggleActive(option)}
+          />
+          <Badge variant={option.is_active ? 'default' : 'secondary'}>
+            {option.is_active ? '啟用' : '停用'}
+          </Badge>
+        </div>
+      </TableCell>
+      <TableCell className="text-right">
+        <div className="flex justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onEdit(option)}
+          >
+            <Pencil className="w-4 h-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onDelete(option)}
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
 export default function SystemOptions() {
   const { isAdmin } = useAuth();
   const [activeTab, setActiveTab] = useState<OptionCategory>('project_status');
-  const { options, isLoading, createOption, updateOption, deleteOption } = useSystemOptions();
+  const { options, isLoading, createOption, updateOption, deleteOption, reorderOptions } = useSystemOptions();
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOption, setEditingOption] = useState<SystemOption | null>(null);
@@ -79,6 +171,32 @@ export default function SystemOptions() {
   const [formLabel, setFormLabel] = useState('');
 
   const filteredOptions = options.filter(opt => opt.category === activeTab);
+
+  // Setup dnd-kit sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = filteredOptions.findIndex((opt) => opt.id === active.id);
+      const newIndex = filteredOptions.findIndex((opt) => opt.id === over.id);
+
+      const newOrder = arrayMove(filteredOptions, oldIndex, newIndex);
+      const orderedIds = newOrder.map((opt) => opt.id);
+      
+      await reorderOptions.mutateAsync(orderedIds);
+    }
+  };
 
   const handleOpenCreate = () => {
     setEditingOption(null);
@@ -137,24 +255,6 @@ export default function SystemOptions() {
     }
   };
 
-  const handleMoveUp = async (option: SystemOption, index: number) => {
-    if (index === 0) return;
-    const prevOption = filteredOptions[index - 1];
-    await Promise.all([
-      updateOption.mutateAsync({ id: option.id, sort_order: prevOption.sort_order }),
-      updateOption.mutateAsync({ id: prevOption.id, sort_order: option.sort_order }),
-    ]);
-  };
-
-  const handleMoveDown = async (option: SystemOption, index: number) => {
-    if (index === filteredOptions.length - 1) return;
-    const nextOption = filteredOptions[index + 1];
-    await Promise.all([
-      updateOption.mutateAsync({ id: option.id, sort_order: nextOption.sort_order }),
-      updateOption.mutateAsync({ id: nextOption.id, sort_order: option.sort_order }),
-    ]);
-  };
-
   if (!isAdmin) {
     return (
       <div className="flex items-center justify-center h-[50vh]">
@@ -171,7 +271,7 @@ export default function SystemOptions() {
           系統選項設定
         </h1>
         <p className="text-muted-foreground mt-1">
-          管理下拉選單的選項，包括專案狀態、文件類型和文件狀態
+          管理下拉選單的選項，包括專案狀態、文件類型和文件狀態。拖曳列可調整順序。
         </p>
       </div>
 
@@ -191,6 +291,8 @@ export default function SystemOptions() {
 
         {(Object.keys(categoryConfig) as OptionCategory[]).map((cat) => {
           const config = categoryConfig[cat];
+          const categoryOptions = options.filter(opt => opt.category === cat);
+          
           return (
             <TabsContent key={cat} value={cat}>
               <Card>
@@ -207,81 +309,44 @@ export default function SystemOptions() {
                 <CardContent>
                   {isLoading ? (
                     <div className="text-center py-8 text-muted-foreground">載入中...</div>
-                  ) : filteredOptions.length === 0 ? (
+                  ) : categoryOptions.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       尚無選項，請點擊「新增選項」開始建立
                     </div>
                   ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-12">順序</TableHead>
-                          <TableHead>值</TableHead>
-                          <TableHead>顯示名稱</TableHead>
-                          <TableHead className="w-24">狀態</TableHead>
-                          <TableHead className="w-32 text-right">操作</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredOptions.map((option, index) => (
-                          <TableRow key={option.id} className={!option.is_active ? 'opacity-50' : ''}>
-                            <TableCell>
-                              <div className="flex items-center gap-1">
-                                <GripVertical className="w-4 h-4 text-muted-foreground" />
-                                <div className="flex flex-col">
-                                  <button
-                                    onClick={() => handleMoveUp(option, index)}
-                                    disabled={index === 0}
-                                    className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30"
-                                  >
-                                    ▲
-                                  </button>
-                                  <button
-                                    onClick={() => handleMoveDown(option, index)}
-                                    disabled={index === filteredOptions.length - 1}
-                                    className="text-xs text-muted-foreground hover:text-foreground disabled:opacity-30"
-                                  >
-                                    ▼
-                                  </button>
-                                </div>
-                              </div>
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">{option.value}</TableCell>
-                            <TableCell>{option.label}</TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Switch
-                                  checked={option.is_active}
-                                  onCheckedChange={() => handleToggleActive(option)}
-                                />
-                                <Badge variant={option.is_active ? 'default' : 'secondary'}>
-                                  {option.is_active ? '啟用' : '停用'}
-                                </Badge>
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleOpenEdit(option)}
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setDeleteConfirmOption(option)}
-                                  className="text-destructive hover:text-destructive"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              </div>
-                            </TableCell>
+                    <DndContext
+                      sensors={sensors}
+                      collisionDetection={closestCenter}
+                      onDragEnd={handleDragEnd}
+                    >
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead className="w-12">順序</TableHead>
+                            <TableHead>值</TableHead>
+                            <TableHead>顯示名稱</TableHead>
+                            <TableHead className="w-24">狀態</TableHead>
+                            <TableHead className="w-32 text-right">操作</TableHead>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                        </TableHeader>
+                        <TableBody>
+                          <SortableContext
+                            items={categoryOptions.map((opt) => opt.id)}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            {categoryOptions.map((option) => (
+                              <SortableRow
+                                key={option.id}
+                                option={option}
+                                onEdit={handleOpenEdit}
+                                onDelete={setDeleteConfirmOption}
+                                onToggleActive={handleToggleActive}
+                              />
+                            ))}
+                          </SortableContext>
+                        </TableBody>
+                      </Table>
+                    </DndContext>
                   )}
                 </CardContent>
               </Card>
