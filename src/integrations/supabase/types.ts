@@ -220,9 +220,13 @@ export type Database = {
       }
       projects: {
         Row: {
+          actual_installed_capacity: number | null
           address: string | null
           capacity_kwp: number | null
           city: string | null
+          construction_status:
+            | Database["public"]["Enums"]["construction_status"]
+            | null
           contact_person: string | null
           contact_phone: string | null
           coordinates: string | null
@@ -235,20 +239,36 @@ export type Database = {
           fiscal_year: number | null
           folder_error: string | null
           folder_status: Database["public"]["Enums"]["folder_status"] | null
+          grid_connection_type:
+            | Database["public"]["Enums"]["grid_connection_type"]
+            | null
           id: string
+          installation_type:
+            | Database["public"]["Enums"]["installation_type"]
+            | null
           investor_id: string | null
           land_owner: string | null
           land_owner_contact: string | null
           note: string | null
+          pole_status: Database["public"]["Enums"]["pole_status"] | null
+          power_phase_type:
+            | Database["public"]["Enums"]["power_phase_type"]
+            | null
+          power_voltage: Database["public"]["Enums"]["power_voltage"] | null
           project_code: string
           project_name: string
           status: Database["public"]["Enums"]["project_status"]
+          taipower_pv_id: string | null
           updated_at: string
         }
         Insert: {
+          actual_installed_capacity?: number | null
           address?: string | null
           capacity_kwp?: number | null
           city?: string | null
+          construction_status?:
+            | Database["public"]["Enums"]["construction_status"]
+            | null
           contact_person?: string | null
           contact_phone?: string | null
           coordinates?: string | null
@@ -261,20 +281,36 @@ export type Database = {
           fiscal_year?: number | null
           folder_error?: string | null
           folder_status?: Database["public"]["Enums"]["folder_status"] | null
+          grid_connection_type?:
+            | Database["public"]["Enums"]["grid_connection_type"]
+            | null
           id?: string
+          installation_type?:
+            | Database["public"]["Enums"]["installation_type"]
+            | null
           investor_id?: string | null
           land_owner?: string | null
           land_owner_contact?: string | null
           note?: string | null
+          pole_status?: Database["public"]["Enums"]["pole_status"] | null
+          power_phase_type?:
+            | Database["public"]["Enums"]["power_phase_type"]
+            | null
+          power_voltage?: Database["public"]["Enums"]["power_voltage"] | null
           project_code: string
           project_name: string
           status?: Database["public"]["Enums"]["project_status"]
+          taipower_pv_id?: string | null
           updated_at?: string
         }
         Update: {
+          actual_installed_capacity?: number | null
           address?: string | null
           capacity_kwp?: number | null
           city?: string | null
+          construction_status?:
+            | Database["public"]["Enums"]["construction_status"]
+            | null
           contact_person?: string | null
           contact_phone?: string | null
           coordinates?: string | null
@@ -287,14 +323,26 @@ export type Database = {
           fiscal_year?: number | null
           folder_error?: string | null
           folder_status?: Database["public"]["Enums"]["folder_status"] | null
+          grid_connection_type?:
+            | Database["public"]["Enums"]["grid_connection_type"]
+            | null
           id?: string
+          installation_type?:
+            | Database["public"]["Enums"]["installation_type"]
+            | null
           investor_id?: string | null
           land_owner?: string | null
           land_owner_contact?: string | null
           note?: string | null
+          pole_status?: Database["public"]["Enums"]["pole_status"] | null
+          power_phase_type?:
+            | Database["public"]["Enums"]["power_phase_type"]
+            | null
+          power_voltage?: Database["public"]["Enums"]["power_voltage"] | null
           project_code?: string
           project_name?: string
           status?: Database["public"]["Enums"]["project_status"]
+          taipower_pv_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -426,6 +474,13 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "staff" | "viewer"
+      construction_status:
+        | "已開工"
+        | "尚未開工"
+        | "已掛錶"
+        | "待掛錶"
+        | "暫緩"
+        | "取消"
       doc_status: "未開始" | "進行中" | "已完成" | "退件補正"
       doc_type:
         | "台電審查意見書"
@@ -437,6 +492,34 @@ export type Database = {
         | "土地契約"
         | "其他"
       folder_status: "pending" | "created" | "failed"
+      grid_connection_type:
+        | "高壓併低壓側"
+        | "低壓"
+        | "併內線－躉售"
+        | "併內線－自發自用"
+      installation_type:
+        | "畜牧舍"
+        | "農業設施"
+        | "農棚"
+        | "地面型"
+        | "農舍"
+        | "住宅"
+        | "廠辦"
+        | "特目用建物"
+        | "特登工廠"
+        | "集合住宅"
+        | "其他設施"
+        | "新建物（農業）"
+        | "新建物（其他）"
+      pole_status:
+        | "已立桿"
+        | "未立桿"
+        | "基礎完成"
+        | "無須"
+        | "需移桿"
+        | "亭置式"
+      power_phase_type: "單相三線式" | "三相三線式" | "三相四線式"
+      power_voltage: "220V" | "220V / 380V" | "380V" | "440V" | "480V"
       project_status:
         | "開發中"
         | "土地確認"
@@ -579,6 +662,14 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "staff", "viewer"],
+      construction_status: [
+        "已開工",
+        "尚未開工",
+        "已掛錶",
+        "待掛錶",
+        "暫緩",
+        "取消",
+      ],
       doc_status: ["未開始", "進行中", "已完成", "退件補正"],
       doc_type: [
         "台電審查意見書",
@@ -591,6 +682,30 @@ export const Constants = {
         "其他",
       ],
       folder_status: ["pending", "created", "failed"],
+      grid_connection_type: [
+        "高壓併低壓側",
+        "低壓",
+        "併內線－躉售",
+        "併內線－自發自用",
+      ],
+      installation_type: [
+        "畜牧舍",
+        "農業設施",
+        "農棚",
+        "地面型",
+        "農舍",
+        "住宅",
+        "廠辦",
+        "特目用建物",
+        "特登工廠",
+        "集合住宅",
+        "其他設施",
+        "新建物（農業）",
+        "新建物（其他）",
+      ],
+      pole_status: ["已立桿", "未立桿", "基礎完成", "無須", "需移桿", "亭置式"],
+      power_phase_type: ["單相三線式", "三相三線式", "三相四線式"],
+      power_voltage: ["220V", "220V / 380V", "380V", "440V", "480V"],
       project_status: [
         "開發中",
         "土地確認",

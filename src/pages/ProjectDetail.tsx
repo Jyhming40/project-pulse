@@ -28,7 +28,9 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle2,
-  Link
+  Link,
+  Wrench,
+  Plug
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -97,6 +99,30 @@ const getDocStatusColor = (status: string) => {
   return docStatusColorMap[status] || 'bg-muted text-muted-foreground';
 };
 
+const getConstructionStatusColor = (status: string) => {
+  const colorMap: Record<string, string> = {
+    '已開工': 'bg-primary/15 text-primary',
+    '尚未開工': 'bg-muted text-muted-foreground',
+    '已掛錶': 'bg-success/15 text-success',
+    '待掛錶': 'bg-warning/15 text-warning',
+    '暫緩': 'bg-muted text-muted-foreground',
+    '取消': 'bg-destructive/15 text-destructive',
+  };
+  return colorMap[status] || 'bg-muted text-muted-foreground';
+};
+
+// Enum options for new fields
+const installationTypes = [
+  '畜牧舍', '農業設施', '農棚', '地面型', '農舍', '住宅', '廠辦',
+  '特目用建物', '特登工廠', '集合住宅', '其他設施', '新建物（農業）', '新建物（其他）'
+];
+
+const gridConnectionTypes = ['高壓併低壓側', '低壓', '併內線－躉售', '併內線－自發自用'];
+const powerPhaseTypes = ['單相三線式', '三相三線式', '三相四線式'];
+const powerVoltages = ['220V', '220V / 380V', '380V', '440V', '480V'];
+const poleStatuses = ['已立桿', '未立桿', '基礎完成', '無須', '需移桿', '亭置式'];
+const constructionStatuses = ['已開工', '尚未開工', '已掛錶', '待掛錶', '暫緩', '取消'];
+
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -111,6 +137,7 @@ export default function ProjectDetail() {
 
   const [isAddDocOpen, setIsAddDocOpen] = useState(false);
   const [isAddStatusOpen, setIsAddStatusOpen] = useState(false);
+  const [isEditConstructionOpen, setIsEditConstructionOpen] = useState(false);
   const [docForm, setDocForm] = useState<{
     doc_type?: DocType;
     doc_status?: DocStatus;
@@ -123,6 +150,7 @@ export default function ProjectDetail() {
     status?: ProjectStatus;
     note?: string;
   }>({});
+  const [constructionForm, setConstructionForm] = useState<string>('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
   // Fetch project
@@ -239,6 +267,22 @@ export default function ProjectDetail() {
     },
   });
 
+  // Update construction status mutation
+  const updateConstructionMutation = useMutation({
+    mutationFn: async (newStatus: string) => {
+      const { error } = await supabase
+        .from('projects')
+        .update({ construction_status: newStatus as any })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      toast.success('施工狀態已更新');
+      setIsEditConstructionOpen(false);
+    },
+  });
+
   // Add document mutation
   const addDocumentMutation = useMutation({
     mutationFn: async (data: typeof docForm) => {
@@ -332,13 +376,18 @@ export default function ProjectDetail() {
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div className="flex-1">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             <h1 className="text-2xl font-display font-bold text-foreground">
               {project.project_name}
             </h1>
             <Badge className={getStatusColor(project.status)} variant="secondary">
               {project.status}
             </Badge>
+            {(project as any).construction_status && (
+              <Badge className={getConstructionStatusColor((project as any).construction_status)} variant="secondary">
+                施工：{(project as any).construction_status}
+              </Badge>
+            )}
           </div>
           <p className="text-muted-foreground mt-1">
             {project.project_code} • {project.city} {project.district}
@@ -356,6 +405,8 @@ export default function ProjectDetail() {
       <Tabs defaultValue="info" className="w-full">
         <TabsList>
           <TabsTrigger value="info">基本資料</TabsTrigger>
+          <TabsTrigger value="power">用電資訊</TabsTrigger>
+          <TabsTrigger value="construction">施工進度</TabsTrigger>
           <TabsTrigger value="status">狀態紀錄</TabsTrigger>
           <TabsTrigger value="documents">文件</TabsTrigger>
         </TabsList>
@@ -382,12 +433,20 @@ export default function ProjectDetail() {
                     <p>{project.capacity_kwp || '-'}</p>
                   </div>
                   <div>
+                    <p className="text-sm text-muted-foreground">實際裝置容量 (kWp)</p>
+                    <p>{(project as any).actual_installed_capacity || '-'}</p>
+                  </div>
+                  <div>
                     <p className="text-sm text-muted-foreground">饋線代號</p>
                     <p>{project.feeder_code || '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">業績年度</p>
                     <p>{project.fiscal_year || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">裝置類型</p>
+                    <p>{(project as any).installation_type || '-'}</p>
                   </div>
                 </div>
                 <div>
@@ -592,6 +651,78 @@ export default function ProjectDetail() {
           </div>
         </TabsContent>
 
+        {/* Power Information Tab */}
+        <TabsContent value="power" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Plug className="w-5 h-5 text-primary" />
+                用電資訊
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <p className="text-sm text-muted-foreground">台電 PV 編號</p>
+                  <p className="font-mono">{(project as any).taipower_pv_id || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">併聯方式</p>
+                  <p>{(project as any).grid_connection_type || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">供電模式</p>
+                  <p>{(project as any).power_phase_type || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">供電電壓</p>
+                  <p>{(project as any).power_voltage || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">立桿狀態</p>
+                  <p>{(project as any).pole_status || '-'}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Construction Status Tab */}
+        <TabsContent value="construction" className="mt-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Wrench className="w-5 h-5 text-primary" />
+                施工進度狀況
+              </CardTitle>
+              {canEdit && (
+                <Button 
+                  size="sm" 
+                  onClick={() => {
+                    setConstructionForm((project as any).construction_status || '');
+                    setIsEditConstructionOpen(true);
+                  }}
+                >
+                  <Edit className="w-4 h-4 mr-2" />
+                  變更狀態
+                </Button>
+              )}
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-4">
+                <span className="text-muted-foreground">目前施工狀態：</span>
+                {(project as any).construction_status ? (
+                  <Badge className={getConstructionStatusColor((project as any).construction_status)} variant="secondary">
+                    {(project as any).construction_status}
+                  </Badge>
+                ) : (
+                  <span className="text-muted-foreground">尚未設定</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* Status History Tab */}
         <TabsContent value="status" className="mt-6">
           <Card>
@@ -735,6 +866,43 @@ export default function ProjectDetail() {
             <Button
               onClick={() => statusForm.status && addStatusHistoryMutation.mutate(statusForm as { status: ProjectStatus; note?: string })}
               disabled={!statusForm.status || addStatusHistoryMutation.isPending}
+            >
+              確認變更
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Construction Status Dialog */}
+      <Dialog open={isEditConstructionOpen} onOpenChange={setIsEditConstructionOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>變更施工狀態</DialogTitle>
+            <DialogDescription>選擇新的施工進度狀態</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>施工狀態</Label>
+              <Select
+                value={constructionForm}
+                onValueChange={setConstructionForm}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="選擇狀態" />
+                </SelectTrigger>
+                <SelectContent>
+                  {constructionStatuses.map(status => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditConstructionOpen(false)}>取消</Button>
+            <Button
+              onClick={() => constructionForm && updateConstructionMutation.mutate(constructionForm)}
+              disabled={!constructionForm || updateConstructionMutation.isPending}
             >
               確認變更
             </Button>

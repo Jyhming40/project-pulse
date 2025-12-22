@@ -15,7 +15,8 @@ import {
   Edit,
   Trash2,
   FileDown,
-  FileUp
+  FileUp,
+  Wrench
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -81,12 +82,36 @@ const getStatusColor = (status: string) => {
   return statusColorMap[status] || 'bg-muted text-muted-foreground';
 };
 
+const getConstructionStatusColor = (status: string) => {
+  const colorMap: Record<string, string> = {
+    '已開工': 'bg-primary/15 text-primary',
+    '尚未開工': 'bg-muted text-muted-foreground',
+    '已掛錶': 'bg-success/15 text-success',
+    '待掛錶': 'bg-warning/15 text-warning',
+    '暫緩': 'bg-muted text-muted-foreground',
+    '取消': 'bg-destructive/15 text-destructive',
+  };
+  return colorMap[status] || 'bg-muted text-muted-foreground';
+};
+
 const cities = [
   '台北市', '新北市', '桃園市', '台中市', '台南市', '高雄市',
   '基隆市', '新竹市', '新竹縣', '苗栗縣', '彰化縣', '南投縣',
   '雲林縣', '嘉義市', '嘉義縣', '屏東縣', '宜蘭縣', '花蓮縣',
   '台東縣', '澎湖縣', '金門縣', '連江縣'
 ];
+
+// Enum options for new fields
+const installationTypes = [
+  '畜牧舍', '農業設施', '農棚', '地面型', '農舍', '住宅', '廠辦',
+  '特目用建物', '特登工廠', '集合住宅', '其他設施', '新建物（農業）', '新建物（其他）'
+];
+
+const gridConnectionTypes = ['高壓併低壓側', '低壓', '併內線－躉售', '併內線－自發自用'];
+const powerPhaseTypes = ['單相三線式', '三相三線式', '三相四線式'];
+const powerVoltages = ['220V', '220V / 380V', '380V', '440V', '480V'];
+const poleStatuses = ['已立桿', '未立桿', '基礎完成', '無須', '需移桿', '亭置式'];
+const constructionStatuses = ['已開工', '尚未開工', '已掛錶', '待掛錶', '暫緩', '取消'];
 
 export default function Projects() {
   const navigate = useNavigate();
@@ -99,11 +124,21 @@ export default function Projects() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [cityFilter, setCityFilter] = useState<string>('all');
+  const [constructionFilter, setConstructionFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
 
   // Form state
-  const [formData, setFormData] = useState<Partial<ProjectInsert>>({});
+  const [formData, setFormData] = useState<Partial<ProjectInsert> & {
+    installation_type?: string;
+    actual_installed_capacity?: number;
+    taipower_pv_id?: string;
+    grid_connection_type?: string;
+    power_phase_type?: string;
+    power_voltage?: string;
+    pole_status?: string;
+    construction_status?: string;
+  }>({});
   
   // Import/Export dialog
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
@@ -136,7 +171,7 @@ export default function Projects() {
 
   // Create mutation
   const createMutation = useMutation({
-    mutationFn: async (data: ProjectInsert) => {
+    mutationFn: async (data: any) => {
       const { data: newProject, error } = await supabase
         .from('projects')
         .insert(data)
@@ -163,7 +198,7 @@ export default function Projects() {
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: Partial<Project> }) => {
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
       const { error } = await supabase.from('projects').update(data).eq('id', id);
       if (error) throw error;
     },
@@ -203,8 +238,9 @@ export default function Projects() {
     
     const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
     const matchesCity = cityFilter === 'all' || project.city === cityFilter;
+    const matchesConstruction = constructionFilter === 'all' || (project as any).construction_status === constructionFilter;
     
-    return matchesSearch && matchesStatus && matchesCity;
+    return matchesSearch && matchesStatus && matchesCity && matchesConstruction;
   });
 
   const handleCreate = () => {
@@ -215,7 +251,7 @@ export default function Projects() {
     createMutation.mutate({
       ...formData,
       created_by: user?.id,
-    } as ProjectInsert);
+    });
   };
 
   const handleUpdate = () => {
@@ -241,6 +277,14 @@ export default function Projects() {
       contact_person: project.contact_person,
       contact_phone: project.contact_phone,
       note: project.note,
+      installation_type: (project as any).installation_type,
+      actual_installed_capacity: (project as any).actual_installed_capacity,
+      taipower_pv_id: (project as any).taipower_pv_id,
+      grid_connection_type: (project as any).grid_connection_type,
+      power_phase_type: (project as any).power_phase_type,
+      power_voltage: (project as any).power_voltage,
+      pole_status: (project as any).pole_status,
+      construction_status: (project as any).construction_status,
     });
   };
 
@@ -301,6 +345,17 @@ export default function Projects() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={constructionFilter} onValueChange={setConstructionFilter}>
+          <SelectTrigger className="w-full sm:w-[150px]">
+            <SelectValue placeholder="施工狀態" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部施工狀態</SelectItem>
+            {constructionStatuses.map(status => (
+              <SelectItem key={status} value={status}>{status}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}
@@ -312,6 +367,7 @@ export default function Projects() {
               <TableHead>案場名稱</TableHead>
               <TableHead>投資方</TableHead>
               <TableHead>狀態</TableHead>
+              <TableHead>施工狀態</TableHead>
               <TableHead>容量 (kWp)</TableHead>
               <TableHead>縣市</TableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -320,7 +376,7 @@ export default function Projects() {
           <TableBody>
             {filteredProjects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                   {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
@@ -338,6 +394,13 @@ export default function Projects() {
                     <Badge className={getStatusColor(project.status)} variant="secondary">
                       {project.status}
                     </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {(project as any).construction_status ? (
+                      <Badge className={getConstructionStatusColor((project as any).construction_status)} variant="secondary">
+                        {(project as any).construction_status}
+                      </Badge>
+                    ) : '-'}
                   </TableCell>
                   <TableCell>{project.capacity_kwp || '-'}</TableCell>
                   <TableCell>{project.city || '-'}</TableCell>
@@ -389,7 +452,7 @@ export default function Projects() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingProject ? '編輯案場' : '新增案場'}</DialogTitle>
             <DialogDescription>
@@ -398,6 +461,8 @@ export default function Projects() {
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
+            {/* Basic Info Section */}
+            <h3 className="font-semibold text-foreground border-b pb-2">基本資料</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="project_code">案場編號 *</Label>
@@ -454,7 +519,7 @@ export default function Projects() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="capacity_kwp">容量 (kWp)</Label>
                 <Input
@@ -467,6 +532,17 @@ export default function Projects() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="actual_installed_capacity">實際裝置容量 (kWp)</Label>
+                <Input
+                  id="actual_installed_capacity"
+                  type="number"
+                  step="0.01"
+                  value={formData.actual_installed_capacity || ''}
+                  onChange={(e) => setFormData({ ...formData, actual_installed_capacity: parseFloat(e.target.value) || undefined })}
+                  placeholder="例：495.0"
+                />
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="feeder_code">饋線代號</Label>
                 <Input
                   id="feeder_code"
@@ -474,6 +550,41 @@ export default function Projects() {
                   onChange={(e) => setFormData({ ...formData, feeder_code: e.target.value })}
                   placeholder="例：TN-001"
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="installation_type">裝置類型</Label>
+                <Select 
+                  value={formData.installation_type || ''} 
+                  onValueChange={(value) => setFormData({ ...formData, installation_type: value as any })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇裝置類型" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {installationTypes.map(type => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="construction_status">施工狀態</Label>
+                <Select 
+                  value={formData.construction_status || ''} 
+                  onValueChange={(value) => setFormData({ ...formData, construction_status: value as any })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇施工狀態" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {constructionStatuses.map(status => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -550,6 +661,87 @@ export default function Projects() {
                   value={formData.contact_phone || ''}
                   onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
                 />
+              </div>
+            </div>
+
+            {/* Power Info Section */}
+            <h3 className="font-semibold text-foreground border-b pb-2 mt-4">用電資訊</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="taipower_pv_id">台電 PV 編號</Label>
+                <Input
+                  id="taipower_pv_id"
+                  value={formData.taipower_pv_id || ''}
+                  onChange={(e) => setFormData({ ...formData, taipower_pv_id: e.target.value })}
+                  placeholder="台電審查意見書後填寫"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="grid_connection_type">併聯方式</Label>
+                <Select 
+                  value={formData.grid_connection_type || ''} 
+                  onValueChange={(value) => setFormData({ ...formData, grid_connection_type: value as any })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇併聯方式" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {gridConnectionTypes.map(type => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="power_phase_type">供電模式</Label>
+                <Select 
+                  value={formData.power_phase_type || ''} 
+                  onValueChange={(value) => setFormData({ ...formData, power_phase_type: value as any })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇供電模式" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {powerPhaseTypes.map(type => (
+                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="power_voltage">供電電壓</Label>
+                <Select 
+                  value={formData.power_voltage || ''} 
+                  onValueChange={(value) => setFormData({ ...formData, power_voltage: value as any })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇供電電壓" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {powerVoltages.map(v => (
+                      <SelectItem key={v} value={v}>{v}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pole_status">立桿狀態</Label>
+                <Select 
+                  value={formData.pole_status || ''} 
+                  onValueChange={(value) => setFormData({ ...formData, pole_status: value as any })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇立桿狀態" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {poleStatuses.map(status => (
+                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
