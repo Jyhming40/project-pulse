@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      construction_status_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          note: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["construction_status"]
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          note?: string | null
+          project_id: string
+          status: Database["public"]["Enums"]["construction_status"]
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          note?: string | null
+          project_id?: string
+          status?: Database["public"]["Enums"]["construction_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "construction_status_history_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_files: {
         Row: {
           document_id: string
