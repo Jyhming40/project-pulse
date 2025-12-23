@@ -731,6 +731,14 @@ export function useDataImport() {
     setDocumentPreview(null);
   }, []);
 
+  const clearInvestorContactPreview = useCallback(() => {
+    setInvestorContactPreview(null);
+  }, []);
+
+  const clearInvestorPaymentMethodPreview = useCallback(() => {
+    setInvestorPaymentMethodPreview(null);
+  }, []);
+
   return {
     isProcessing,
     projectPreview,
@@ -749,5 +757,7 @@ export function useDataImport() {
     importInvestorPaymentMethods,
     importDocuments,
     clearPreview,
+    clearInvestorContactPreview,
+    clearInvestorPaymentMethodPreview,
   };
 }

@@ -132,8 +132,13 @@ export default function InvestorDataManagement() {
   };
 
   const handleImportContacts = async (strategy: 'skip' | 'update') => {
+    if (!investorContactPreview) return;
     try {
-      await importInvestorContacts(strategy);
+      await importInvestorContacts(
+        investorContactPreview.data,
+        strategy,
+        investorContactPreview.duplicates
+      );
       toast.success('聯絡人匯入成功');
     } catch (error) {
       toast.error('匯入失敗', { description: error instanceof Error ? error.message : '未知錯誤' });
@@ -141,8 +146,13 @@ export default function InvestorDataManagement() {
   };
 
   const handleImportPayments = async (strategy: 'skip' | 'update') => {
+    if (!investorPaymentMethodPreview) return;
     try {
-      await importInvestorPaymentMethods(strategy);
+      await importInvestorPaymentMethods(
+        investorPaymentMethodPreview.data,
+        strategy,
+        investorPaymentMethodPreview.duplicates
+      );
       toast.success('支付方式匯入成功');
     } catch (error) {
       toast.error('匯入失敗', { description: error instanceof Error ? error.message : '未知錯誤' });

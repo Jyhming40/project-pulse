@@ -415,11 +415,17 @@ export default function Investors() {
               </TabsContent>
 
               <TabsContent value="contacts" className="mt-4">
-                <InvestorContacts investorId={viewingInvestor.id} />
+                <InvestorContacts 
+                  investorId={viewingInvestor.id} 
+                  onExport={(contacts, format) => exportInvestorContacts(contacts, format)}
+                />
               </TabsContent>
 
               <TabsContent value="payments" className="mt-4">
-                <InvestorPaymentMethods investorId={viewingInvestor.id} />
+                <InvestorPaymentMethods 
+                  investorId={viewingInvestor.id}
+                  onExport={(methods, format) => exportInvestorPaymentMethods(methods, format)}
+                />
               </TabsContent>
 
               <TabsContent value="projects" className="mt-4">

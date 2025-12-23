@@ -12,6 +12,7 @@ import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import Investors from "./pages/Investors";
 import InvestorCodeReference from "./pages/InvestorCodeReference";
+import InvestorDataManagement from "./pages/InvestorDataManagement";
 import Documents from "./pages/Documents";
 import Settings from "./pages/Settings";
 import SystemOptions from "./pages/SystemOptions";
@@ -32,6 +33,7 @@ const App = () => (
             <Route path="/projects/:id" element={<ProtectedRoute><Layout><ProjectDetail /></Layout></ProtectedRoute>} />
             <Route path="/investors" element={<ProtectedRoute><Layout><Investors /></Layout></ProtectedRoute>} />
             <Route path="/investor-codes" element={<ProtectedRoute><Layout><InvestorCodeReference /></Layout></ProtectedRoute>} />
+            <Route path="/investor-data" element={<ProtectedRoute><Layout><InvestorDataManagement /></Layout></ProtectedRoute>} />
             <Route path="/documents" element={<ProtectedRoute><Layout><Documents /></Layout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Layout><Settings /></Layout></ProtectedRoute>} />
             <Route path="/system-options" element={<ProtectedRoute adminOnly><Layout><SystemOptions /></Layout></ProtectedRoute>} />
