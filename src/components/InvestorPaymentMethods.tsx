@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Edit, CreditCard, Star, Trash2 } from 'lucide-react';
+import { Plus, Edit, CreditCard, Star, Trash2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +24,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 
@@ -40,9 +46,11 @@ const METHOD_TYPE_OPTIONS: { value: PaymentMethodType; label: string }[] = [
 
 interface InvestorPaymentMethodsProps {
   investorId: string;
+  investorCode?: string;
+  onExport?: (methods: InvestorPaymentMethod[]) => void;
 }
 
-export function InvestorPaymentMethods({ investorId }: InvestorPaymentMethodsProps) {
+export function InvestorPaymentMethods({ investorId, investorCode, onExport }: InvestorPaymentMethodsProps) {
   const { canEdit, isAdmin, user } = useAuth();
   const queryClient = useQueryClient();
   
@@ -200,12 +208,29 @@ export function InvestorPaymentMethods({ investorId }: InvestorPaymentMethodsPro
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">共 {methods.length} 種支付方式</p>
-        {canEdit && (
-          <Button size="sm" onClick={openCreateDialog}>
-            <Plus className="w-4 h-4 mr-1" />
-            新增支付方式
-          </Button>
-        )}
+        <div className="flex gap-2">
+          {methods.length > 0 && onExport && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Download className="w-4 h-4 mr-1" />
+                  匯出
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onClick={() => onExport(methods)}>
+                  匯出此投資方支付方式
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+          {canEdit && (
+            <Button size="sm" onClick={openCreateDialog}>
+              <Plus className="w-4 h-4 mr-1" />
+              新增支付方式
+            </Button>
+          )}
+        </div>
       </div>
 
       {methods.length === 0 ? (
