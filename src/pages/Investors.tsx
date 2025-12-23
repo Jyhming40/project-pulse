@@ -21,6 +21,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ImportExportDialog } from '@/components/ImportExportDialog';
+import { useDataExport } from '@/hooks/useDataExport';
 import { InvestorContacts } from '@/components/InvestorContacts';
 import { InvestorPaymentMethods } from '@/components/InvestorPaymentMethods';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -69,6 +70,7 @@ const INVESTOR_TYPE_OPTIONS: InvestorType[] = ['自有投資', '租賃投資', '
 export default function Investors() {
   const { canEdit, isAdmin, user } = useAuth();
   const queryClient = useQueryClient();
+  const { exportInvestorContacts, exportInvestorPaymentMethods } = useDataExport();
   
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
