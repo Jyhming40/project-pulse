@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import {
 import { 
   Plus, 
   Search, 
@@ -13,11 +14,17 @@ import {
   Trash2,
   Phone,
   Mail,
-  FileDown
+  FileDown,
+  User,
+  CreditCard,
+  Contact
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ImportExportDialog } from '@/components/ImportExportDialog';
+import { InvestorContacts } from '@/components/InvestorContacts';
+import { InvestorPaymentMethods } from '@/components/InvestorPaymentMethods';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Table, 
   TableBody, 
@@ -41,6 +48,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -49,6 +63,9 @@ import type { Database } from '@/integrations/supabase/types';
 
 type Investor = Database['public']['Tables']['investors']['Row'];
 type InvestorInsert = Database['public']['Tables']['investors']['Insert'];
+type InvestorType = Database['public']['Enums']['investor_type'];
+
+const INVESTOR_TYPE_OPTIONS: InvestorType[] = ['自有投資', '租賃投資', 'SPC', '個人', '其他'];
 
 export default function Investors() {
   const { canEdit, isAdmin, user } = useAuth();
@@ -58,6 +75,7 @@ export default function Investors() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingInvestor, setEditingInvestor] = useState<Investor | null>(null);
   const [viewingInvestor, setViewingInvestor] = useState<Investor | null>(null);
+  const [activeTab, setActiveTab] = useState('info');
 
   // Form state
   const [formData, setFormData] = useState<Partial<InvestorInsert>>({});
@@ -149,6 +167,7 @@ export default function Investors() {
       inv.company_name.toLowerCase().includes(search.toLowerCase()) ||
       inv.investor_code.toLowerCase().includes(search.toLowerCase()) ||
       inv.contact_person?.toLowerCase().includes(search.toLowerCase()) ||
+      inv.owner_name?.toLowerCase().includes(search.toLowerCase()) ||
       inv.email?.toLowerCase().includes(search.toLowerCase());
     return matchesSearch;
   });
@@ -175,12 +194,20 @@ export default function Investors() {
       investor_code: investor.investor_code,
       company_name: investor.company_name,
       tax_id: investor.tax_id,
+      owner_name: investor.owner_name,
+      owner_title: investor.owner_title,
+      investor_type: investor.investor_type,
       contact_person: investor.contact_person,
       phone: investor.phone,
       email: investor.email,
       address: investor.address,
       note: investor.note,
     });
+  };
+
+  const openViewDialog = (investor: Investor) => {
+    setViewingInvestor(investor);
+    setActiveTab('info');
   };
 
   const statusColors: Record<string, string> = {
@@ -219,7 +246,7 @@ export default function Investors() {
       <div className="relative max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="搜尋公司名稱、編號、聯絡人、Email..."
+          placeholder="搜尋公司名稱、編號、負責人、聯絡人..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="pl-10"
@@ -233,10 +260,10 @@ export default function Investors() {
             <TableRow>
               <TableHead>投資方編號</TableHead>
               <TableHead>公司名稱</TableHead>
-              <TableHead>統編</TableHead>
+              <TableHead>類型</TableHead>
+              <TableHead>負責人</TableHead>
               <TableHead>聯絡人</TableHead>
               <TableHead>電話</TableHead>
-              <TableHead>Email</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -252,14 +279,20 @@ export default function Investors() {
                 <TableRow 
                   key={investor.id}
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => setViewingInvestor(investor)}
+                  onClick={() => openViewDialog(investor)}
                 >
                   <TableCell className="font-mono text-sm">{investor.investor_code}</TableCell>
                   <TableCell className="font-medium">{investor.company_name}</TableCell>
-                  <TableCell>{investor.tax_id || '-'}</TableCell>
+                  <TableCell>
+                    {investor.investor_type && (
+                      <Badge variant="outline" className="text-xs">
+                        {investor.investor_type}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>{investor.owner_name || '-'}</TableCell>
                   <TableCell>{investor.contact_person || '-'}</TableCell>
                   <TableCell>{investor.phone || '-'}</TableCell>
-                  <TableCell>{investor.email || '-'}</TableCell>
                   <TableCell onClick={(e) => e.stopPropagation()}>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -268,7 +301,7 @@ export default function Investors() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setViewingInvestor(investor)}>
+                        <DropdownMenuItem onClick={() => openViewDialog(investor)}>
                           <Eye className="w-4 h-4 mr-2" />
                           檢視
                         </DropdownMenuItem>
@@ -297,82 +330,124 @@ export default function Investors() {
         </Table>
       </div>
 
-      {/* View Investor Dialog */}
+      {/* View Investor Dialog with Tabs */}
       <Dialog open={!!viewingInvestor} onOpenChange={(open) => !open && setViewingInvestor(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="w-5 h-5 text-primary" />
               {viewingInvestor?.company_name}
+              {viewingInvestor?.investor_type && (
+                <Badge variant="outline" className="ml-2">
+                  {viewingInvestor.investor_type}
+                </Badge>
+              )}
             </DialogTitle>
-            <DialogDescription>投資方詳細資訊</DialogDescription>
+            <DialogDescription>投資方編號：{viewingInvestor?.investor_code}</DialogDescription>
           </DialogHeader>
+          
           {viewingInvestor && (
-            <div className="space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">投資方編號</p>
-                  <p className="font-mono">{viewingInvestor.investor_code}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">統一編號</p>
-                  <p>{viewingInvestor.tax_id || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">聯絡人</p>
-                  <p>{viewingInvestor.contact_person || '-'}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">電話</p>
-                  <p>{viewingInvestor.phone || '-'}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-sm text-muted-foreground">Email</p>
-                  <p>{viewingInvestor.email || '-'}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-sm text-muted-foreground">地址</p>
-                  <p>{viewingInvestor.address || '-'}</p>
-                </div>
-                {viewingInvestor.note && (
-                  <div className="col-span-2">
-                    <p className="text-sm text-muted-foreground">備註</p>
-                    <p className="whitespace-pre-wrap">{viewingInvestor.note}</p>
-                  </div>
-                )}
-              </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="mt-2">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="info" className="flex items-center gap-1">
+                  <User className="w-4 h-4" />
+                  基本資料
+                </TabsTrigger>
+                <TabsTrigger value="contacts" className="flex items-center gap-1">
+                  <Contact className="w-4 h-4" />
+                  聯絡人
+                </TabsTrigger>
+                <TabsTrigger value="payments" className="flex items-center gap-1">
+                  <CreditCard className="w-4 h-4" />
+                  支付方式
+                </TabsTrigger>
+                <TabsTrigger value="projects" className="flex items-center gap-1">
+                  <Building2 className="w-4 h-4" />
+                  關聯案場
+                </TabsTrigger>
+              </TabsList>
 
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Building2 className="w-4 h-4" />
-                    關聯案場 ({investorProjects.length})
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {investorProjects.length === 0 ? (
-                    <p className="text-sm text-muted-foreground text-center py-4">無關聯案場</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {investorProjects.map(project => (
-                        <div 
-                          key={project.id} 
-                          className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
-                        >
-                          <div>
-                            <p className="font-medium">{project.project_name}</p>
-                            <p className="text-sm text-muted-foreground">{project.project_code}</p>
-                          </div>
-                          <Badge className={statusColors[project.status] || 'bg-muted text-muted-foreground'} variant="secondary">
-                            {project.status}
-                          </Badge>
-                        </div>
-                      ))}
+              <TabsContent value="info" className="mt-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-muted-foreground">投資方編號</p>
+                    <p className="font-mono">{viewingInvestor.investor_code}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">統一編號</p>
+                    <p>{viewingInvestor.tax_id || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">負責人</p>
+                    <p>
+                      {viewingInvestor.owner_name || '-'}
+                      {viewingInvestor.owner_title && ` (${viewingInvestor.owner_title})`}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">投資方類型</p>
+                    <p>{viewingInvestor.investor_type || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">聯絡人</p>
+                    <p>{viewingInvestor.contact_person || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">電話</p>
+                    <p>{viewingInvestor.phone || '-'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-sm text-muted-foreground">Email</p>
+                    <p>{viewingInvestor.email || '-'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-sm text-muted-foreground">地址</p>
+                    <p>{viewingInvestor.address || '-'}</p>
+                  </div>
+                  {viewingInvestor.note && (
+                    <div className="col-span-2">
+                      <p className="text-sm text-muted-foreground">備註</p>
+                      <p className="whitespace-pre-wrap">{viewingInvestor.note}</p>
                     </div>
                   )}
-                </CardContent>
-              </Card>
-            </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="contacts" className="mt-4">
+                <InvestorContacts investorId={viewingInvestor.id} />
+              </TabsContent>
+
+              <TabsContent value="payments" className="mt-4">
+                <InvestorPaymentMethods investorId={viewingInvestor.id} />
+              </TabsContent>
+
+              <TabsContent value="projects" className="mt-4">
+                {investorProjects.length === 0 ? (
+                  <div className="py-8 text-center text-muted-foreground border rounded-lg bg-muted/30">
+                    尚無關聯案場
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {investorProjects.map(project => (
+                      <div 
+                        key={project.id} 
+                        className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+                      >
+                        <div>
+                          <p className="font-medium">{project.project_name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {project.site_code_display || project.project_code}
+                          </p>
+                        </div>
+                        <Badge className={statusColors[project.status] || 'bg-muted text-muted-foreground'} variant="secondary">
+                          {project.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           )}
         </DialogContent>
       </Dialog>
@@ -388,7 +463,7 @@ export default function Investors() {
           }
         }}
       >
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingInvestor ? '編輯投資方' : '新增投資方'}</DialogTitle>
             <DialogDescription>
@@ -434,16 +509,55 @@ export default function Investors() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="contact_person">聯絡人</Label>
+                <Label htmlFor="investor_type">投資方類型</Label>
+                <Select
+                  value={formData.investor_type || ''}
+                  onValueChange={(value) => setFormData({ ...formData, investor_type: value as InvestorType })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇類型" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INVESTOR_TYPE_OPTIONS.map(type => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="owner_name">負責人</Label>
+                <Input
+                  id="owner_name"
+                  value={formData.owner_name || ''}
+                  onChange={(e) => setFormData({ ...formData, owner_name: e.target.value })}
+                  placeholder="公司負責人姓名"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="owner_title">負責人職稱</Label>
+                <Input
+                  id="owner_title"
+                  value={formData.owner_title || ''}
+                  onChange={(e) => setFormData({ ...formData, owner_title: e.target.value })}
+                  placeholder="例：董事長"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="contact_person">主要聯絡人</Label>
                 <Input
                   id="contact_person"
                   value={formData.contact_person || ''}
                   onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
                 />
               </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="phone">電話</Label>
                 <Input
@@ -452,15 +566,16 @@ export default function Investors() {
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={formData.email || ''}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                />
-              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                value={formData.email || ''}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+              />
             </div>
 
             <div className="space-y-2">

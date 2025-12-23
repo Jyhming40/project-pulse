@@ -143,6 +143,127 @@ export type Database = {
           },
         ]
       }
+      investor_contacts: {
+        Row: {
+          contact_name: string
+          created_at: string
+          created_by: string | null
+          department: string | null
+          email: string | null
+          id: string
+          investor_id: string
+          is_active: boolean | null
+          is_primary: boolean | null
+          line_id: string | null
+          mobile: string | null
+          note: string | null
+          phone: string | null
+          role_tags: Database["public"]["Enums"]["contact_role_tag"][] | null
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          contact_name: string
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          email?: string | null
+          id?: string
+          investor_id: string
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          line_id?: string | null
+          mobile?: string | null
+          note?: string | null
+          phone?: string | null
+          role_tags?: Database["public"]["Enums"]["contact_role_tag"][] | null
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contact_name?: string
+          created_at?: string
+          created_by?: string | null
+          department?: string | null
+          email?: string | null
+          id?: string
+          investor_id?: string
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          line_id?: string | null
+          mobile?: string | null
+          note?: string | null
+          phone?: string | null
+          role_tags?: Database["public"]["Enums"]["contact_role_tag"][] | null
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_contacts_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investor_payment_methods: {
+        Row: {
+          account_name: string | null
+          account_number: string | null
+          bank_code: string | null
+          bank_name: string | null
+          branch_name: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          investor_id: string
+          is_default: boolean | null
+          method_type: Database["public"]["Enums"]["payment_method_type"]
+          note: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_name?: string | null
+          account_number?: string | null
+          bank_code?: string | null
+          bank_name?: string | null
+          branch_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          investor_id: string
+          is_default?: boolean | null
+          method_type: Database["public"]["Enums"]["payment_method_type"]
+          note?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_name?: string | null
+          account_number?: string | null
+          bank_code?: string | null
+          bank_name?: string | null
+          branch_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          investor_id?: string
+          is_default?: boolean | null
+          method_type?: Database["public"]["Enums"]["payment_method_type"]
+          note?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investor_payment_methods_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       investor_year_counters: {
         Row: {
           created_at: string
@@ -180,7 +301,10 @@ export type Database = {
           email: string | null
           id: string
           investor_code: string
+          investor_type: Database["public"]["Enums"]["investor_type"] | null
           note: string | null
+          owner_name: string | null
+          owner_title: string | null
           phone: string | null
           tax_id: string | null
           updated_at: string
@@ -194,7 +318,10 @@ export type Database = {
           email?: string | null
           id?: string
           investor_code: string
+          investor_type?: Database["public"]["Enums"]["investor_type"] | null
           note?: string | null
+          owner_name?: string | null
+          owner_title?: string | null
           phone?: string | null
           tax_id?: string | null
           updated_at?: string
@@ -208,7 +335,10 @@ export type Database = {
           email?: string | null
           id?: string
           investor_code?: string
+          investor_type?: Database["public"]["Enums"]["investor_type"] | null
           note?: string | null
+          owner_name?: string | null
+          owner_title?: string | null
           phone?: string | null
           tax_id?: string | null
           updated_at?: string
@@ -568,6 +698,14 @@ export type Database = {
         | "待掛錶"
         | "暫緩"
         | "取消"
+      contact_role_tag:
+        | "主要聯絡人"
+        | "財務"
+        | "工程"
+        | "法務"
+        | "行政"
+        | "業務"
+        | "其他"
       doc_status: "未開始" | "進行中" | "已完成" | "退件補正"
       doc_type:
         | "台電審查意見書"
@@ -598,6 +736,8 @@ export type Database = {
         | "其他設施"
         | "新建物（農業）"
         | "新建物（其他）"
+      investor_type: "自有投資" | "租賃投資" | "SPC" | "個人" | "其他"
+      payment_method_type: "銀行轉帳" | "支票" | "現金" | "信用卡" | "其他"
       pole_status:
         | "已立桿"
         | "未立桿"
@@ -757,6 +897,15 @@ export const Constants = {
         "暫緩",
         "取消",
       ],
+      contact_role_tag: [
+        "主要聯絡人",
+        "財務",
+        "工程",
+        "法務",
+        "行政",
+        "業務",
+        "其他",
+      ],
       doc_status: ["未開始", "進行中", "已完成", "退件補正"],
       doc_type: [
         "台電審查意見書",
@@ -790,6 +939,8 @@ export const Constants = {
         "新建物（農業）",
         "新建物（其他）",
       ],
+      investor_type: ["自有投資", "租賃投資", "SPC", "個人", "其他"],
+      payment_method_type: ["銀行轉帳", "支票", "現金", "信用卡", "其他"],
       pole_status: ["已立桿", "未立桿", "基礎完成", "無須", "需移桿", "亭置式"],
       power_phase_type: ["單相三線式", "三相三線式", "三相四線式"],
       power_voltage: ["220V", "220V / 380V", "380V", "440V", "480V"],
