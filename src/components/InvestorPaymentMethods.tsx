@@ -47,7 +47,7 @@ const METHOD_TYPE_OPTIONS: { value: PaymentMethodType; label: string }[] = [
 interface InvestorPaymentMethodsProps {
   investorId: string;
   investorCode?: string;
-  onExport?: (methods: InvestorPaymentMethod[]) => void;
+  onExport?: (methods: InvestorPaymentMethod[], format: 'xlsx' | 'csv') => void;
 }
 
 export function InvestorPaymentMethods({ investorId, investorCode, onExport }: InvestorPaymentMethodsProps) {
@@ -218,8 +218,11 @@ export function InvestorPaymentMethods({ investorId, investorCode, onExport }: I
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => onExport(methods)}>
-                  匯出此投資方支付方式
+                <DropdownMenuItem onClick={() => onExport(methods, 'xlsx')}>
+                  匯出 Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onExport(methods, 'csv')}>
+                  匯出 CSV
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

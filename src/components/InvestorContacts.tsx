@@ -43,7 +43,7 @@ const ROLE_TAG_OPTIONS: { value: ContactRoleTag; label: string }[] = [
 interface InvestorContactsProps {
   investorId: string;
   investorCode?: string;
-  onExport?: (contacts: InvestorContact[]) => void;
+  onExport?: (contacts: InvestorContact[], format: 'xlsx' | 'csv') => void;
 }
 
 export function InvestorContacts({ investorId, investorCode, onExport }: InvestorContactsProps) {
@@ -229,8 +229,11 @@ export function InvestorContacts({ investorId, investorCode, onExport }: Investo
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent>
-                <DropdownMenuItem onClick={() => onExport(contacts)}>
-                  匯出此投資方聯絡人
+                <DropdownMenuItem onClick={() => onExport(contacts, 'xlsx')}>
+                  匯出 Excel
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => onExport(contacts, 'csv')}>
+                  匯出 CSV
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
