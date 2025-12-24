@@ -1,0 +1,852 @@
+import { useState, useCallback } from 'react';
+import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import type { Database } from '@/integrations/supabase/types';
+
+// Types
+type Project = Database['public']['Tables']['projects']['Row'];
+type ProjectStatusHistory = Database['public']['Tables']['project_status_history']['Row'];
+type ConstructionStatusHistory = Database['public']['Tables']['construction_status_history']['Row'];
+type Document = Database['public']['Tables']['documents']['Row'];
+type DocumentFile = Database['public']['Tables']['document_files']['Row'];
+
+export type ImportMode = 'insert' | 'upsert' | 'skip';
+
+export interface BackupProgress {
+  current: number;
+  total: number;
+  phase: 'preparing' | 'exporting' | 'importing' | 'done';
+  currentSheet?: string;
+}
+
+export interface ImportError {
+  row: number;
+  sheet: string;
+  field?: string;
+  message: string;
+  errorType: 'unique_constraint' | 'foreign_key' | 'validation' | 'data_type' | 'not_found' | 'unknown';
+  code?: string;
+}
+
+export interface ImportSummary {
+  projects: { inserted: number; updated: number; skipped: number; errors: number };
+  statusHistory: { inserted: number; updated: number; skipped: number; errors: number };
+  constructionHistory: { inserted: number; updated: number; skipped: number; errors: number };
+  documents: { inserted: number; updated: number; skipped: number; errors: number };
+  documentFiles: { inserted: number; updated: number; skipped: number; errors: number };
+  errorList: ImportError[];
+}
+
+// Column definitions for export
+const projectColumns = [
+  'id', 'project_code', 'project_name', 'site_code_display', 'investor_code', 'status',
+  'capacity_kwp', 'actual_installed_capacity', 'feeder_code', 'city', 'district', 'address',
+  'coordinates', 'land_owner', 'land_owner_contact', 'contact_person', 'contact_phone',
+  'fiscal_year', 'intake_year', 'seq', 'approval_date', 'installation_type', 'taipower_pv_id',
+  'grid_connection_type', 'power_phase_type', 'power_voltage', 'pole_status', 'construction_status',
+  'drive_folder_id', 'drive_folder_url', 'folder_status', 'folder_error', 'note', 'created_at', 'updated_at'
+];
+
+const projectLabels: Record<string, string> = {
+  id: 'ID', project_code: '案場編號', project_name: '案場名稱', site_code_display: '案場代碼',
+  investor_code: '投資方代碼', status: '狀態', capacity_kwp: '容量(kWp)', actual_installed_capacity: '實際容量',
+  feeder_code: '饋線代號', city: '縣市', district: '鄉鎮區', address: '地址', coordinates: '座標',
+  land_owner: '地主', land_owner_contact: '地主聯絡方式', contact_person: '聯絡人', contact_phone: '聯絡電話',
+  fiscal_year: '年度', intake_year: '收件年度', seq: '序號', approval_date: '同意備案日',
+  installation_type: '裝置類型', taipower_pv_id: '台電PV編號', grid_connection_type: '併網類型',
+  power_phase_type: '相別', power_voltage: '電壓', pole_status: '電桿狀態', construction_status: '施工狀態',
+  drive_folder_id: 'Drive資料夾ID', drive_folder_url: 'Drive資料夾網址', folder_status: '資料夾狀態',
+  folder_error: '資料夾錯誤', note: '備註', created_at: '建立時間', updated_at: '更新時間'
+};
+
+const statusHistoryColumns = ['id', 'project_code', 'status', 'changed_at', 'note'];
+const statusHistoryLabels: Record<string, string> = {
+  id: 'ID', project_code: '案場編號', status: '狀態', changed_at: '變更時間', note: '備註'
+};
+
+const constructionHistoryColumns = ['id', 'project_code', 'status', 'changed_at', 'note'];
+const constructionHistoryLabels: Record<string, string> = {
+  id: 'ID', project_code: '案場編號', status: '施工狀態', changed_at: '變更時間', note: '備註'
+};
+
+const documentColumns = ['id', 'project_code', 'doc_type', 'doc_status', 'submitted_at', 'issued_at', 'due_at', 'note', 'created_at', 'updated_at'];
+const documentLabels: Record<string, string> = {
+  id: 'ID', project_code: '案場編號', doc_type: '文件類型', doc_status: '狀態',
+  submitted_at: '送件日', issued_at: '核發日', due_at: '到期日', note: '備註',
+  created_at: '建立時間', updated_at: '更新時間'
+};
+
+const documentFileColumns = ['id', 'document_id', 'original_name', 'storage_path', 'mime_type', 'file_size', 'uploaded_at'];
+const documentFileLabels: Record<string, string> = {
+  id: 'ID', document_id: '文件ID', original_name: '檔案名稱', storage_path: '儲存路徑',
+  mime_type: 'MIME類型', file_size: '檔案大小', uploaded_at: '上傳時間'
+};
+
+function formatDate(value: any): string {
+  if (!value) return '';
+  if (value instanceof Date) return value.toISOString().split('T')[0];
+  const str = String(value);
+  // Already YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
+  // Parse and format
+  const d = new Date(str);
+  if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+  return str;
+}
+
+function parseDate(value: any): string | null {
+  if (!value || value === '' || value === null || value === undefined) return null;
+  
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return value.toISOString().split('T')[0];
+  }
+  
+  const strValue = String(value).trim();
+  if (!strValue) return null;
+  
+  // Excel serial number
+  const numValue = Number(strValue);
+  if (!isNaN(numValue) && numValue > 1000 && numValue < 100000) {
+    const excelEpoch = new Date(1899, 11, 30);
+    const date = new Date(excelEpoch.getTime() + numValue * 24 * 60 * 60 * 1000);
+    if (!isNaN(date.getTime())) return date.toISOString().split('T')[0];
+  }
+  
+  // YYYY/M/D or YYYY-M-D format
+  const slashMatch = strValue.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (slashMatch) {
+    const [, year, month, day] = slashMatch;
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(date.getTime())) return date.toISOString().split('T')[0];
+  }
+  
+  // ISO format
+  const date = new Date(strValue);
+  if (!isNaN(date.getTime())) return date.toISOString().split('T')[0];
+  
+  return null;
+}
+
+function downloadFile(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+// Fetch all records with pagination
+async function fetchAllRecords<T>(
+  tableName: 'projects' | 'project_status_history' | 'construction_status_history' | 'documents' | 'document_files',
+  select: string = '*',
+  orderBy: string = 'created_at'
+): Promise<T[]> {
+  const records: T[] = [];
+  const pageSize = 1000;
+  let offset = 0;
+  let hasMore = true;
+
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select(select)
+      .order(orderBy, { ascending: true })
+      .range(offset, offset + pageSize - 1);
+
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      hasMore = false;
+    } else {
+      records.push(...(data as T[]));
+      offset += pageSize;
+      if (data.length < pageSize) hasMore = false;
+    }
+  }
+
+  return records;
+}
+
+export function useProjectBackup() {
+  const { user } = useAuth();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [progress, setProgress] = useState<BackupProgress>({ current: 0, total: 0, phase: 'preparing' });
+  const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+
+  // Export all project data to Excel with multiple sheets
+  const exportFullBackup = useCallback(async () => {
+    setIsProcessing(true);
+    setProgress({ current: 0, total: 5, phase: 'preparing' });
+
+    try {
+      // 1. Fetch projects with investor info
+      setProgress({ current: 1, total: 5, phase: 'exporting', currentSheet: '案場主表' });
+      const projects = await fetchAllRecords<Project & { investors?: { investor_code: string } | null }>(
+        'projects',
+        '*, investors(investor_code)',
+        'created_at'
+      );
+
+      // Create project code map for history tables
+      const projectIdToCode = new Map<string, string>();
+      projects.forEach(p => {
+        projectIdToCode.set(p.id, p.project_code);
+      });
+
+      // 2. Fetch status history
+      setProgress({ current: 2, total: 5, phase: 'exporting', currentSheet: '狀態歷程' });
+      const statusHistory = await fetchAllRecords<ProjectStatusHistory>('project_status_history', '*', 'changed_at');
+
+      // 3. Fetch construction history
+      setProgress({ current: 3, total: 5, phase: 'exporting', currentSheet: '施工歷程' });
+      const constructionHistory = await fetchAllRecords<ConstructionStatusHistory>('construction_status_history', '*', 'changed_at');
+
+      // 4. Fetch documents
+      setProgress({ current: 4, total: 5, phase: 'exporting', currentSheet: '文件' });
+      const documents = await fetchAllRecords<Document>('documents', '*', 'created_at');
+
+      // 5. Fetch document files
+      setProgress({ current: 5, total: 5, phase: 'exporting', currentSheet: '文件附件' });
+      const documentFiles = await fetchAllRecords<DocumentFile>('document_files', '*', 'uploaded_at');
+
+      // Create workbook
+      const workbook = XLSX.utils.book_new();
+
+      // Projects sheet
+      const projectData = projects.map(p => {
+        const row: Record<string, any> = {};
+        projectColumns.forEach(col => {
+          if (col === 'investor_code') {
+            row[projectLabels[col]] = p.investors?.investor_code || '';
+          } else if (col === 'approval_date') {
+            row[projectLabels[col]] = formatDate((p as any)[col]);
+          } else {
+            row[projectLabels[col]] = (p as any)[col] ?? '';
+          }
+        });
+        return row;
+      });
+      const projectSheet = XLSX.utils.json_to_sheet(projectData);
+      projectSheet['!cols'] = projectColumns.map(col => ({ wch: Math.max(projectLabels[col].length * 2 + 5, 12) }));
+      XLSX.utils.book_append_sheet(workbook, projectSheet, '案場主表');
+
+      // Status history sheet
+      const statusData = statusHistory.map(h => {
+        const row: Record<string, any> = {};
+        statusHistoryColumns.forEach(col => {
+          if (col === 'project_code') {
+            row[statusHistoryLabels[col]] = projectIdToCode.get(h.project_id) || '';
+          } else if (col === 'changed_at') {
+            row[statusHistoryLabels[col]] = formatDate(h.changed_at);
+          } else {
+            row[statusHistoryLabels[col]] = (h as any)[col] ?? '';
+          }
+        });
+        return row;
+      });
+      const statusSheet = XLSX.utils.json_to_sheet(statusData);
+      XLSX.utils.book_append_sheet(workbook, statusSheet, '狀態歷程');
+
+      // Construction history sheet
+      const constructionData = constructionHistory.map(h => {
+        const row: Record<string, any> = {};
+        constructionHistoryColumns.forEach(col => {
+          if (col === 'project_code') {
+            row[constructionHistoryLabels[col]] = projectIdToCode.get(h.project_id) || '';
+          } else if (col === 'changed_at') {
+            row[constructionHistoryLabels[col]] = formatDate(h.changed_at);
+          } else {
+            row[constructionHistoryLabels[col]] = (h as any)[col] ?? '';
+          }
+        });
+        return row;
+      });
+      const constructionSheet = XLSX.utils.json_to_sheet(constructionData);
+      XLSX.utils.book_append_sheet(workbook, constructionSheet, '施工歷程');
+
+      // Documents sheet
+      const docData = documents.map(d => {
+        const row: Record<string, any> = {};
+        documentColumns.forEach(col => {
+          if (col === 'project_code') {
+            row[documentLabels[col]] = projectIdToCode.get(d.project_id) || '';
+          } else if (['submitted_at', 'issued_at', 'due_at'].includes(col)) {
+            row[documentLabels[col]] = formatDate((d as any)[col]);
+          } else {
+            row[documentLabels[col]] = (d as any)[col] ?? '';
+          }
+        });
+        return row;
+      });
+      const docSheet = XLSX.utils.json_to_sheet(docData);
+      XLSX.utils.book_append_sheet(workbook, docSheet, '文件');
+
+      // Document files sheet
+      const fileData = documentFiles.map(f => {
+        const row: Record<string, any> = {};
+        documentFileColumns.forEach(col => {
+          if (col === 'uploaded_at') {
+            row[documentFileLabels[col]] = formatDate(f.uploaded_at);
+          } else {
+            row[documentFileLabels[col]] = (f as any)[col] ?? '';
+          }
+        });
+        return row;
+      });
+      const fileSheet = XLSX.utils.json_to_sheet(fileData);
+      XLSX.utils.book_append_sheet(workbook, fileSheet, '文件附件');
+
+      // Download
+      const timestamp = new Date().toISOString().slice(0, 10);
+      const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      downloadFile(blob, `案場完整備份_${timestamp}.xlsx`);
+
+      setProgress({ current: 5, total: 5, phase: 'done' });
+      toast.success('備份匯出完成', {
+        description: `案場 ${projects.length} 筆、狀態歷程 ${statusHistory.length} 筆、施工歷程 ${constructionHistory.length} 筆、文件 ${documents.length} 筆`
+      });
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('匯出失敗', { description: error instanceof Error ? error.message : '未知錯誤' });
+    } finally {
+      setIsProcessing(false);
+    }
+  }, []);
+
+  // Download import template
+  const downloadTemplate = useCallback(() => {
+    const workbook = XLSX.utils.book_new();
+
+    // Projects template
+    const projectHeaders: Record<string, string> = {};
+    projectColumns.forEach(col => { projectHeaders[projectLabels[col]] = ''; });
+    const projectSheet = XLSX.utils.json_to_sheet([projectHeaders]);
+    XLSX.utils.book_append_sheet(workbook, projectSheet, '案場主表');
+
+    // Status history template
+    const statusHeaders: Record<string, string> = {};
+    statusHistoryColumns.forEach(col => { statusHeaders[statusHistoryLabels[col]] = ''; });
+    const statusSheet = XLSX.utils.json_to_sheet([statusHeaders]);
+    XLSX.utils.book_append_sheet(workbook, statusSheet, '狀態歷程');
+
+    // Construction history template
+    const constructionHeaders: Record<string, string> = {};
+    constructionHistoryColumns.forEach(col => { constructionHeaders[constructionHistoryLabels[col]] = ''; });
+    const constructionSheet = XLSX.utils.json_to_sheet([constructionHeaders]);
+    XLSX.utils.book_append_sheet(workbook, constructionSheet, '施工歷程');
+
+    // Documents template
+    const docHeaders: Record<string, string> = {};
+    documentColumns.forEach(col => { docHeaders[documentLabels[col]] = ''; });
+    const docSheet = XLSX.utils.json_to_sheet([docHeaders]);
+    XLSX.utils.book_append_sheet(workbook, docSheet, '文件');
+
+    // Document files template
+    const fileHeaders: Record<string, string> = {};
+    documentFileColumns.forEach(col => { fileHeaders[documentFileLabels[col]] = ''; });
+    const fileSheet = XLSX.utils.json_to_sheet([fileHeaders]);
+    XLSX.utils.book_append_sheet(workbook, fileSheet, '文件附件');
+
+    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    downloadFile(blob, '案場匯入範本.xlsx');
+
+    toast.success('範本下載成功');
+  }, []);
+
+  // Import from Excel file
+  const importFullBackup = useCallback(async (file: File, mode: ImportMode) => {
+    setIsProcessing(true);
+    setImportSummary(null);
+
+    const summary: ImportSummary = {
+      projects: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
+      statusHistory: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
+      constructionHistory: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
+      documents: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
+      documentFiles: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
+      errorList: [],
+    };
+
+    try {
+      setProgress({ current: 0, total: 5, phase: 'preparing' });
+
+      // Read Excel file
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data, { cellDates: true });
+
+      // Build lookup maps
+      const { data: investors } = await supabase.from('investors').select('id, investor_code');
+      const investorCodeToId = new Map(investors?.map(i => [i.investor_code, i.id]) || []);
+
+      // Existing projects map (for upsert)
+      const { data: existingProjects } = await supabase.from('projects').select('id, project_code, site_code_display');
+      const projectCodeToId = new Map<string, string>();
+      const siteCodeToId = new Map<string, string>();
+      existingProjects?.forEach(p => {
+        projectCodeToId.set(p.project_code, p.id);
+        if (p.site_code_display) siteCodeToId.set(p.site_code_display, p.id);
+      });
+
+      // Helper to reverse lookup column name
+      const reverseLabels = (labels: Record<string, string>) => {
+        const reversed: Record<string, string> = {};
+        Object.entries(labels).forEach(([key, label]) => { reversed[label] = key; });
+        return reversed;
+      };
+
+      // 1. Import Projects
+      const projectSheetName = workbook.SheetNames.find(s => s.includes('案場主表'));
+      if (projectSheetName) {
+        setProgress({ current: 1, total: 5, phase: 'importing', currentSheet: '案場主表' });
+        const sheet = workbook.Sheets[projectSheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+        const reversedLabels = reverseLabels(projectLabels);
+
+        const newProjectCodeToId = new Map<string, string>();
+        const batchSize = 50;
+
+        for (let i = 0; i < rows.length; i += batchSize) {
+          const batch = rows.slice(i, i + batchSize);
+          
+          for (const row of batch) {
+            const rowNum = i + rows.indexOf(row) + 2;
+            try {
+              const mapped: Record<string, any> = {};
+              let providedId: string | null = null;
+              let projectCode: string | null = null;
+              let siteCode: string | null = null;
+              let investorCode: string | null = null;
+
+              Object.entries(row).forEach(([label, value]) => {
+                const key = reversedLabels[label];
+                if (!key || value === '' || value === null) return;
+
+                if (key === 'id') {
+                  providedId = String(value);
+                } else if (key === 'investor_code') {
+                  investorCode = String(value).toUpperCase();
+                } else if (key === 'project_code') {
+                  projectCode = String(value);
+                  mapped[key] = projectCode;
+                } else if (key === 'site_code_display') {
+                  siteCode = String(value);
+                  mapped[key] = siteCode;
+                } else if (key === 'approval_date') {
+                  const d = parseDate(value);
+                  if (d) mapped[key] = d;
+                } else if (['capacity_kwp', 'actual_installed_capacity', 'fiscal_year', 'intake_year', 'seq'].includes(key)) {
+                  const num = Number(value);
+                  if (!isNaN(num)) mapped[key] = num;
+                } else if (!['created_at', 'updated_at', 'created_by'].includes(key)) {
+                  mapped[key] = String(value);
+                }
+              });
+
+              // Validate required fields
+              if (!mapped.project_code) {
+                summary.errorList.push({ row: rowNum, sheet: '案場主表', message: '缺少案場編號', errorType: 'validation' });
+                summary.projects.errors++;
+                continue;
+              }
+              if (!mapped.project_name) {
+                summary.errorList.push({ row: rowNum, sheet: '案場主表', field: 'project_name', message: '缺少案場名稱', errorType: 'validation', code: mapped.project_code });
+                summary.projects.errors++;
+                continue;
+              }
+
+              // Resolve investor
+              if (investorCode) {
+                const investorId = investorCodeToId.get(investorCode);
+                if (investorId) {
+                  mapped.investor_id = investorId;
+                } else {
+                  summary.errorList.push({ row: rowNum, sheet: '案場主表', field: 'investor_code', message: `找不到投資方代碼「${investorCode}」`, errorType: 'not_found', code: mapped.project_code });
+                  summary.projects.errors++;
+                  continue;
+                }
+              }
+
+              // Determine existing ID
+              let existingId = providedId && projectCodeToId.has(providedId) ? providedId : null;
+              if (!existingId && projectCode) existingId = projectCodeToId.get(projectCode) || null;
+              if (!existingId && siteCode) existingId = siteCodeToId.get(siteCode) || null;
+
+              // Execute based on mode
+              if (existingId) {
+                if (mode === 'insert') {
+                  summary.errorList.push({ row: rowNum, sheet: '案場主表', message: '案場已存在（僅新增模式）', errorType: 'unique_constraint', code: mapped.project_code as string });
+                  summary.projects.errors++;
+                } else if (mode === 'skip') {
+                  summary.projects.skipped++;
+                } else {
+                  // Upsert - update
+                  const { error } = await supabase.from('projects').update(mapped as any).eq('id', existingId);
+                  if (error) {
+                    summary.errorList.push({ row: rowNum, sheet: '案場主表', message: error.message, errorType: 'unknown', code: mapped.project_code as string });
+                    summary.projects.errors++;
+                  } else {
+                    summary.projects.updated++;
+                    newProjectCodeToId.set(mapped.project_code as string, existingId);
+                  }
+                }
+              } else {
+                // Insert new
+                const { data: inserted, error } = await supabase.from('projects').insert(mapped as any).select('id').single();
+                if (error) {
+                  summary.errorList.push({ row: rowNum, sheet: '案場主表', message: error.message, errorType: 'unknown', code: mapped.project_code as string });
+                  summary.projects.errors++;
+                } else if (inserted) {
+                  summary.projects.inserted++;
+                  newProjectCodeToId.set(mapped.project_code as string, inserted.id);
+                  projectCodeToId.set(mapped.project_code as string, inserted.id);
+                }
+              }
+            } catch (err) {
+              summary.errorList.push({ row: rowNum, sheet: '案場主表', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+              summary.projects.errors++;
+            }
+          }
+          setProgress({ current: 1, total: 5, phase: 'importing', currentSheet: `案場主表 (${Math.min(i + batchSize, rows.length)}/${rows.length})` });
+        }
+
+        // Merge new project codes
+        newProjectCodeToId.forEach((id, code) => projectCodeToId.set(code, id));
+      }
+
+      // 2. Import Status History
+      const statusSheetName = workbook.SheetNames.find(s => s.includes('狀態歷程'));
+      if (statusSheetName) {
+        setProgress({ current: 2, total: 5, phase: 'importing', currentSheet: '狀態歷程' });
+        const sheet = workbook.Sheets[statusSheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+        const reversedLabels = reverseLabels(statusHistoryLabels);
+
+        // Fetch existing history for upsert
+        const { data: existingHistory } = await supabase.from('project_status_history').select('id');
+        const existingHistoryIds = new Set(existingHistory?.map(h => h.id) || []);
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+          try {
+            const mapped: Record<string, any> = {};
+            let providedId: string | null = null;
+            let projectCode: string | null = null;
+
+            Object.entries(row).forEach(([label, value]) => {
+              const key = reversedLabels[label];
+              if (!key || value === '' || value === null) return;
+              if (key === 'id') providedId = String(value);
+              else if (key === 'project_code') projectCode = String(value);
+              else if (key === 'changed_at') {
+                const d = parseDate(value);
+                if (d) mapped[key] = d;
+              } else mapped[key] = String(value);
+            });
+
+            if (!projectCode) {
+              summary.errorList.push({ row: rowNum, sheet: '狀態歷程', message: '缺少案場編號', errorType: 'validation' });
+              summary.statusHistory.errors++;
+              continue;
+            }
+
+            const projectId = projectCodeToId.get(projectCode);
+            if (!projectId) {
+              summary.errorList.push({ row: rowNum, sheet: '狀態歷程', message: `找不到案場「${projectCode}」`, errorType: 'not_found', code: projectCode });
+              summary.statusHistory.errors++;
+              continue;
+            }
+            mapped.project_id = projectId;
+
+            const existingId = providedId && existingHistoryIds.has(providedId) ? providedId : null;
+
+            if (existingId) {
+              if (mode === 'insert') {
+                summary.errorList.push({ row: rowNum, sheet: '狀態歷程', message: '記錄已存在（僅新增模式）', errorType: 'unique_constraint', code: projectCode });
+                summary.statusHistory.errors++;
+              } else if (mode === 'skip') {
+                summary.statusHistory.skipped++;
+              } else {
+                const { error } = await supabase.from('project_status_history').update(mapped).eq('id', existingId);
+                if (error) {
+                  summary.errorList.push({ row: rowNum, sheet: '狀態歷程', message: error.message, errorType: 'unknown', code: projectCode });
+                  summary.statusHistory.errors++;
+                } else {
+                  summary.statusHistory.updated++;
+                }
+              }
+            } else {
+              const { error } = await supabase.from('project_status_history').insert(mapped);
+              if (error) {
+                summary.errorList.push({ row: rowNum, sheet: '狀態歷程', message: error.message, errorType: 'unknown', code: projectCode });
+                summary.statusHistory.errors++;
+              } else {
+                summary.statusHistory.inserted++;
+              }
+            }
+          } catch (err) {
+            summary.errorList.push({ row: rowNum, sheet: '狀態歷程', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.statusHistory.errors++;
+          }
+        }
+      }
+
+      // 3. Import Construction History
+      const constructionSheetName = workbook.SheetNames.find(s => s.includes('施工歷程'));
+      if (constructionSheetName) {
+        setProgress({ current: 3, total: 5, phase: 'importing', currentSheet: '施工歷程' });
+        const sheet = workbook.Sheets[constructionSheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+        const reversedLabels = reverseLabels(constructionHistoryLabels);
+
+        const { data: existingHistory } = await supabase.from('construction_status_history').select('id');
+        const existingHistoryIds = new Set(existingHistory?.map(h => h.id) || []);
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+          try {
+            const mapped: Record<string, any> = {};
+            let providedId: string | null = null;
+            let projectCode: string | null = null;
+
+            Object.entries(row).forEach(([label, value]) => {
+              const key = reversedLabels[label];
+              if (!key || value === '' || value === null) return;
+              if (key === 'id') providedId = String(value);
+              else if (key === 'project_code') projectCode = String(value);
+              else if (key === 'changed_at') {
+                const d = parseDate(value);
+                if (d) mapped[key] = d;
+              } else mapped[key] = String(value);
+            });
+
+            if (!projectCode) {
+              summary.errorList.push({ row: rowNum, sheet: '施工歷程', message: '缺少案場編號', errorType: 'validation' });
+              summary.constructionHistory.errors++;
+              continue;
+            }
+
+            const projectId = projectCodeToId.get(projectCode);
+            if (!projectId) {
+              summary.errorList.push({ row: rowNum, sheet: '施工歷程', message: `找不到案場「${projectCode}」`, errorType: 'not_found', code: projectCode });
+              summary.constructionHistory.errors++;
+              continue;
+            }
+            mapped.project_id = projectId;
+
+            const existingId = providedId && existingHistoryIds.has(providedId) ? providedId : null;
+
+            if (existingId) {
+              if (mode === 'insert') {
+                summary.errorList.push({ row: rowNum, sheet: '施工歷程', message: '記錄已存在（僅新增模式）', errorType: 'unique_constraint', code: projectCode });
+                summary.constructionHistory.errors++;
+              } else if (mode === 'skip') {
+                summary.constructionHistory.skipped++;
+              } else {
+                const { error } = await supabase.from('construction_status_history').update(mapped).eq('id', existingId);
+                if (error) {
+                  summary.errorList.push({ row: rowNum, sheet: '施工歷程', message: error.message, errorType: 'unknown', code: projectCode });
+                  summary.constructionHistory.errors++;
+                } else {
+                  summary.constructionHistory.updated++;
+                }
+              }
+            } else {
+              const { error } = await supabase.from('construction_status_history').insert(mapped);
+              if (error) {
+                summary.errorList.push({ row: rowNum, sheet: '施工歷程', message: error.message, errorType: 'unknown', code: projectCode });
+                summary.constructionHistory.errors++;
+              } else {
+                summary.constructionHistory.inserted++;
+              }
+            }
+          } catch (err) {
+            summary.errorList.push({ row: rowNum, sheet: '施工歷程', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.constructionHistory.errors++;
+          }
+        }
+      }
+
+      // 4. Import Documents
+      const documentSheetName = workbook.SheetNames.find(s => s === '文件');
+      if (documentSheetName) {
+        setProgress({ current: 4, total: 5, phase: 'importing', currentSheet: '文件' });
+        const sheet = workbook.Sheets[documentSheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+        const reversedLabels = reverseLabels(documentLabels);
+
+        const { data: existingDocs } = await supabase.from('documents').select('id, project_id, doc_type');
+        const existingDocIds = new Set(existingDocs?.map(d => d.id) || []);
+        const docKeyToId = new Map<string, string>();
+        existingDocs?.forEach(d => docKeyToId.set(`${d.project_id}-${d.doc_type}`, d.id));
+
+        // Store new document IDs for document_files reference
+        const newDocIdMap = new Map<string, string>();
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+          try {
+            const mapped: Record<string, any> = {};
+            let providedId: string | null = null;
+            let projectCode: string | null = null;
+
+            Object.entries(row).forEach(([label, value]) => {
+              const key = reversedLabels[label];
+              if (!key || value === '' || value === null) return;
+              if (key === 'id') providedId = String(value);
+              else if (key === 'project_code') projectCode = String(value);
+              else if (['submitted_at', 'issued_at', 'due_at'].includes(key)) {
+                const d = parseDate(value);
+                if (d) mapped[key] = d;
+              } else if (!['created_at', 'updated_at', 'created_by'].includes(key)) {
+                mapped[key] = String(value);
+              }
+            });
+
+            if (!projectCode) {
+              summary.errorList.push({ row: rowNum, sheet: '文件', message: '缺少案場編號', errorType: 'validation' });
+              summary.documents.errors++;
+              continue;
+            }
+            if (!mapped.doc_type) {
+              summary.errorList.push({ row: rowNum, sheet: '文件', message: '缺少文件類型', errorType: 'validation', code: projectCode });
+              summary.documents.errors++;
+              continue;
+            }
+
+            const projectId = projectCodeToId.get(projectCode);
+            if (!projectId) {
+              summary.errorList.push({ row: rowNum, sheet: '文件', message: `找不到案場「${projectCode}」`, errorType: 'not_found', code: projectCode });
+              summary.documents.errors++;
+              continue;
+            }
+            mapped.project_id = projectId;
+
+            // Determine existing ID
+            let existingId = providedId && existingDocIds.has(providedId) ? providedId : null;
+            if (!existingId) {
+              existingId = docKeyToId.get(`${projectId}-${mapped.doc_type}`) || null;
+            }
+
+            if (existingId) {
+              if (mode === 'insert') {
+                summary.errorList.push({ row: rowNum, sheet: '文件', message: '文件已存在（僅新增模式）', errorType: 'unique_constraint', code: `${projectCode}-${mapped.doc_type}` });
+                summary.documents.errors++;
+              } else if (mode === 'skip') {
+                summary.documents.skipped++;
+                if (providedId) newDocIdMap.set(providedId, existingId);
+              } else {
+                const { error } = await supabase.from('documents').update(mapped).eq('id', existingId);
+                if (error) {
+                  summary.errorList.push({ row: rowNum, sheet: '文件', message: error.message, errorType: 'unknown', code: `${projectCode}-${mapped.doc_type}` });
+                  summary.documents.errors++;
+                } else {
+                  summary.documents.updated++;
+                  if (providedId) newDocIdMap.set(providedId, existingId);
+                }
+              }
+            } else {
+              const { data: inserted, error } = await supabase.from('documents').insert(mapped).select('id').single();
+              if (error) {
+                summary.errorList.push({ row: rowNum, sheet: '文件', message: error.message, errorType: 'unknown', code: `${projectCode}-${mapped.doc_type}` });
+                summary.documents.errors++;
+              } else if (inserted) {
+                summary.documents.inserted++;
+                if (providedId) newDocIdMap.set(providedId, inserted.id);
+                docKeyToId.set(`${projectId}-${mapped.doc_type}`, inserted.id);
+              }
+            }
+          } catch (err) {
+            summary.errorList.push({ row: rowNum, sheet: '文件', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.documents.errors++;
+          }
+        }
+      }
+
+      // 5. Import Document Files (optional, mainly for reference)
+      const fileSheetName = workbook.SheetNames.find(s => s.includes('文件附件'));
+      if (fileSheetName) {
+        setProgress({ current: 5, total: 5, phase: 'importing', currentSheet: '文件附件' });
+        // Document files import is informational only - actual files need to be uploaded separately
+        // Just skip this for now as storage paths may not be valid
+        summary.documentFiles.skipped = XLSX.utils.sheet_to_json(workbook.Sheets[fileSheetName]).length;
+      }
+
+      setProgress({ current: 5, total: 5, phase: 'done' });
+      setImportSummary(summary);
+
+      const totalInserted = summary.projects.inserted + summary.statusHistory.inserted + summary.constructionHistory.inserted + summary.documents.inserted;
+      const totalUpdated = summary.projects.updated + summary.statusHistory.updated + summary.constructionHistory.updated + summary.documents.updated;
+      const totalErrors = summary.projects.errors + summary.statusHistory.errors + summary.constructionHistory.errors + summary.documents.errors;
+
+      if (totalErrors > 0) {
+        toast.warning('匯入完成（部分失敗）', { 
+          description: `新增 ${totalInserted} 筆、更新 ${totalUpdated} 筆、失敗 ${totalErrors} 筆` 
+        });
+      } else {
+        toast.success('匯入完成', { 
+          description: `新增 ${totalInserted} 筆、更新 ${totalUpdated} 筆` 
+        });
+      }
+
+      return summary;
+    } catch (error) {
+      console.error('Import error:', error);
+      toast.error('匯入失敗', { description: error instanceof Error ? error.message : '未知錯誤' });
+      throw error;
+    } finally {
+      setIsProcessing(false);
+    }
+  }, []);
+
+  // Download error report
+  const downloadErrorReport = useCallback(() => {
+    if (!importSummary || importSummary.errorList.length === 0) {
+      toast.info('沒有錯誤記錄');
+      return;
+    }
+
+    const workbook = XLSX.utils.book_new();
+    const data = importSummary.errorList.map(e => ({
+      '工作表': e.sheet,
+      '行號': e.row,
+      '識別碼': e.code || '',
+      '欄位': e.field || '',
+      '錯誤類型': e.errorType,
+      '錯誤訊息': e.message,
+    }));
+    const sheet = XLSX.utils.json_to_sheet(data);
+    XLSX.utils.book_append_sheet(workbook, sheet, '錯誤清單');
+
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '');
+    const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    downloadFile(blob, `匯入錯誤報告_${timestamp}.xlsx`);
+
+    toast.success('錯誤報告已下載');
+  }, [importSummary]);
+
+  const clearSummary = useCallback(() => {
+    setImportSummary(null);
+    setProgress({ current: 0, total: 0, phase: 'preparing' });
+  }, []);
+
+  return {
+    isProcessing,
+    progress,
+    importSummary,
+    exportFullBackup,
+    downloadTemplate,
+    importFullBackup,
+    downloadErrorReport,
+    clearSummary,
+  };
+}
