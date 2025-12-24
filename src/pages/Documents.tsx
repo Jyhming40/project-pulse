@@ -66,17 +66,26 @@ export default function Documents() {
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
 
   // Fetch documents with project info
-  const { data: documents = [], isLoading } = useQuery({
+  const { data: documents = [], isLoading, error: queryError } = useQuery({
     queryKey: ['all-documents'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
         .select('*, projects(project_name, project_code), profiles:owner_user_id(full_name)')
         .order('updated_at', { ascending: false });
-      if (error) throw error;
+      if (error) {
+        console.error('Documents query error:', error);
+        throw error;
+      }
+      console.log('Documents fetched:', data?.length || 0);
       return data;
     },
   });
+
+  // Debug: log query errors
+  if (queryError) {
+    console.error('React Query error:', queryError);
+  }
 
   // Filter documents
   const filteredDocuments = documents.filter(doc => {
@@ -111,7 +120,9 @@ export default function Documents() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-display font-bold text-foreground">文件管理</h1>
-          <p className="text-muted-foreground mt-1">所有案場文件總覽</p>
+          <p className="text-muted-foreground mt-1">
+            所有案場文件總覽 {documents.length > 0 && `(共 ${documents.length} 筆)`}
+          </p>
         </div>
         {canEdit && (
           <Button variant="outline" onClick={() => setIsImportExportOpen(true)}>
@@ -222,7 +233,7 @@ export default function Documents() {
             {filteredDocuments.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                  {isLoading ? '載入中...' : '暫無資料'}
+                  {isLoading ? '載入中...' : queryError ? `查詢錯誤: ${queryError.message}` : '暫無資料'}
                 </TableCell>
               </TableRow>
             ) : (
