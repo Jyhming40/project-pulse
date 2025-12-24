@@ -582,7 +582,7 @@ export function useProjectBackup() {
                 }
               }
             } else {
-              const { error } = await supabase.from('project_status_history').insert(mapped);
+              const { error } = await supabase.from('project_status_history').insert(mapped as any);
               if (error) {
                 summary.errorList.push({ row: rowNum, sheet: '狀態歷程', message: error.message, errorType: 'unknown', code: projectCode });
                 summary.statusHistory.errors++;
@@ -659,7 +659,7 @@ export function useProjectBackup() {
                 }
               }
             } else {
-              const { error } = await supabase.from('construction_status_history').insert(mapped);
+              const { error } = await supabase.from('construction_status_history').insert(mapped as any);
               if (error) {
                 summary.errorList.push({ row: rowNum, sheet: '施工歷程', message: error.message, errorType: 'unknown', code: projectCode });
                 summary.constructionHistory.errors++;
@@ -754,7 +754,7 @@ export function useProjectBackup() {
                 }
               }
             } else {
-              const { data: inserted, error } = await supabase.from('documents').insert(mapped).select('id').single();
+              const { data: inserted, error } = await supabase.from('documents').insert(mapped as any).select('id').single();
               if (error) {
                 summary.errorList.push({ row: rowNum, sheet: '文件', message: error.message, errorType: 'unknown', code: `${projectCode}-${mapped.doc_type}` });
                 summary.documents.errors++;
