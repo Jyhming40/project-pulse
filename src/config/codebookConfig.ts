@@ -1,0 +1,232 @@
+import { 
+  Activity, 
+  FileText, 
+  CheckCircle2,
+  Building2,
+  Zap,
+  CircuitBoard,
+  Gauge,
+  Construction,
+  Wrench,
+  Users,
+  CreditCard,
+  LucideIcon
+} from 'lucide-react';
+
+// All categories that can be managed in the Codebook
+export type CodebookCategory = 
+  | 'project_status'
+  | 'doc_type'
+  | 'doc_status'
+  | 'installation_type'
+  | 'grid_connection_type'
+  | 'power_phase_type'
+  | 'power_voltage'
+  | 'pole_status'
+  | 'construction_status'
+  | 'investor_type'
+  | 'payment_method_type';
+
+export interface CategoryConfig {
+  label: string;
+  icon: LucideIcon;
+  description: string;
+  // Which table and column references this category
+  usageMapping: {
+    table: string;
+    column: string;
+  }[];
+}
+
+// Complete category configuration with usage mappings
+export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = {
+  project_status: {
+    label: '專案狀態',
+    icon: Activity,
+    description: '專案進度的狀態選項',
+    usageMapping: [
+      { table: 'projects', column: 'status' },
+    ],
+  },
+  doc_type: {
+    label: '文件類型',
+    icon: FileText,
+    description: '文件分類的類型選項',
+    usageMapping: [
+      { table: 'documents', column: 'doc_type' },
+    ],
+  },
+  doc_status: {
+    label: '文件狀態',
+    icon: CheckCircle2,
+    description: '文件處理的狀態選項',
+    usageMapping: [
+      { table: 'documents', column: 'doc_status' },
+    ],
+  },
+  installation_type: {
+    label: '裝置類型',
+    icon: Building2,
+    description: '案場安裝類型（畜牧舍、農業設施等）',
+    usageMapping: [
+      { table: 'projects', column: 'installation_type' },
+    ],
+  },
+  grid_connection_type: {
+    label: '併聯方式',
+    icon: Zap,
+    description: '電網併聯類型（高壓、低壓等）',
+    usageMapping: [
+      { table: 'projects', column: 'grid_connection_type' },
+    ],
+  },
+  power_phase_type: {
+    label: '供電模式',
+    icon: CircuitBoard,
+    description: '供電相位類型（單相/三相）',
+    usageMapping: [
+      { table: 'projects', column: 'power_phase_type' },
+    ],
+  },
+  power_voltage: {
+    label: '供電電壓',
+    icon: Gauge,
+    description: '電壓規格選項',
+    usageMapping: [
+      { table: 'projects', column: 'power_voltage' },
+    ],
+  },
+  pole_status: {
+    label: '立桿狀態',
+    icon: Construction,
+    description: '電線桿施工狀態',
+    usageMapping: [
+      { table: 'projects', column: 'pole_status' },
+    ],
+  },
+  construction_status: {
+    label: '施工進度',
+    icon: Wrench,
+    description: '案場施工進度狀態',
+    usageMapping: [
+      { table: 'projects', column: 'construction_status' },
+    ],
+  },
+  investor_type: {
+    label: '投資方類型',
+    icon: Users,
+    description: '投資方分類（自有投資、租賃等）',
+    usageMapping: [
+      { table: 'investors', column: 'investor_type' },
+    ],
+  },
+  payment_method_type: {
+    label: '付款方式',
+    icon: CreditCard,
+    description: '付款方式類型',
+    usageMapping: [
+      { table: 'investor_payment_methods', column: 'method_type' },
+    ],
+  },
+};
+
+// Get all category keys
+export const allCategories = Object.keys(codebookCategoryConfig) as CodebookCategory[];
+
+// Default enum values from database (for initial population)
+export const defaultEnumValues: Record<CodebookCategory, { value: string; label: string }[]> = {
+  project_status: [
+    { value: '開發中', label: '開發中' },
+    { value: '土地確認', label: '土地確認' },
+    { value: '結構簽證', label: '結構簽證' },
+    { value: '台電送件', label: '台電送件' },
+    { value: '台電審查', label: '台電審查' },
+    { value: '能源局送件', label: '能源局送件' },
+    { value: '同意備案', label: '同意備案' },
+    { value: '工程施工', label: '工程施工' },
+    { value: '報竣掛表', label: '報竣掛表' },
+    { value: '設備登記', label: '設備登記' },
+    { value: '運維中', label: '運維中' },
+    { value: '暫停', label: '暫停' },
+    { value: '取消', label: '取消' },
+  ],
+  doc_type: [
+    { value: '台電審查意見書', label: '台電審查意見書' },
+    { value: '能源局同意備案', label: '能源局同意備案' },
+    { value: '結構簽證', label: '結構簽證' },
+    { value: '躉售合約', label: '躉售合約' },
+    { value: '報竣掛表', label: '報竣掛表' },
+    { value: '設備登記', label: '設備登記' },
+    { value: '土地契約', label: '土地契約' },
+    { value: '其他', label: '其他' },
+  ],
+  doc_status: [
+    { value: '未開始', label: '未開始' },
+    { value: '進行中', label: '進行中' },
+    { value: '已完成', label: '已完成' },
+    { value: '退件補正', label: '退件補正' },
+  ],
+  installation_type: [
+    { value: '畜牧舍', label: '畜牧舍' },
+    { value: '農業設施', label: '農業設施' },
+    { value: '農棚', label: '農棚' },
+    { value: '地面型', label: '地面型' },
+    { value: '農舍', label: '農舍' },
+    { value: '住宅', label: '住宅' },
+    { value: '廠辦', label: '廠辦' },
+    { value: '特目用建物', label: '特目用建物' },
+    { value: '特登工廠', label: '特登工廠' },
+    { value: '集合住宅', label: '集合住宅' },
+    { value: '其他設施', label: '其他設施' },
+    { value: '新建物（農業）', label: '新建物（農業）' },
+    { value: '新建物（其他）', label: '新建物（其他）' },
+  ],
+  grid_connection_type: [
+    { value: '高壓併低壓側', label: '高壓併低壓側' },
+    { value: '低壓', label: '低壓' },
+    { value: '併內線－躉售', label: '併內線－躉售' },
+    { value: '併內線－自發自用', label: '併內線－自發自用' },
+  ],
+  power_phase_type: [
+    { value: '單相三線式', label: '單相三線式' },
+    { value: '三相三線式', label: '三相三線式' },
+    { value: '三相四線式', label: '三相四線式' },
+  ],
+  power_voltage: [
+    { value: '220V', label: '220V' },
+    { value: '220V / 380V', label: '220V / 380V' },
+    { value: '380V', label: '380V' },
+    { value: '440V', label: '440V' },
+    { value: '480V', label: '480V' },
+  ],
+  pole_status: [
+    { value: '已立桿', label: '已立桿' },
+    { value: '未立桿', label: '未立桿' },
+    { value: '基礎完成', label: '基礎完成' },
+    { value: '無須', label: '無須' },
+    { value: '需移桿', label: '需移桿' },
+    { value: '亭置式', label: '亭置式' },
+  ],
+  construction_status: [
+    { value: '已開工', label: '已開工' },
+    { value: '尚未開工', label: '尚未開工' },
+    { value: '已掛錶', label: '已掛錶' },
+    { value: '待掛錶', label: '待掛錶' },
+    { value: '暫緩', label: '暫緩' },
+    { value: '取消', label: '取消' },
+  ],
+  investor_type: [
+    { value: '自有投資', label: '自有投資' },
+    { value: '租賃投資', label: '租賃投資' },
+    { value: 'SPC', label: 'SPC' },
+    { value: '個人', label: '個人' },
+    { value: '其他', label: '其他' },
+  ],
+  payment_method_type: [
+    { value: '銀行轉帳', label: '銀行轉帳' },
+    { value: '支票', label: '支票' },
+    { value: '現金', label: '現金' },
+    { value: '信用卡', label: '信用卡' },
+    { value: '其他', label: '其他' },
+  ],
+};
