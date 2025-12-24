@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCodebook, CodebookOption } from '@/hooks/useCodebook';
+import { useBatchInitialize } from '@/hooks/useSystemOptions';
 import { CodebookCategory, codebookCategoryConfig, allCategories, defaultEnumValues } from '@/config/codebookConfig';
 import {
   DndContext,
@@ -29,7 +30,8 @@ import {
   X,
   AlertCircle,
   Database,
-  RefreshCw
+  RefreshCw,
+  Layers
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -198,6 +200,8 @@ export default function SystemOptions() {
     reorderOptions 
   } = useCodebook(activeCategory);
   
+  const batchInitialize = useBatchInitialize();
+  
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingOption, setEditingOption] = useState<CodebookOption | null>(null);
   const [deleteConfirmOption, setDeleteConfirmOption] = useState<{ option: CodebookOption; usageCount: number } | null>(null);
@@ -348,14 +352,24 @@ export default function SystemOptions() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl font-display font-bold flex items-center gap-2">
-          <Settings2 className="w-6 h-6" />
-          代碼對照表 (Codebook)
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          統一管理系統所有下拉選單選項，包括新增、修改、排序、啟用/停用。
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-display font-bold flex items-center gap-2">
+            <Settings2 className="w-6 h-6" />
+            代碼對照表 (Codebook)
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            統一管理系統所有下拉選單選項，包括新增、修改、排序、啟用/停用。
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => batchInitialize.mutate()}
+          disabled={batchInitialize.isPending}
+        >
+          <Layers className={`w-4 h-4 mr-2 ${batchInitialize.isPending ? 'animate-spin' : ''}`} />
+          {batchInitialize.isPending ? '初始化中...' : '批次初始化所有類別'}
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
