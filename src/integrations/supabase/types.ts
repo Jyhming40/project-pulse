@@ -21,7 +21,7 @@ export type Database = {
           id: string
           note: string | null
           project_id: string
-          status: Database["public"]["Enums"]["construction_status"]
+          status: string
         }
         Insert: {
           changed_at?: string
@@ -29,7 +29,7 @@ export type Database = {
           id?: string
           note?: string | null
           project_id: string
-          status: Database["public"]["Enums"]["construction_status"]
+          status: string
         }
         Update: {
           changed_at?: string
@@ -37,7 +37,7 @@ export type Database = {
           id?: string
           note?: string | null
           project_id?: string
-          status?: Database["public"]["Enums"]["construction_status"]
+          status?: string
         }
         Relationships: [
           {
@@ -94,8 +94,8 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
-          doc_status: Database["public"]["Enums"]["doc_status"]
-          doc_type: Database["public"]["Enums"]["doc_type"]
+          doc_status: string
+          doc_type: string
           due_at: string | null
           id: string
           issued_at: string | null
@@ -108,8 +108,8 @@ export type Database = {
         Insert: {
           created_at?: string
           created_by?: string | null
-          doc_status?: Database["public"]["Enums"]["doc_status"]
-          doc_type: Database["public"]["Enums"]["doc_type"]
+          doc_status?: string
+          doc_type: string
           due_at?: string | null
           id?: string
           issued_at?: string | null
@@ -122,8 +122,8 @@ export type Database = {
         Update: {
           created_at?: string
           created_by?: string | null
-          doc_status?: Database["public"]["Enums"]["doc_status"]
-          doc_type?: Database["public"]["Enums"]["doc_type"]
+          doc_status?: string
+          doc_type?: string
           due_at?: string | null
           id?: string
           issued_at?: string | null
@@ -165,7 +165,7 @@ export type Database = {
           mobile: string | null
           note: string | null
           phone: string | null
-          role_tags: Database["public"]["Enums"]["contact_role_tag"][] | null
+          role_tags: string[] | null
           title: string | null
           updated_at: string
         }
@@ -183,7 +183,7 @@ export type Database = {
           mobile?: string | null
           note?: string | null
           phone?: string | null
-          role_tags?: Database["public"]["Enums"]["contact_role_tag"][] | null
+          role_tags?: string[] | null
           title?: string | null
           updated_at?: string
         }
@@ -201,7 +201,7 @@ export type Database = {
           mobile?: string | null
           note?: string | null
           phone?: string | null
-          role_tags?: Database["public"]["Enums"]["contact_role_tag"][] | null
+          role_tags?: string[] | null
           title?: string | null
           updated_at?: string
         }
@@ -227,7 +227,7 @@ export type Database = {
           id: string
           investor_id: string
           is_default: boolean | null
-          method_type: Database["public"]["Enums"]["payment_method_type"]
+          method_type: string
           note: string | null
           updated_at: string
         }
@@ -242,7 +242,7 @@ export type Database = {
           id?: string
           investor_id: string
           is_default?: boolean | null
-          method_type: Database["public"]["Enums"]["payment_method_type"]
+          method_type: string
           note?: string | null
           updated_at?: string
         }
@@ -257,7 +257,7 @@ export type Database = {
           id?: string
           investor_id?: string
           is_default?: boolean | null
-          method_type?: Database["public"]["Enums"]["payment_method_type"]
+          method_type?: string
           note?: string | null
           updated_at?: string
         }
@@ -308,7 +308,7 @@ export type Database = {
           email: string | null
           id: string
           investor_code: string
-          investor_type: Database["public"]["Enums"]["investor_type"] | null
+          investor_type: string | null
           note: string | null
           owner_name: string | null
           owner_title: string | null
@@ -325,7 +325,7 @@ export type Database = {
           email?: string | null
           id?: string
           investor_code: string
-          investor_type?: Database["public"]["Enums"]["investor_type"] | null
+          investor_type?: string | null
           note?: string | null
           owner_name?: string | null
           owner_title?: string | null
@@ -342,7 +342,7 @@ export type Database = {
           email?: string | null
           id?: string
           investor_code?: string
-          investor_type?: Database["public"]["Enums"]["investor_type"] | null
+          investor_type?: string | null
           note?: string | null
           owner_name?: string | null
           owner_title?: string | null
@@ -387,7 +387,7 @@ export type Database = {
           id: string
           note: string | null
           project_id: string
-          status: Database["public"]["Enums"]["project_status"]
+          status: string
         }
         Insert: {
           attachment_path?: string | null
@@ -396,7 +396,7 @@ export type Database = {
           id?: string
           note?: string | null
           project_id: string
-          status: Database["public"]["Enums"]["project_status"]
+          status: string
         }
         Update: {
           attachment_path?: string | null
@@ -405,7 +405,7 @@ export type Database = {
           id?: string
           note?: string | null
           project_id?: string
-          status?: Database["public"]["Enums"]["project_status"]
+          status?: string
         }
         Relationships: [
           {
@@ -424,9 +424,7 @@ export type Database = {
           approval_date: string | null
           capacity_kwp: number | null
           city: string | null
-          construction_status:
-            | Database["public"]["Enums"]["construction_status"]
-            | null
+          construction_status: string | null
           contact_person: string | null
           contact_phone: string | null
           coordinates: string | null
@@ -438,29 +436,23 @@ export type Database = {
           feeder_code: string | null
           fiscal_year: number | null
           folder_error: string | null
-          folder_status: Database["public"]["Enums"]["folder_status"] | null
-          grid_connection_type:
-            | Database["public"]["Enums"]["grid_connection_type"]
-            | null
+          folder_status: string | null
+          grid_connection_type: string | null
           id: string
-          installation_type:
-            | Database["public"]["Enums"]["installation_type"]
-            | null
+          installation_type: string | null
           intake_year: number | null
           investor_id: string | null
           land_owner: string | null
           land_owner_contact: string | null
           note: string | null
-          pole_status: Database["public"]["Enums"]["pole_status"] | null
-          power_phase_type:
-            | Database["public"]["Enums"]["power_phase_type"]
-            | null
-          power_voltage: Database["public"]["Enums"]["power_voltage"] | null
+          pole_status: string | null
+          power_phase_type: string | null
+          power_voltage: string | null
           project_code: string
           project_name: string
           seq: number | null
           site_code_display: string | null
-          status: Database["public"]["Enums"]["project_status"]
+          status: string
           taipower_pv_id: string | null
           updated_at: string
         }
@@ -470,9 +462,7 @@ export type Database = {
           approval_date?: string | null
           capacity_kwp?: number | null
           city?: string | null
-          construction_status?:
-            | Database["public"]["Enums"]["construction_status"]
-            | null
+          construction_status?: string | null
           contact_person?: string | null
           contact_phone?: string | null
           coordinates?: string | null
@@ -484,29 +474,23 @@ export type Database = {
           feeder_code?: string | null
           fiscal_year?: number | null
           folder_error?: string | null
-          folder_status?: Database["public"]["Enums"]["folder_status"] | null
-          grid_connection_type?:
-            | Database["public"]["Enums"]["grid_connection_type"]
-            | null
+          folder_status?: string | null
+          grid_connection_type?: string | null
           id?: string
-          installation_type?:
-            | Database["public"]["Enums"]["installation_type"]
-            | null
+          installation_type?: string | null
           intake_year?: number | null
           investor_id?: string | null
           land_owner?: string | null
           land_owner_contact?: string | null
           note?: string | null
-          pole_status?: Database["public"]["Enums"]["pole_status"] | null
-          power_phase_type?:
-            | Database["public"]["Enums"]["power_phase_type"]
-            | null
-          power_voltage?: Database["public"]["Enums"]["power_voltage"] | null
+          pole_status?: string | null
+          power_phase_type?: string | null
+          power_voltage?: string | null
           project_code: string
           project_name: string
           seq?: number | null
           site_code_display?: string | null
-          status?: Database["public"]["Enums"]["project_status"]
+          status?: string
           taipower_pv_id?: string | null
           updated_at?: string
         }
@@ -516,9 +500,7 @@ export type Database = {
           approval_date?: string | null
           capacity_kwp?: number | null
           city?: string | null
-          construction_status?:
-            | Database["public"]["Enums"]["construction_status"]
-            | null
+          construction_status?: string | null
           contact_person?: string | null
           contact_phone?: string | null
           coordinates?: string | null
@@ -530,29 +512,23 @@ export type Database = {
           feeder_code?: string | null
           fiscal_year?: number | null
           folder_error?: string | null
-          folder_status?: Database["public"]["Enums"]["folder_status"] | null
-          grid_connection_type?:
-            | Database["public"]["Enums"]["grid_connection_type"]
-            | null
+          folder_status?: string | null
+          grid_connection_type?: string | null
           id?: string
-          installation_type?:
-            | Database["public"]["Enums"]["installation_type"]
-            | null
+          installation_type?: string | null
           intake_year?: number | null
           investor_id?: string | null
           land_owner?: string | null
           land_owner_contact?: string | null
           note?: string | null
-          pole_status?: Database["public"]["Enums"]["pole_status"] | null
-          power_phase_type?:
-            | Database["public"]["Enums"]["power_phase_type"]
-            | null
-          power_voltage?: Database["public"]["Enums"]["power_voltage"] | null
+          pole_status?: string | null
+          power_phase_type?: string | null
+          power_voltage?: string | null
           project_code?: string
           project_name?: string
           seq?: number | null
           site_code_display?: string | null
-          status?: Database["public"]["Enums"]["project_status"]
+          status?: string
           taipower_pv_id?: string | null
           updated_at?: string
         }
