@@ -66,26 +66,17 @@ export default function Documents() {
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
 
   // Fetch documents with project info
-  const { data: documents = [], isLoading, error: queryError } = useQuery({
+  const { data: documents = [], isLoading } = useQuery({
     queryKey: ['all-documents'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
-        .select('*, projects(project_name, project_code), profiles:owner_user_id(full_name)')
+        .select('*, projects(project_name, project_code), owner:profiles!documents_owner_user_id_fkey(full_name)')
         .order('updated_at', { ascending: false });
-      if (error) {
-        console.error('Documents query error:', error);
-        throw error;
-      }
-      console.log('Documents fetched:', data?.length || 0);
+      if (error) throw error;
       return data;
     },
   });
-
-  // Debug: log query errors
-  if (queryError) {
-    console.error('React Query error:', queryError);
-  }
 
   // Filter documents
   const filteredDocuments = documents.filter(doc => {
@@ -233,13 +224,13 @@ export default function Documents() {
             {filteredDocuments.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
-                  {isLoading ? '載入中...' : queryError ? `查詢錯誤: ${queryError.message}` : '暫無資料'}
+                  {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
             ) : (
               filteredDocuments.map(doc => {
                 const project = doc.projects as any;
-                const owner = doc.profiles as any;
+                const owner = doc.owner as any;
                 const isDueSoon = doc.due_at && isWithinInterval(new Date(doc.due_at), {
                   start: new Date(),
                   end: subDays(new Date(), -14)
