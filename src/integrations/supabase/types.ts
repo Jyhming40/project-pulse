@@ -352,6 +352,51 @@ export type Database = {
         }
         Relationships: []
       }
+      partners: {
+        Row: {
+          address: string | null
+          contact_person: string | null
+          contact_phone: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          note: string | null
+          partner_type: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          note?: string | null
+          partner_type?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          contact_person?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          note?: string | null
+          partner_type?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -378,6 +423,69 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      project_construction_assignments: {
+        Row: {
+          actual_end_date: string | null
+          actual_start_date: string | null
+          assignment_status: string
+          construction_work_type: string
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          partner_id: string | null
+          planned_end_date: string | null
+          planned_start_date: string | null
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          actual_end_date?: string | null
+          actual_start_date?: string | null
+          assignment_status?: string
+          construction_work_type: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          partner_id?: string | null
+          planned_end_date?: string | null
+          planned_start_date?: string | null
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          actual_end_date?: string | null
+          actual_start_date?: string | null
+          assignment_status?: string
+          construction_work_type?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          partner_id?: string | null
+          planned_end_date?: string | null
+          planned_start_date?: string | null
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_construction_assignments_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_construction_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       project_status_history: {
         Row: {

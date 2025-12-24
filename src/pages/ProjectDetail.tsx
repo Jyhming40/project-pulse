@@ -31,7 +31,8 @@ import {
   CheckCircle2,
   Link,
   Wrench,
-  Plug
+  Plug,
+  HardHat
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,6 +66,7 @@ import {
 } from '@/components/ui/table';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
+import ProjectConstructionAssignments from '@/components/ProjectConstructionAssignments';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 type DocType = Database['public']['Enums']['doc_type'];
@@ -436,6 +438,7 @@ export default function ProjectDetail() {
           <TabsTrigger value="info">基本資料</TabsTrigger>
           <TabsTrigger value="power">用電資訊</TabsTrigger>
           <TabsTrigger value="construction">施工進度</TabsTrigger>
+          <TabsTrigger value="partners">施工工班</TabsTrigger>
           <TabsTrigger value="status">狀態紀錄</TabsTrigger>
           <TabsTrigger value="documents">文件</TabsTrigger>
         </TabsList>
