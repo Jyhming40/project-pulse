@@ -65,16 +65,43 @@ export default function Documents() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
 
-  // Fetch documents with project info
+  // Fetch documents with project info - use range to get all records (no 1000 limit)
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['all-documents'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // First get total count
+      const { count, error: countError } = await supabase
         .from('documents')
-        .select('*, projects(project_name, project_code), owner:profiles!documents_owner_user_id_fkey(full_name)')
-        .order('updated_at', { ascending: false });
-      if (error) throw error;
-      return data;
+        .select('*', { count: 'exact', head: true });
+      
+      if (countError) throw countError;
+      
+      const totalCount = count || 0;
+      const pageSize = 1000;
+      const pages = Math.ceil(totalCount / pageSize);
+      
+      // Fetch all pages in parallel
+      const promises = [];
+      for (let i = 0; i < pages; i++) {
+        promises.push(
+          supabase
+            .from('documents')
+            .select('*, projects(project_name, project_code), owner:profiles!documents_owner_user_id_fkey(full_name)')
+            .order('updated_at', { ascending: false })
+            .range(i * pageSize, (i + 1) * pageSize - 1)
+        );
+      }
+      
+      const results = await Promise.all(promises);
+      
+      // Combine all results
+      const allData: any[] = [];
+      for (const result of results) {
+        if (result.error) throw result.error;
+        allData.push(...(result.data || []));
+      }
+      
+      return allData;
     },
   });
 
