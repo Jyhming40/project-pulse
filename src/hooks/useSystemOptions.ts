@@ -1,8 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { CodebookCategory } from '@/config/codebookConfig';
 
-export type OptionCategory = 'project_status' | 'doc_type' | 'doc_status';
+// Re-export CodebookCategory as OptionCategory for backward compatibility
+export type OptionCategory = CodebookCategory;
 
 export interface SystemOption {
   id: string;

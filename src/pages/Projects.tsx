@@ -101,25 +101,22 @@ const cities = [
   '台東縣', '澎湖縣', '金門縣', '連江縣'
 ];
 
-// Enum options for new fields
-const installationTypes = [
-  '畜牧舍', '農業設施', '農棚', '地面型', '農舍', '住宅', '廠辦',
-  '特目用建物', '特登工廠', '集合住宅', '其他設施', '新建物（農業）', '新建物（其他）'
-];
-
-const gridConnectionTypes = ['高壓併低壓側', '低壓', '併內線－躉售', '併內線－自發自用'];
-const powerPhaseTypes = ['單相三線式', '三相三線式', '三相四線式'];
-const powerVoltages = ['220V', '220V / 380V', '380V', '440V', '480V'];
-const poleStatuses = ['已立桿', '未立桿', '基礎完成', '無須', '需移桿', '亭置式'];
-const constructionStatuses = ['已開工', '尚未開工', '已掛錶', '待掛錶', '暫緩', '取消'];
+// Static options (cities only - not managed in Codebook)
+// All other dropdowns now read from Codebook (system_options table)
 
 export default function Projects() {
   const navigate = useNavigate();
   const { canEdit, isAdmin, user } = useAuth();
   const queryClient = useQueryClient();
   
-  // Fetch dynamic status options
+  // Fetch dynamic options from Codebook
   const { options: statusOptions } = useOptionsForCategory('project_status');
+  const { options: installationTypeOptions } = useOptionsForCategory('installation_type');
+  const { options: constructionStatusOptions } = useOptionsForCategory('construction_status');
+  const { options: gridConnectionTypeOptions } = useOptionsForCategory('grid_connection_type');
+  const { options: powerPhaseTypeOptions } = useOptionsForCategory('power_phase_type');
+  const { options: powerVoltageOptions } = useOptionsForCategory('power_voltage');
+  const { options: poleStatusOptions } = useOptionsForCategory('pole_status');
   
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -397,8 +394,8 @@ export default function Projects() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">全部施工狀態</SelectItem>
-            {constructionStatuses.map(status => (
-              <SelectItem key={status} value={status}>{status}</SelectItem>
+            {constructionStatusOptions.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -691,8 +688,8 @@ export default function Projects() {
                     <SelectValue placeholder="選擇裝置類型" />
                   </SelectTrigger>
                   <SelectContent>
-                    {installationTypes.map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    {installationTypeOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -707,8 +704,8 @@ export default function Projects() {
                     <SelectValue placeholder="選擇施工狀態" />
                   </SelectTrigger>
                   <SelectContent>
-                    {constructionStatuses.map(status => (
-                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    {constructionStatusOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -813,8 +810,8 @@ export default function Projects() {
                     <SelectValue placeholder="選擇併聯方式" />
                   </SelectTrigger>
                   <SelectContent>
-                    {gridConnectionTypes.map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    {gridConnectionTypeOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -832,8 +829,8 @@ export default function Projects() {
                     <SelectValue placeholder="選擇供電模式" />
                   </SelectTrigger>
                   <SelectContent>
-                    {powerPhaseTypes.map(type => (
-                      <SelectItem key={type} value={type}>{type}</SelectItem>
+                    {powerPhaseTypeOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -848,8 +845,8 @@ export default function Projects() {
                     <SelectValue placeholder="選擇供電電壓" />
                   </SelectTrigger>
                   <SelectContent>
-                    {powerVoltages.map(v => (
-                      <SelectItem key={v} value={v}>{v}</SelectItem>
+                    {powerVoltageOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -864,8 +861,8 @@ export default function Projects() {
                     <SelectValue placeholder="選擇立桿狀態" />
                   </SelectTrigger>
                   <SelectContent>
-                    {poleStatuses.map(status => (
-                      <SelectItem key={status} value={status}>{status}</SelectItem>
+                    {poleStatusOptions.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
