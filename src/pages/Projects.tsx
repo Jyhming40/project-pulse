@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { CodebookSelect } from '@/components/CodebookSelect';
 import { 
   Plus, 
   Search, 
@@ -109,14 +110,9 @@ export default function Projects() {
   const { canEdit, isAdmin, user } = useAuth();
   const queryClient = useQueryClient();
   
-  // Fetch dynamic options from Codebook
+  // Fetch dynamic options from Codebook (for filter dropdowns only)
   const { options: statusOptions } = useOptionsForCategory('project_status');
-  const { options: installationTypeOptions } = useOptionsForCategory('installation_type');
   const { options: constructionStatusOptions } = useOptionsForCategory('construction_status');
-  const { options: gridConnectionTypeOptions } = useOptionsForCategory('grid_connection_type');
-  const { options: powerPhaseTypeOptions } = useOptionsForCategory('power_phase_type');
-  const { options: powerVoltageOptions } = useOptionsForCategory('power_voltage');
-  const { options: poleStatusOptions } = useOptionsForCategory('pole_status');
   
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -680,35 +676,21 @@ export default function Projects() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="installation_type">裝置類型</Label>
-                <Select 
-                  value={formData.installation_type || ''} 
-                  onValueChange={(value) => setFormData({ ...formData, installation_type: value as any })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="選擇裝置類型" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {installationTypeOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CodebookSelect
+                  category="installation_type"
+                  value={formData.installation_type}
+                  onValueChange={(value) => setFormData({ ...formData, installation_type: value })}
+                  placeholder="選擇裝置類型"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="construction_status">施工狀態</Label>
-                <Select 
-                  value={formData.construction_status || ''} 
-                  onValueChange={(value) => setFormData({ ...formData, construction_status: value as any })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="選擇施工狀態" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {constructionStatusOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CodebookSelect
+                  category="construction_status"
+                  value={formData.construction_status}
+                  onValueChange={(value) => setFormData({ ...formData, construction_status: value })}
+                  placeholder="選擇施工狀態"
+                />
               </div>
             </div>
 
@@ -802,70 +784,42 @@ export default function Projects() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="grid_connection_type">併聯方式</Label>
-                <Select 
-                  value={formData.grid_connection_type || ''} 
-                  onValueChange={(value) => setFormData({ ...formData, grid_connection_type: value as any })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="選擇併聯方式" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {gridConnectionTypeOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CodebookSelect
+                  category="grid_connection_type"
+                  value={formData.grid_connection_type}
+                  onValueChange={(value) => setFormData({ ...formData, grid_connection_type: value })}
+                  placeholder="選擇併聯方式"
+                />
               </div>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="power_phase_type">供電模式</Label>
-                <Select 
-                  value={formData.power_phase_type || ''} 
-                  onValueChange={(value) => setFormData({ ...formData, power_phase_type: value as any })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="選擇供電模式" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {powerPhaseTypeOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CodebookSelect
+                  category="power_phase_type"
+                  value={formData.power_phase_type}
+                  onValueChange={(value) => setFormData({ ...formData, power_phase_type: value })}
+                  placeholder="選擇供電模式"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="power_voltage">供電電壓</Label>
-                <Select 
-                  value={formData.power_voltage || ''} 
-                  onValueChange={(value) => setFormData({ ...formData, power_voltage: value as any })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="選擇供電電壓" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {powerVoltageOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CodebookSelect
+                  category="power_voltage"
+                  value={formData.power_voltage}
+                  onValueChange={(value) => setFormData({ ...formData, power_voltage: value })}
+                  placeholder="選擇供電電壓"
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="pole_status">立桿狀態</Label>
-                <Select 
-                  value={formData.pole_status || ''} 
-                  onValueChange={(value) => setFormData({ ...formData, pole_status: value as any })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="選擇立桿狀態" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {poleStatusOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CodebookSelect
+                  category="pole_status"
+                  value={formData.pole_status}
+                  onValueChange={(value) => setFormData({ ...formData, pole_status: value })}
+                  placeholder="選擇立桿狀態"
+                />
               </div>
             </div>
 

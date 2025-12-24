@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { CodebookSelect } from '@/components/CodebookSelect';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import {
@@ -111,17 +112,7 @@ const getConstructionStatusColor = (status: string) => {
   return colorMap[status] || 'bg-muted text-muted-foreground';
 };
 
-// Enum options for new fields
-const installationTypes = [
-  '畜牧舍', '農業設施', '農棚', '地面型', '農舍', '住宅', '廠辦',
-  '特目用建物', '特登工廠', '集合住宅', '其他設施', '新建物（農業）', '新建物（其他）'
-];
-
-const gridConnectionTypes = ['高壓併低壓側', '低壓', '併內線－躉售', '併內線－自發自用'];
-const powerPhaseTypes = ['單相三線式', '三相三線式', '三相四線式'];
-const powerVoltages = ['220V', '220V / 380V', '380V', '440V', '480V'];
-const poleStatuses = ['已立桿', '未立桿', '基礎完成', '無須', '需移桿', '亭置式'];
-const constructionStatuses = ['已開工', '尚未開工', '已掛錶', '待掛錶', '暫緩', '取消'];
+// Hardcoded arrays removed - now using CodebookSelect component which reads from system_options table
 
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
@@ -984,19 +975,12 @@ export default function ProjectDetail() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label>施工狀態</Label>
-              <Select
+              <CodebookSelect
+                category="construction_status"
                 value={constructionForm}
                 onValueChange={setConstructionForm}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇狀態" />
-                </SelectTrigger>
-                <SelectContent>
-                  {constructionStatuses.map(status => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="選擇狀態"
+              />
             </div>
           </div>
           <DialogFooter>
