@@ -201,7 +201,7 @@ export default function ProjectDetail() {
   });
 
   // Fetch documents
-  const { data: documents = [] } = useQuery({
+  const { data: documents = [], error: documentsError } = useQuery({
     queryKey: ['project-documents', id],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -209,7 +209,11 @@ export default function ProjectDetail() {
         .select('*, profiles:owner_user_id(full_name, email)')
         .eq('project_id', id)
         .order('created_at', { ascending: false });
-      if (error) throw error;
+      if (error) {
+        console.error('Project documents query error:', error);
+        throw error;
+      }
+      console.log('Project documents fetched:', data?.length || 0, 'for project:', id);
       return data;
     },
     enabled: !!id,
