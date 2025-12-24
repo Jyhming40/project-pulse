@@ -16,6 +16,7 @@ import InvestorDataManagement from "./pages/InvestorDataManagement";
 import Documents from "./pages/Documents";
 import Settings from "./pages/Settings";
 import SystemOptions from "./pages/SystemOptions";
+import Partners from "./pages/Partners";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -35,6 +36,7 @@ const App = () => (
             <Route path="/investor-codes" element={<ProtectedRoute><Layout><InvestorCodeReference /></Layout></ProtectedRoute>} />
             <Route path="/investor-data" element={<ProtectedRoute><Layout><InvestorDataManagement /></Layout></ProtectedRoute>} />
             <Route path="/documents" element={<ProtectedRoute><Layout><Documents /></Layout></ProtectedRoute>} />
+            <Route path="/partners" element={<ProtectedRoute><Layout><Partners /></Layout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Layout><Settings /></Layout></ProtectedRoute>} />
             <Route path="/system-options" element={<ProtectedRoute adminOnly><Layout><SystemOptions /></Layout></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />

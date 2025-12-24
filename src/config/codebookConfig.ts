@@ -10,6 +10,9 @@ import {
   Wrench,
   Users,
   CreditCard,
+  Hammer,
+  ClipboardList,
+  HardHat,
   LucideIcon
 } from 'lucide-react';
 
@@ -25,7 +28,10 @@ export type CodebookCategory =
   | 'pole_status'
   | 'construction_status'
   | 'investor_type'
-  | 'payment_method_type';
+  | 'payment_method_type'
+  | 'construction_work_type'
+  | 'construction_assignment_status'
+  | 'partner_type';
 
 export interface CategoryConfig {
   label: string;
@@ -128,6 +134,30 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
       { table: 'investor_payment_methods', column: 'method_type' },
     ],
   },
+  construction_work_type: {
+    label: '工程項目',
+    icon: Hammer,
+    description: '案場工程項目分類（模組支架、機電、土建等）',
+    usageMapping: [
+      { table: 'project_construction_assignments', column: 'construction_work_type' },
+    ],
+  },
+  construction_assignment_status: {
+    label: '工班指派狀態',
+    icon: ClipboardList,
+    description: '工班指派進度狀態',
+    usageMapping: [
+      { table: 'project_construction_assignments', column: 'assignment_status' },
+    ],
+  },
+  partner_type: {
+    label: '外包夥伴類型',
+    icon: HardHat,
+    description: '外包夥伴分類（工班、廠商、個人）',
+    usageMapping: [
+      { table: 'partners', column: 'partner_type' },
+    ],
+  },
 };
 
 // Get all category keys
@@ -228,5 +258,28 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
     { value: '現金', label: '現金' },
     { value: '信用卡', label: '信用卡' },
     { value: '其他', label: '其他' },
+  ],
+  construction_work_type: [
+    { value: '模組支架組裝工程－鋼構工班', label: '模組支架組裝工程－鋼構工班' },
+    { value: '模組支架組裝工程－鋁擠型支架', label: '模組支架組裝工程－鋁擠型支架' },
+    { value: '模組支架組裝工程－鍍鎂鋁鋅支架', label: '模組支架組裝工程－鍍鎂鋁鋅支架' },
+    { value: '模組支架組裝工程－其他支架', label: '模組支架組裝工程－其他支架' },
+    { value: '機電工程', label: '機電工程' },
+    { value: '箱體工程', label: '箱體工程' },
+    { value: '土建工程', label: '土建工程' },
+    { value: '其他工程', label: '其他工程' },
+  ],
+  construction_assignment_status: [
+    { value: '預計', label: '預計' },
+    { value: '已確認', label: '已確認' },
+    { value: '已進場', label: '已進場' },
+    { value: '已完成', label: '已完成' },
+    { value: '暫緩', label: '暫緩' },
+    { value: '取消', label: '取消' },
+  ],
+  partner_type: [
+    { value: '工班', label: '工班' },
+    { value: '廠商', label: '廠商' },
+    { value: '個人', label: '個人' },
   ],
 };
