@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import type { Database } from '@/integrations/supabase/types';
+import type { ImportRowResult, ImportResult } from '@/components/ImportConstraintsInfo';
 
 type ProjectInsert = Database['public']['Tables']['projects']['Insert'];
 type InvestorInsert = Database['public']['Tables']['investors']['Insert'];
@@ -16,7 +17,7 @@ type DocStatus = Database['public']['Enums']['doc_status'];
 type PaymentMethodType = Database['public']['Enums']['payment_method_type'];
 type ContactRoleTag = Database['public']['Enums']['contact_role_tag'];
 
-export type ImportStrategy = 'skip' | 'update';
+export type ImportStrategy = 'skip' | 'update' | 'insert_only';
 
 export interface ImportPreview<T> {
   data: T[];
@@ -25,10 +26,11 @@ export interface ImportPreview<T> {
 }
 
 // Extended types for import mapping
-type ProjectInsertWithInvestor = ProjectInsert & { investor_name?: string };
-type DocumentInsertWithProject = DocumentInsert & { project_code?: string; project_name?: string; owner_name?: string };
-type InvestorContactInsertWithCode = InvestorContactInsert & { investor_code?: string; investor_name?: string };
-type InvestorPaymentMethodInsertWithCode = InvestorPaymentMethodInsert & { investor_code?: string; investor_name?: string };
+type ProjectInsertWithInvestor = ProjectInsert & { investor_name?: string; _rowIndex?: number };
+type DocumentInsertWithProject = DocumentInsert & { project_code?: string; project_name?: string; owner_name?: string; _rowIndex?: number };
+type InvestorContactInsertWithCode = InvestorContactInsert & { investor_code?: string; investor_name?: string; _rowIndex?: number };
+type InvestorPaymentMethodInsertWithCode = InvestorPaymentMethodInsert & { investor_code?: string; investor_name?: string; _rowIndex?: number };
+type InvestorInsertWithRow = InvestorInsert & { _rowIndex?: number };
 
 // Column mappings
 const projectColumnMap: Record<string, keyof ProjectInsertWithInvestor> = {
@@ -50,7 +52,7 @@ const projectColumnMap: Record<string, keyof ProjectInsertWithInvestor> = {
   '備註': 'note',
 };
 
-const investorColumnMap: Record<string, keyof InvestorInsert> = {
+const investorColumnMap: Record<string, keyof InvestorInsertWithRow> = {
   '投資方編號': 'investor_code',
   '公司名稱': 'company_name',
   '投資方類型': 'investor_type',
@@ -125,8 +127,8 @@ function parseFile(file: File): Promise<Record<string, any>[]> {
   });
 }
 
-function mapRowToProject(row: Record<string, any>): Partial<ProjectInsertWithInvestor> {
-  const mapped: Partial<ProjectInsertWithInvestor> = {};
+function mapRowToProject(row: Record<string, any>, rowIndex: number): Partial<ProjectInsertWithInvestor> {
+  const mapped: Partial<ProjectInsertWithInvestor> = { _rowIndex: rowIndex };
   Object.entries(row).forEach(([key, value]) => {
     const mappedKey = projectColumnMap[key.trim()];
     if (mappedKey && value !== '' && value !== null && value !== undefined) {
@@ -141,8 +143,8 @@ function mapRowToProject(row: Record<string, any>): Partial<ProjectInsertWithInv
   return mapped;
 }
 
-function mapRowToInvestor(row: Record<string, any>): Partial<InvestorInsert> {
-  const mapped: Partial<InvestorInsert> = {};
+function mapRowToInvestor(row: Record<string, any>, rowIndex: number): Partial<InvestorInsertWithRow> {
+  const mapped: Partial<InvestorInsertWithRow> = { _rowIndex: rowIndex };
   Object.entries(row).forEach(([key, value]) => {
     const mappedKey = investorColumnMap[key.trim()];
     if (mappedKey && value !== '' && value !== null && value !== undefined) {
@@ -152,13 +154,12 @@ function mapRowToInvestor(row: Record<string, any>): Partial<InvestorInsert> {
   return mapped;
 }
 
-function mapRowToInvestorContact(row: Record<string, any>): Partial<InvestorContactInsertWithCode> {
-  const mapped: Partial<InvestorContactInsertWithCode> = {};
+function mapRowToInvestorContact(row: Record<string, any>, rowIndex: number): Partial<InvestorContactInsertWithCode> {
+  const mapped: Partial<InvestorContactInsertWithCode> = { _rowIndex: rowIndex };
   Object.entries(row).forEach(([key, value]) => {
     const mappedKey = investorContactColumnMap[key.trim()];
     if (mappedKey && value !== '' && value !== null && value !== undefined) {
       if (mappedKey === 'role_tags') {
-        // Parse comma-separated role tags
         const tags = String(value).split(',').map(t => t.trim()).filter(Boolean);
         (mapped as any)[mappedKey] = tags as ContactRoleTag[];
       } else if (mappedKey === 'is_primary' || mappedKey === 'is_active') {
@@ -171,8 +172,8 @@ function mapRowToInvestorContact(row: Record<string, any>): Partial<InvestorCont
   return mapped;
 }
 
-function mapRowToInvestorPaymentMethod(row: Record<string, any>): Partial<InvestorPaymentMethodInsertWithCode> {
-  const mapped: Partial<InvestorPaymentMethodInsertWithCode> = {};
+function mapRowToInvestorPaymentMethod(row: Record<string, any>, rowIndex: number): Partial<InvestorPaymentMethodInsertWithCode> {
+  const mapped: Partial<InvestorPaymentMethodInsertWithCode> = { _rowIndex: rowIndex };
   Object.entries(row).forEach(([key, value]) => {
     const mappedKey = investorPaymentMethodColumnMap[key.trim()];
     if (mappedKey && value !== '' && value !== null && value !== undefined) {
@@ -186,8 +187,8 @@ function mapRowToInvestorPaymentMethod(row: Record<string, any>): Partial<Invest
   return mapped;
 }
 
-function mapRowToDocument(row: Record<string, any>): Partial<DocumentInsertWithProject> {
-  const mapped: Partial<DocumentInsertWithProject> = {};
+function mapRowToDocument(row: Record<string, any>, rowIndex: number): Partial<DocumentInsertWithProject> {
+  const mapped: Partial<DocumentInsertWithProject> = { _rowIndex: rowIndex };
   Object.entries(row).forEach(([key, value]) => {
     const mappedKey = documentColumnMap[key.trim()];
     if (mappedKey && value !== '' && value !== null && value !== undefined) {
@@ -213,7 +214,7 @@ function validateProject(data: Partial<ProjectInsertWithInvestor>, rowIndex: num
   return null;
 }
 
-function validateInvestor(data: Partial<InvestorInsert>, rowIndex: number): string | null {
+function validateInvestor(data: Partial<InvestorInsertWithRow>, rowIndex: number): string | null {
   if (!data.investor_code) return `第 ${rowIndex} 行：缺少投資方編號`;
   if (!data.company_name) return `第 ${rowIndex} 行：缺少公司名稱`;
   return null;
@@ -246,11 +247,78 @@ function validateDocument(data: Partial<DocumentInsertWithProject>, rowIndex: nu
   return null;
 }
 
+// Parse Postgres error to get meaningful error info
+function parsePostgresError(error: any, row: number, code: string): ImportRowResult {
+  const errorMessage = error?.message || error?.toString() || '未知錯誤';
+  const errorCode = error?.code;
+  
+  // Unique constraint violation
+  if (errorCode === '23505' || errorMessage.includes('duplicate key') || errorMessage.includes('unique constraint')) {
+    const match = errorMessage.match(/Key \(([^)]+)\)/);
+    const field = match ? match[1] : undefined;
+    return {
+      row,
+      status: 'error',
+      code,
+      message: `唯一鍵衝突：${field || '資料已存在'}`,
+      errorType: 'unique_constraint',
+      field,
+    };
+  }
+  
+  // Foreign key violation
+  if (errorCode === '23503' || errorMessage.includes('foreign key') || errorMessage.includes('violates foreign key')) {
+    const match = errorMessage.match(/Key \(([^)]+)\)/);
+    const field = match ? match[1] : undefined;
+    return {
+      row,
+      status: 'error',
+      code,
+      message: `外鍵關聯錯誤：參照的資料不存在`,
+      errorType: 'foreign_key',
+      field,
+    };
+  }
+  
+  // Data type error
+  if (errorCode === '22P02' || errorMessage.includes('invalid input syntax')) {
+    return {
+      row,
+      status: 'error',
+      code,
+      message: `資料格式錯誤：${errorMessage}`,
+      errorType: 'data_type',
+    };
+  }
+  
+  // Not null violation
+  if (errorCode === '23502' || errorMessage.includes('null value') || errorMessage.includes('not-null constraint')) {
+    const match = errorMessage.match(/column "([^"]+)"/);
+    const field = match ? match[1] : undefined;
+    return {
+      row,
+      status: 'error',
+      code,
+      message: `必填欄位遺漏：${field || '未知欄位'}`,
+      errorType: 'validation',
+      field,
+    };
+  }
+  
+  return {
+    row,
+    status: 'error',
+    code,
+    message: errorMessage,
+    errorType: 'unknown',
+  };
+}
+
 export function useDataImport() {
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [projectPreview, setProjectPreview] = useState<ImportPreview<Partial<ProjectInsertWithInvestor>> | null>(null);
-  const [investorPreview, setInvestorPreview] = useState<ImportPreview<Partial<InvestorInsert>> | null>(null);
+  const [investorPreview, setInvestorPreview] = useState<ImportPreview<Partial<InvestorInsertWithRow>> | null>(null);
   const [investorContactPreview, setInvestorContactPreview] = useState<ImportPreview<Partial<InvestorContactInsertWithCode>> | null>(null);
   const [investorPaymentMethodPreview, setInvestorPaymentMethodPreview] = useState<ImportPreview<Partial<InvestorPaymentMethodInsertWithCode>> | null>(null);
   const [documentPreview, setDocumentPreview] = useState<ImportPreview<Partial<DocumentInsertWithProject>> | null>(null);
@@ -271,17 +339,18 @@ export function useDataImport() {
       const errors: { row: number; message: string }[] = [];
 
       rawData.forEach((row, index) => {
-        const mapped = mapRowToProject(row);
-        const error = validateProject(mapped, index + 2, validStatuses);
+        const rowIndex = index + 2; // Excel row (1-indexed, plus header)
+        const mapped = mapRowToProject(row, rowIndex);
+        const error = validateProject(mapped, rowIndex, validStatuses);
         if (error) {
-          errors.push({ row: index + 2, message: error });
+          errors.push({ row: rowIndex, message: error });
         } else {
           if (mapped.investor_name) {
             const investorId = investorMap.get(mapped.investor_name);
             if (investorId) {
               mapped.investor_id = investorId;
             } else {
-              errors.push({ row: index + 2, message: `第 ${index + 2} 行：找不到投資方「${mapped.investor_name}」` });
+              errors.push({ row: rowIndex, message: `第 ${rowIndex} 行：找不到投資方「${mapped.investor_name}」` });
               return;
             }
           }
@@ -293,8 +362,9 @@ export function useDataImport() {
       const { data: existingProjects } = await supabase.from('projects').select('id, project_code').in('project_code', codes);
 
       const duplicates = (existingProjects || []).map(existing => {
-        const rowIndex = mappedData.findIndex(d => d.project_code === existing.project_code);
-        return { row: rowIndex + 2, existingId: existing.id, code: existing.project_code };
+        const dataIndex = mappedData.findIndex(d => d.project_code === existing.project_code);
+        const rowIndex = mappedData[dataIndex]?._rowIndex || dataIndex + 2;
+        return { row: rowIndex, existingId: existing.id, code: existing.project_code };
       });
 
       const preview = { data: mappedData, errors, duplicates };
@@ -305,20 +375,21 @@ export function useDataImport() {
     }
   }, []);
 
-  const previewInvestors = useCallback(async (file: File): Promise<ImportPreview<Partial<InvestorInsert>>> => {
+  const previewInvestors = useCallback(async (file: File): Promise<ImportPreview<Partial<InvestorInsertWithRow>>> => {
     setIsProcessing(true);
     try {
       const rawData = await parseFile(file);
       if (rawData.length === 0) throw new Error('檔案中沒有資料');
 
-      const mappedData: Partial<InvestorInsert>[] = [];
+      const mappedData: Partial<InvestorInsertWithRow>[] = [];
       const errors: { row: number; message: string }[] = [];
 
       rawData.forEach((row, index) => {
-        const mapped = mapRowToInvestor(row);
-        const error = validateInvestor(mapped, index + 2);
+        const rowIndex = index + 2;
+        const mapped = mapRowToInvestor(row, rowIndex);
+        const error = validateInvestor(mapped, rowIndex);
         if (error) {
-          errors.push({ row: index + 2, message: error });
+          errors.push({ row: rowIndex, message: error });
         } else {
           mappedData.push(mapped);
         }
@@ -328,8 +399,9 @@ export function useDataImport() {
       const { data: existingInvestors } = await supabase.from('investors').select('id, investor_code').in('investor_code', codes);
 
       const duplicates = (existingInvestors || []).map(existing => {
-        const rowIndex = mappedData.findIndex(d => d.investor_code === existing.investor_code);
-        return { row: rowIndex + 2, existingId: existing.id, code: existing.investor_code };
+        const dataIndex = mappedData.findIndex(d => d.investor_code?.toUpperCase() === existing.investor_code.toUpperCase());
+        const rowIndex = mappedData[dataIndex]?._rowIndex || dataIndex + 2;
+        return { row: rowIndex, existingId: existing.id, code: existing.investor_code };
       });
 
       const preview = { data: mappedData, errors, duplicates };
@@ -353,17 +425,18 @@ export function useDataImport() {
       const errors: { row: number; message: string }[] = [];
 
       rawData.forEach((row, index) => {
-        const mapped = mapRowToInvestorContact(row);
-        const error = validateInvestorContact(mapped, index + 2);
+        const rowIndex = index + 2;
+        const mapped = mapRowToInvestorContact(row, rowIndex);
+        const error = validateInvestorContact(mapped, rowIndex);
         if (error) {
-          errors.push({ row: index + 2, message: error });
+          errors.push({ row: rowIndex, message: error });
         } else {
           if (mapped.investor_code) {
-            const investorId = investorMap.get(mapped.investor_code);
+            const investorId = investorMap.get(mapped.investor_code.toUpperCase());
             if (investorId) {
               mapped.investor_id = investorId;
             } else {
-              errors.push({ row: index + 2, message: `第 ${index + 2} 行：找不到投資方編號「${mapped.investor_code}」` });
+              errors.push({ row: rowIndex, message: `第 ${rowIndex} 行：找不到投資方編號「${mapped.investor_code}」` });
               return;
             }
           }
@@ -371,7 +444,6 @@ export function useDataImport() {
         }
       });
 
-      // Check for duplicates by investor_id + contact_name
       const duplicates: { row: number; existingId: string; code: string }[] = [];
       for (let i = 0; i < mappedData.length; i++) {
         const d = mappedData[i];
@@ -383,7 +455,7 @@ export function useDataImport() {
             .eq('contact_name', d.contact_name)
             .maybeSingle();
           if (existing) {
-            duplicates.push({ row: i + 2, existingId: existing.id, code: `${d.investor_code}-${d.contact_name}` });
+            duplicates.push({ row: d._rowIndex || i + 2, existingId: existing.id, code: `${d.investor_code}-${d.contact_name}` });
           }
         }
       }
@@ -411,17 +483,18 @@ export function useDataImport() {
       const errors: { row: number; message: string }[] = [];
 
       rawData.forEach((row, index) => {
-        const mapped = mapRowToInvestorPaymentMethod(row);
-        const error = validateInvestorPaymentMethod(mapped, index + 2, validMethodTypes);
+        const rowIndex = index + 2;
+        const mapped = mapRowToInvestorPaymentMethod(row, rowIndex);
+        const error = validateInvestorPaymentMethod(mapped, rowIndex, validMethodTypes);
         if (error) {
-          errors.push({ row: index + 2, message: error });
+          errors.push({ row: rowIndex, message: error });
         } else {
           if (mapped.investor_code) {
-            const investorId = investorMap.get(mapped.investor_code);
+            const investorId = investorMap.get(mapped.investor_code.toUpperCase());
             if (investorId) {
               mapped.investor_id = investorId;
             } else {
-              errors.push({ row: index + 2, message: `第 ${index + 2} 行：找不到投資方編號「${mapped.investor_code}」` });
+              errors.push({ row: rowIndex, message: `第 ${rowIndex} 行：找不到投資方編號「${mapped.investor_code}」` });
               return;
             }
           }
@@ -429,7 +502,6 @@ export function useDataImport() {
         }
       });
 
-      // Check for duplicates by investor_id + method_type + account_number
       const duplicates: { row: number; existingId: string; code: string }[] = [];
       for (let i = 0; i < mappedData.length; i++) {
         const d = mappedData[i];
@@ -444,7 +516,7 @@ export function useDataImport() {
           }
           const { data: existing } = await query.maybeSingle();
           if (existing) {
-            duplicates.push({ row: i + 2, existingId: existing.id, code: `${d.investor_code}-${d.method_type}` });
+            duplicates.push({ row: d._rowIndex || i + 2, existingId: existing.id, code: `${d.investor_code}-${d.method_type}` });
           }
         }
       }
@@ -475,17 +547,18 @@ export function useDataImport() {
       const errors: { row: number; message: string }[] = [];
 
       rawData.forEach((row, index) => {
-        const mapped = mapRowToDocument(row);
-        const error = validateDocument(mapped, index + 2, validDocTypes, validDocStatuses);
+        const rowIndex = index + 2;
+        const mapped = mapRowToDocument(row, rowIndex);
+        const error = validateDocument(mapped, rowIndex, validDocTypes, validDocStatuses);
         if (error) {
-          errors.push({ row: index + 2, message: error });
+          errors.push({ row: rowIndex, message: error });
         } else {
           if (mapped.project_code) {
             const projectId = projectMap.get(mapped.project_code);
             if (projectId) {
               mapped.project_id = projectId;
             } else {
-              errors.push({ row: index + 2, message: `第 ${index + 2} 行：找不到案場「${mapped.project_code}」` });
+              errors.push({ row: rowIndex, message: `第 ${rowIndex} 行：找不到案場「${mapped.project_code}」` });
               return;
             }
           }
@@ -504,7 +577,7 @@ export function useDataImport() {
             .eq('doc_type', d.doc_type as DocType)
             .maybeSingle();
           if (existing) {
-            duplicates.push({ row: i + 2, existingId: existing.id, code: `${d.project_code}-${d.doc_type}` });
+            duplicates.push({ row: d._rowIndex || i + 2, existingId: existing.id, code: `${d.project_code}-${d.doc_type}` });
           }
         }
       }
@@ -517,81 +590,155 @@ export function useDataImport() {
     }
   }, []);
 
+  // Generic import function with row-by-row processing
   const importProjects = useCallback(async (
     data: Partial<ProjectInsertWithInvestor>[],
     strategy: ImportStrategy,
     duplicates: { row: number; existingId: string; code: string }[]
-  ): Promise<{ inserted: number; updated: number }> => {
+  ): Promise<ImportResult> => {
     setIsProcessing(true);
+    const rowResults: ImportRowResult[] = [];
+    let inserted = 0, updated = 0, skipped = 0, errors = 0;
+
     try {
       const duplicateCodes = new Set(duplicates.map(d => d.code));
-      const newRecords = data.filter(d => !duplicateCodes.has(d.project_code!));
-      const existingRecords = data.filter(d => duplicateCodes.has(d.project_code!));
 
-      let inserted = 0, updated = 0;
+      for (const record of data) {
+        const rowIndex = record._rowIndex || 0;
+        const code = record.project_code || '';
+        const isDuplicate = duplicateCodes.has(code);
 
-      if (newRecords.length > 0) {
-        const toInsert = newRecords.map(record => {
-          const { investor_name, ...dbRecord } = record;
-          return { ...dbRecord, created_by: user?.id, status: (dbRecord.status as ProjectStatus) || '開發中' };
-        }) as ProjectInsert[];
-        const { error } = await supabase.from('projects').insert(toInsert);
-        if (error) throw error;
-        inserted = newRecords.length;
-      }
-
-      if (strategy === 'update' && existingRecords.length > 0) {
-        for (const record of existingRecords) {
-          const existing = duplicates.find(d => d.code === record.project_code);
-          if (existing) {
-            const { investor_name, ...dbRecord } = record;
-            const { error } = await supabase.from('projects').update(dbRecord).eq('id', existing.existingId);
-            if (error) throw error;
-            updated++;
+        // Handle based on strategy
+        if (isDuplicate) {
+          if (strategy === 'insert_only') {
+            rowResults.push({
+              row: rowIndex,
+              status: 'error',
+              code,
+              message: '唯一鍵衝突：案場編號已存在',
+              errorType: 'unique_constraint',
+              field: 'project_code',
+            });
+            errors++;
+            continue;
+          } else if (strategy === 'skip') {
+            rowResults.push({ row: rowIndex, status: 'skipped', code, message: '略過：資料已存在' });
+            skipped++;
+            continue;
+          } else if (strategy === 'update') {
+            const existing = duplicates.find(d => d.code === code);
+            if (existing) {
+              try {
+                const { investor_name, _rowIndex, ...dbRecord } = record;
+                const { error } = await supabase.from('projects').update(dbRecord).eq('id', existing.existingId);
+                if (error) throw error;
+                rowResults.push({ row: rowIndex, status: 'success', code, message: '更新成功' });
+                updated++;
+              } catch (err) {
+                const result = parsePostgresError(err, rowIndex, code);
+                rowResults.push(result);
+                errors++;
+              }
+            }
+            continue;
           }
+        }
+
+        // Insert new record
+        try {
+          const { investor_name, _rowIndex, ...dbRecord } = record;
+          const { error } = await supabase.from('projects').insert({
+            ...dbRecord,
+            created_by: user?.id,
+            status: (dbRecord.status as ProjectStatus) || '開發中',
+          } as ProjectInsert);
+          if (error) throw error;
+          rowResults.push({ row: rowIndex, status: 'success', code, message: '新增成功' });
+          inserted++;
+        } catch (err) {
+          const result = parsePostgresError(err, rowIndex, code);
+          rowResults.push(result);
+          errors++;
         }
       }
 
       setProjectPreview(null);
-      return { inserted, updated };
+      return { inserted, updated, skipped, errors, rowResults };
     } finally {
       setIsProcessing(false);
     }
   }, [user?.id]);
 
   const importInvestors = useCallback(async (
-    data: Partial<InvestorInsert>[],
+    data: Partial<InvestorInsertWithRow>[],
     strategy: ImportStrategy,
     duplicates: { row: number; existingId: string; code: string }[]
-  ): Promise<{ inserted: number; updated: number }> => {
+  ): Promise<ImportResult> => {
     setIsProcessing(true);
+    const rowResults: ImportRowResult[] = [];
+    let inserted = 0, updated = 0, skipped = 0, errors = 0;
+
     try {
-      const duplicateCodes = new Set(duplicates.map(d => d.code));
-      const newRecords = data.filter(d => !duplicateCodes.has(d.investor_code!));
-      const existingRecords = data.filter(d => duplicateCodes.has(d.investor_code!));
+      const duplicateCodes = new Set(duplicates.map(d => d.code.toUpperCase()));
 
-      let inserted = 0, updated = 0;
+      for (const record of data) {
+        const rowIndex = record._rowIndex || 0;
+        const code = record.investor_code || '';
+        const isDuplicate = duplicateCodes.has(code.toUpperCase());
 
-      if (newRecords.length > 0) {
-        const toInsert = newRecords.map(record => ({ ...record, created_by: user?.id })) as InvestorInsert[];
-        const { error } = await supabase.from('investors').insert(toInsert);
-        if (error) throw error;
-        inserted = newRecords.length;
-      }
-
-      if (strategy === 'update' && existingRecords.length > 0) {
-        for (const record of existingRecords) {
-          const existing = duplicates.find(d => d.code === record.investor_code);
-          if (existing) {
-            const { error } = await supabase.from('investors').update(record).eq('id', existing.existingId);
-            if (error) throw error;
-            updated++;
+        if (isDuplicate) {
+          if (strategy === 'insert_only') {
+            rowResults.push({
+              row: rowIndex,
+              status: 'error',
+              code,
+              message: '唯一鍵衝突：投資方編號已存在',
+              errorType: 'unique_constraint',
+              field: 'investor_code',
+            });
+            errors++;
+            continue;
+          } else if (strategy === 'skip') {
+            rowResults.push({ row: rowIndex, status: 'skipped', code, message: '略過：資料已存在' });
+            skipped++;
+            continue;
+          } else if (strategy === 'update') {
+            const existing = duplicates.find(d => d.code.toUpperCase() === code.toUpperCase());
+            if (existing) {
+              try {
+                const { _rowIndex, ...dbRecord } = record;
+                const { error } = await supabase.from('investors').update(dbRecord).eq('id', existing.existingId);
+                if (error) throw error;
+                rowResults.push({ row: rowIndex, status: 'success', code, message: '更新成功' });
+                updated++;
+              } catch (err) {
+                const result = parsePostgresError(err, rowIndex, code);
+                rowResults.push(result);
+                errors++;
+              }
+            }
+            continue;
           }
+        }
+
+        try {
+          const { _rowIndex, ...dbRecord } = record;
+          const { error } = await supabase.from('investors').insert({
+            ...dbRecord,
+            created_by: user?.id,
+          } as InvestorInsert);
+          if (error) throw error;
+          rowResults.push({ row: rowIndex, status: 'success', code, message: '新增成功' });
+          inserted++;
+        } catch (err) {
+          const result = parsePostgresError(err, rowIndex, code);
+          rowResults.push(result);
+          errors++;
         }
       }
 
       setInvestorPreview(null);
-      return { inserted, updated };
+      return { inserted, updated, skipped, errors, rowResults };
     } finally {
       setIsProcessing(false);
     }
@@ -601,39 +748,72 @@ export function useDataImport() {
     data: Partial<InvestorContactInsertWithCode>[],
     strategy: ImportStrategy,
     duplicates: { row: number; existingId: string; code: string }[]
-  ): Promise<{ inserted: number; updated: number }> => {
+  ): Promise<ImportResult> => {
     setIsProcessing(true);
+    const rowResults: ImportRowResult[] = [];
+    let inserted = 0, updated = 0, skipped = 0, errors = 0;
+
     try {
       const duplicateCodes = new Set(duplicates.map(d => d.code));
-      const newRecords = data.filter(d => !duplicateCodes.has(`${d.investor_code}-${d.contact_name}`));
-      const existingRecords = data.filter(d => duplicateCodes.has(`${d.investor_code}-${d.contact_name}`));
 
-      let inserted = 0, updated = 0;
+      for (const record of data) {
+        const rowIndex = record._rowIndex || 0;
+        const code = `${record.investor_code}-${record.contact_name}`;
+        const isDuplicate = duplicateCodes.has(code);
 
-      if (newRecords.length > 0) {
-        const toInsert = newRecords.map(record => {
-          const { investor_code, investor_name, ...dbRecord } = record;
-          return { ...dbRecord, created_by: user?.id };
-        }) as InvestorContactInsert[];
-        const { error } = await supabase.from('investor_contacts').insert(toInsert);
-        if (error) throw error;
-        inserted = newRecords.length;
-      }
-
-      if (strategy === 'update' && existingRecords.length > 0) {
-        for (const record of existingRecords) {
-          const existing = duplicates.find(d => d.code === `${record.investor_code}-${record.contact_name}`);
-          if (existing) {
-            const { investor_code, investor_name, ...dbRecord } = record;
-            const { error } = await supabase.from('investor_contacts').update(dbRecord).eq('id', existing.existingId);
-            if (error) throw error;
-            updated++;
+        if (isDuplicate) {
+          if (strategy === 'insert_only') {
+            rowResults.push({
+              row: rowIndex,
+              status: 'error',
+              code,
+              message: '唯一鍵衝突：此投資方已有同名聯絡人',
+              errorType: 'unique_constraint',
+              field: 'investor_id, contact_name',
+            });
+            errors++;
+            continue;
+          } else if (strategy === 'skip') {
+            rowResults.push({ row: rowIndex, status: 'skipped', code, message: '略過：資料已存在' });
+            skipped++;
+            continue;
+          } else if (strategy === 'update') {
+            const existing = duplicates.find(d => d.code === code);
+            if (existing) {
+              try {
+                const { investor_code, investor_name, _rowIndex, ...dbRecord } = record;
+                const { error } = await supabase.from('investor_contacts').update(dbRecord).eq('id', existing.existingId);
+                if (error) throw error;
+                rowResults.push({ row: rowIndex, status: 'success', code, message: '更新成功' });
+                updated++;
+              } catch (err) {
+                const result = parsePostgresError(err, rowIndex, code);
+                rowResults.push(result);
+                errors++;
+              }
+            }
+            continue;
           }
+        }
+
+        try {
+          const { investor_code, investor_name, _rowIndex, ...dbRecord } = record;
+          const { error } = await supabase.from('investor_contacts').insert({
+            ...dbRecord,
+            created_by: user?.id,
+          } as InvestorContactInsert);
+          if (error) throw error;
+          rowResults.push({ row: rowIndex, status: 'success', code, message: '新增成功' });
+          inserted++;
+        } catch (err) {
+          const result = parsePostgresError(err, rowIndex, code);
+          rowResults.push(result);
+          errors++;
         }
       }
 
       setInvestorContactPreview(null);
-      return { inserted, updated };
+      return { inserted, updated, skipped, errors, rowResults };
     } finally {
       setIsProcessing(false);
     }
@@ -643,39 +823,72 @@ export function useDataImport() {
     data: Partial<InvestorPaymentMethodInsertWithCode>[],
     strategy: ImportStrategy,
     duplicates: { row: number; existingId: string; code: string }[]
-  ): Promise<{ inserted: number; updated: number }> => {
+  ): Promise<ImportResult> => {
     setIsProcessing(true);
+    const rowResults: ImportRowResult[] = [];
+    let inserted = 0, updated = 0, skipped = 0, errors = 0;
+
     try {
       const duplicateCodes = new Set(duplicates.map(d => d.code));
-      const newRecords = data.filter(d => !duplicateCodes.has(`${d.investor_code}-${d.method_type}`));
-      const existingRecords = data.filter(d => duplicateCodes.has(`${d.investor_code}-${d.method_type}`));
 
-      let inserted = 0, updated = 0;
+      for (const record of data) {
+        const rowIndex = record._rowIndex || 0;
+        const code = `${record.investor_code}-${record.method_type}`;
+        const isDuplicate = duplicateCodes.has(code);
 
-      if (newRecords.length > 0) {
-        const toInsert = newRecords.map(record => {
-          const { investor_code, investor_name, ...dbRecord } = record;
-          return { ...dbRecord, created_by: user?.id };
-        }) as InvestorPaymentMethodInsert[];
-        const { error } = await supabase.from('investor_payment_methods').insert(toInsert);
-        if (error) throw error;
-        inserted = newRecords.length;
-      }
-
-      if (strategy === 'update' && existingRecords.length > 0) {
-        for (const record of existingRecords) {
-          const existing = duplicates.find(d => d.code === `${record.investor_code}-${record.method_type}`);
-          if (existing) {
-            const { investor_code, investor_name, ...dbRecord } = record;
-            const { error } = await supabase.from('investor_payment_methods').update(dbRecord).eq('id', existing.existingId);
-            if (error) throw error;
-            updated++;
+        if (isDuplicate) {
+          if (strategy === 'insert_only') {
+            rowResults.push({
+              row: rowIndex,
+              status: 'error',
+              code,
+              message: '唯一鍵衝突：此投資方已有相同付款方式',
+              errorType: 'unique_constraint',
+              field: 'investor_id, method_type, account_number',
+            });
+            errors++;
+            continue;
+          } else if (strategy === 'skip') {
+            rowResults.push({ row: rowIndex, status: 'skipped', code, message: '略過：資料已存在' });
+            skipped++;
+            continue;
+          } else if (strategy === 'update') {
+            const existing = duplicates.find(d => d.code === code);
+            if (existing) {
+              try {
+                const { investor_code, investor_name, _rowIndex, ...dbRecord } = record;
+                const { error } = await supabase.from('investor_payment_methods').update(dbRecord).eq('id', existing.existingId);
+                if (error) throw error;
+                rowResults.push({ row: rowIndex, status: 'success', code, message: '更新成功' });
+                updated++;
+              } catch (err) {
+                const result = parsePostgresError(err, rowIndex, code);
+                rowResults.push(result);
+                errors++;
+              }
+            }
+            continue;
           }
+        }
+
+        try {
+          const { investor_code, investor_name, _rowIndex, ...dbRecord } = record;
+          const { error } = await supabase.from('investor_payment_methods').insert({
+            ...dbRecord,
+            created_by: user?.id,
+          } as InvestorPaymentMethodInsert);
+          if (error) throw error;
+          rowResults.push({ row: rowIndex, status: 'success', code, message: '新增成功' });
+          inserted++;
+        } catch (err) {
+          const result = parsePostgresError(err, rowIndex, code);
+          rowResults.push(result);
+          errors++;
         }
       }
 
       setInvestorPaymentMethodPreview(null);
-      return { inserted, updated };
+      return { inserted, updated, skipped, errors, rowResults };
     } finally {
       setIsProcessing(false);
     }
@@ -685,39 +898,73 @@ export function useDataImport() {
     data: Partial<DocumentInsertWithProject>[],
     strategy: ImportStrategy,
     duplicates: { row: number; existingId: string; code: string }[]
-  ): Promise<{ inserted: number; updated: number }> => {
+  ): Promise<ImportResult> => {
     setIsProcessing(true);
+    const rowResults: ImportRowResult[] = [];
+    let inserted = 0, updated = 0, skipped = 0, errors = 0;
+
     try {
       const duplicateCodes = new Set(duplicates.map(d => d.code));
-      const newRecords = data.filter(d => !duplicateCodes.has(`${d.project_code}-${d.doc_type}`));
-      const existingRecords = data.filter(d => duplicateCodes.has(`${d.project_code}-${d.doc_type}`));
 
-      let inserted = 0, updated = 0;
+      for (const record of data) {
+        const rowIndex = record._rowIndex || 0;
+        const code = `${record.project_code}-${record.doc_type}`;
+        const isDuplicate = duplicateCodes.has(code);
 
-      if (newRecords.length > 0) {
-        const toInsert = newRecords.map(record => {
-          const { project_code, project_name, owner_name, ...dbRecord } = record;
-          return { ...dbRecord, created_by: user?.id, doc_status: (dbRecord.doc_status as DocStatus) || '未開始' };
-        }) as DocumentInsert[];
-        const { error } = await supabase.from('documents').insert(toInsert);
-        if (error) throw error;
-        inserted = newRecords.length;
-      }
-
-      if (strategy === 'update' && existingRecords.length > 0) {
-        for (const record of existingRecords) {
-          const existing = duplicates.find(d => d.code === `${record.project_code}-${record.doc_type}`);
-          if (existing) {
-            const { project_code, project_name, owner_name, ...dbRecord } = record;
-            const { error } = await supabase.from('documents').update(dbRecord).eq('id', existing.existingId);
-            if (error) throw error;
-            updated++;
+        if (isDuplicate) {
+          if (strategy === 'insert_only') {
+            rowResults.push({
+              row: rowIndex,
+              status: 'error',
+              code,
+              message: '唯一鍵衝突：此案場已有相同類型文件',
+              errorType: 'unique_constraint',
+              field: 'project_id, doc_type',
+            });
+            errors++;
+            continue;
+          } else if (strategy === 'skip') {
+            rowResults.push({ row: rowIndex, status: 'skipped', code, message: '略過：資料已存在' });
+            skipped++;
+            continue;
+          } else if (strategy === 'update') {
+            const existing = duplicates.find(d => d.code === code);
+            if (existing) {
+              try {
+                const { project_code, project_name, owner_name, _rowIndex, ...dbRecord } = record;
+                const { error } = await supabase.from('documents').update(dbRecord).eq('id', existing.existingId);
+                if (error) throw error;
+                rowResults.push({ row: rowIndex, status: 'success', code, message: '更新成功' });
+                updated++;
+              } catch (err) {
+                const result = parsePostgresError(err, rowIndex, code);
+                rowResults.push(result);
+                errors++;
+              }
+            }
+            continue;
           }
+        }
+
+        try {
+          const { project_code, project_name, owner_name, _rowIndex, ...dbRecord } = record;
+          const { error } = await supabase.from('documents').insert({
+            ...dbRecord,
+            created_by: user?.id,
+            doc_status: (dbRecord.doc_status as DocStatus) || '未開始',
+          } as DocumentInsert);
+          if (error) throw error;
+          rowResults.push({ row: rowIndex, status: 'success', code, message: '新增成功' });
+          inserted++;
+        } catch (err) {
+          const result = parsePostgresError(err, rowIndex, code);
+          rowResults.push(result);
+          errors++;
         }
       }
 
       setDocumentPreview(null);
-      return { inserted, updated };
+      return { inserted, updated, skipped, errors, rowResults };
     } finally {
       setIsProcessing(false);
     }
@@ -761,3 +1008,5 @@ export function useDataImport() {
     clearInvestorPaymentMethodPreview,
   };
 }
+
+export type { ImportResult, ImportRowResult };
