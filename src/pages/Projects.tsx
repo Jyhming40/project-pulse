@@ -17,11 +17,13 @@ import {
   Trash2,
   FileDown,
   FileUp,
-  Wrench
+  Wrench,
+  Database as DatabaseIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ImportExportDialog } from '@/components/ImportExportDialog';
+import { ProjectBackupDialog } from '@/components/ProjectBackupDialog';
 import { 
   Select, 
   SelectContent, 
@@ -138,6 +140,9 @@ export default function Projects() {
   
   // Import/Export dialog
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+  
+  // Backup dialog
+  const [isBackupOpen, setIsBackupOpen] = useState(false);
   
   // Creating state for Edge Function call
   const [isCreating, setIsCreating] = useState(false);
@@ -336,6 +341,12 @@ export default function Projects() {
           <p className="text-muted-foreground mt-1">共 {projects.length} 個案場</p>
         </div>
         <div className="flex gap-2">
+          {canEdit && (
+            <Button variant="outline" onClick={() => setIsBackupOpen(true)}>
+              <DatabaseIcon className="w-4 h-4 mr-2" />
+              完整備份
+            </Button>
+          )}
           {canEdit && (
             <Button variant="outline" onClick={() => setIsImportExportOpen(true)}>
               <FileDown className="w-4 h-4 mr-2" />
@@ -861,6 +872,13 @@ export default function Projects() {
         onOpenChange={setIsImportExportOpen}
         type="projects"
         data={projects}
+        onImportComplete={() => queryClient.invalidateQueries({ queryKey: ['projects'] })}
+      />
+
+      {/* Project Backup Dialog */}
+      <ProjectBackupDialog
+        open={isBackupOpen}
+        onOpenChange={setIsBackupOpen}
         onImportComplete={() => queryClient.invalidateQueries({ queryKey: ['projects'] })}
       />
     </div>
