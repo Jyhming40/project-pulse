@@ -113,10 +113,12 @@ function parseFile(file: File): Promise<Record<string, any>[]> {
     reader.onload = (e) => {
       try {
         const data = e.target?.result;
-        const workbook = XLSX.read(data, { type: 'binary' });
+        // Use cellDates: true to auto-convert Excel date serial numbers
+        const workbook = XLSX.read(data, { type: 'binary', cellDates: true });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+        // Use raw: false and dateNF to ensure dates are formatted consistently
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: '', raw: false, dateNF: 'yyyy-mm-dd' });
         resolve(jsonData as Record<string, any>[]);
       } catch (error) {
         reject(error);
@@ -125,6 +127,58 @@ function parseFile(file: File): Promise<Record<string, any>[]> {
     reader.onerror = () => reject(new Error('檔案讀取失敗'));
     reader.readAsBinaryString(file);
   });
+}
+
+// Parse various date formats including YYYY/M/D, YYYY-MM-DD, Excel serial numbers
+function parseDate(value: any): string | null {
+  if (!value || value === '' || value === null || value === undefined) return null;
+  
+  // If it's already a Date object
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return value.toISOString().split('T')[0];
+  }
+  
+  const strValue = String(value).trim();
+  if (!strValue) return null;
+  
+  // Try Excel serial number (number like 43831)
+  const numValue = Number(strValue);
+  if (!isNaN(numValue) && numValue > 1000 && numValue < 100000) {
+    // Excel serial date: days since 1899-12-30
+    const excelEpoch = new Date(1899, 11, 30);
+    const date = new Date(excelEpoch.getTime() + numValue * 24 * 60 * 60 * 1000);
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  }
+  
+  // Try YYYY/M/D or YYYY-M-D format
+  const slashMatch = strValue.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+  if (slashMatch) {
+    const [, year, month, day] = slashMatch;
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  }
+  
+  // Try D/M/YYYY format
+  const dmyMatch = strValue.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmyMatch) {
+    const [, day, month, year] = dmyMatch;
+    const date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+    if (!isNaN(date.getTime())) {
+      return date.toISOString().split('T')[0];
+    }
+  }
+  
+  // Try ISO format or other formats
+  const date = new Date(strValue);
+  if (!isNaN(date.getTime())) {
+    return date.toISOString().split('T')[0];
+  }
+  
+  return null;
 }
 
 function mapRowToProject(row: Record<string, any>, rowIndex: number): Partial<ProjectInsertWithInvestor> {
@@ -193,9 +247,9 @@ function mapRowToDocument(row: Record<string, any>, rowIndex: number): Partial<D
     const mappedKey = documentColumnMap[key.trim()];
     if (mappedKey && value !== '' && value !== null && value !== undefined) {
       if (mappedKey === 'submitted_at' || mappedKey === 'issued_at' || mappedKey === 'due_at') {
-        const date = new Date(value);
-        if (!isNaN(date.getTime())) {
-          (mapped as any)[mappedKey] = date.toISOString().split('T')[0];
+        const parsedDate = parseDate(value);
+        if (parsedDate) {
+          (mapped as any)[mappedKey] = parsedDate;
         }
       } else {
         (mapped as any)[mappedKey] = String(value).trim();
@@ -535,13 +589,24 @@ export function useDataImport() {
       const rawData = await parseFile(file);
       if (rawData.length === 0) throw new Error('檔案中沒有資料');
 
-      const { data: docTypeOptions } = await supabase.from('system_options').select('value').eq('category', 'doc_type').eq('is_active', true);
-      const { data: docStatusOptions } = await supabase.from('system_options').select('value').eq('category', 'doc_status').eq('is_active', true);
-      const validDocTypes = docTypeOptions?.map(opt => opt.value) || [];
-      const validDocStatuses = docStatusOptions?.map(opt => opt.value) || [];
-
-      const { data: projects } = await supabase.from('projects').select('id, project_code');
-      const projectMap = new Map(projects?.map(p => [p.project_code, p.id]) || []);
+      // Fetch all required data in parallel for performance
+      const [docTypeResult, docStatusResult, projectsResult, existingDocsResult] = await Promise.all([
+        supabase.from('system_options').select('value').eq('category', 'doc_type').eq('is_active', true),
+        supabase.from('system_options').select('value').eq('category', 'doc_status').eq('is_active', true),
+        supabase.from('projects').select('id, project_code'),
+        supabase.from('documents').select('id, project_id, doc_type'),
+      ]);
+      
+      const validDocTypes = docTypeResult.data?.map(opt => opt.value) || [];
+      const validDocStatuses = docStatusResult.data?.map(opt => opt.value) || [];
+      const projectMap = new Map(projectsResult.data?.map(p => [p.project_code, p.id]) || []);
+      
+      // Build a map of existing documents: "project_id-doc_type" -> document id
+      const existingDocsMap = new Map<string, string>();
+      existingDocsResult.data?.forEach(doc => {
+        const key = `${doc.project_id}-${doc.doc_type}`;
+        existingDocsMap.set(key, doc.id);
+      });
 
       const mappedData: Partial<DocumentInsertWithProject>[] = [];
       const errors: { row: number; message: string }[] = [];
@@ -549,6 +614,8 @@ export function useDataImport() {
       rawData.forEach((row, index) => {
         const rowIndex = index + 2;
         const mapped = mapRowToDocument(row, rowIndex);
+        
+        // Skip validation if validDocTypes is empty (no options defined yet)
         const error = validateDocument(mapped, rowIndex, validDocTypes, validDocStatuses);
         if (error) {
           errors.push({ row: rowIndex, message: error });
@@ -566,21 +633,21 @@ export function useDataImport() {
         }
       });
 
+      // Find duplicates using the pre-built map (no more row-by-row queries)
       const duplicates: { row: number; existingId: string; code: string }[] = [];
-      for (let i = 0; i < mappedData.length; i++) {
-        const d = mappedData[i];
+      mappedData.forEach((d, i) => {
         if (d.project_id && d.doc_type) {
-          const { data: existing } = await supabase
-            .from('documents')
-            .select('id')
-            .eq('project_id', d.project_id)
-            .eq('doc_type', d.doc_type as DocType)
-            .maybeSingle();
-          if (existing) {
-            duplicates.push({ row: d._rowIndex || i + 2, existingId: existing.id, code: `${d.project_code}-${d.doc_type}` });
+          const key = `${d.project_id}-${d.doc_type}`;
+          const existingId = existingDocsMap.get(key);
+          if (existingId) {
+            duplicates.push({ 
+              row: d._rowIndex || i + 2, 
+              existingId, 
+              code: `${d.project_code}-${d.doc_type}` 
+            });
           }
         }
-      }
+      });
 
       const preview = { data: mappedData, errors, duplicates };
       setDocumentPreview(preview);
@@ -905,6 +972,11 @@ export function useDataImport() {
 
     try {
       const duplicateCodes = new Set(duplicates.map(d => d.code));
+      const duplicateMap = new Map(duplicates.map(d => [d.code, d]));
+      
+      // Separate records into: to insert, to update, to skip, to error
+      const toInsert: { record: Partial<DocumentInsertWithProject>; rowIndex: number; code: string }[] = [];
+      const toUpdate: { record: Partial<DocumentInsertWithProject>; rowIndex: number; code: string; existingId: string }[] = [];
 
       for (const record of data) {
         const rowIndex = record._rowIndex || 0;
@@ -922,40 +994,80 @@ export function useDataImport() {
               field: 'project_id, doc_type',
             });
             errors++;
-            continue;
           } else if (strategy === 'skip') {
             rowResults.push({ row: rowIndex, status: 'skipped', code, message: '略過：資料已存在' });
             skipped++;
-            continue;
           } else if (strategy === 'update') {
-            const existing = duplicates.find(d => d.code === code);
+            const existing = duplicateMap.get(code);
             if (existing) {
+              toUpdate.push({ record, rowIndex, code, existingId: existing.existingId });
+            }
+          }
+        } else {
+          toInsert.push({ record, rowIndex, code });
+        }
+      }
+
+      // Batch insert new records (in chunks of 100 to avoid payload limits)
+      const BATCH_SIZE = 100;
+      for (let i = 0; i < toInsert.length; i += BATCH_SIZE) {
+        const batch = toInsert.slice(i, i + BATCH_SIZE);
+        const insertRecords = batch.map(({ record }) => {
+          const { project_code, project_name, owner_name, _rowIndex, ...dbRecord } = record;
+          return {
+            ...dbRecord,
+            created_by: user?.id,
+            doc_status: (dbRecord.doc_status as DocStatus) || '未開始',
+          } as DocumentInsert;
+        });
+
+        try {
+          const { error } = await supabase.from('documents').insert(insertRecords);
+          if (error) {
+            // If batch fails, try individual inserts to identify specific failures
+            for (const item of batch) {
+              const { record, rowIndex, code } = item;
               try {
                 const { project_code, project_name, owner_name, _rowIndex, ...dbRecord } = record;
-                const { error } = await supabase.from('documents').update(dbRecord).eq('id', existing.existingId);
-                if (error) throw error;
-                rowResults.push({ row: rowIndex, status: 'success', code, message: '更新成功' });
-                updated++;
+                const { error: singleError } = await supabase.from('documents').insert({
+                  ...dbRecord,
+                  created_by: user?.id,
+                  doc_status: (dbRecord.doc_status as DocStatus) || '未開始',
+                } as DocumentInsert);
+                if (singleError) throw singleError;
+                rowResults.push({ row: rowIndex, status: 'success', code, message: '新增成功' });
+                inserted++;
               } catch (err) {
                 const result = parsePostgresError(err, rowIndex, code);
                 rowResults.push(result);
                 errors++;
               }
             }
-            continue;
+          } else {
+            // All in batch succeeded
+            for (const item of batch) {
+              rowResults.push({ row: item.rowIndex, status: 'success', code: item.code, message: '新增成功' });
+              inserted++;
+            }
+          }
+        } catch (err) {
+          // Handle unexpected errors
+          for (const item of batch) {
+            const result = parsePostgresError(err, item.rowIndex, item.code);
+            rowResults.push(result);
+            errors++;
           }
         }
+      }
 
+      // Process updates (still one by one as each needs different ID)
+      for (const { record, rowIndex, code, existingId } of toUpdate) {
         try {
           const { project_code, project_name, owner_name, _rowIndex, ...dbRecord } = record;
-          const { error } = await supabase.from('documents').insert({
-            ...dbRecord,
-            created_by: user?.id,
-            doc_status: (dbRecord.doc_status as DocStatus) || '未開始',
-          } as DocumentInsert);
+          const { error } = await supabase.from('documents').update(dbRecord).eq('id', existingId);
           if (error) throw error;
-          rowResults.push({ row: rowIndex, status: 'success', code, message: '新增成功' });
-          inserted++;
+          rowResults.push({ row: rowIndex, status: 'success', code, message: '更新成功' });
+          updated++;
         } catch (err) {
           const result = parsePostgresError(err, rowIndex, code);
           rowResults.push(result);
