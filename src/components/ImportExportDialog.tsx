@@ -9,7 +9,8 @@ import {
   XCircle,
   Loader2,
   AlertTriangle,
-  SkipForward
+  SkipForward,
+  Calendar
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -30,8 +31,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 import { useDataExport } from '@/hooks/useDataExport';
-import { useDataImport, ImportStrategy } from '@/hooks/useDataImport';
+import { useDataImport, ImportStrategy, ImportProgress } from '@/hooks/useDataImport';
 import { ImportConstraintsInfo, ImportType, ImportResult, ImportRowResult } from '@/components/ImportConstraintsInfo';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
@@ -69,6 +71,7 @@ export function ImportExportDialog({
   const { exportProjects, exportInvestors, exportDocuments, downloadTemplate } = useDataExport();
   const { 
     isProcessing, 
+    importProgress,
     projectPreview, 
     investorPreview,
     documentPreview,
@@ -413,6 +416,56 @@ export function ImportExportDialog({
                   </div>
                 </div>
 
+                {/* Date Preview for Documents */}
+                {type === 'documents' && documentPreview && documentPreview.data.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-info" />
+                      <Label>日期欄位預覽（前 5 筆）</Label>
+                    </div>
+                    <ScrollArea className="h-24 border rounded-lg">
+                      <div className="p-2">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-muted-foreground">
+                              <th className="text-left p-1">行號</th>
+                              <th className="text-left p-1">案場</th>
+                              <th className="text-left p-1">送件日</th>
+                              <th className="text-left p-1">核發日</th>
+                              <th className="text-left p-1">到期日</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {documentPreview.data.slice(0, 5).map((doc, i) => (
+                              <tr key={i} className="border-t border-border/50">
+                                <td className="p-1 font-mono">{doc._rowIndex}</td>
+                                <td className="p-1 truncate max-w-[100px]" title={doc.project_code}>
+                                  {doc.project_code}
+                                </td>
+                                <td className="p-1">
+                                  <span className={doc.submitted_at ? 'text-success' : 'text-muted-foreground'}>
+                                    {doc.submitted_at || '-'}
+                                  </span>
+                                </td>
+                                <td className="p-1">
+                                  <span className={doc.issued_at ? 'text-success' : 'text-muted-foreground'}>
+                                    {doc.issued_at || '-'}
+                                  </span>
+                                </td>
+                                <td className="p-1">
+                                  <span className={doc.due_at ? 'text-success' : 'text-muted-foreground'}>
+                                    {doc.due_at || '-'}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </ScrollArea>
+                  </div>
+                )}
+
                 {/* Errors */}
                 {preview.errors.length > 0 && (
                   <Alert variant="destructive">
@@ -499,9 +552,29 @@ export function ImportExportDialog({
                   </div>
                 )}
 
+                {/* Progress bar when importing */}
+                {isProcessing && importProgress.total > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">
+                        {importProgress.phase === 'preparing' && '準備中...'}
+                        {importProgress.phase === 'importing' && '匯入中...'}
+                        {importProgress.phase === 'done' && '完成!'}
+                      </span>
+                      <span className="font-mono">
+                        {importProgress.current} / {importProgress.total}
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(importProgress.current / importProgress.total) * 100} 
+                      className="h-2"
+                    />
+                  </div>
+                )}
+
                 {/* Import button */}
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={handleClose}>
+                  <Button variant="outline" onClick={handleClose} disabled={isProcessing}>
                     取消
                   </Button>
                   <Button 
@@ -511,7 +584,7 @@ export function ImportExportDialog({
                     {isProcessing ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        匯入中...
+                        匯入中 ({importProgress.current}/{importProgress.total})
                       </>
                     ) : (
                       <>

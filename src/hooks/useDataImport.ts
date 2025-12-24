@@ -19,6 +19,12 @@ type ContactRoleTag = Database['public']['Enums']['contact_role_tag'];
 
 export type ImportStrategy = 'skip' | 'update' | 'insert_only';
 
+export interface ImportProgress {
+  current: number;
+  total: number;
+  phase: 'preparing' | 'importing' | 'done';
+}
+
 export interface ImportPreview<T> {
   data: T[];
   errors: { row: number; message: string }[];
@@ -371,6 +377,7 @@ function parsePostgresError(error: any, row: number, code: string): ImportRowRes
 export function useDataImport() {
   const { user } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [importProgress, setImportProgress] = useState<ImportProgress>({ current: 0, total: 0, phase: 'preparing' });
   const [projectPreview, setProjectPreview] = useState<ImportPreview<Partial<ProjectInsertWithInvestor>> | null>(null);
   const [investorPreview, setInvestorPreview] = useState<ImportPreview<Partial<InvestorInsertWithRow>> | null>(null);
   const [investorContactPreview, setInvestorContactPreview] = useState<ImportPreview<Partial<InvestorContactInsertWithCode>> | null>(null);
@@ -967,8 +974,10 @@ export function useDataImport() {
     duplicates: { row: number; existingId: string; code: string }[]
   ): Promise<ImportResult> => {
     setIsProcessing(true);
+    setImportProgress({ current: 0, total: data.length, phase: 'preparing' });
     const rowResults: ImportRowResult[] = [];
     let inserted = 0, updated = 0, skipped = 0, errors = 0;
+    let processedCount = 0;
 
     try {
       const duplicateCodes = new Set(duplicates.map(d => d.code));
@@ -994,9 +1003,11 @@ export function useDataImport() {
               field: 'project_id, doc_type',
             });
             errors++;
+            processedCount++;
           } else if (strategy === 'skip') {
             rowResults.push({ row: rowIndex, status: 'skipped', code, message: '略過：資料已存在' });
             skipped++;
+            processedCount++;
           } else if (strategy === 'update') {
             const existing = duplicateMap.get(code);
             if (existing) {
@@ -1007,6 +1018,8 @@ export function useDataImport() {
           toInsert.push({ record, rowIndex, code });
         }
       }
+
+      setImportProgress({ current: processedCount, total: data.length, phase: 'importing' });
 
       // Batch insert new records (in chunks of 100 to avoid payload limits)
       const BATCH_SIZE = 100;
@@ -1037,10 +1050,14 @@ export function useDataImport() {
                 if (singleError) throw singleError;
                 rowResults.push({ row: rowIndex, status: 'success', code, message: '新增成功' });
                 inserted++;
+                processedCount++;
+                setImportProgress({ current: processedCount, total: data.length, phase: 'importing' });
               } catch (err) {
                 const result = parsePostgresError(err, rowIndex, code);
                 rowResults.push(result);
                 errors++;
+                processedCount++;
+                setImportProgress({ current: processedCount, total: data.length, phase: 'importing' });
               }
             }
           } else {
@@ -1048,7 +1065,9 @@ export function useDataImport() {
             for (const item of batch) {
               rowResults.push({ row: item.rowIndex, status: 'success', code: item.code, message: '新增成功' });
               inserted++;
+              processedCount++;
             }
+            setImportProgress({ current: processedCount, total: data.length, phase: 'importing' });
           }
         } catch (err) {
           // Handle unexpected errors
@@ -1056,7 +1075,9 @@ export function useDataImport() {
             const result = parsePostgresError(err, item.rowIndex, item.code);
             rowResults.push(result);
             errors++;
+            processedCount++;
           }
+          setImportProgress({ current: processedCount, total: data.length, phase: 'importing' });
         }
       }
 
@@ -1068,13 +1089,18 @@ export function useDataImport() {
           if (error) throw error;
           rowResults.push({ row: rowIndex, status: 'success', code, message: '更新成功' });
           updated++;
+          processedCount++;
+          setImportProgress({ current: processedCount, total: data.length, phase: 'importing' });
         } catch (err) {
           const result = parsePostgresError(err, rowIndex, code);
           rowResults.push(result);
           errors++;
+          processedCount++;
+          setImportProgress({ current: processedCount, total: data.length, phase: 'importing' });
         }
       }
 
+      setImportProgress({ current: data.length, total: data.length, phase: 'done' });
       setDocumentPreview(null);
       return { inserted, updated, skipped, errors, rowResults };
     } finally {
@@ -1100,6 +1126,7 @@ export function useDataImport() {
 
   return {
     isProcessing,
+    importProgress,
     projectPreview,
     investorPreview,
     investorContactPreview,
