@@ -201,19 +201,15 @@ export default function ProjectDetail() {
   });
 
   // Fetch documents
-  const { data: documents = [], error: documentsError } = useQuery({
+  const { data: documents = [] } = useQuery({
     queryKey: ['project-documents', id],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('documents')
-        .select('*, profiles:owner_user_id(full_name, email)')
+        .select('*, owner:profiles!documents_owner_user_id_fkey(full_name, email)')
         .eq('project_id', id)
         .order('created_at', { ascending: false });
-      if (error) {
-        console.error('Project documents query error:', error);
-        throw error;
-      }
-      console.log('Project documents fetched:', data?.length || 0, 'for project:', id);
+      if (error) throw error;
       return data;
     },
     enabled: !!id,
@@ -921,7 +917,7 @@ export default function ProjectDetail() {
                           {doc.due_at ? format(new Date(doc.due_at), 'yyyy/MM/dd') : '-'}
                         </TableCell>
                         <TableCell>
-                          {(doc.profiles as any)?.full_name || '-'}
+                          {(doc.owner as any)?.full_name || '-'}
                         </TableCell>
                       </TableRow>
                     ))}
