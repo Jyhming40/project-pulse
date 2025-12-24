@@ -818,6 +818,11 @@ export default function ProjectDetail() {
           </Card>
         </TabsContent>
 
+        {/* Partners/Construction Assignments Tab */}
+        <TabsContent value="partners" className="mt-6">
+          <ProjectConstructionAssignments projectId={id!} />
+        </TabsContent>
+
         {/* Status History Tab */}
         <TabsContent value="status" className="mt-6">
           <Card>
