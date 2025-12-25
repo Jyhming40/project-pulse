@@ -150,34 +150,17 @@ export function useDatabaseBackup() {
     try {
       const workbook = XLSX.utils.book_new();
       let rowsDone = 0;
+      const exportTime = new Date().toISOString();
 
-      // Create meta sheet
-      const metaData = {
-        export_time: new Date().toISOString(),
-        schema_version: '1.0',
-        tables: selectedTables.map(t => ({
-          name: t.table_name,
-          row_count: t.row_count,
-          columns: t.columns.map(c => ({
-            name: c.column_name,
-            type: c.data_type,
-            nullable: c.is_nullable
-          })),
-          primary_key: t.primary_key,
-          suggested_upsert_key: UPSERT_KEY_SUGGESTIONS[t.table_name]
-        }))
-      };
-      
-      const metaSheet = XLSX.utils.json_to_sheet([{ 
-        export_time: metaData.export_time,
-        schema_version: metaData.schema_version,
-        tables_count: selectedTables.length,
-        total_rows: totalRows,
-        meta_json: JSON.stringify(metaData)
-      }]);
-      XLSX.utils.book_append_sheet(workbook, metaSheet, '__meta');
+      // Store table export results for __meta sheet
+      const tableExportResults: Array<{
+        table_name: string;
+        row_count: number;
+        columns: string[];
+        suggested_upsert_key: string;
+      }> = [];
 
-      // Export each table
+      // Export each table first (so we have actual row counts)
       for (let i = 0; i < selectedTables.length; i++) {
         const table = selectedTables[i];
         setExportProgress(prev => ({
@@ -215,30 +198,94 @@ export function useDatabaseBackup() {
           }));
         }
 
-        // Format dates in YYYY-MM-DD format
+        // Get column names from table schema (preserve original column order)
+        const columnNames = table.columns.map(c => c.column_name);
+
+        // Format rows with consistent column order
         const formattedRows = allRows.map(row => {
           const formatted: Record<string, any> = {};
-          for (const [key, value] of Object.entries(row)) {
-            if (value instanceof Date) {
-              formatted[key] = value.toISOString().split('T')[0];
+          // Use column order from schema
+          for (const colName of columnNames) {
+            const value = row[colName];
+            if (value === null || value === undefined) {
+              formatted[colName] = '';
+            } else if (value instanceof Date) {
+              formatted[colName] = value.toISOString().split('T')[0];
             } else if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
-              // Keep as ISO for datetime, but just date for date fields
-              formatted[key] = value;
+              // Keep ISO datetime as-is
+              formatted[colName] = value;
             } else if (Array.isArray(value)) {
-              formatted[key] = JSON.stringify(value);
+              // Format arrays as comma-separated or JSON
+              formatted[colName] = JSON.stringify(value);
+            } else if (typeof value === 'object') {
+              formatted[colName] = JSON.stringify(value);
             } else {
-              formatted[key] = value;
+              formatted[colName] = value;
             }
           }
           return formatted;
         });
 
-        const sheet = XLSX.utils.json_to_sheet(formattedRows);
+        // Create sheet with explicit column headers
+        let sheet: XLSX.WorkSheet;
+        if (formattedRows.length === 0) {
+          // Create empty sheet with just headers
+          sheet = XLSX.utils.aoa_to_sheet([columnNames]);
+        } else {
+          // Create sheet with data, ensuring column order
+          sheet = XLSX.utils.json_to_sheet(formattedRows, { header: columnNames });
+        }
+        
+        // Set column widths for better readability
+        const colWidths = columnNames.map(col => ({
+          wch: Math.max(col.length + 2, 12)
+        }));
+        sheet['!cols'] = colWidths;
         
         // Truncate sheet name to 31 chars (Excel limit)
         const sheetName = table.table_name.substring(0, 31);
         XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+
+        // Record export result for __meta
+        tableExportResults.push({
+          table_name: table.table_name,
+          row_count: allRows.length,
+          columns: columnNames,
+          suggested_upsert_key: UPSERT_KEY_SUGGESTIONS[table.table_name] || 'id'
+        });
       }
+
+      // Create __meta sheet with readable format (one row per table)
+      const metaRows = tableExportResults.map(t => ({
+        '資料表名稱': t.table_name,
+        '匯出筆數': t.row_count,
+        '欄位數': t.columns.length,
+        '建議Upsert鍵': t.suggested_upsert_key,
+        '欄位列表': t.columns.join(', ')
+      }));
+
+      // Add summary row at the top
+      const summaryRow = {
+        '資料表名稱': '【匯出摘要】',
+        '匯出筆數': tableExportResults.reduce((sum, t) => sum + t.row_count, 0),
+        '欄位數': tableExportResults.length,
+        '建議Upsert鍵': '',
+        '欄位列表': `匯出時間: ${exportTime}`
+      };
+
+      const metaSheet = XLSX.utils.json_to_sheet([summaryRow, ...metaRows]);
+      metaSheet['!cols'] = [
+        { wch: 35 },  // 資料表名稱
+        { wch: 12 },  // 匯出筆數
+        { wch: 10 },  // 欄位數
+        { wch: 20 },  // 建議Upsert鍵
+        { wch: 80 }   // 欄位列表
+      ];
+      
+      // Insert __meta sheet at the beginning
+      const newSheetNames = ['__meta', ...workbook.SheetNames];
+      workbook.SheetNames = newSheetNames;
+      workbook.Sheets['__meta'] = metaSheet;
 
       // Generate and download file
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
@@ -249,11 +296,11 @@ export function useDatabaseBackup() {
         phase: 'complete',
         tables_done: selectedTables.length,
         tables_total: selectedTables.length,
-        rows_done: totalRows,
+        rows_done: rowsDone,
         rows_total: totalRows
       });
       
-      toast.success(`已匯出 ${selectedTables.length} 個資料表，共 ${totalRows} 筆資料`);
+      toast.success(`已匯出 ${selectedTables.length} 個資料表，共 ${rowsDone} 筆資料`);
     } catch (err) {
       console.error('Export error:', err);
       toast.error('匯出失敗');
