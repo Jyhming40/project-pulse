@@ -17,6 +17,7 @@ import Documents from "./pages/Documents";
 import Settings from "./pages/Settings";
 import SystemOptions from "./pages/SystemOptions";
 import Partners from "./pages/Partners";
+import DatabaseBackup from "./pages/DatabaseBackup";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -39,6 +40,7 @@ const App = () => (
             <Route path="/partners" element={<ProtectedRoute><Layout><Partners /></Layout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Layout><Settings /></Layout></ProtectedRoute>} />
             <Route path="/system-options" element={<ProtectedRoute adminOnly><Layout><SystemOptions /></Layout></ProtectedRoute>} />
+            <Route path="/database-backup" element={<ProtectedRoute adminOnly><Layout><DatabaseBackup /></Layout></ProtectedRoute>} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
