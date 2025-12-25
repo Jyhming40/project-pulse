@@ -160,6 +160,9 @@ export function useDatabaseBackup() {
         suggested_upsert_key: string;
       }> = [];
 
+      // Create a map to store sheets temporarily
+      const tableSheets: Map<string, XLSX.WorkSheet> = new Map();
+
       // Export each table first (so we have actual row counts)
       for (let i = 0; i < selectedTables.length; i++) {
         const table = selectedTables[i];
@@ -242,9 +245,8 @@ export function useDatabaseBackup() {
         }));
         sheet['!cols'] = colWidths;
         
-        // Truncate sheet name to 31 chars (Excel limit)
-        const sheetName = table.table_name.substring(0, 31);
-        XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+        // Store sheet temporarily
+        tableSheets.set(table.table_name, sheet);
 
         // Record export result for __meta
         tableExportResults.push({
@@ -282,10 +284,15 @@ export function useDatabaseBackup() {
         { wch: 80 }   // 欄位列表
       ];
       
-      // Insert __meta sheet at the beginning
-      const newSheetNames = ['__meta', ...workbook.SheetNames];
-      workbook.SheetNames = newSheetNames;
-      workbook.Sheets['__meta'] = metaSheet;
+      // Add __meta sheet first
+      XLSX.utils.book_append_sheet(workbook, metaSheet, '__meta');
+      
+      // Then add all table sheets
+      for (const [tableName, sheet] of tableSheets) {
+        // Truncate sheet name to 31 chars (Excel limit)
+        const sheetName = tableName.substring(0, 31);
+        XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+      }
 
       // Generate and download file
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
