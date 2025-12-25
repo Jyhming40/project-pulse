@@ -15,5 +15,3 @@ verify_jwt = true
 [functions.create-project-with-seq]
 verify_jwt = true
 
-[functions.database-backup]
-verify_jwt = true
