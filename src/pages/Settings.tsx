@@ -113,38 +113,6 @@ export default function Settings() {
     },
   });
 
-  const seedDataMutation = useMutation({
-    mutationFn: async () => {
-      const { data: inv1 } = await supabase.from('investors').insert({
-        investor_code: 'INV-001', company_name: '永沛投資股份有限公司',
-        tax_id: '12345678', contact_person: '王大明', phone: '02-1234-5678',
-        email: 'contact@yungpei.com', address: '台北市信義區信義路五段7號'
-      }).select().single();
-      
-      const { data: inv2 } = await supabase.from('investors').insert({
-        investor_code: 'INV-002', company_name: '明群綠能有限公司',
-        tax_id: '87654321', contact_person: '李小華', phone: '04-2345-6789',
-        email: 'info@mingqun.com', address: '台中市西屯區台灣大道四段1號'
-      }).select().single();
-
-      await supabase.from('projects').insert([
-        { project_code: 'PRJ-2024-001', project_name: '台南永康太陽能案', investor_id: inv1?.id,
-          status: '同意備案', capacity_kwp: 499.5, city: '台南市', district: '永康區',
-          address: '永康區中正路100號', feeder_code: 'TN-001' },
-        { project_code: 'PRJ-2024-002', project_name: '高雄鳳山屋頂案', investor_id: inv1?.id,
-          status: '工程施工', capacity_kwp: 299.8, city: '高雄市', district: '鳳山區',
-          address: '鳳山區五甲路200號', feeder_code: 'KH-002' },
-        { project_code: 'PRJ-2024-003', project_name: '台中大肚地面案', investor_id: inv2?.id,
-          status: '台電審查', capacity_kwp: 999.0, city: '台中市', district: '大肚區',
-          address: '大肚區沙田路一段50號', feeder_code: 'TC-001' },
-      ]);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      queryClient.invalidateQueries({ queryKey: ['investors'] });
-      toast.success('範例資料已建立');
-    },
-  });
 
   const handleAuthorizeDrive = async () => {
     try {
@@ -665,16 +633,6 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Database className="w-5 h-5" /> 資料管理</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Button onClick={() => seedDataMutation.mutate()} disabled={seedDataMutation.isPending}>
-                匯入範例資料
-              </Button>
-            </CardContent>
-          </Card>
         </>
       )}
     </div>
