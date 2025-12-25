@@ -13,7 +13,8 @@ import {
   ChevronLeft,
   Menu,
   BookOpen,
-  HardHat
+  HardHat,
+  Database
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -103,6 +104,16 @@ export default function Layout({ children }: LayoutProps) {
               >
                 <Settings2 className="w-5 h-5 flex-shrink-0" />
                 {!collapsed && <span className="animate-fade-in">選項設定</span>}
+              </NavLink>
+              <NavLink
+                to="/database-backup"
+                className={cn(
+                  "sidebar-link",
+                  location.pathname === '/database-backup' && "sidebar-link-active"
+                )}
+              >
+                <Database className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span className="animate-fade-in">資料庫備份</span>}
               </NavLink>
               <NavLink
                 to="/settings"
