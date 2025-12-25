@@ -31,7 +31,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
-import { useProjectBackup, ImportMode, ImportError } from '@/hooks/useProjectBackup';
+import { useProjectBackup, ImportMode, ImportError, ExportStats } from '@/hooks/useProjectBackup';
 
 interface ProjectBackupDialogProps {
   open: boolean;
@@ -141,11 +141,17 @@ export function ProjectBackupDialog({
                 <AlertDescription>
                   將匯出包含以下工作表的 Excel 檔案：
                   <ul className="list-disc list-inside mt-2 text-sm">
-                    <li><strong>案場主表</strong>：所有案場基本資料與欄位</li>
+                    <li><strong>投資方</strong>：投資方基本資料</li>
+                    <li><strong>投資方聯絡人</strong>：投資方聯絡人資料</li>
+                    <li><strong>投資方付款方式</strong>：付款方式設定</li>
+                    <li><strong>廠商</strong>：合作廠商資料</li>
+                    <li><strong>案場主表</strong>：所有案場基本資料</li>
                     <li><strong>狀態歷程</strong>：專案狀態變更紀錄</li>
                     <li><strong>施工歷程</strong>：施工狀態變更紀錄</li>
+                    <li><strong>施工派工</strong>：施工派工紀錄</li>
                     <li><strong>文件</strong>：文件資料（不含附件檔案）</li>
-                    <li><strong>文件附件</strong>：附件清單（檔案需另行備份）</li>
+                    <li><strong>文件附件</strong>：附件清單</li>
+                    <li><strong>系統選項</strong>：系統設定</li>
                   </ul>
                 </AlertDescription>
               </Alert>
@@ -166,11 +172,64 @@ export function ProjectBackupDialog({
                   <Progress value={progressPercent} className="h-2" />
                 </div>
               )}
+
+              {/* Export Stats Display */}
+              {progress.phase === 'done' && progress.exportStats && (
+                <div className="space-y-3">
+                  <Label className="text-base font-semibold">匯出統計</Label>
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 text-sm">
+                    <div className="border rounded p-2 text-center">
+                      <p className="text-lg font-bold text-primary">{progress.exportStats.investors}</p>
+                      <p className="text-xs text-muted-foreground">投資方</p>
+                    </div>
+                    <div className="border rounded p-2 text-center">
+                      <p className="text-lg font-bold text-primary">{progress.exportStats.investorContacts}</p>
+                      <p className="text-xs text-muted-foreground">聯絡人</p>
+                    </div>
+                    <div className="border rounded p-2 text-center">
+                      <p className="text-lg font-bold text-primary">{progress.exportStats.investorPaymentMethods}</p>
+                      <p className="text-xs text-muted-foreground">付款方式</p>
+                    </div>
+                    <div className="border rounded p-2 text-center">
+                      <p className="text-lg font-bold text-primary">{progress.exportStats.partners}</p>
+                      <p className="text-xs text-muted-foreground">廠商</p>
+                    </div>
+                    <div className="border rounded p-2 text-center">
+                      <p className="text-lg font-bold text-primary">{progress.exportStats.projects}</p>
+                      <p className="text-xs text-muted-foreground">案場</p>
+                    </div>
+                    <div className="border rounded p-2 text-center">
+                      <p className="text-lg font-bold text-primary">{progress.exportStats.statusHistory}</p>
+                      <p className="text-xs text-muted-foreground">狀態歷程</p>
+                    </div>
+                    <div className="border rounded p-2 text-center">
+                      <p className="text-lg font-bold text-primary">{progress.exportStats.constructionHistory}</p>
+                      <p className="text-xs text-muted-foreground">施工歷程</p>
+                    </div>
+                    <div className="border rounded p-2 text-center">
+                      <p className="text-lg font-bold text-primary">{progress.exportStats.constructionAssignments}</p>
+                      <p className="text-xs text-muted-foreground">施工派工</p>
+                    </div>
+                    <div className="border rounded p-2 text-center">
+                      <p className="text-lg font-bold text-primary">{progress.exportStats.documents}</p>
+                      <p className="text-xs text-muted-foreground">文件</p>
+                    </div>
+                    <div className="border rounded p-2 text-center">
+                      <p className="text-lg font-bold text-primary">{progress.exportStats.documentFiles}</p>
+                      <p className="text-xs text-muted-foreground">附件</p>
+                    </div>
+                    <div className="border rounded p-2 text-center">
+                      <p className="text-lg font-bold text-primary">{progress.exportStats.systemOptions}</p>
+                      <p className="text-xs text-muted-foreground">系統選項</p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={handleClose} disabled={isProcessing}>
-                取消
+                {progress.phase === 'done' ? '關閉' : '取消'}
               </Button>
               <Button onClick={handleExport} disabled={isProcessing}>
                 {isProcessing ? (
@@ -181,7 +240,7 @@ export function ProjectBackupDialog({
                 ) : (
                   <>
                     <Download className="w-4 h-4 mr-2" />
-                    匯出完整備份
+                    {progress.phase === 'done' ? '重新匯出' : '匯出完整備份'}
                   </>
                 )}
               </Button>
@@ -197,57 +256,71 @@ export function ProjectBackupDialog({
                 <div className="grid grid-cols-4 gap-3">
                   <div className="border rounded-lg p-3 text-center">
                     <p className="text-lg font-bold text-success">
-                      {importSummary.projects.inserted + importSummary.statusHistory.inserted + importSummary.constructionHistory.inserted + importSummary.documents.inserted}
+                      {importSummary.investors.inserted + importSummary.investorContacts.inserted + importSummary.investorPaymentMethods.inserted + importSummary.partners.inserted + importSummary.projects.inserted + importSummary.statusHistory.inserted + importSummary.constructionHistory.inserted + importSummary.constructionAssignments.inserted + importSummary.documents.inserted + importSummary.systemOptions.inserted}
                     </p>
                     <p className="text-xs text-muted-foreground">新增成功</p>
                   </div>
                   <div className="border rounded-lg p-3 text-center">
                     <p className="text-lg font-bold text-info">
-                      {importSummary.projects.updated + importSummary.statusHistory.updated + importSummary.constructionHistory.updated + importSummary.documents.updated}
+                      {importSummary.investors.updated + importSummary.investorContacts.updated + importSummary.investorPaymentMethods.updated + importSummary.partners.updated + importSummary.projects.updated + importSummary.statusHistory.updated + importSummary.constructionHistory.updated + importSummary.constructionAssignments.updated + importSummary.documents.updated + importSummary.systemOptions.updated}
                     </p>
                     <p className="text-xs text-muted-foreground">更新成功</p>
                   </div>
                   <div className="border rounded-lg p-3 text-center">
                     <p className="text-lg font-bold text-warning">
-                      {importSummary.projects.skipped + importSummary.statusHistory.skipped + importSummary.constructionHistory.skipped + importSummary.documents.skipped}
+                      {importSummary.investors.skipped + importSummary.investorContacts.skipped + importSummary.investorPaymentMethods.skipped + importSummary.partners.skipped + importSummary.projects.skipped + importSummary.statusHistory.skipped + importSummary.constructionHistory.skipped + importSummary.constructionAssignments.skipped + importSummary.documents.skipped + importSummary.documentFiles.skipped + importSummary.systemOptions.skipped}
                     </p>
                     <p className="text-xs text-muted-foreground">略過</p>
                   </div>
                   <div className="border rounded-lg p-3 text-center">
                     <p className="text-lg font-bold text-destructive">
-                      {importSummary.projects.errors + importSummary.statusHistory.errors + importSummary.constructionHistory.errors + importSummary.documents.errors}
+                      {importSummary.investors.errors + importSummary.investorContacts.errors + importSummary.investorPaymentMethods.errors + importSummary.partners.errors + importSummary.projects.errors + importSummary.statusHistory.errors + importSummary.constructionHistory.errors + importSummary.constructionAssignments.errors + importSummary.documents.errors + importSummary.systemOptions.errors}
                     </p>
                     <p className="text-xs text-muted-foreground">失敗</p>
                   </div>
                 </div>
 
                 {/* Breakdown by Sheet */}
-                <div className="grid grid-cols-4 gap-2 text-xs">
-                  <div className="border rounded p-2">
-                    <p className="font-medium mb-1">案場</p>
-                    <p className="text-success">+{importSummary.projects.inserted}</p>
-                    <p className="text-info">↻{importSummary.projects.updated}</p>
-                    <p className="text-destructive">✗{importSummary.projects.errors}</p>
+                <ScrollArea className="max-h-32">
+                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 text-xs">
+                    <div className="border rounded p-2">
+                      <p className="font-medium mb-1">投資方</p>
+                      <p className="text-success">+{importSummary.investors.inserted}</p>
+                      <p className="text-info">↻{importSummary.investors.updated}</p>
+                      <p className="text-destructive">✗{importSummary.investors.errors}</p>
+                    </div>
+                    <div className="border rounded p-2">
+                      <p className="font-medium mb-1">廠商</p>
+                      <p className="text-success">+{importSummary.partners.inserted}</p>
+                      <p className="text-info">↻{importSummary.partners.updated}</p>
+                      <p className="text-destructive">✗{importSummary.partners.errors}</p>
+                    </div>
+                    <div className="border rounded p-2">
+                      <p className="font-medium mb-1">案場</p>
+                      <p className="text-success">+{importSummary.projects.inserted}</p>
+                      <p className="text-info">↻{importSummary.projects.updated}</p>
+                      <p className="text-destructive">✗{importSummary.projects.errors}</p>
+                    </div>
+                    <div className="border rounded p-2">
+                      <p className="font-medium mb-1">狀態歷程</p>
+                      <p className="text-success">+{importSummary.statusHistory.inserted}</p>
+                      <p className="text-info">↻{importSummary.statusHistory.updated}</p>
+                      <p className="text-destructive">✗{importSummary.statusHistory.errors}</p>
+                    </div>
+                    <div className="border rounded p-2">
+                      <p className="font-medium mb-1">施工派工</p>
+                      <p className="text-success">+{importSummary.constructionAssignments.inserted}</p>
+                      <p className="text-info">↻{importSummary.constructionAssignments.updated}</p>
+                      <p className="text-destructive">✗{importSummary.constructionAssignments.errors}</p>
+                    </div>
+                    <div className="border rounded p-2">
+                      <p className="font-medium mb-1">文件</p>
+                      <p className="text-success">+{importSummary.documents.inserted}</p>
+                      <p className="text-info">↻{importSummary.documents.updated}</p>
+                      <p className="text-destructive">✗{importSummary.documents.errors}</p>
+                    </div>
                   </div>
-                  <div className="border rounded p-2">
-                    <p className="font-medium mb-1">狀態歷程</p>
-                    <p className="text-success">+{importSummary.statusHistory.inserted}</p>
-                    <p className="text-info">↻{importSummary.statusHistory.updated}</p>
-                    <p className="text-destructive">✗{importSummary.statusHistory.errors}</p>
-                  </div>
-                  <div className="border rounded p-2">
-                    <p className="font-medium mb-1">施工歷程</p>
-                    <p className="text-success">+{importSummary.constructionHistory.inserted}</p>
-                    <p className="text-info">↻{importSummary.constructionHistory.updated}</p>
-                    <p className="text-destructive">✗{importSummary.constructionHistory.errors}</p>
-                  </div>
-                  <div className="border rounded p-2">
-                    <p className="font-medium mb-1">文件</p>
-                    <p className="text-success">+{importSummary.documents.inserted}</p>
-                    <p className="text-info">↻{importSummary.documents.updated}</p>
-                    <p className="text-destructive">✗{importSummary.documents.errors}</p>
-                  </div>
-                </div>
+                </ScrollArea>
 
                 {/* Error List */}
                 {importSummary.errorList.length > 0 && (
