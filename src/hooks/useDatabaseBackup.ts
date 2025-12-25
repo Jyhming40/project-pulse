@@ -17,6 +17,7 @@ export interface ColumnInfo {
   data_type: string;
   is_nullable: boolean;
   column_default: string | null;
+  ordinal_position?: number;
 }
 
 export interface ImportError {
@@ -34,12 +35,13 @@ export interface ImportResult {
 }
 
 export interface ExportProgress {
-  phase: 'idle' | 'discovering' | 'exporting' | 'complete';
+  phase: 'idle' | 'discovering' | 'exporting' | 'complete' | 'error';
   current_table?: string;
   tables_done: number;
   tables_total: number;
   rows_done: number;
   rows_total: number;
+  error_message?: string;
 }
 
 export interface ImportProgress {
@@ -138,32 +140,40 @@ export function useDatabaseBackup() {
     }
 
     setIsProcessing(true);
-    const totalRows = selectedTables.reduce((sum, t) => sum + t.row_count, 0);
+    
+    // Initialize with expected total from schema discovery
+    const expectedTotalRows = selectedTables.reduce((sum, t) => sum + t.row_count, 0);
     setExportProgress({
       phase: 'exporting',
       tables_done: 0,
       tables_total: selectedTables.length,
       rows_done: 0,
-      rows_total: totalRows
+      rows_total: expectedTotalRows
     });
 
     try {
       const workbook = XLSX.utils.book_new();
-      let rowsDone = 0;
       const exportTime = new Date().toISOString();
 
-      // Store table export results for __meta sheet
-      const tableExportResults: Array<{
+      // Track actual totals from backend for verification
+      interface TableExportResult {
         table_name: string;
-        row_count: number;
+        sheet_name: string;
+        row_count: number;        // Actually exported
+        total_count: number;      // From DB (total_count)
+        column_count: number;
         columns: string[];
         suggested_upsert_key: string;
-      }> = [];
-
-      // Create a map to store sheets temporarily
+        status: 'success' | 'incomplete' | 'error';
+      }
+      const tableExportResults: TableExportResult[] = [];
       const tableSheets: Map<string, XLSX.WorkSheet> = new Map();
+      
+      let actualRowsDone = 0;
+      let actualTotalRows = 0;
+      let hasIncomplete = false;
 
-      // Export each table first (so we have actual row counts)
+      // Export each table
       for (let i = 0; i < selectedTables.length; i++) {
         const table = selectedTables[i];
         setExportProgress(prev => ({
@@ -177,6 +187,7 @@ export function useDatabaseBackup() {
         let offset = 0;
         const limit = 2000;
         let hasMore = true;
+        let tableTotalCount = 0;
 
         while (hasMore) {
           const { data, error } = await supabase.functions.invoke('database-backup', {
@@ -188,18 +199,39 @@ export function useDatabaseBackup() {
             }
           });
 
-          if (error) throw error;
+          if (error) {
+            console.error(`Export error for ${table.table_name}:`, error);
+            tableExportResults.push({
+              table_name: table.table_name,
+              sheet_name: table.table_name.substring(0, 31),
+              row_count: 0,
+              total_count: table.row_count,
+              column_count: table.columns.length,
+              columns: table.columns.map(c => c.column_name),
+              suggested_upsert_key: UPSERT_KEY_SUGGESTIONS[table.table_name] || 'id',
+              status: 'error'
+            });
+            hasIncomplete = true;
+            break;
+          }
+          
+          // Use total_count from backend (exact DB count)
+          tableTotalCount = data.total_count;
           
           allRows = [...allRows, ...data.rows];
           hasMore = data.hasMore;
           offset += limit;
           
-          rowsDone += data.rows.length;
+          actualRowsDone += data.rows.length;
           setExportProgress(prev => ({
             ...prev,
-            rows_done: rowsDone
+            rows_done: actualRowsDone,
+            rows_total: actualTotalRows + tableTotalCount
           }));
         }
+
+        // Update actual total after getting backend count
+        actualTotalRows += tableTotalCount;
 
         // Get column names from table schema (preserve original column order)
         const columnNames = table.columns.map(c => c.column_name);
@@ -207,7 +239,6 @@ export function useDatabaseBackup() {
         // Format rows with consistent column order
         const formattedRows = allRows.map(row => {
           const formatted: Record<string, any> = {};
-          // Use column order from schema
           for (const colName of columnNames) {
             const value = row[colName];
             if (value === null || value === undefined) {
@@ -215,10 +246,8 @@ export function useDatabaseBackup() {
             } else if (value instanceof Date) {
               formatted[colName] = value.toISOString().split('T')[0];
             } else if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(value)) {
-              // Keep ISO datetime as-is
               formatted[colName] = value;
             } else if (Array.isArray(value)) {
-              // Format arrays as comma-separated or JSON
               formatted[colName] = JSON.stringify(value);
             } else if (typeof value === 'object') {
               formatted[colName] = JSON.stringify(value);
@@ -229,13 +258,12 @@ export function useDatabaseBackup() {
           return formatted;
         });
 
-        // Create sheet with explicit column headers
+        // Create sheet - ALWAYS include headers even for empty tables
         let sheet: XLSX.WorkSheet;
         if (formattedRows.length === 0) {
           // Create empty sheet with just headers
           sheet = XLSX.utils.aoa_to_sheet([columnNames]);
         } else {
-          // Create sheet with data, ensuring column order
           sheet = XLSX.utils.json_to_sheet(formattedRows, { header: columnNames });
         }
         
@@ -245,32 +273,53 @@ export function useDatabaseBackup() {
         }));
         sheet['!cols'] = colWidths;
         
-        // Store sheet temporarily
+        // Truncate sheet name to 31 chars (Excel limit)
+        const sheetName = table.table_name.substring(0, 31);
         tableSheets.set(table.table_name, sheet);
+
+        // Check if export is complete
+        const isComplete = allRows.length === tableTotalCount;
+        if (!isComplete) {
+          hasIncomplete = true;
+        }
 
         // Record export result for __meta
         tableExportResults.push({
           table_name: table.table_name,
+          sheet_name: sheetName,
           row_count: allRows.length,
+          total_count: tableTotalCount,
+          column_count: columnNames.length,
           columns: columnNames,
-          suggested_upsert_key: UPSERT_KEY_SUGGESTIONS[table.table_name] || 'id'
+          suggested_upsert_key: UPSERT_KEY_SUGGESTIONS[table.table_name] || 'id',
+          status: isComplete ? 'success' : 'incomplete'
         });
       }
 
-      // Create __meta sheet with readable format (one row per table)
+      // Create __meta sheet with all required fields
       const metaRows = tableExportResults.map(t => ({
         '資料表名稱': t.table_name,
+        'Sheet名稱': t.sheet_name,
         '匯出筆數': t.row_count,
-        '欄位數': t.columns.length,
+        '資料庫總筆數': t.total_count,
+        '欄位數': t.column_count,
+        '狀態': t.status === 'success' ? '完整' : (t.status === 'incomplete' ? '未完整' : '錯誤'),
         '建議Upsert鍵': t.suggested_upsert_key,
         '欄位列表': t.columns.join(', ')
       }));
 
       // Add summary row at the top
+      const totalExported = tableExportResults.reduce((sum, t) => sum + t.row_count, 0);
+      const totalInDB = tableExportResults.reduce((sum, t) => sum + t.total_count, 0);
+      const allComplete = tableExportResults.every(t => t.status === 'success');
+      
       const summaryRow = {
         '資料表名稱': '【匯出摘要】',
-        '匯出筆數': tableExportResults.reduce((sum, t) => sum + t.row_count, 0),
+        'Sheet名稱': '',
+        '匯出筆數': totalExported,
+        '資料庫總筆數': totalInDB,
         '欄位數': tableExportResults.length,
+        '狀態': allComplete ? '全部完整' : '有未完整',
         '建議Upsert鍵': '',
         '欄位列表': `匯出時間: ${exportTime}`
       };
@@ -278,8 +327,11 @@ export function useDatabaseBackup() {
       const metaSheet = XLSX.utils.json_to_sheet([summaryRow, ...metaRows]);
       metaSheet['!cols'] = [
         { wch: 35 },  // 資料表名稱
+        { wch: 35 },  // Sheet名稱
         { wch: 12 },  // 匯出筆數
+        { wch: 14 },  // 資料庫總筆數
         { wch: 10 },  // 欄位數
+        { wch: 12 },  // 狀態
         { wch: 20 },  // 建議Upsert鍵
         { wch: 80 }   // 欄位列表
       ];
@@ -289,7 +341,6 @@ export function useDatabaseBackup() {
       
       // Then add all table sheets
       for (const [tableName, sheet] of tableSheets) {
-        // Truncate sheet name to 31 chars (Excel limit)
         const sheetName = tableName.substring(0, 31);
         XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
       }
@@ -299,17 +350,34 @@ export function useDatabaseBackup() {
       const filename = `database_backup_${timestamp}.xlsx`;
       XLSX.writeFile(workbook, filename);
 
-      setExportProgress({
-        phase: 'complete',
-        tables_done: selectedTables.length,
-        tables_total: selectedTables.length,
-        rows_done: rowsDone,
-        rows_total: totalRows
-      });
-      
-      toast.success(`已匯出 ${selectedTables.length} 個資料表，共 ${rowsDone} 筆資料`);
+      // Final status check
+      if (hasIncomplete) {
+        setExportProgress({
+          phase: 'error',
+          tables_done: selectedTables.length,
+          tables_total: selectedTables.length,
+          rows_done: totalExported,
+          rows_total: totalInDB,
+          error_message: `部分資料表匯出不完整 (${totalExported}/${totalInDB})`
+        });
+        toast.warning(`匯出完成但有不完整的資料表，請檢查 __meta 工作表`);
+      } else {
+        setExportProgress({
+          phase: 'complete',
+          tables_done: selectedTables.length,
+          tables_total: selectedTables.length,
+          rows_done: totalExported,
+          rows_total: totalInDB
+        });
+        toast.success(`已完整匯出 ${selectedTables.length} 個資料表，共 ${totalExported} 筆資料`);
+      }
     } catch (err) {
       console.error('Export error:', err);
+      setExportProgress(prev => ({
+        ...prev,
+        phase: 'error',
+        error_message: '匯出失敗'
+      }));
       toast.error('匯出失敗');
     } finally {
       setIsProcessing(false);
@@ -317,7 +385,7 @@ export function useDatabaseBackup() {
   }, [tables]);
 
   const parseImportFile = useCallback(async (file: File) => {
-    return new Promise<{ sheets: Record<string, any[]>; meta: any }>((resolve, reject) => {
+    return new Promise<{ sheets: Record<string, any[]>; meta: any; sheetToTableMap: Record<string, string> }>((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
@@ -326,26 +394,45 @@ export function useDatabaseBackup() {
           
           const sheets: Record<string, any[]> = {};
           let meta: any = null;
+          const sheetToTableMap: Record<string, string> = {};
 
-          for (const sheetName of workbook.SheetNames) {
-            const sheet = workbook.Sheets[sheetName];
-            const jsonData = XLSX.utils.sheet_to_json(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+          // First, parse __meta to get sheet-to-table mapping
+          if (workbook.SheetNames.includes('__meta')) {
+            const metaSheet = workbook.Sheets['__meta'];
+            const metaData = XLSX.utils.sheet_to_json(metaSheet, { raw: false });
             
-            if (sheetName === '__meta') {
-              if (jsonData.length > 0) {
-                const metaRow = jsonData[0] as any;
-                try {
-                  meta = metaRow.meta_json ? JSON.parse(metaRow.meta_json) : metaRow;
-                } catch {
-                  meta = metaRow;
-                }
+            for (const row of metaData as any[]) {
+              if (row['資料表名稱'] && row['資料表名稱'] !== '【匯出摘要】') {
+                const tableName = row['資料表名稱'];
+                const sheetName = row['Sheet名稱'] || tableName.substring(0, 31);
+                sheetToTableMap[sheetName] = tableName;
               }
-            } else {
-              sheets[sheetName] = jsonData;
+            }
+            
+            // Extract summary info
+            const summaryRow = (metaData as any[]).find(r => r['資料表名稱'] === '【匯出摘要】');
+            if (summaryRow) {
+              meta = {
+                exported_at: summaryRow['欄位列表']?.replace('匯出時間: ', ''),
+                total_rows: summaryRow['匯出筆數'],
+                total_tables: summaryRow['欄位數']
+              };
             }
           }
 
-          resolve({ sheets, meta });
+          // Parse all other sheets
+          for (const sheetName of workbook.SheetNames) {
+            if (sheetName === '__meta') continue;
+            
+            const sheet = workbook.Sheets[sheetName];
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+            
+            // Use the mapping to get actual table name, or fall back to sheet name
+            const tableName = sheetToTableMap[sheetName] || sheetName;
+            sheets[tableName] = jsonData;
+          }
+
+          resolve({ sheets, meta, sheetToTableMap });
         } catch (err) {
           reject(err);
         }
