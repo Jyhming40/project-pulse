@@ -20,11 +20,26 @@ type SystemOption = Database['public']['Tables']['system_options']['Row'];
 
 export type ImportMode = 'insert' | 'upsert' | 'skip';
 
+export interface ExportStats {
+  investors: number;
+  investorContacts: number;
+  investorPaymentMethods: number;
+  partners: number;
+  projects: number;
+  statusHistory: number;
+  constructionHistory: number;
+  constructionAssignments: number;
+  documents: number;
+  documentFiles: number;
+  systemOptions: number;
+}
+
 export interface BackupProgress {
   current: number;
   total: number;
   phase: 'preparing' | 'exporting' | 'importing' | 'done';
   currentSheet?: string;
+  exportStats?: ExportStats;
 }
 
 export interface ImportError {
@@ -470,13 +485,28 @@ export function useProjectBackup() {
       });
       XLSX.utils.book_append_sheet(workbook, createSheet(optionData, systemOptionColumns, systemOptionLabels), '系統選項');
 
+      // Build export stats
+      const exportStats: ExportStats = {
+        investors: investors.length,
+        investorContacts: investorContacts.length,
+        investorPaymentMethods: investorPayments.length,
+        partners: partners.length,
+        projects: projects.length,
+        statusHistory: statusHistory.length,
+        constructionHistory: constructionHistory.length,
+        constructionAssignments: constructionAssignments.length,
+        documents: documents.length,
+        documentFiles: documentFiles.length,
+        systemOptions: systemOptions.length,
+      };
+
       // Download
       const timestamp = new Date().toISOString().slice(0, 10);
       const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       downloadFile(blob, `案場完整備份_${timestamp}.xlsx`);
 
-      setProgress({ current: 11, total: 11, phase: 'done' });
+      setProgress({ current: 11, total: 11, phase: 'done', exportStats });
       toast.success('備份匯出完成', {
         description: `投資方 ${investors.length}、廠商 ${partners.length}、案場 ${projects.length}、文件 ${documents.length} 筆`
       });
@@ -539,24 +569,11 @@ export function useProjectBackup() {
     };
 
     try {
-      setProgress({ current: 0, total: 5, phase: 'preparing' });
+      setProgress({ current: 0, total: 11, phase: 'preparing' });
 
       // Read Excel file
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data, { cellDates: true });
-
-      // Build lookup maps
-      const { data: investors } = await supabase.from('investors').select('id, investor_code');
-      const investorCodeToId = new Map(investors?.map(i => [i.investor_code, i.id]) || []);
-
-      // Existing projects map (for upsert)
-      const { data: existingProjects } = await supabase.from('projects').select('id, project_code, site_code_display');
-      const projectCodeToId = new Map<string, string>();
-      const siteCodeToId = new Map<string, string>();
-      existingProjects?.forEach(p => {
-        projectCodeToId.set(p.project_code, p.id);
-        if (p.site_code_display) siteCodeToId.set(p.site_code_display, p.id);
-      });
 
       // Helper to reverse lookup column name
       const reverseLabels = (labels: Record<string, string>) => {
@@ -565,134 +582,473 @@ export function useProjectBackup() {
         return reversed;
       };
 
-      // 1. Import Projects
+      // Build lookup maps - will be populated as we import
+      const investorCodeToId = new Map<string, string>();
+      const partnerNameToId = new Map<string, string>();
+      const projectCodeToId = new Map<string, string>();
+      const siteCodeToId = new Map<string, string>();
+
+      // Fetch existing data for lookups
+      const { data: existingInvestors } = await supabase.from('investors').select('id, investor_code');
+      existingInvestors?.forEach(i => investorCodeToId.set(i.investor_code.toUpperCase(), i.id));
+
+      const { data: existingPartners } = await supabase.from('partners').select('id, name');
+      existingPartners?.forEach(p => partnerNameToId.set(p.name, p.id));
+
+      const { data: existingProjects } = await supabase.from('projects').select('id, project_code, site_code_display');
+      existingProjects?.forEach(p => {
+        projectCodeToId.set(p.project_code, p.id);
+        if (p.site_code_display) siteCodeToId.set(p.site_code_display, p.id);
+      });
+
+      // 1. Import Investors
+      const investorSheetName = workbook.SheetNames.find(s => s === '投資方');
+      if (investorSheetName) {
+        setProgress({ current: 1, total: 11, phase: 'importing', currentSheet: '投資方' });
+        const sheet = workbook.Sheets[investorSheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+        const reversedLabels = reverseLabels(investorLabels);
+
+        const { data: existingData } = await supabase.from('investors').select('id, investor_code');
+        const existingIds = new Set(existingData?.map(i => i.id) || []);
+        const existingCodes = new Set(existingData?.map(i => i.investor_code.toUpperCase()) || []);
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+          try {
+            const mapped: Record<string, any> = {};
+            let providedId: string | null = null;
+            let investorCode: string | null = null;
+
+            Object.entries(row).forEach(([label, value]) => {
+              const key = reversedLabels[label];
+              if (!key || value === '' || value === null) return;
+              if (key === 'id') providedId = String(value);
+              else if (key === 'investor_code') {
+                investorCode = String(value).toUpperCase();
+                mapped[key] = investorCode;
+              } else if (!['created_at', 'updated_at', 'created_by'].includes(key)) {
+                mapped[key] = String(value);
+              }
+            });
+
+            // Validate required fields
+            if (!investorCode) {
+              summary.errorList.push({ row: rowNum, sheet: '投資方', message: '缺少投資方代碼', errorType: 'validation' });
+              summary.investors.errors++;
+              continue;
+            }
+            if (!mapped.company_name) {
+              summary.errorList.push({ row: rowNum, sheet: '投資方', field: 'company_name', message: '缺少公司名稱', errorType: 'validation', code: investorCode });
+              summary.investors.errors++;
+              continue;
+            }
+
+            // Determine existing ID
+            let existingId = providedId && existingIds.has(providedId) ? providedId : null;
+            if (!existingId && existingCodes.has(investorCode)) {
+              const found = existingData?.find(i => i.investor_code.toUpperCase() === investorCode);
+              if (found) existingId = found.id;
+            }
+
+            if (existingId) {
+              if (mode === 'insert') {
+                summary.errorList.push({ row: rowNum, sheet: '投資方', message: '投資方已存在（僅新增模式）', errorType: 'unique_constraint', code: investorCode });
+                summary.investors.errors++;
+              } else if (mode === 'skip') {
+                summary.investors.skipped++;
+                investorCodeToId.set(investorCode, existingId);
+              } else {
+                const { error } = await supabase.from('investors').update(mapped as any).eq('id', existingId);
+                if (error) {
+                  summary.errorList.push({ row: rowNum, sheet: '投資方', message: error.message, errorType: 'unknown', code: investorCode });
+                  summary.investors.errors++;
+                } else {
+                  summary.investors.updated++;
+                  investorCodeToId.set(investorCode, existingId);
+                }
+              }
+            } else {
+              const { data: inserted, error } = await supabase.from('investors').insert(mapped as any).select('id').single();
+              if (error) {
+                summary.errorList.push({ row: rowNum, sheet: '投資方', message: error.message, errorType: 'unknown', code: investorCode });
+                summary.investors.errors++;
+              } else if (inserted) {
+                summary.investors.inserted++;
+                investorCodeToId.set(investorCode, inserted.id);
+              }
+            }
+          } catch (err) {
+            summary.errorList.push({ row: rowNum, sheet: '投資方', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.investors.errors++;
+          }
+        }
+      }
+
+      // 2. Import Investor Contacts
+      const contactSheetName = workbook.SheetNames.find(s => s === '投資方聯絡人');
+      if (contactSheetName) {
+        setProgress({ current: 2, total: 11, phase: 'importing', currentSheet: '投資方聯絡人' });
+        const sheet = workbook.Sheets[contactSheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+        const reversedLabels = reverseLabels(investorContactLabels);
+
+        const { data: existingData } = await supabase.from('investor_contacts').select('id');
+        const existingIds = new Set(existingData?.map(c => c.id) || []);
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+          try {
+            const mapped: Record<string, any> = {};
+            let providedId: string | null = null;
+            let investorCode: string | null = null;
+
+            Object.entries(row).forEach(([label, value]) => {
+              const key = reversedLabels[label];
+              if (!key || value === '' || value === null) return;
+              if (key === 'id') providedId = String(value);
+              else if (key === 'investor_code') investorCode = String(value).toUpperCase();
+              else if (key === 'role_tags') {
+                const tags = String(value).split(',').map(t => t.trim()).filter(t => t);
+                mapped[key] = tags;
+              } else if (key === 'is_primary' || key === 'is_active') {
+                mapped[key] = String(value).toLowerCase() === 'true' || value === true;
+              } else if (!['created_at', 'updated_at', 'created_by'].includes(key)) {
+                mapped[key] = String(value);
+              }
+            });
+
+            if (!investorCode) {
+              summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', message: '缺少投資方代碼', errorType: 'validation' });
+              summary.investorContacts.errors++;
+              continue;
+            }
+            if (!mapped.contact_name) {
+              summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', field: 'contact_name', message: '缺少聯絡人姓名', errorType: 'validation', code: investorCode });
+              summary.investorContacts.errors++;
+              continue;
+            }
+
+            const investorId = investorCodeToId.get(investorCode);
+            if (!investorId) {
+              summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', message: `找不到投資方代碼「${investorCode}」`, errorType: 'not_found', code: investorCode });
+              summary.investorContacts.errors++;
+              continue;
+            }
+            mapped.investor_id = investorId;
+
+            const existingId = providedId && existingIds.has(providedId) ? providedId : null;
+
+            if (existingId) {
+              if (mode === 'insert') {
+                summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', message: '記錄已存在（僅新增模式）', errorType: 'unique_constraint', code: investorCode });
+                summary.investorContacts.errors++;
+              } else if (mode === 'skip') {
+                summary.investorContacts.skipped++;
+              } else {
+                const { error } = await supabase.from('investor_contacts').update(mapped).eq('id', existingId);
+                if (error) {
+                  summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', message: error.message, errorType: 'unknown', code: investorCode });
+                  summary.investorContacts.errors++;
+                } else {
+                  summary.investorContacts.updated++;
+                }
+              }
+            } else {
+              const { error } = await supabase.from('investor_contacts').insert(mapped as any);
+              if (error) {
+                summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', message: error.message, errorType: 'unknown', code: investorCode });
+                summary.investorContacts.errors++;
+              } else {
+                summary.investorContacts.inserted++;
+              }
+            }
+          } catch (err) {
+            summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.investorContacts.errors++;
+          }
+        }
+      }
+
+      // 3. Import Investor Payment Methods
+      const paymentSheetName = workbook.SheetNames.find(s => s === '投資方付款方式');
+      if (paymentSheetName) {
+        setProgress({ current: 3, total: 11, phase: 'importing', currentSheet: '投資方付款方式' });
+        const sheet = workbook.Sheets[paymentSheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+        const reversedLabels = reverseLabels(investorPaymentLabels);
+
+        const { data: existingData } = await supabase.from('investor_payment_methods').select('id');
+        const existingIds = new Set(existingData?.map(p => p.id) || []);
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+          try {
+            const mapped: Record<string, any> = {};
+            let providedId: string | null = null;
+            let investorCode: string | null = null;
+
+            Object.entries(row).forEach(([label, value]) => {
+              const key = reversedLabels[label];
+              if (!key || value === '' || value === null) return;
+              if (key === 'id') providedId = String(value);
+              else if (key === 'investor_code') investorCode = String(value).toUpperCase();
+              else if (key === 'is_default') {
+                mapped[key] = String(value).toLowerCase() === 'true' || value === true;
+              } else if (!['created_at', 'updated_at', 'created_by'].includes(key)) {
+                mapped[key] = String(value);
+              }
+            });
+
+            if (!investorCode) {
+              summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', message: '缺少投資方代碼', errorType: 'validation' });
+              summary.investorPaymentMethods.errors++;
+              continue;
+            }
+            if (!mapped.method_type) {
+              summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', field: 'method_type', message: '缺少付款方式', errorType: 'validation', code: investorCode });
+              summary.investorPaymentMethods.errors++;
+              continue;
+            }
+
+            const investorId = investorCodeToId.get(investorCode);
+            if (!investorId) {
+              summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', message: `找不到投資方代碼「${investorCode}」`, errorType: 'not_found', code: investorCode });
+              summary.investorPaymentMethods.errors++;
+              continue;
+            }
+            mapped.investor_id = investorId;
+
+            const existingId = providedId && existingIds.has(providedId) ? providedId : null;
+
+            if (existingId) {
+              if (mode === 'insert') {
+                summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', message: '記錄已存在（僅新增模式）', errorType: 'unique_constraint', code: investorCode });
+                summary.investorPaymentMethods.errors++;
+              } else if (mode === 'skip') {
+                summary.investorPaymentMethods.skipped++;
+              } else {
+                const { error } = await supabase.from('investor_payment_methods').update(mapped).eq('id', existingId);
+                if (error) {
+                  summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', message: error.message, errorType: 'unknown', code: investorCode });
+                  summary.investorPaymentMethods.errors++;
+                } else {
+                  summary.investorPaymentMethods.updated++;
+                }
+              }
+            } else {
+              const { error } = await supabase.from('investor_payment_methods').insert(mapped as any);
+              if (error) {
+                summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', message: error.message, errorType: 'unknown', code: investorCode });
+                summary.investorPaymentMethods.errors++;
+              } else {
+                summary.investorPaymentMethods.inserted++;
+              }
+            }
+          } catch (err) {
+            summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.investorPaymentMethods.errors++;
+          }
+        }
+      }
+
+      // 4. Import Partners
+      const partnerSheetName = workbook.SheetNames.find(s => s === '廠商');
+      if (partnerSheetName) {
+        setProgress({ current: 4, total: 11, phase: 'importing', currentSheet: '廠商' });
+        const sheet = workbook.Sheets[partnerSheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+        const reversedLabels = reverseLabels(partnerLabels);
+
+        const { data: existingData } = await supabase.from('partners').select('id, name');
+        const existingIds = new Set(existingData?.map(p => p.id) || []);
+        const existingNames = new Map(existingData?.map(p => [p.name, p.id]) || []);
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+          try {
+            const mapped: Record<string, any> = {};
+            let providedId: string | null = null;
+            let partnerName: string | null = null;
+
+            Object.entries(row).forEach(([label, value]) => {
+              const key = reversedLabels[label];
+              if (!key || value === '' || value === null) return;
+              if (key === 'id') providedId = String(value);
+              else if (key === 'name') {
+                partnerName = String(value);
+                mapped[key] = partnerName;
+              } else if (key === 'is_active') {
+                mapped[key] = String(value).toLowerCase() === 'true' || value === true;
+              } else if (!['created_at', 'updated_at', 'created_by'].includes(key)) {
+                mapped[key] = String(value);
+              }
+            });
+
+            if (!partnerName) {
+              summary.errorList.push({ row: rowNum, sheet: '廠商', message: '缺少廠商名稱', errorType: 'validation' });
+              summary.partners.errors++;
+              continue;
+            }
+
+            // Determine existing ID
+            let existingId = providedId && existingIds.has(providedId) ? providedId : null;
+            if (!existingId && existingNames.has(partnerName)) {
+              existingId = existingNames.get(partnerName) || null;
+            }
+
+            if (existingId) {
+              if (mode === 'insert') {
+                summary.errorList.push({ row: rowNum, sheet: '廠商', message: '廠商已存在（僅新增模式）', errorType: 'unique_constraint', code: partnerName });
+                summary.partners.errors++;
+              } else if (mode === 'skip') {
+                summary.partners.skipped++;
+                partnerNameToId.set(partnerName, existingId);
+              } else {
+                const { error } = await supabase.from('partners').update(mapped as any).eq('id', existingId);
+                if (error) {
+                  summary.errorList.push({ row: rowNum, sheet: '廠商', message: error.message, errorType: 'unknown', code: partnerName });
+                  summary.partners.errors++;
+                } else {
+                  summary.partners.updated++;
+                  partnerNameToId.set(partnerName, existingId);
+                }
+              }
+            } else {
+              const { data: inserted, error } = await supabase.from('partners').insert(mapped as any).select('id').single();
+              if (error) {
+                summary.errorList.push({ row: rowNum, sheet: '廠商', message: error.message, errorType: 'unknown', code: partnerName });
+                summary.partners.errors++;
+              } else if (inserted) {
+                summary.partners.inserted++;
+                partnerNameToId.set(partnerName, inserted.id);
+              }
+            }
+          } catch (err) {
+            summary.errorList.push({ row: rowNum, sheet: '廠商', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.partners.errors++;
+          }
+        }
+      }
+
+      // 5. Import Projects
       const projectSheetName = workbook.SheetNames.find(s => s.includes('案場主表'));
       if (projectSheetName) {
-        setProgress({ current: 1, total: 5, phase: 'importing', currentSheet: '案場主表' });
+        setProgress({ current: 5, total: 11, phase: 'importing', currentSheet: '案場主表' });
         const sheet = workbook.Sheets[projectSheetName];
         const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
         const reversedLabels = reverseLabels(projectLabels);
 
-        const newProjectCodeToId = new Map<string, string>();
-        const batchSize = 50;
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+          try {
+            const mapped: Record<string, any> = {};
+            let providedId: string | null = null;
+            let projectCode: string | null = null;
+            let siteCode: string | null = null;
+            let investorCode: string | null = null;
 
-        for (let i = 0; i < rows.length; i += batchSize) {
-          const batch = rows.slice(i, i + batchSize);
-          
-          for (const row of batch) {
-            const rowNum = i + rows.indexOf(row) + 2;
-            try {
-              const mapped: Record<string, any> = {};
-              let providedId: string | null = null;
-              let projectCode: string | null = null;
-              let siteCode: string | null = null;
-              let investorCode: string | null = null;
+            Object.entries(row).forEach(([label, value]) => {
+              const key = reversedLabels[label];
+              if (!key || value === '' || value === null) return;
 
-              Object.entries(row).forEach(([label, value]) => {
-                const key = reversedLabels[label];
-                if (!key || value === '' || value === null) return;
-
-                if (key === 'id') {
-                  providedId = String(value);
-                } else if (key === 'investor_code') {
-                  investorCode = String(value).toUpperCase();
-                } else if (key === 'project_code') {
-                  projectCode = String(value);
-                  mapped[key] = projectCode;
-                } else if (key === 'site_code_display') {
-                  siteCode = String(value);
-                  mapped[key] = siteCode;
-                } else if (key === 'approval_date') {
-                  const d = parseDate(value);
-                  if (d) mapped[key] = d;
-                } else if (['capacity_kwp', 'actual_installed_capacity', 'fiscal_year', 'intake_year', 'seq'].includes(key)) {
-                  const num = Number(value);
-                  if (!isNaN(num)) mapped[key] = num;
-                } else if (!['created_at', 'updated_at', 'created_by'].includes(key)) {
-                  mapped[key] = String(value);
-                }
-              });
-
-              // Validate required fields
-              if (!mapped.project_code) {
-                summary.errorList.push({ row: rowNum, sheet: '案場主表', message: '缺少案場編號', errorType: 'validation' });
-                summary.projects.errors++;
-                continue;
+              if (key === 'id') {
+                providedId = String(value);
+              } else if (key === 'investor_code') {
+                investorCode = String(value).toUpperCase();
+              } else if (key === 'project_code') {
+                projectCode = String(value);
+                mapped[key] = projectCode;
+              } else if (key === 'site_code_display') {
+                siteCode = String(value);
+                mapped[key] = siteCode;
+              } else if (key === 'approval_date') {
+                const d = parseDate(value);
+                if (d) mapped[key] = d;
+              } else if (['capacity_kwp', 'actual_installed_capacity', 'fiscal_year', 'intake_year', 'seq'].includes(key)) {
+                const num = Number(value);
+                if (!isNaN(num)) mapped[key] = num;
+              } else if (!['created_at', 'updated_at', 'created_by'].includes(key)) {
+                mapped[key] = String(value);
               }
-              if (!mapped.project_name) {
-                summary.errorList.push({ row: rowNum, sheet: '案場主表', field: 'project_name', message: '缺少案場名稱', errorType: 'validation', code: mapped.project_code });
-                summary.projects.errors++;
-                continue;
-              }
+            });
 
-              // Resolve investor
-              if (investorCode) {
-                const investorId = investorCodeToId.get(investorCode);
-                if (investorId) {
-                  mapped.investor_id = investorId;
-                } else {
-                  summary.errorList.push({ row: rowNum, sheet: '案場主表', field: 'investor_code', message: `找不到投資方代碼「${investorCode}」`, errorType: 'not_found', code: mapped.project_code });
-                  summary.projects.errors++;
-                  continue;
-                }
-              }
+            // Validate required fields
+            if (!mapped.project_code) {
+              summary.errorList.push({ row: rowNum, sheet: '案場主表', message: '缺少案場編號', errorType: 'validation' });
+              summary.projects.errors++;
+              continue;
+            }
+            if (!mapped.project_name) {
+              summary.errorList.push({ row: rowNum, sheet: '案場主表', field: 'project_name', message: '缺少案場名稱', errorType: 'validation', code: mapped.project_code });
+              summary.projects.errors++;
+              continue;
+            }
 
-              // Determine existing ID
-              let existingId = providedId && projectCodeToId.has(providedId) ? providedId : null;
-              if (!existingId && projectCode) existingId = projectCodeToId.get(projectCode) || null;
-              if (!existingId && siteCode) existingId = siteCodeToId.get(siteCode) || null;
-
-              // Execute based on mode
-              if (existingId) {
-                if (mode === 'insert') {
-                  summary.errorList.push({ row: rowNum, sheet: '案場主表', message: '案場已存在（僅新增模式）', errorType: 'unique_constraint', code: mapped.project_code as string });
-                  summary.projects.errors++;
-                } else if (mode === 'skip') {
-                  summary.projects.skipped++;
-                } else {
-                  // Upsert - update
-                  const { error } = await supabase.from('projects').update(mapped as any).eq('id', existingId);
-                  if (error) {
-                    summary.errorList.push({ row: rowNum, sheet: '案場主表', message: error.message, errorType: 'unknown', code: mapped.project_code as string });
-                    summary.projects.errors++;
-                  } else {
-                    summary.projects.updated++;
-                    newProjectCodeToId.set(mapped.project_code as string, existingId);
-                  }
-                }
+            // Resolve investor
+            if (investorCode) {
+              const investorId = investorCodeToId.get(investorCode);
+              if (investorId) {
+                mapped.investor_id = investorId;
               } else {
-                // Insert new
-                const { data: inserted, error } = await supabase.from('projects').insert(mapped as any).select('id').single();
+                summary.errorList.push({ row: rowNum, sheet: '案場主表', field: 'investor_code', message: `找不到投資方代碼「${investorCode}」`, errorType: 'not_found', code: mapped.project_code });
+                summary.projects.errors++;
+                continue;
+              }
+            }
+
+            // Determine existing ID
+            let existingId = providedId && projectCodeToId.has(providedId) ? providedId : null;
+            if (!existingId && projectCode) existingId = projectCodeToId.get(projectCode) || null;
+            if (!existingId && siteCode) existingId = siteCodeToId.get(siteCode) || null;
+
+            // Execute based on mode
+            if (existingId) {
+              if (mode === 'insert') {
+                summary.errorList.push({ row: rowNum, sheet: '案場主表', message: '案場已存在（僅新增模式）', errorType: 'unique_constraint', code: mapped.project_code as string });
+                summary.projects.errors++;
+              } else if (mode === 'skip') {
+                summary.projects.skipped++;
+              } else {
+                const { error } = await supabase.from('projects').update(mapped as any).eq('id', existingId);
                 if (error) {
                   summary.errorList.push({ row: rowNum, sheet: '案場主表', message: error.message, errorType: 'unknown', code: mapped.project_code as string });
                   summary.projects.errors++;
-                } else if (inserted) {
-                  summary.projects.inserted++;
-                  newProjectCodeToId.set(mapped.project_code as string, inserted.id);
-                  projectCodeToId.set(mapped.project_code as string, inserted.id);
+                } else {
+                  summary.projects.updated++;
+                  projectCodeToId.set(mapped.project_code as string, existingId);
                 }
               }
-            } catch (err) {
-              summary.errorList.push({ row: rowNum, sheet: '案場主表', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
-              summary.projects.errors++;
+            } else {
+              const { data: inserted, error } = await supabase.from('projects').insert(mapped as any).select('id').single();
+              if (error) {
+                summary.errorList.push({ row: rowNum, sheet: '案場主表', message: error.message, errorType: 'unknown', code: mapped.project_code as string });
+                summary.projects.errors++;
+              } else if (inserted) {
+                summary.projects.inserted++;
+                projectCodeToId.set(mapped.project_code as string, inserted.id);
+              }
             }
+          } catch (err) {
+            summary.errorList.push({ row: rowNum, sheet: '案場主表', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.projects.errors++;
           }
-          setProgress({ current: 1, total: 5, phase: 'importing', currentSheet: `案場主表 (${Math.min(i + batchSize, rows.length)}/${rows.length})` });
         }
-
-        // Merge new project codes
-        newProjectCodeToId.forEach((id, code) => projectCodeToId.set(code, id));
       }
 
-      // 2. Import Status History
+      // 6. Import Status History
       const statusSheetName = workbook.SheetNames.find(s => s.includes('狀態歷程'));
       if (statusSheetName) {
-        setProgress({ current: 2, total: 5, phase: 'importing', currentSheet: '狀態歷程' });
+        setProgress({ current: 6, total: 11, phase: 'importing', currentSheet: '狀態歷程' });
         const sheet = workbook.Sheets[statusSheetName];
         const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
         const reversedLabels = reverseLabels(statusHistoryLabels);
 
-        // Fetch existing history for upsert
         const { data: existingHistory } = await supabase.from('project_status_history').select('id');
         const existingHistoryIds = new Set(existingHistory?.map(h => h.id) || []);
 
@@ -762,10 +1118,10 @@ export function useProjectBackup() {
         }
       }
 
-      // 3. Import Construction History
+      // 7. Import Construction History
       const constructionSheetName = workbook.SheetNames.find(s => s.includes('施工歷程'));
       if (constructionSheetName) {
-        setProgress({ current: 3, total: 5, phase: 'importing', currentSheet: '施工歷程' });
+        setProgress({ current: 7, total: 11, phase: 'importing', currentSheet: '施工歷程' });
         const sheet = workbook.Sheets[constructionSheetName];
         const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
         const reversedLabels = reverseLabels(constructionHistoryLabels);
@@ -839,10 +1195,107 @@ export function useProjectBackup() {
         }
       }
 
-      // 4. Import Documents
+      // 8. Import Construction Assignments
+      const assignmentSheetName = workbook.SheetNames.find(s => s.includes('施工派工'));
+      if (assignmentSheetName) {
+        setProgress({ current: 8, total: 11, phase: 'importing', currentSheet: '施工派工' });
+        const sheet = workbook.Sheets[assignmentSheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+        const reversedLabels = reverseLabels(constructionAssignmentLabels);
+
+        const { data: existingData } = await supabase.from('project_construction_assignments').select('id');
+        const existingIds = new Set(existingData?.map(a => a.id) || []);
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+          try {
+            const mapped: Record<string, any> = {};
+            let providedId: string | null = null;
+            let projectCode: string | null = null;
+            let partnerName: string | null = null;
+
+            Object.entries(row).forEach(([label, value]) => {
+              const key = reversedLabels[label];
+              if (!key || value === '' || value === null) return;
+              if (key === 'id') providedId = String(value);
+              else if (key === 'project_code') projectCode = String(value);
+              else if (key === 'partner_name') partnerName = String(value);
+              else if (['planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date'].includes(key)) {
+                const d = parseDate(value);
+                if (d) mapped[key] = d;
+              } else if (!['created_at', 'updated_at', 'created_by'].includes(key)) {
+                mapped[key] = String(value);
+              }
+            });
+
+            if (!projectCode) {
+              summary.errorList.push({ row: rowNum, sheet: '施工派工', message: '缺少案場編號', errorType: 'validation' });
+              summary.constructionAssignments.errors++;
+              continue;
+            }
+            if (!mapped.construction_work_type) {
+              summary.errorList.push({ row: rowNum, sheet: '施工派工', message: '缺少工程類型', errorType: 'validation', code: projectCode });
+              summary.constructionAssignments.errors++;
+              continue;
+            }
+
+            const projectId = projectCodeToId.get(projectCode);
+            if (!projectId) {
+              summary.errorList.push({ row: rowNum, sheet: '施工派工', message: `找不到案場「${projectCode}」`, errorType: 'not_found', code: projectCode });
+              summary.constructionAssignments.errors++;
+              continue;
+            }
+            mapped.project_id = projectId;
+
+            if (partnerName) {
+              const partnerId = partnerNameToId.get(partnerName);
+              if (partnerId) {
+                mapped.partner_id = partnerId;
+              } else {
+                summary.errorList.push({ row: rowNum, sheet: '施工派工', message: `找不到廠商「${partnerName}」`, errorType: 'not_found', code: projectCode });
+                summary.constructionAssignments.errors++;
+                continue;
+              }
+            }
+
+            const existingId = providedId && existingIds.has(providedId) ? providedId : null;
+
+            if (existingId) {
+              if (mode === 'insert') {
+                summary.errorList.push({ row: rowNum, sheet: '施工派工', message: '記錄已存在（僅新增模式）', errorType: 'unique_constraint', code: projectCode });
+                summary.constructionAssignments.errors++;
+              } else if (mode === 'skip') {
+                summary.constructionAssignments.skipped++;
+              } else {
+                const { error } = await supabase.from('project_construction_assignments').update(mapped).eq('id', existingId);
+                if (error) {
+                  summary.errorList.push({ row: rowNum, sheet: '施工派工', message: error.message, errorType: 'unknown', code: projectCode });
+                  summary.constructionAssignments.errors++;
+                } else {
+                  summary.constructionAssignments.updated++;
+                }
+              }
+            } else {
+              const { error } = await supabase.from('project_construction_assignments').insert(mapped as any);
+              if (error) {
+                summary.errorList.push({ row: rowNum, sheet: '施工派工', message: error.message, errorType: 'unknown', code: projectCode });
+                summary.constructionAssignments.errors++;
+              } else {
+                summary.constructionAssignments.inserted++;
+              }
+            }
+          } catch (err) {
+            summary.errorList.push({ row: rowNum, sheet: '施工派工', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.constructionAssignments.errors++;
+          }
+        }
+      }
+
+      // 9. Import Documents
       const documentSheetName = workbook.SheetNames.find(s => s === '文件');
       if (documentSheetName) {
-        setProgress({ current: 4, total: 5, phase: 'importing', currentSheet: '文件' });
+        setProgress({ current: 9, total: 11, phase: 'importing', currentSheet: '文件' });
         const sheet = workbook.Sheets[documentSheetName];
         const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
         const reversedLabels = reverseLabels(documentLabels);
@@ -851,9 +1304,6 @@ export function useProjectBackup() {
         const existingDocIds = new Set(existingDocs?.map(d => d.id) || []);
         const docKeyToId = new Map<string, string>();
         existingDocs?.forEach(d => docKeyToId.set(`${d.project_id}-${d.doc_type}`, d.id));
-
-        // Store new document IDs for document_files reference
-        const newDocIdMap = new Map<string, string>();
 
         for (let i = 0; i < rows.length; i++) {
           const row = rows[i];
@@ -907,7 +1357,6 @@ export function useProjectBackup() {
                 summary.documents.errors++;
               } else if (mode === 'skip') {
                 summary.documents.skipped++;
-                if (providedId) newDocIdMap.set(providedId, existingId);
               } else {
                 const { error } = await supabase.from('documents').update(mapped).eq('id', existingId);
                 if (error) {
@@ -915,18 +1364,15 @@ export function useProjectBackup() {
                   summary.documents.errors++;
                 } else {
                   summary.documents.updated++;
-                  if (providedId) newDocIdMap.set(providedId, existingId);
                 }
               }
             } else {
-              const { data: inserted, error } = await supabase.from('documents').insert(mapped as any).select('id').single();
+              const { error } = await supabase.from('documents').insert(mapped as any);
               if (error) {
                 summary.errorList.push({ row: rowNum, sheet: '文件', message: error.message, errorType: 'unknown', code: `${projectCode}-${mapped.doc_type}` });
                 summary.documents.errors++;
-              } else if (inserted) {
+              } else {
                 summary.documents.inserted++;
-                if (providedId) newDocIdMap.set(providedId, inserted.id);
-                docKeyToId.set(`${projectId}-${mapped.doc_type}`, inserted.id);
               }
             }
           } catch (err) {
@@ -936,21 +1382,102 @@ export function useProjectBackup() {
         }
       }
 
-      // 5. Import Document Files (optional, mainly for reference)
+      // 10. Import Document Files (skip - informational only)
       const fileSheetName = workbook.SheetNames.find(s => s.includes('文件附件'));
       if (fileSheetName) {
-        setProgress({ current: 5, total: 5, phase: 'importing', currentSheet: '文件附件' });
-        // Document files import is informational only - actual files need to be uploaded separately
-        // Just skip this for now as storage paths may not be valid
+        setProgress({ current: 10, total: 11, phase: 'importing', currentSheet: '文件附件' });
         summary.documentFiles.skipped = XLSX.utils.sheet_to_json(workbook.Sheets[fileSheetName]).length;
       }
 
-      setProgress({ current: 5, total: 5, phase: 'done' });
+      // 11. Import System Options
+      const optionSheetName = workbook.SheetNames.find(s => s === '系統選項');
+      if (optionSheetName) {
+        setProgress({ current: 11, total: 11, phase: 'importing', currentSheet: '系統選項' });
+        const sheet = workbook.Sheets[optionSheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+        const reversedLabels = reverseLabels(systemOptionLabels);
+
+        const { data: existingData } = await supabase.from('system_options').select('id');
+        const existingIds = new Set(existingData?.map(o => o.id) || []);
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+          try {
+            const mapped: Record<string, any> = {};
+            let providedId: string | null = null;
+
+            Object.entries(row).forEach(([label, value]) => {
+              const key = reversedLabels[label];
+              if (!key || value === '' || value === null) return;
+              if (key === 'id') providedId = String(value);
+              else if (key === 'sort_order') {
+                const num = Number(value);
+                if (!isNaN(num)) mapped[key] = num;
+              } else if (key === 'is_active') {
+                mapped[key] = String(value).toLowerCase() === 'true' || value === true;
+              } else if (!['created_at', 'updated_at', 'created_by'].includes(key)) {
+                mapped[key] = String(value);
+              }
+            });
+
+            if (!mapped.category || !mapped.value || !mapped.label) {
+              summary.errorList.push({ row: rowNum, sheet: '系統選項', message: '缺少必填欄位（類別/值/顯示名稱）', errorType: 'validation' });
+              summary.systemOptions.errors++;
+              continue;
+            }
+
+            const existingId = providedId && existingIds.has(providedId) ? providedId : null;
+
+            if (existingId) {
+              if (mode === 'insert') {
+                summary.errorList.push({ row: rowNum, sheet: '系統選項', message: '記錄已存在（僅新增模式）', errorType: 'unique_constraint' });
+                summary.systemOptions.errors++;
+              } else if (mode === 'skip') {
+                summary.systemOptions.skipped++;
+              } else {
+                const { error } = await supabase.from('system_options').update(mapped).eq('id', existingId);
+                if (error) {
+                  summary.errorList.push({ row: rowNum, sheet: '系統選項', message: error.message, errorType: 'unknown' });
+                  summary.systemOptions.errors++;
+                } else {
+                  summary.systemOptions.updated++;
+                }
+              }
+            } else {
+              const { error } = await supabase.from('system_options').insert(mapped as any);
+              if (error) {
+                summary.errorList.push({ row: rowNum, sheet: '系統選項', message: error.message, errorType: 'unknown' });
+                summary.systemOptions.errors++;
+              } else {
+                summary.systemOptions.inserted++;
+              }
+            }
+          } catch (err) {
+            summary.errorList.push({ row: rowNum, sheet: '系統選項', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.systemOptions.errors++;
+          }
+        }
+      }
+
+      setProgress({ current: 11, total: 11, phase: 'done' });
       setImportSummary(summary);
 
-      const totalInserted = summary.projects.inserted + summary.statusHistory.inserted + summary.constructionHistory.inserted + summary.documents.inserted;
-      const totalUpdated = summary.projects.updated + summary.statusHistory.updated + summary.constructionHistory.updated + summary.documents.updated;
-      const totalErrors = summary.projects.errors + summary.statusHistory.errors + summary.constructionHistory.errors + summary.documents.errors;
+      const totalInserted = 
+        summary.investors.inserted + summary.investorContacts.inserted + summary.investorPaymentMethods.inserted +
+        summary.partners.inserted + summary.projects.inserted + summary.statusHistory.inserted + 
+        summary.constructionHistory.inserted + summary.constructionAssignments.inserted + 
+        summary.documents.inserted + summary.systemOptions.inserted;
+      const totalUpdated = 
+        summary.investors.updated + summary.investorContacts.updated + summary.investorPaymentMethods.updated +
+        summary.partners.updated + summary.projects.updated + summary.statusHistory.updated + 
+        summary.constructionHistory.updated + summary.constructionAssignments.updated + 
+        summary.documents.updated + summary.systemOptions.updated;
+      const totalErrors = 
+        summary.investors.errors + summary.investorContacts.errors + summary.investorPaymentMethods.errors +
+        summary.partners.errors + summary.projects.errors + summary.statusHistory.errors + 
+        summary.constructionHistory.errors + summary.constructionAssignments.errors + 
+        summary.documents.errors + summary.systemOptions.errors;
 
       if (totalErrors > 0) {
         toast.warning('匯入完成（部分失敗）', { 
