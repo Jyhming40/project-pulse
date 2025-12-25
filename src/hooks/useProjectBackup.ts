@@ -11,6 +11,12 @@ type ProjectStatusHistory = Database['public']['Tables']['project_status_history
 type ConstructionStatusHistory = Database['public']['Tables']['construction_status_history']['Row'];
 type Document = Database['public']['Tables']['documents']['Row'];
 type DocumentFile = Database['public']['Tables']['document_files']['Row'];
+type Investor = Database['public']['Tables']['investors']['Row'];
+type InvestorContact = Database['public']['Tables']['investor_contacts']['Row'];
+type InvestorPaymentMethod = Database['public']['Tables']['investor_payment_methods']['Row'];
+type Partner = Database['public']['Tables']['partners']['Row'];
+type ProjectConstructionAssignment = Database['public']['Tables']['project_construction_assignments']['Row'];
+type SystemOption = Database['public']['Tables']['system_options']['Row'];
 
 export type ImportMode = 'insert' | 'upsert' | 'skip';
 
@@ -31,11 +37,17 @@ export interface ImportError {
 }
 
 export interface ImportSummary {
+  investors: { inserted: number; updated: number; skipped: number; errors: number };
+  investorContacts: { inserted: number; updated: number; skipped: number; errors: number };
+  investorPaymentMethods: { inserted: number; updated: number; skipped: number; errors: number };
+  partners: { inserted: number; updated: number; skipped: number; errors: number };
   projects: { inserted: number; updated: number; skipped: number; errors: number };
   statusHistory: { inserted: number; updated: number; skipped: number; errors: number };
   constructionHistory: { inserted: number; updated: number; skipped: number; errors: number };
+  constructionAssignments: { inserted: number; updated: number; skipped: number; errors: number };
   documents: { inserted: number; updated: number; skipped: number; errors: number };
   documentFiles: { inserted: number; updated: number; skipped: number; errors: number };
+  systemOptions: { inserted: number; updated: number; skipped: number; errors: number };
   errorList: ImportError[];
 }
 
@@ -82,6 +94,55 @@ const documentFileColumns = ['id', 'document_id', 'original_name', 'storage_path
 const documentFileLabels: Record<string, string> = {
   id: 'ID', document_id: '文件ID', original_name: '檔案名稱', storage_path: '儲存路徑',
   mime_type: 'MIME類型', file_size: '檔案大小', uploaded_at: '上傳時間'
+};
+
+// Investor columns
+const investorColumns = ['id', 'investor_code', 'company_name', 'investor_type', 'owner_name', 'owner_title', 'tax_id', 'address', 'phone', 'email', 'contact_person', 'note', 'created_at', 'updated_at'];
+const investorLabels: Record<string, string> = {
+  id: 'ID', investor_code: '投資方代碼', company_name: '公司名稱', investor_type: '投資方類型',
+  owner_name: '負責人', owner_title: '負責人職稱', tax_id: '統一編號', address: '地址',
+  phone: '電話', email: 'Email', contact_person: '聯絡人', note: '備註',
+  created_at: '建立時間', updated_at: '更新時間'
+};
+
+// Investor contact columns
+const investorContactColumns = ['id', 'investor_code', 'contact_name', 'title', 'department', 'phone', 'mobile', 'email', 'line_id', 'role_tags', 'is_primary', 'is_active', 'note', 'created_at', 'updated_at'];
+const investorContactLabels: Record<string, string> = {
+  id: 'ID', investor_code: '投資方代碼', contact_name: '聯絡人姓名', title: '職稱', department: '部門',
+  phone: '電話', mobile: '手機', email: 'Email', line_id: 'Line ID', role_tags: '角色標籤',
+  is_primary: '主要聯絡人', is_active: '啟用', note: '備註', created_at: '建立時間', updated_at: '更新時間'
+};
+
+// Investor payment method columns
+const investorPaymentColumns = ['id', 'investor_code', 'method_type', 'bank_name', 'bank_code', 'branch_name', 'account_name', 'account_number', 'is_default', 'note', 'created_at', 'updated_at'];
+const investorPaymentLabels: Record<string, string> = {
+  id: 'ID', investor_code: '投資方代碼', method_type: '付款方式', bank_name: '銀行名稱',
+  bank_code: '銀行代碼', branch_name: '分行名稱', account_name: '戶名', account_number: '帳號',
+  is_default: '預設', note: '備註', created_at: '建立時間', updated_at: '更新時間'
+};
+
+// Partner columns
+const partnerColumns = ['id', 'name', 'partner_type', 'contact_person', 'contact_phone', 'email', 'address', 'is_active', 'note', 'created_at', 'updated_at'];
+const partnerLabels: Record<string, string> = {
+  id: 'ID', name: '廠商名稱', partner_type: '廠商類型', contact_person: '聯絡人',
+  contact_phone: '聯絡電話', email: 'Email', address: '地址', is_active: '啟用',
+  note: '備註', created_at: '建立時間', updated_at: '更新時間'
+};
+
+// Construction assignment columns
+const constructionAssignmentColumns = ['id', 'project_code', 'partner_name', 'construction_work_type', 'assignment_status', 'planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date', 'note', 'created_at', 'updated_at'];
+const constructionAssignmentLabels: Record<string, string> = {
+  id: 'ID', project_code: '案場編號', partner_name: '廠商名稱', construction_work_type: '工程類型',
+  assignment_status: '派工狀態', planned_start_date: '預計開始日', planned_end_date: '預計結束日',
+  actual_start_date: '實際開始日', actual_end_date: '實際結束日', note: '備註',
+  created_at: '建立時間', updated_at: '更新時間'
+};
+
+// System options columns
+const systemOptionColumns = ['id', 'category', 'value', 'label', 'sort_order', 'is_active', 'created_at', 'updated_at'];
+const systemOptionLabels: Record<string, string> = {
+  id: 'ID', category: '類別', value: '值', label: '顯示名稱', sort_order: '排序',
+  is_active: '啟用', created_at: '建立時間', updated_at: '更新時間'
 };
 
 function formatDate(value: any): string {
@@ -141,8 +202,10 @@ function downloadFile(blob: Blob, filename: string) {
 }
 
 // Fetch all records with pagination
+type TableName = 'projects' | 'project_status_history' | 'construction_status_history' | 'documents' | 'document_files' | 'investors' | 'investor_contacts' | 'investor_payment_methods' | 'partners' | 'project_construction_assignments' | 'system_options';
+
 async function fetchAllRecords<T>(
-  tableName: 'projects' | 'project_status_history' | 'construction_status_history' | 'documents' | 'document_files',
+  tableName: TableName,
   select: string = '*',
   orderBy: string = 'created_at'
 ): Promise<T[]> {
@@ -180,43 +243,128 @@ export function useProjectBackup() {
   // Export all project data to Excel with multiple sheets
   const exportFullBackup = useCallback(async () => {
     setIsProcessing(true);
-    setProgress({ current: 0, total: 5, phase: 'preparing' });
+    setProgress({ current: 0, total: 11, phase: 'preparing' });
 
     try {
-      // 1. Fetch projects with investor info
-      setProgress({ current: 1, total: 5, phase: 'exporting', currentSheet: '案場主表' });
+      // 1. Fetch investors
+      setProgress({ current: 1, total: 11, phase: 'exporting', currentSheet: '投資方' });
+      const investors = await fetchAllRecords<Investor>('investors', '*', 'created_at');
+      const investorIdToCode = new Map<string, string>();
+      investors.forEach(i => investorIdToCode.set(i.id, i.investor_code));
+
+      // 2. Fetch investor contacts
+      setProgress({ current: 2, total: 11, phase: 'exporting', currentSheet: '投資方聯絡人' });
+      const investorContacts = await fetchAllRecords<InvestorContact>('investor_contacts', '*', 'created_at');
+
+      // 3. Fetch investor payment methods
+      setProgress({ current: 3, total: 11, phase: 'exporting', currentSheet: '投資方付款方式' });
+      const investorPayments = await fetchAllRecords<InvestorPaymentMethod>('investor_payment_methods', '*', 'created_at');
+
+      // 4. Fetch partners
+      setProgress({ current: 4, total: 11, phase: 'exporting', currentSheet: '廠商' });
+      const partners = await fetchAllRecords<Partner>('partners', '*', 'created_at');
+      const partnerIdToName = new Map<string, string>();
+      partners.forEach(p => partnerIdToName.set(p.id, p.name));
+
+      // 5. Fetch projects with investor info
+      setProgress({ current: 5, total: 11, phase: 'exporting', currentSheet: '案場主表' });
       const projects = await fetchAllRecords<Project & { investors?: { investor_code: string } | null }>(
         'projects',
         '*, investors(investor_code)',
         'created_at'
       );
-
-      // Create project code map for history tables
       const projectIdToCode = new Map<string, string>();
-      projects.forEach(p => {
-        projectIdToCode.set(p.id, p.project_code);
-      });
+      projects.forEach(p => projectIdToCode.set(p.id, p.project_code));
 
-      // 2. Fetch status history
-      setProgress({ current: 2, total: 5, phase: 'exporting', currentSheet: '狀態歷程' });
+      // 6. Fetch status history
+      setProgress({ current: 6, total: 11, phase: 'exporting', currentSheet: '狀態歷程' });
       const statusHistory = await fetchAllRecords<ProjectStatusHistory>('project_status_history', '*', 'changed_at');
 
-      // 3. Fetch construction history
-      setProgress({ current: 3, total: 5, phase: 'exporting', currentSheet: '施工歷程' });
+      // 7. Fetch construction history
+      setProgress({ current: 7, total: 11, phase: 'exporting', currentSheet: '施工歷程' });
       const constructionHistory = await fetchAllRecords<ConstructionStatusHistory>('construction_status_history', '*', 'changed_at');
 
-      // 4. Fetch documents
-      setProgress({ current: 4, total: 5, phase: 'exporting', currentSheet: '文件' });
+      // 8. Fetch construction assignments
+      setProgress({ current: 8, total: 11, phase: 'exporting', currentSheet: '施工派工' });
+      const constructionAssignments = await fetchAllRecords<ProjectConstructionAssignment>('project_construction_assignments', '*', 'created_at');
+
+      // 9. Fetch documents
+      setProgress({ current: 9, total: 11, phase: 'exporting', currentSheet: '文件' });
       const documents = await fetchAllRecords<Document>('documents', '*', 'created_at');
 
-      // 5. Fetch document files
-      setProgress({ current: 5, total: 5, phase: 'exporting', currentSheet: '文件附件' });
+      // 10. Fetch document files
+      setProgress({ current: 10, total: 11, phase: 'exporting', currentSheet: '文件附件' });
       const documentFiles = await fetchAllRecords<DocumentFile>('document_files', '*', 'uploaded_at');
+
+      // 11. Fetch system options
+      setProgress({ current: 11, total: 11, phase: 'exporting', currentSheet: '系統選項' });
+      const systemOptions = await fetchAllRecords<SystemOption>('system_options', '*', 'created_at');
 
       // Create workbook
       const workbook = XLSX.utils.book_new();
 
-      // Projects sheet
+      // Helper to create sheet
+      const createSheet = (data: any[], columns: string[], labels: Record<string, string>) => {
+        if (data.length === 0) {
+          const headers = columns.map(c => labels[c]);
+          return XLSX.utils.aoa_to_sheet([headers]);
+        }
+        const sheet = XLSX.utils.json_to_sheet(data);
+        sheet['!cols'] = columns.map(col => ({ wch: Math.max((labels[col]?.length || 10) * 2 + 5, 12) }));
+        return sheet;
+      };
+
+      // 1. Investors sheet
+      const investorData = investors.map(i => {
+        const row: Record<string, any> = {};
+        investorColumns.forEach(col => {
+          row[investorLabels[col]] = (i as any)[col] ?? '';
+        });
+        return row;
+      });
+      XLSX.utils.book_append_sheet(workbook, createSheet(investorData, investorColumns, investorLabels), '投資方');
+
+      // 2. Investor contacts sheet
+      const contactData = investorContacts.map(c => {
+        const row: Record<string, any> = {};
+        investorContactColumns.forEach(col => {
+          if (col === 'investor_code') {
+            row[investorContactLabels[col]] = investorIdToCode.get(c.investor_id) || '';
+          } else if (col === 'role_tags') {
+            row[investorContactLabels[col]] = Array.isArray(c.role_tags) ? c.role_tags.join(', ') : '';
+          } else {
+            row[investorContactLabels[col]] = (c as any)[col] ?? '';
+          }
+        });
+        return row;
+      });
+      XLSX.utils.book_append_sheet(workbook, createSheet(contactData, investorContactColumns, investorContactLabels), '投資方聯絡人');
+
+      // 3. Investor payment methods sheet
+      const paymentData = investorPayments.map(p => {
+        const row: Record<string, any> = {};
+        investorPaymentColumns.forEach(col => {
+          if (col === 'investor_code') {
+            row[investorPaymentLabels[col]] = investorIdToCode.get(p.investor_id) || '';
+          } else {
+            row[investorPaymentLabels[col]] = (p as any)[col] ?? '';
+          }
+        });
+        return row;
+      });
+      XLSX.utils.book_append_sheet(workbook, createSheet(paymentData, investorPaymentColumns, investorPaymentLabels), '投資方付款方式');
+
+      // 4. Partners sheet
+      const partnerData = partners.map(p => {
+        const row: Record<string, any> = {};
+        partnerColumns.forEach(col => {
+          row[partnerLabels[col]] = (p as any)[col] ?? '';
+        });
+        return row;
+      });
+      XLSX.utils.book_append_sheet(workbook, createSheet(partnerData, partnerColumns, partnerLabels), '廠商');
+
+      // 5. Projects sheet
       const projectData = projects.map(p => {
         const row: Record<string, any> = {};
         projectColumns.forEach(col => {
@@ -230,11 +378,9 @@ export function useProjectBackup() {
         });
         return row;
       });
-      const projectSheet = XLSX.utils.json_to_sheet(projectData);
-      projectSheet['!cols'] = projectColumns.map(col => ({ wch: Math.max(projectLabels[col].length * 2 + 5, 12) }));
-      XLSX.utils.book_append_sheet(workbook, projectSheet, '案場主表');
+      XLSX.utils.book_append_sheet(workbook, createSheet(projectData, projectColumns, projectLabels), '案場主表');
 
-      // Status history sheet
+      // 6. Status history sheet
       const statusData = statusHistory.map(h => {
         const row: Record<string, any> = {};
         statusHistoryColumns.forEach(col => {
@@ -248,10 +394,9 @@ export function useProjectBackup() {
         });
         return row;
       });
-      const statusSheet = XLSX.utils.json_to_sheet(statusData);
-      XLSX.utils.book_append_sheet(workbook, statusSheet, '狀態歷程');
+      XLSX.utils.book_append_sheet(workbook, createSheet(statusData, statusHistoryColumns, statusHistoryLabels), '狀態歷程');
 
-      // Construction history sheet
+      // 7. Construction history sheet
       const constructionData = constructionHistory.map(h => {
         const row: Record<string, any> = {};
         constructionHistoryColumns.forEach(col => {
@@ -265,10 +410,27 @@ export function useProjectBackup() {
         });
         return row;
       });
-      const constructionSheet = XLSX.utils.json_to_sheet(constructionData);
-      XLSX.utils.book_append_sheet(workbook, constructionSheet, '施工歷程');
+      XLSX.utils.book_append_sheet(workbook, createSheet(constructionData, constructionHistoryColumns, constructionHistoryLabels), '施工歷程');
 
-      // Documents sheet
+      // 8. Construction assignments sheet
+      const assignmentData = constructionAssignments.map(a => {
+        const row: Record<string, any> = {};
+        constructionAssignmentColumns.forEach(col => {
+          if (col === 'project_code') {
+            row[constructionAssignmentLabels[col]] = projectIdToCode.get(a.project_id) || '';
+          } else if (col === 'partner_name') {
+            row[constructionAssignmentLabels[col]] = a.partner_id ? partnerIdToName.get(a.partner_id) || '' : '';
+          } else if (['planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date'].includes(col)) {
+            row[constructionAssignmentLabels[col]] = formatDate((a as any)[col]);
+          } else {
+            row[constructionAssignmentLabels[col]] = (a as any)[col] ?? '';
+          }
+        });
+        return row;
+      });
+      XLSX.utils.book_append_sheet(workbook, createSheet(assignmentData, constructionAssignmentColumns, constructionAssignmentLabels), '施工派工');
+
+      // 9. Documents sheet
       const docData = documents.map(d => {
         const row: Record<string, any> = {};
         documentColumns.forEach(col => {
@@ -282,10 +444,9 @@ export function useProjectBackup() {
         });
         return row;
       });
-      const docSheet = XLSX.utils.json_to_sheet(docData);
-      XLSX.utils.book_append_sheet(workbook, docSheet, '文件');
+      XLSX.utils.book_append_sheet(workbook, createSheet(docData, documentColumns, documentLabels), '文件');
 
-      // Document files sheet
+      // 10. Document files sheet
       const fileData = documentFiles.map(f => {
         const row: Record<string, any> = {};
         documentFileColumns.forEach(col => {
@@ -297,8 +458,17 @@ export function useProjectBackup() {
         });
         return row;
       });
-      const fileSheet = XLSX.utils.json_to_sheet(fileData);
-      XLSX.utils.book_append_sheet(workbook, fileSheet, '文件附件');
+      XLSX.utils.book_append_sheet(workbook, createSheet(fileData, documentFileColumns, documentFileLabels), '文件附件');
+
+      // 11. System options sheet
+      const optionData = systemOptions.map(o => {
+        const row: Record<string, any> = {};
+        systemOptionColumns.forEach(col => {
+          row[systemOptionLabels[col]] = (o as any)[col] ?? '';
+        });
+        return row;
+      });
+      XLSX.utils.book_append_sheet(workbook, createSheet(optionData, systemOptionColumns, systemOptionLabels), '系統選項');
 
       // Download
       const timestamp = new Date().toISOString().slice(0, 10);
@@ -306,9 +476,9 @@ export function useProjectBackup() {
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       downloadFile(blob, `案場完整備份_${timestamp}.xlsx`);
 
-      setProgress({ current: 5, total: 5, phase: 'done' });
+      setProgress({ current: 11, total: 11, phase: 'done' });
       toast.success('備份匯出完成', {
-        description: `案場 ${projects.length} 筆、狀態歷程 ${statusHistory.length} 筆、施工歷程 ${constructionHistory.length} 筆、文件 ${documents.length} 筆`
+        description: `投資方 ${investors.length}、廠商 ${partners.length}、案場 ${projects.length}、文件 ${documents.length} 筆`
       });
     } catch (error) {
       console.error('Export error:', error);
@@ -322,35 +492,24 @@ export function useProjectBackup() {
   const downloadTemplate = useCallback(() => {
     const workbook = XLSX.utils.book_new();
 
-    // Projects template
-    const projectHeaders: Record<string, string> = {};
-    projectColumns.forEach(col => { projectHeaders[projectLabels[col]] = ''; });
-    const projectSheet = XLSX.utils.json_to_sheet([projectHeaders]);
-    XLSX.utils.book_append_sheet(workbook, projectSheet, '案場主表');
+    // Helper to create template sheet
+    const createTemplateSheet = (columns: string[], labels: Record<string, string>) => {
+      const headers = columns.map(col => labels[col]);
+      return XLSX.utils.aoa_to_sheet([headers]);
+    };
 
-    // Status history template
-    const statusHeaders: Record<string, string> = {};
-    statusHistoryColumns.forEach(col => { statusHeaders[statusHistoryLabels[col]] = ''; });
-    const statusSheet = XLSX.utils.json_to_sheet([statusHeaders]);
-    XLSX.utils.book_append_sheet(workbook, statusSheet, '狀態歷程');
-
-    // Construction history template
-    const constructionHeaders: Record<string, string> = {};
-    constructionHistoryColumns.forEach(col => { constructionHeaders[constructionHistoryLabels[col]] = ''; });
-    const constructionSheet = XLSX.utils.json_to_sheet([constructionHeaders]);
-    XLSX.utils.book_append_sheet(workbook, constructionSheet, '施工歷程');
-
-    // Documents template
-    const docHeaders: Record<string, string> = {};
-    documentColumns.forEach(col => { docHeaders[documentLabels[col]] = ''; });
-    const docSheet = XLSX.utils.json_to_sheet([docHeaders]);
-    XLSX.utils.book_append_sheet(workbook, docSheet, '文件');
-
-    // Document files template
-    const fileHeaders: Record<string, string> = {};
-    documentFileColumns.forEach(col => { fileHeaders[documentFileLabels[col]] = ''; });
-    const fileSheet = XLSX.utils.json_to_sheet([fileHeaders]);
-    XLSX.utils.book_append_sheet(workbook, fileSheet, '文件附件');
+    // Add all sheets in order
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(investorColumns, investorLabels), '投資方');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(investorContactColumns, investorContactLabels), '投資方聯絡人');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(investorPaymentColumns, investorPaymentLabels), '投資方付款方式');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(partnerColumns, partnerLabels), '廠商');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(projectColumns, projectLabels), '案場主表');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(statusHistoryColumns, statusHistoryLabels), '狀態歷程');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(constructionHistoryColumns, constructionHistoryLabels), '施工歷程');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(constructionAssignmentColumns, constructionAssignmentLabels), '施工派工');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(documentColumns, documentLabels), '文件');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(documentFileColumns, documentFileLabels), '文件附件');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(systemOptionColumns, systemOptionLabels), '系統選項');
 
     const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -365,11 +524,17 @@ export function useProjectBackup() {
     setImportSummary(null);
 
     const summary: ImportSummary = {
+      investors: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
+      investorContacts: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
+      investorPaymentMethods: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
+      partners: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
       projects: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
       statusHistory: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
       constructionHistory: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
+      constructionAssignments: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
       documents: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
       documentFiles: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
+      systemOptions: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
       errorList: [],
     };
 
