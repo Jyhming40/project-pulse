@@ -239,27 +239,58 @@ function inferDataType(value: any): string {
 async function exportTable(supabase: any, tableName: string, limit: number, offset: number) {
   console.log(`[export_table] Exporting ${tableName} (limit: ${limit}, offset: ${offset})`)
   
-  const { data, error, count } = await supabase
+  // First get the total count
+  const { count: totalCount, error: countError } = await supabase
     .from(tableName)
-    .select('*', { count: 'exact' })
-    .range(offset, offset + limit - 1)
-    .order('created_at', { ascending: true, nullsFirst: true })
+    .select('*', { count: 'exact', head: true })
+  
+  if (countError) {
+    console.error(`[export_table] Count error for ${tableName}:`, countError.message)
+    throw countError
+  }
+
+  const total = totalCount || 0
+  console.log(`[export_table] Total rows in ${tableName}: ${total}`)
+
+  // Try with ordering first
+  let data, error
+  try {
+    const result = await supabase
+      .from(tableName)
+      .select('*')
+      .order('created_at', { ascending: true, nullsFirst: true })
+      .range(offset, offset + limit - 1)
+    
+    data = result.data
+    error = result.error
+  } catch (e) {
+    error = e
+  }
 
   if (error) {
     // Try without ordering if created_at doesn't exist
-    const { data: data2, error: error2, count: count2 } = await supabase
+    console.log(`[export_table] Retrying ${tableName} without created_at ordering`)
+    const { data: data2, error: error2 } = await supabase
       .from(tableName)
-      .select('*', { count: 'exact' })
+      .select('*')
       .range(offset, offset + limit - 1)
 
-    if (error2) throw error2
-    return { rows: data2 || [], total: count2 || 0, hasMore: (offset + limit) < (count2 || 0) }
+    if (error2) {
+      console.error(`[export_table] Export error for ${tableName}:`, error2.message)
+      throw error2
+    }
+    data = data2
   }
 
+  const rows = data || []
+  const hasMore = (offset + rows.length) < total
+  
+  console.log(`[export_table] Fetched ${rows.length} rows from ${tableName} (offset: ${offset}, hasMore: ${hasMore})`)
+
   return { 
-    rows: data || [], 
-    total: count || 0,
-    hasMore: (offset + limit) < (count || 0)
+    rows, 
+    total,
+    hasMore
   }
 }
 
