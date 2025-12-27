@@ -2,6 +2,7 @@ import { useState, useRef, Fragment } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePartners, type Partner, type CreatePartnerInput } from '@/hooks/usePartners';
 import { usePartnersImport } from '@/hooks/usePartnersImport';
+import { useCodebookOptions } from '@/hooks/useCodebook';
 import { CodebookSelect, CodebookValue } from '@/components/CodebookSelect';
 import { PartnerContacts } from '@/components/PartnerContacts';
 import {
@@ -22,12 +23,16 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
+  Hammer,
+  X,
+  Filter,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Card,
   CardContent,
@@ -92,8 +97,11 @@ export default function Partners() {
     downloadTemplate,
   } = usePartnersImport();
 
+  const { options: workTypeOptions } = useCodebookOptions('construction_work_type');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterWorkType, setFilterWorkType] = useState<string>('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -110,17 +118,22 @@ export default function Partners() {
     email: '',
     address: '',
     note: '',
+    work_capabilities: [],
   });
 
-  // Filter partners by search
+  // Filter partners by search and work type
   const filteredPartners = partners.filter((p) => {
     const query = searchQuery.toLowerCase();
-    return (
+    const matchesSearch =
       p.name.toLowerCase().includes(query) ||
       p.contact_person?.toLowerCase().includes(query) ||
       p.contact_phone?.includes(query) ||
-      p.tax_id?.includes(query)
-    );
+      p.tax_id?.includes(query);
+    
+    const matchesWorkType = !filterWorkType || 
+      (p.work_capabilities && p.work_capabilities.includes(filterWorkType));
+    
+    return matchesSearch && matchesWorkType;
   });
 
   const handleOpenForm = (partner?: Partner) => {
@@ -135,6 +148,7 @@ export default function Partners() {
         email: partner.email || '',
         address: partner.address || '',
         note: partner.note || '',
+        work_capabilities: partner.work_capabilities || [],
       });
     } else {
       setEditingPartner(null);
@@ -147,6 +161,7 @@ export default function Partners() {
         email: '',
         address: '',
         note: '',
+        work_capabilities: [],
       });
     }
     setIsFormOpen(true);
@@ -264,7 +279,7 @@ export default function Partners() {
       </div>
 
       {/* Search */}
-      <div className="flex gap-4">
+      <div className="flex gap-4 flex-wrap">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
@@ -273,6 +288,35 @@ export default function Partners() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
           />
+        </div>
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-muted-foreground" />
+          <Select
+            value={filterWorkType}
+            onValueChange={setFilterWorkType}
+          >
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="依工程能力篩選" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="">全部</SelectItem>
+              {workTypeOptions.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {filterWorkType && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setFilterWorkType('')}
+              title="清除篩選"
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -302,8 +346,8 @@ export default function Partners() {
                   <TableHead>名稱</TableHead>
                   <TableHead>類型</TableHead>
                   <TableHead>統編</TableHead>
+                  <TableHead>工程能力</TableHead>
                   <TableHead>聯絡人</TableHead>
-                  <TableHead>電話</TableHead>
                   <TableHead>狀態</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
@@ -333,15 +377,25 @@ export default function Partners() {
                         <CodebookValue category="partner_type" value={partner.partner_type} />
                       </TableCell>
                       <TableCell>{partner.tax_id || '-'}</TableCell>
-                      <TableCell>{partner.contact_person || '-'}</TableCell>
                       <TableCell>
-                        {partner.contact_phone ? (
-                          <a href={`tel:${partner.contact_phone}`} className="flex items-center gap-1 text-primary hover:underline">
-                            <Phone className="w-3 h-3" />
-                            {partner.contact_phone}
-                          </a>
-                        ) : '-'}
+                        <div className="flex flex-wrap gap-1 max-w-[200px]">
+                          {partner.work_capabilities && partner.work_capabilities.length > 0 ? (
+                            partner.work_capabilities.slice(0, 2).map((cap) => (
+                              <Badge key={cap} variant="outline" className="text-xs">
+                                {cap.length > 10 ? cap.substring(0, 10) + '...' : cap}
+                              </Badge>
+                            ))
+                          ) : (
+                            <span className="text-muted-foreground">-</span>
+                          )}
+                          {partner.work_capabilities && partner.work_capabilities.length > 2 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{partner.work_capabilities.length - 2}
+                            </Badge>
+                          )}
+                        </div>
                       </TableCell>
+                      <TableCell>{partner.contact_person || '-'}</TableCell>
                       <TableCell>
                         <Badge variant={partner.is_active ? 'default' : 'secondary'}>
                           {partner.is_active ? '啟用' : '停用'}
@@ -439,6 +493,55 @@ export default function Partners() {
                   placeholder="統一編號"
                 />
               </div>
+            </div>
+            <div className="grid gap-2">
+              <Label className="flex items-center gap-2">
+                <Hammer className="w-4 h-4" />
+                工程能力（可多選）
+              </Label>
+              <div className="border rounded-md p-3 max-h-[150px] overflow-y-auto space-y-2">
+                {workTypeOptions.map((opt) => (
+                  <div key={opt.value} className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`work-${opt.value}`}
+                      checked={formData.work_capabilities?.includes(opt.value) || false}
+                      onCheckedChange={(checked) => {
+                        const current = formData.work_capabilities || [];
+                        if (checked) {
+                          setFormData({ ...formData, work_capabilities: [...current, opt.value] });
+                        } else {
+                          setFormData({ ...formData, work_capabilities: current.filter(v => v !== opt.value) });
+                        }
+                      }}
+                    />
+                    <label
+                      htmlFor={`work-${opt.value}`}
+                      className="text-sm cursor-pointer"
+                    >
+                      {opt.label}
+                    </label>
+                  </div>
+                ))}
+              </div>
+              {formData.work_capabilities && formData.work_capabilities.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {formData.work_capabilities.map((cap) => (
+                    <Badge key={cap} variant="secondary" className="text-xs">
+                      {cap}
+                      <button
+                        type="button"
+                        onClick={() => setFormData({
+                          ...formData,
+                          work_capabilities: formData.work_capabilities?.filter(v => v !== cap)
+                        })}
+                        className="ml-1 hover:text-destructive"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
