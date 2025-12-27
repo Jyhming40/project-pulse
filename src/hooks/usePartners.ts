@@ -39,20 +39,21 @@ export function usePartners() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  // Fetch all partners
+  // Fetch all partners (exclude soft-deleted)
   const { data: partners = [], isLoading, error } = useQuery({
     queryKey: ['partners'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('partners')
         .select('*')
+        .eq('is_deleted', false)
         .order('name', { ascending: true });
       if (error) throw error;
       return data as Partner[];
     },
   });
 
-  // Fetch only active partners (for dropdowns)
+  // Fetch only active partners (for dropdowns) - also exclude soft-deleted
   const { data: activePartners = [] } = useQuery({
     queryKey: ['partners', 'active'],
     queryFn: async () => {
@@ -60,6 +61,7 @@ export function usePartners() {
         .from('partners')
         .select('*')
         .eq('is_active', true)
+        .eq('is_deleted', false)
         .order('name', { ascending: true });
       if (error) throw error;
       return data as Partner[];

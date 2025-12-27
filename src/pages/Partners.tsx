@@ -2,9 +2,11 @@ import { useState, useRef, Fragment } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePartners, type Partner, type CreatePartnerInput } from '@/hooks/usePartners';
 import { usePartnersImport } from '@/hooks/usePartnersImport';
+import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useCodebookOptions } from '@/hooks/useCodebook';
 import { CodebookSelect, CodebookValue } from '@/components/CodebookSelect';
 import { PartnerContacts } from '@/components/PartnerContacts';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import {
   Plus,
   Edit,
@@ -83,10 +85,15 @@ export default function Partners() {
     createPartner,
     updatePartner,
     toggleActive,
-    deletePartner,
     isCreating,
     isUpdating,
   } = usePartners();
+
+  // Soft delete hook
+  const { softDelete, isDeleting } = useSoftDelete({
+    tableName: 'partners',
+    queryKey: 'partners',
+  });
 
   const {
     isProcessing: isImporting,
@@ -185,10 +192,10 @@ export default function Partners() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (reason?: string) => {
     if (!deletingPartner) return;
     try {
-      await deletePartner(deletingPartner.id);
+      await softDelete({ id: deletingPartner.id, reason });
       setIsDeleteOpen(false);
       setDeletingPartner(null);
     } catch (error) {
@@ -699,23 +706,14 @@ export default function Partners() {
       </Dialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>確認刪除</AlertDialogTitle>
-            <AlertDialogDescription>
-              確定要刪除「{deletingPartner?.name}」嗎？此操作無法復原。
-              如果此夥伴已被使用，建議改為停用。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              刪除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={isDeleteOpen}
+        onOpenChange={setIsDeleteOpen}
+        onConfirm={handleDelete}
+        tableName="partners"
+        itemName={deletingPartner?.name}
+        isPending={isDeleting}
+      />
     </div>
   );
 }

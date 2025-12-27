@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSoftDelete } from '@/hooks/useSoftDelete';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import {
   Plus, 
   Search, 
@@ -83,14 +85,24 @@ export default function Investors() {
   
   // Import/Export dialog
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+  
+  // Delete dialog state
+  const [deletingInvestor, setDeletingInvestor] = useState<Investor | null>(null);
+  
+  // Soft delete hook
+  const { softDelete, isDeleting } = useSoftDelete({
+    tableName: 'investors',
+    queryKey: 'investors',
+  });
 
-  // Fetch investors
+  // Fetch investors (exclude soft-deleted)
   const { data: investors = [], isLoading } = useQuery({
     queryKey: ['investors'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('investors')
         .select('*')
+        .eq('is_deleted', false)
         .order('updated_at', { ascending: false });
       if (error) throw error;
       return data;
@@ -147,20 +159,12 @@ export default function Investors() {
     },
   });
 
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('investors').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['investors'] });
-      toast.success('投資方已刪除');
-    },
-    onError: (error: Error) => {
-      toast.error('刪除失敗', { description: error.message });
-    },
-  });
+  // Handle soft delete
+  const handleDelete = async (reason?: string) => {
+    if (!deletingInvestor) return;
+    await softDelete({ id: deletingInvestor.id, reason });
+    setDeletingInvestor(null);
+  };
 
   // Filter investors
   const filteredInvestors = investors.filter(inv => {
@@ -315,7 +319,7 @@ export default function Investors() {
                         {isAdmin && (
                           <DropdownMenuItem 
                             className="text-destructive"
-                            onClick={() => deleteMutation.mutate(investor.id)}
+                            onClick={() => setDeletingInvestor(investor)}
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
                             刪除
@@ -633,6 +637,16 @@ export default function Investors() {
         type="investors"
         data={investors}
         onImportComplete={() => queryClient.invalidateQueries({ queryKey: ['investors'] })}
+      />
+
+      {/* Delete Confirm Dialog */}
+      <DeleteConfirmDialog
+        open={!!deletingInvestor}
+        onOpenChange={(open) => !open && setDeletingInvestor(null)}
+        onConfirm={handleDelete}
+        tableName="investors"
+        itemName={deletingInvestor?.company_name}
+        isPending={isDeleting}
       />
     </div>
   );

@@ -126,9 +126,13 @@ export type Database = {
       }
       document_files: {
         Row: {
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           document_id: string
           file_size: number | null
           id: string
+          is_deleted: boolean | null
           mime_type: string | null
           original_name: string
           storage_path: string
@@ -136,9 +140,13 @@ export type Database = {
           uploaded_by: string | null
         }
         Insert: {
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           document_id: string
           file_size?: number | null
           id?: string
+          is_deleted?: boolean | null
           mime_type?: string | null
           original_name: string
           storage_path: string
@@ -146,9 +154,13 @@ export type Database = {
           uploaded_by?: string | null
         }
         Update: {
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           document_id?: string
           file_size?: number | null
           id?: string
+          is_deleted?: boolean | null
           mime_type?: string | null
           original_name?: string
           storage_path?: string
@@ -167,12 +179,20 @@ export type Database = {
       }
       documents: {
         Row: {
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
           created_at: string
           created_by: string | null
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           doc_status: string
           doc_type: string
           due_at: string | null
           id: string
+          is_archived: boolean | null
+          is_deleted: boolean | null
           issued_at: string | null
           note: string | null
           owner_user_id: string | null
@@ -181,12 +201,20 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           doc_status?: string
           doc_type: string
           due_at?: string | null
           id?: string
+          is_archived?: boolean | null
+          is_deleted?: boolean | null
           issued_at?: string | null
           note?: string | null
           owner_user_id?: string | null
@@ -195,12 +223,20 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           doc_status?: string
           doc_type?: string
           due_at?: string | null
           id?: string
+          is_archived?: boolean | null
+          is_deleted?: boolean | null
           issued_at?: string | null
           note?: string | null
           owner_user_id?: string | null
@@ -230,11 +266,15 @@ export type Database = {
           contact_name: string
           created_at: string
           created_by: string | null
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           department: string | null
           email: string | null
           id: string
           investor_id: string
           is_active: boolean | null
+          is_deleted: boolean | null
           is_primary: boolean | null
           line_id: string | null
           mobile: string | null
@@ -248,11 +288,15 @@ export type Database = {
           contact_name: string
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           department?: string | null
           email?: string | null
           id?: string
           investor_id: string
           is_active?: boolean | null
+          is_deleted?: boolean | null
           is_primary?: boolean | null
           line_id?: string | null
           mobile?: string | null
@@ -266,11 +310,15 @@ export type Database = {
           contact_name?: string
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           department?: string | null
           email?: string | null
           id?: string
           investor_id?: string
           is_active?: boolean | null
+          is_deleted?: boolean | null
           is_primary?: boolean | null
           line_id?: string | null
           mobile?: string | null
@@ -299,9 +347,13 @@ export type Database = {
           branch_name: string | null
           created_at: string
           created_by: string | null
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           id: string
           investor_id: string
           is_default: boolean | null
+          is_deleted: boolean | null
           method_type: string
           note: string | null
           updated_at: string
@@ -314,9 +366,13 @@ export type Database = {
           branch_name?: string | null
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           investor_id: string
           is_default?: boolean | null
+          is_deleted?: boolean | null
           method_type: string
           note?: string | null
           updated_at?: string
@@ -329,9 +385,13 @@ export type Database = {
           branch_name?: string | null
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
           investor_id?: string
           is_default?: boolean | null
+          is_deleted?: boolean | null
           method_type?: string
           note?: string | null
           updated_at?: string
@@ -376,14 +436,22 @@ export type Database = {
       investors: {
         Row: {
           address: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
           company_name: string
           contact_person: string | null
           created_at: string
           created_by: string | null
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           id: string
           investor_code: string
           investor_type: string | null
+          is_archived: boolean | null
+          is_deleted: boolean | null
           note: string | null
           owner_name: string | null
           owner_title: string | null
@@ -393,14 +461,22 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           company_name: string
           contact_person?: string | null
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           id?: string
           investor_code: string
           investor_type?: string | null
+          is_archived?: boolean | null
+          is_deleted?: boolean | null
           note?: string | null
           owner_name?: string | null
           owner_title?: string | null
@@ -410,14 +486,22 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           company_name?: string
           contact_person?: string | null
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           id?: string
           investor_code?: string
           investor_type?: string | null
+          is_archived?: boolean | null
+          is_deleted?: boolean | null
           note?: string | null
           owner_name?: string | null
           owner_title?: string | null
@@ -432,9 +516,13 @@ export type Database = {
           contact_name: string
           created_at: string
           created_by: string | null
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           id: string
           is_active: boolean | null
+          is_deleted: boolean | null
           is_primary: boolean | null
           note: string | null
           partner_id: string
@@ -446,9 +534,13 @@ export type Database = {
           contact_name: string
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           id?: string
           is_active?: boolean | null
+          is_deleted?: boolean | null
           is_primary?: boolean | null
           note?: string | null
           partner_id: string
@@ -460,9 +552,13 @@ export type Database = {
           contact_name?: string
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           id?: string
           is_active?: boolean | null
+          is_deleted?: boolean | null
           is_primary?: boolean | null
           note?: string | null
           partner_id?: string
@@ -483,13 +579,21 @@ export type Database = {
       partners: {
         Row: {
           address: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
           contact_person: string | null
           contact_phone: string | null
           created_at: string
           created_by: string | null
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           email: string | null
           id: string
           is_active: boolean
+          is_archived: boolean | null
+          is_deleted: boolean | null
           name: string
           note: string | null
           partner_type: string | null
@@ -499,13 +603,21 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           contact_person?: string | null
           contact_phone?: string | null
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
+          is_archived?: boolean | null
+          is_deleted?: boolean | null
           name: string
           note?: string | null
           partner_type?: string | null
@@ -515,13 +627,21 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           contact_person?: string | null
           contact_phone?: string | null
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           email?: string | null
           id?: string
           is_active?: boolean
+          is_archived?: boolean | null
+          is_deleted?: boolean | null
           name?: string
           note?: string | null
           partner_type?: string | null
@@ -566,7 +686,11 @@ export type Database = {
           construction_work_type: string
           created_at: string
           created_by: string | null
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           id: string
+          is_deleted: boolean | null
           note: string | null
           partner_id: string | null
           planned_end_date: string | null
@@ -581,7 +705,11 @@ export type Database = {
           construction_work_type: string
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
+          is_deleted?: boolean | null
           note?: string | null
           partner_id?: string | null
           planned_end_date?: string | null
@@ -596,7 +724,11 @@ export type Database = {
           construction_work_type?: string
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
+          is_deleted?: boolean | null
           note?: string | null
           partner_id?: string | null
           planned_end_date?: string | null
@@ -664,6 +796,9 @@ export type Database = {
           actual_installed_capacity: number | null
           address: string | null
           approval_date: string | null
+          archive_reason: string | null
+          archived_at: string | null
+          archived_by: string | null
           capacity_kwp: number | null
           city: string | null
           construction_status: string | null
@@ -672,6 +807,9 @@ export type Database = {
           coordinates: string | null
           created_at: string
           created_by: string | null
+          delete_reason: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           district: string | null
           drive_folder_id: string | null
           drive_folder_url: string | null
@@ -684,6 +822,8 @@ export type Database = {
           installation_type: string | null
           intake_year: number | null
           investor_id: string | null
+          is_archived: boolean | null
+          is_deleted: boolean | null
           land_owner: string | null
           land_owner_contact: string | null
           note: string | null
@@ -702,6 +842,9 @@ export type Database = {
           actual_installed_capacity?: number | null
           address?: string | null
           approval_date?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           capacity_kwp?: number | null
           city?: string | null
           construction_status?: string | null
@@ -710,6 +853,9 @@ export type Database = {
           coordinates?: string | null
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           district?: string | null
           drive_folder_id?: string | null
           drive_folder_url?: string | null
@@ -722,6 +868,8 @@ export type Database = {
           installation_type?: string | null
           intake_year?: number | null
           investor_id?: string | null
+          is_archived?: boolean | null
+          is_deleted?: boolean | null
           land_owner?: string | null
           land_owner_contact?: string | null
           note?: string | null
@@ -740,6 +888,9 @@ export type Database = {
           actual_installed_capacity?: number | null
           address?: string | null
           approval_date?: string | null
+          archive_reason?: string | null
+          archived_at?: string | null
+          archived_by?: string | null
           capacity_kwp?: number | null
           city?: string | null
           construction_status?: string | null
@@ -748,6 +899,9 @@ export type Database = {
           coordinates?: string | null
           created_at?: string
           created_by?: string | null
+          delete_reason?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           district?: string | null
           drive_folder_id?: string | null
           drive_folder_url?: string | null
@@ -760,6 +914,8 @@ export type Database = {
           installation_type?: string | null
           intake_year?: number | null
           investor_id?: string | null
+          is_archived?: boolean | null
+          is_deleted?: boolean | null
           land_owner?: string | null
           land_owner_contact?: string | null
           note?: string | null
@@ -891,6 +1047,27 @@ export type Database = {
         }
         Returns: string
       }
+      get_deletion_policy: {
+        Args: { p_table_name: string }
+        Returns: {
+          allow_auto_purge: boolean | null
+          created_at: string | null
+          created_by: string | null
+          deletion_mode: Database["public"]["Enums"]["deletion_mode"]
+          id: string
+          require_confirmation: boolean | null
+          require_reason: boolean | null
+          retention_days: number | null
+          table_name: string
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "deletion_policies"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_next_project_seq: {
         Args: { p_investor_code: string; p_year: number }
         Returns: number
@@ -912,6 +1089,17 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      log_audit_action: {
+        Args: {
+          p_action: Database["public"]["Enums"]["audit_action"]
+          p_new_data?: Json
+          p_old_data?: Json
+          p_reason?: string
+          p_record_id: string
+          p_table_name: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

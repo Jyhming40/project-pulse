@@ -3,7 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { CodebookSelect } from '@/components/CodebookSelect';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { 
   Plus, 
   Search, 
@@ -146,14 +148,24 @@ export default function Projects() {
   
   // Creating state for Edge Function call
   const [isCreating, setIsCreating] = useState(false);
+  
+  // Delete dialog state
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  
+  // Soft delete hook
+  const { softDelete, isDeleting } = useSoftDelete({
+    tableName: 'projects',
+    queryKey: 'projects',
+  });
 
-  // Fetch projects with investor info
+  // Fetch projects with investor info (exclude soft-deleted)
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
         .select('*, investors(company_name)')
+        .eq('is_deleted', false)
         .order('updated_at', { ascending: false });
       if (error) throw error;
       return data;
@@ -260,20 +272,12 @@ export default function Projects() {
     },
   });
 
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('projects').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success('案場已刪除');
-    },
-    onError: (error: Error) => {
-      toast.error('刪除失敗', { description: error.message });
-    },
-  });
+  // Handle soft delete
+  const handleDelete = async (reason?: string) => {
+    if (!deletingProject) return;
+    await softDelete({ id: deletingProject.id, reason });
+    setDeletingProject(null);
+  };
 
   // Filter projects
   const filteredProjects = projects.filter(project => {
@@ -479,7 +483,7 @@ export default function Projects() {
                         {isAdmin && (
                           <DropdownMenuItem 
                             className="text-destructive"
-                            onClick={() => deleteMutation.mutate(project.id)}
+                            onClick={() => setDeletingProject(project)}
                           >
                             <Trash2 className="w-4 h-4 mr-2" />
                             刪除
@@ -880,6 +884,16 @@ export default function Projects() {
         open={isBackupOpen}
         onOpenChange={setIsBackupOpen}
         onImportComplete={() => queryClient.invalidateQueries({ queryKey: ['projects'] })}
+      />
+
+      {/* Delete Confirm Dialog */}
+      <DeleteConfirmDialog
+        open={!!deletingProject}
+        onOpenChange={(open) => !open && setDeletingProject(null)}
+        onConfirm={handleDelete}
+        tableName="projects"
+        itemName={deletingProject?.project_name}
+        isPending={isDeleting}
       />
     </div>
   );
