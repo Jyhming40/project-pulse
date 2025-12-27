@@ -15,6 +15,7 @@ export interface ConstructionAssignment {
   actual_start_date: string | null;
   actual_end_date: string | null;
   note: string | null;
+  is_deleted: boolean;
   created_at: string;
   updated_at: string;
   partners?: Partner;
@@ -38,7 +39,7 @@ export function useConstructionAssignments(projectId?: string) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  // Fetch assignments for a project
+  // Fetch assignments for a project (exclude soft deleted)
   const { data: assignments = [], isLoading, error } = useQuery({
     queryKey: ['construction-assignments', projectId],
     queryFn: async () => {
@@ -47,6 +48,7 @@ export function useConstructionAssignments(projectId?: string) {
         .from('project_construction_assignments')
         .select('*, partners(*)')
         .eq('project_id', projectId)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: true });
       if (error) throw error;
       return data as ConstructionAssignment[];
@@ -98,7 +100,7 @@ export function useConstructionAssignments(projectId?: string) {
     },
   });
 
-  // Delete assignment
+  // Delete assignment (kept for backwards compatibility, should use soft delete)
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase

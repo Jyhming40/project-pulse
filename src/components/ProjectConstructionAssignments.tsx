@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConstructionAssignments, type ConstructionAssignment, type CreateAssignmentInput } from '@/hooks/useConstructionAssignments';
 import { usePartners, type Partner } from '@/hooks/usePartners';
+import { useSoftDelete } from '@/hooks/useSoftDelete';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { CodebookSelect, CodebookValue } from '@/components/CodebookSelect';
 import { AssignmentTimeline } from '@/components/AssignmentTimeline';
 import { format } from 'date-fns';
@@ -44,16 +46,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import {
   Select,
   SelectContent,
@@ -179,14 +171,17 @@ export default function ProjectConstructionAssignments({ projectId, readOnly = f
     isLoading,
     createAssignment,
     updateAssignment,
-    deleteAssignment,
     isCreating,
     isUpdating,
   } = useConstructionAssignments(projectId);
   const { activePartners } = usePartners();
 
+  const { softDelete, isDeleting } = useSoftDelete({
+    tableName: 'project_construction_assignments',
+    queryKey: ['construction-assignments', projectId],
+  });
+
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'timeline'>('table');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [editingAssignment, setEditingAssignment] = useState<ConstructionAssignment | null>(null);
@@ -261,11 +256,10 @@ export default function ProjectConstructionAssignments({ projectId, readOnly = f
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (reason?: string) => {
     if (!deletingAssignment) return;
     try {
-      await deleteAssignment(deletingAssignment.id);
-      setIsDeleteOpen(false);
+      await softDelete({ id: deletingAssignment.id, reason });
       setDeletingAssignment(null);
     } catch (error) {
       // Error handled by mutation
@@ -398,10 +392,7 @@ export default function ProjectConstructionAssignments({ projectId, readOnly = f
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => {
-                              setDeletingAssignment(assignment);
-                              setIsDeleteOpen(true);
-                            }}
+                            onClick={() => setDeletingAssignment(assignment)}
                             title="刪除"
                           >
                             <Trash2 className="w-4 h-4 text-destructive" />
@@ -506,23 +497,14 @@ export default function ProjectConstructionAssignments({ projectId, readOnly = f
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>確認刪除</AlertDialogTitle>
-            <AlertDialogDescription>
-              確定要刪除此工班指派嗎？此操作無法復原。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              刪除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={!!deletingAssignment}
+        onOpenChange={(open) => !open && setDeletingAssignment(null)}
+        onConfirm={handleDelete}
+        tableName="project_construction_assignments"
+        itemName={deletingAssignment?.construction_work_type || ''}
+        isPending={isDeleting}
+      />
     </Card>
   );
 }

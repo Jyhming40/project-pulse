@@ -13,6 +13,7 @@ export interface PartnerContact {
   note: string | null;
   is_primary: boolean;
   is_active: boolean;
+  is_deleted: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -35,7 +36,7 @@ export function usePartnerContacts(partnerId?: string) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  // Fetch contacts for a specific partner
+  // Fetch contacts for a specific partner (exclude soft deleted)
   const { data: contacts = [], isLoading, error } = useQuery({
     queryKey: ['partner-contacts', partnerId],
     queryFn: async () => {
@@ -44,6 +45,7 @@ export function usePartnerContacts(partnerId?: string) {
         .from('partner_contacts')
         .select('*')
         .eq('partner_id', partnerId)
+        .eq('is_deleted', false)
         .order('is_primary', { ascending: false })
         .order('contact_name', { ascending: true });
       if (error) throw error;
@@ -113,9 +115,11 @@ export function usePartnerContacts(partnerId?: string) {
     },
   });
 
-  // Delete contact
+  // Delete contact (now just returns id and partnerId for soft delete hook)
   const deleteMutation = useMutation({
     mutationFn: async ({ id, partnerId: pId }: { id: string; partnerId: string }) => {
+      // Hard delete is now handled by useSoftDelete.purge
+      // This mutation is kept for backwards compatibility but should use soft delete
       const { error } = await supabase
         .from('partner_contacts')
         .delete()
