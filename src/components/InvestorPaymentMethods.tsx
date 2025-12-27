@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSoftDelete } from '@/hooks/useSoftDelete';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { Plus, Edit, CreditCard, Star, Trash2, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,9 +58,15 @@ export function InvestorPaymentMethods({ investorId, investorCode, onExport }: I
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingMethod, setEditingMethod] = useState<InvestorPaymentMethod | null>(null);
+  const [deletingMethod, setDeletingMethod] = useState<InvestorPaymentMethod | null>(null);
   const [formData, setFormData] = useState<Partial<InvestorPaymentMethodInsert>>({});
 
-  // Fetch payment methods
+  const { softDelete, isDeleting } = useSoftDelete({
+    tableName: 'investor_payment_methods',
+    queryKey: ['investor-payment-methods', investorId],
+  });
+
+  // Fetch payment methods (exclude soft deleted)
   const { data: methods = [], isLoading } = useQuery({
     queryKey: ['investor-payment-methods', investorId],
     queryFn: async () => {
@@ -66,6 +74,7 @@ export function InvestorPaymentMethods({ investorId, investorCode, onExport }: I
         .from('investor_payment_methods')
         .select('*')
         .eq('investor_id', investorId)
+        .eq('is_deleted', false)
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: false });
       if (error) throw error;
@@ -117,21 +126,6 @@ export function InvestorPaymentMethods({ investorId, investorCode, onExport }: I
     },
     onError: (error: Error) => {
       toast.error('更新失敗', { description: error.message });
-    },
-  });
-
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from('investor_payment_methods').delete().eq('id', id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['investor-payment-methods', investorId] });
-      toast.success('支付方式已刪除');
-    },
-    onError: (error: Error) => {
-      toast.error('刪除失敗', { description: error.message });
     },
   });
 
@@ -197,6 +191,16 @@ export function InvestorPaymentMethods({ investorId, investorCode, onExport }: I
         investor_id: investorId,
         created_by: user?.id,
       } as InvestorPaymentMethodInsert);
+    }
+  };
+
+  const handleDelete = async (reason?: string) => {
+    if (!deletingMethod) return;
+    try {
+      await softDelete({ id: deletingMethod.id, reason });
+      setDeletingMethod(null);
+    } catch (error) {
+      // Error handled by mutation
     }
   };
 
@@ -293,7 +297,7 @@ export function InvestorPaymentMethods({ investorId, investorCode, onExport }: I
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive"
-                        onClick={() => deleteMutation.mutate(method.id)}
+                        onClick={() => setDeletingMethod(method)}
                       >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -421,6 +425,15 @@ export function InvestorPaymentMethods({ investorId, investorCode, onExport }: I
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={!!deletingMethod}
+        onOpenChange={(open) => !open && setDeletingMethod(null)}
+        onConfirm={handleDelete}
+        tableName="investor_payment_methods"
+        itemName={deletingMethod?.method_type || ''}
+        isPending={isDeleting}
+      />
     </div>
   );
 }

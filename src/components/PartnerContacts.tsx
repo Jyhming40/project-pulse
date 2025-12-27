@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { usePartnerContacts, type PartnerContact, type CreatePartnerContactInput } from '@/hooks/usePartnerContacts';
+import { useSoftDelete } from '@/hooks/useSoftDelete';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { useAuth } from '@/contexts/AuthContext';
 import {
   Plus,
@@ -31,16 +33,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 
 interface PartnerContactsProps {
   partnerId: string;
@@ -54,13 +46,16 @@ export function PartnerContacts({ partnerId, partnerName }: PartnerContactsProps
     isLoading,
     createContact,
     updateContact,
-    deleteContact,
     isCreating,
     isUpdating,
   } = usePartnerContacts(partnerId);
 
+  const { softDelete, isDeleting } = useSoftDelete({
+    tableName: 'partner_contacts',
+    queryKey: ['partner-contacts', partnerId],
+  });
+
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<PartnerContact | null>(null);
   const [deletingContact, setDeletingContact] = useState<PartnerContact | null>(null);
   const [formData, setFormData] = useState<Omit<CreatePartnerContactInput, 'partner_id'>>({
@@ -114,11 +109,10 @@ export function PartnerContacts({ partnerId, partnerName }: PartnerContactsProps
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (reason?: string) => {
     if (!deletingContact) return;
     try {
-      await deleteContact({ id: deletingContact.id, partnerId });
-      setIsDeleteOpen(false);
+      await softDelete({ id: deletingContact.id, reason });
       setDeletingContact(null);
     } catch (error) {
       // Error handled by mutation
@@ -211,10 +205,7 @@ export function PartnerContacts({ partnerId, partnerName }: PartnerContactsProps
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => {
-                            setDeletingContact(contact);
-                            setIsDeleteOpen(true);
-                          }}
+                          onClick={() => setDeletingContact(contact)}
                         >
                           <Trash2 className="w-3 h-3 text-destructive" />
                         </Button>
@@ -304,23 +295,14 @@ export function PartnerContacts({ partnerId, partnerName }: PartnerContactsProps
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>確認刪除</AlertDialogTitle>
-            <AlertDialogDescription>
-              確定要刪除「{deletingContact?.contact_name}」嗎？此操作無法復原。
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>取消</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              刪除
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteConfirmDialog
+        open={!!deletingContact}
+        onOpenChange={(open) => !open && setDeletingContact(null)}
+        onConfirm={handleDelete}
+        tableName="partner_contacts"
+        itemName={deletingContact?.contact_name || ''}
+        isPending={isDeleting}
+      />
     </Card>
   );
 }
