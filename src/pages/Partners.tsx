@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useRef, Fragment } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePartners, type Partner, type CreatePartnerInput } from '@/hooks/usePartners';
+import { usePartnersImport } from '@/hooks/usePartnersImport';
 import { CodebookSelect, CodebookValue } from '@/components/CodebookSelect';
+import { PartnerContacts } from '@/components/PartnerContacts';
 import {
   Plus,
   Edit,
@@ -12,6 +14,14 @@ import {
   Users,
   Phone,
   Mail,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +61,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 
 export default function Partners() {
@@ -66,14 +83,28 @@ export default function Partners() {
     isUpdating,
   } = usePartners();
 
+  const {
+    isProcessing: isImporting,
+    preview: importPreview,
+    previewImport,
+    executeImport,
+    clearPreview,
+    downloadTemplate,
+  } = usePartnersImport();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importMode, setImportMode] = useState<'insert' | 'upsert'>('upsert');
   const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
   const [deletingPartner, setDeletingPartner] = useState<Partner | null>(null);
+  const [expandedPartner, setExpandedPartner] = useState<string | null>(null);
   const [formData, setFormData] = useState<CreatePartnerInput>({
     name: '',
     partner_type: '',
+    tax_id: '',
     contact_person: '',
     contact_phone: '',
     email: '',
@@ -87,7 +118,8 @@ export default function Partners() {
     return (
       p.name.toLowerCase().includes(query) ||
       p.contact_person?.toLowerCase().includes(query) ||
-      p.contact_phone?.includes(query)
+      p.contact_phone?.includes(query) ||
+      p.tax_id?.includes(query)
     );
   });
 
@@ -97,6 +129,7 @@ export default function Partners() {
       setFormData({
         name: partner.name,
         partner_type: partner.partner_type || '',
+        tax_id: partner.tax_id || '',
         contact_person: partner.contact_person || '',
         contact_phone: partner.contact_phone || '',
         email: partner.email || '',
@@ -108,6 +141,7 @@ export default function Partners() {
       setFormData({
         name: '',
         partner_type: '',
+        tax_id: '',
         contact_person: '',
         contact_phone: '',
         email: '',
@@ -151,6 +185,41 @@ export default function Partners() {
     await toggleActive({ id: partner.id, is_active: !partner.is_active });
   };
 
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    try {
+      await previewImport(file);
+      setIsImportOpen(true);
+    } catch (error) {
+      toast.error('檔案解析失敗');
+    }
+    
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleImport = async () => {
+    const result = await executeImport(importPreview, importMode);
+    if (result.errors === 0) {
+      setIsImportOpen(false);
+      clearPreview();
+    }
+  };
+
+  const handleCloseImport = () => {
+    setIsImportOpen(false);
+    clearPreview();
+  };
+
+  const previewStats = {
+    insert: importPreview.filter((i) => i.status === 'insert').length,
+    update: importPreview.filter((i) => i.status === 'update').length,
+    error: importPreview.filter((i) => i.status === 'error').length,
+  };
+
   if (!canEdit) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -171,10 +240,27 @@ export default function Partners() {
             管理施工工班、廠商與個人外包夥伴
           </p>
         </div>
-        <Button onClick={() => handleOpenForm()}>
-          <Plus className="w-4 h-4 mr-2" />
-          新增夥伴
-        </Button>
+        <div className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+          <Button variant="outline" onClick={downloadTemplate}>
+            <Download className="w-4 h-4 mr-2" />
+            下載範本
+          </Button>
+          <Button variant="outline" onClick={() => fileInputRef.current?.click()}>
+            <Upload className="w-4 h-4 mr-2" />
+            匯入 Excel
+          </Button>
+          <Button onClick={() => handleOpenForm()}>
+            <Plus className="w-4 h-4 mr-2" />
+            新增夥伴
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -182,7 +268,7 @@ export default function Partners() {
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="搜尋名稱、聯絡人、電話..."
+            placeholder="搜尋名稱、統編、聯絡人、電話..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-9"
@@ -212,82 +298,102 @@ export default function Partners() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10"></TableHead>
                   <TableHead>名稱</TableHead>
                   <TableHead>類型</TableHead>
+                  <TableHead>統編</TableHead>
                   <TableHead>聯絡人</TableHead>
                   <TableHead>電話</TableHead>
-                  <TableHead>Email</TableHead>
                   <TableHead>狀態</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredPartners.map((partner) => (
-                  <TableRow key={partner.id} className={!partner.is_active ? 'opacity-50' : ''}>
-                    <TableCell className="font-medium">{partner.name}</TableCell>
-                    <TableCell>
-                      <CodebookValue category="partner_type" value={partner.partner_type} />
-                    </TableCell>
-                    <TableCell>{partner.contact_person || '-'}</TableCell>
-                    <TableCell>
-                      {partner.contact_phone ? (
-                        <a href={`tel:${partner.contact_phone}`} className="flex items-center gap-1 text-primary hover:underline">
-                          <Phone className="w-3 h-3" />
-                          {partner.contact_phone}
-                        </a>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      {partner.email ? (
-                        <a href={`mailto:${partner.email}`} className="flex items-center gap-1 text-primary hover:underline">
-                          <Mail className="w-3 h-3" />
-                          {partner.email}
-                        </a>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={partner.is_active ? 'default' : 'secondary'}>
-                        {partner.is_active ? '啟用' : '停用'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <div className="flex justify-end gap-1">
+                  <Fragment key={partner.id}>
+                    <TableRow className={!partner.is_active ? 'opacity-50' : ''}>
+                      <TableCell>
                         <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleOpenForm(partner)}
-                          title="編輯"
+                          className="h-6 w-6"
+                          onClick={() => setExpandedPartner(
+                            expandedPartner === partner.id ? null : partner.id
+                          )}
                         >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleToggleActive(partner)}
-                          title={partner.is_active ? '停用' : '啟用'}
-                        >
-                          {partner.is_active ? (
-                            <PowerOff className="w-4 h-4 text-warning" />
+                          {expandedPartner === partner.id ? (
+                            <ChevronUp className="w-4 h-4" />
                           ) : (
-                            <Power className="w-4 h-4 text-success" />
+                            <ChevronDown className="w-4 h-4" />
                           )}
                         </Button>
-                        {isAdmin && (
+                      </TableCell>
+                      <TableCell className="font-medium">{partner.name}</TableCell>
+                      <TableCell>
+                        <CodebookValue category="partner_type" value={partner.partner_type} />
+                      </TableCell>
+                      <TableCell>{partner.tax_id || '-'}</TableCell>
+                      <TableCell>{partner.contact_person || '-'}</TableCell>
+                      <TableCell>
+                        {partner.contact_phone ? (
+                          <a href={`tel:${partner.contact_phone}`} className="flex items-center gap-1 text-primary hover:underline">
+                            <Phone className="w-3 h-3" />
+                            {partner.contact_phone}
+                          </a>
+                        ) : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={partner.is_active ? 'default' : 'secondary'}>
+                          {partner.is_active ? '啟用' : '停用'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => {
-                              setDeletingPartner(partner);
-                              setIsDeleteOpen(true);
-                            }}
-                            title="刪除"
+                            onClick={() => handleOpenForm(partner)}
+                            title="編輯"
                           >
-                            <Trash2 className="w-4 h-4 text-destructive" />
+                            <Edit className="w-4 h-4" />
                           </Button>
-                        )}
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleToggleActive(partner)}
+                            title={partner.is_active ? '停用' : '啟用'}
+                          >
+                            {partner.is_active ? (
+                              <PowerOff className="w-4 h-4 text-warning" />
+                            ) : (
+                              <Power className="w-4 h-4 text-success" />
+                            )}
+                          </Button>
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => {
+                                setDeletingPartner(partner);
+                                setIsDeleteOpen(true);
+                              }}
+                              title="刪除"
+                            >
+                              <Trash2 className="w-4 h-4 text-destructive" />
+                            </Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {/* Expanded contacts row */}
+                    {expandedPartner === partner.id && (
+                      <TableRow>
+                        <TableCell colSpan={8} className="bg-muted/30 p-4">
+                          <PartnerContacts partnerId={partner.id} partnerName={partner.name} />
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </Fragment>
                 ))}
               </TableBody>
             </Table>
@@ -304,7 +410,7 @@ export default function Partners() {
               {editingPartner ? '修改夥伴資料' : '建立新的外包夥伴'}
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
+          <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
             <div className="grid gap-2">
               <Label htmlFor="name">名稱 *</Label>
               <Input
@@ -314,18 +420,29 @@ export default function Partners() {
                 placeholder="請輸入夥伴名稱"
               />
             </div>
-            <div className="grid gap-2">
-              <Label>類型</Label>
-              <CodebookSelect
-                category="partner_type"
-                value={formData.partner_type || ''}
-                onValueChange={(v) => setFormData({ ...formData, partner_type: v })}
-                placeholder="選擇類型"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label>類型</Label>
+                <CodebookSelect
+                  category="partner_type"
+                  value={formData.partner_type || ''}
+                  onValueChange={(v) => setFormData({ ...formData, partner_type: v })}
+                  placeholder="選擇類型"
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="tax_id">統編</Label>
+                <Input
+                  id="tax_id"
+                  value={formData.tax_id || ''}
+                  onChange={(e) => setFormData({ ...formData, tax_id: e.target.value })}
+                  placeholder="統一編號"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid gap-2">
-                <Label htmlFor="contact_person">聯絡人</Label>
+                <Label htmlFor="contact_person">聯絡人（舊欄位）</Label>
                 <Input
                   id="contact_person"
                   value={formData.contact_person || ''}
@@ -374,6 +491,105 @@ export default function Partners() {
             </Button>
             <Button onClick={handleSave} disabled={isCreating || isUpdating}>
               {isCreating || isUpdating ? '儲存中...' : '儲存'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Import Dialog */}
+      <Dialog open={isImportOpen} onOpenChange={(open) => !open && handleCloseImport()}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5" />
+              匯入外包夥伴
+            </DialogTitle>
+            <DialogDescription>
+              預覽匯入資料，確認後執行匯入
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {/* Stats */}
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2 text-sm">
+                <CheckCircle className="w-4 h-4 text-success" />
+                新增: {previewStats.insert}
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <AlertCircle className="w-4 h-4 text-warning" />
+                更新: {previewStats.update}
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <XCircle className="w-4 h-4 text-destructive" />
+                錯誤: {previewStats.error}
+              </div>
+            </div>
+
+            {/* Import Mode */}
+            <div className="flex items-center gap-4">
+              <Label>匯入模式:</Label>
+              <Select value={importMode} onValueChange={(v) => setImportMode(v as 'insert' | 'upsert')}>
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="upsert">Insert / Upsert（更新重複）</SelectItem>
+                  <SelectItem value="insert">僅新增（略過重複）</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Preview Table */}
+            <div className="max-h-[40vh] overflow-auto border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16">列</TableHead>
+                    <TableHead className="w-20">狀態</TableHead>
+                    <TableHead>名稱</TableHead>
+                    <TableHead>類型</TableHead>
+                    <TableHead>統編</TableHead>
+                    <TableHead>錯誤</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {importPreview.map((item) => (
+                    <TableRow key={item.rowIndex} className={item.status === 'error' ? 'bg-destructive/10' : ''}>
+                      <TableCell>{item.rowIndex}</TableCell>
+                      <TableCell>
+                        <Badge variant={
+                          item.status === 'insert' ? 'default' :
+                          item.status === 'update' ? 'secondary' :
+                          'destructive'
+                        }>
+                          {item.status === 'insert' ? '新增' :
+                           item.status === 'update' ? '更新' :
+                           '錯誤'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{item.data.name}</TableCell>
+                      <TableCell>{item.data.partner_type || '-'}</TableCell>
+                      <TableCell>{item.data.tax_id || '-'}</TableCell>
+                      <TableCell className="text-destructive text-sm">
+                        {item.error || '-'}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseImport}>
+              取消
+            </Button>
+            <Button 
+              onClick={handleImport} 
+              disabled={isImporting || previewStats.insert + previewStats.update === 0}
+            >
+              {isImporting ? '匯入中...' : '確認匯入'}
             </Button>
           </DialogFooter>
         </DialogContent>
