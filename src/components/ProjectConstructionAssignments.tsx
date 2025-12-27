@@ -3,6 +3,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useConstructionAssignments, type ConstructionAssignment, type CreateAssignmentInput } from '@/hooks/useConstructionAssignments';
 import { usePartners, type Partner } from '@/hooks/usePartners';
 import { CodebookSelect, CodebookValue } from '@/components/CodebookSelect';
+import { AssignmentTimeline } from '@/components/AssignmentTimeline';
 import { format } from 'date-fns';
 import {
   Plus,
@@ -12,6 +13,8 @@ import {
   Calendar,
   Star,
   Sparkles,
+  LayoutList,
+  CalendarDays,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -184,6 +187,8 @@ export default function ProjectConstructionAssignments({ projectId, readOnly = f
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'timeline'>('table');
+  const [currentMonth, setCurrentMonth] = useState(new Date());
   const [editingAssignment, setEditingAssignment] = useState<ConstructionAssignment | null>(null);
   const [deletingAssignment, setDeletingAssignment] = useState<ConstructionAssignment | null>(null);
   const [formData, setFormData] = useState<CreateAssignmentInput>({
@@ -282,12 +287,35 @@ export default function ProjectConstructionAssignments({ projectId, readOnly = f
               案場工程項目與外包夥伴指派
             </CardDescription>
           </div>
-          {canModify && (
-            <Button onClick={() => handleOpenForm()} size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              新增指派
-            </Button>
-          )}
+          <div className="flex items-center gap-2">
+            {/* View mode toggle */}
+            <div className="flex items-center border rounded-md">
+              <Button
+                variant={viewMode === 'table' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="rounded-r-none"
+                onClick={() => setViewMode('table')}
+              >
+                <LayoutList className="w-4 h-4 mr-1" />
+                表格
+              </Button>
+              <Button
+                variant={viewMode === 'timeline' ? 'secondary' : 'ghost'}
+                size="sm"
+                className="rounded-l-none"
+                onClick={() => setViewMode('timeline')}
+              >
+                <CalendarDays className="w-4 h-4 mr-1" />
+                時間軸
+              </Button>
+            </div>
+            {canModify && (
+              <Button onClick={() => handleOpenForm()} size="sm">
+                <Plus className="w-4 h-4 mr-2" />
+                新增指派
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -297,6 +325,13 @@ export default function ProjectConstructionAssignments({ projectId, readOnly = f
           <div className="text-center py-8 text-muted-foreground">
             尚未安排工班
           </div>
+        ) : viewMode === 'timeline' ? (
+          <AssignmentTimeline
+            assignments={assignments}
+            currentMonth={currentMonth}
+            onMonthChange={setCurrentMonth}
+            onAssignmentClick={canModify ? handleOpenForm : undefined}
+          />
         ) : (
           <Table>
             <TableHeader>
