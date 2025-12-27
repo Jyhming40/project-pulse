@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useConstructionAssignments, type ConstructionAssignment, type CreateAssignmentInput } from '@/hooks/useConstructionAssignments';
-import { usePartners } from '@/hooks/usePartners';
+import { usePartners, type Partner } from '@/hooks/usePartners';
 import { CodebookSelect, CodebookValue } from '@/components/CodebookSelect';
 import { format } from 'date-fns';
 import {
@@ -10,6 +10,8 @@ import {
   Trash2,
   HardHat,
   Calendar,
+  Star,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,7 +54,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -69,6 +73,96 @@ const getStatusColor = (status: string) => {
   };
   return colorMap[status] || 'bg-muted text-muted-foreground';
 };
+
+// Partner selector with smart recommendations
+interface PartnerSelectorProps {
+  selectedWorkType: string;
+  partners: Partner[];
+  value: string;
+  onValueChange: (value: string) => void;
+}
+
+function PartnerSelector({ selectedWorkType, partners, value, onValueChange }: PartnerSelectorProps) {
+  // Separate partners into recommended (matching work type) and others
+  const { recommended, others } = useMemo(() => {
+    if (!selectedWorkType) {
+      return { recommended: [], others: partners };
+    }
+    
+    const rec: Partner[] = [];
+    const oth: Partner[] = [];
+    
+    partners.forEach((p) => {
+      if (p.work_capabilities && p.work_capabilities.includes(selectedWorkType)) {
+        rec.push(p);
+      } else {
+        oth.push(p);
+      }
+    });
+    
+    return { recommended: rec, others: oth };
+  }, [selectedWorkType, partners]);
+
+  const hasRecommendations = recommended.length > 0;
+
+  return (
+    <div className="grid gap-2">
+      <div className="flex items-center gap-2">
+        <Label>外包夥伴</Label>
+        {hasRecommendations && (
+          <Badge variant="secondary" className="gap-1 text-xs">
+            <Sparkles className="w-3 h-3" />
+            {recommended.length} 個推薦
+          </Badge>
+        )}
+      </div>
+      <Select
+        value={value || '__none__'}
+        onValueChange={(v) => onValueChange(v === '__none__' ? '' : v)}
+      >
+        <SelectTrigger>
+          <SelectValue placeholder="選擇夥伴" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">不指派</SelectItem>
+          {hasRecommendations && (
+            <SelectGroup>
+              <SelectLabel className="flex items-center gap-1 text-success">
+                <Star className="w-3 h-3" />
+                推薦夥伴（具備相關工程能力）
+              </SelectLabel>
+              {recommended.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  <div className="flex items-center gap-2">
+                    <Star className="w-3 h-3 text-success" />
+                    {p.name}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          )}
+          {others.length > 0 && (
+            <SelectGroup>
+              {hasRecommendations && (
+                <SelectLabel className="text-muted-foreground">其他夥伴</SelectLabel>
+              )}
+              {others.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectGroup>
+          )}
+        </SelectContent>
+      </Select>
+      {hasRecommendations && !value && (
+        <p className="text-xs text-muted-foreground">
+          已根據「{selectedWorkType}」自動篩選具備相關工程能力的夥伴
+        </p>
+      )}
+    </div>
+  );
+}
 
 interface Props {
   projectId: string;
@@ -303,29 +397,16 @@ export default function ProjectConstructionAssignments({ projectId, readOnly = f
               <CodebookSelect
                 category="construction_work_type"
                 value={formData.construction_work_type}
-                onValueChange={(v) => setFormData({ ...formData, construction_work_type: v })}
+                onValueChange={(v) => setFormData({ ...formData, construction_work_type: v, partner_id: '' })}
                 placeholder="選擇工程項目"
               />
             </div>
-            <div className="grid gap-2">
-              <Label>外包夥伴</Label>
-              <Select
-                value={formData.partner_id || ''}
-                onValueChange={(v) => setFormData({ ...formData, partner_id: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇夥伴" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">不指派</SelectItem>
-                  {activePartners.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <PartnerSelector
+              selectedWorkType={formData.construction_work_type}
+              partners={activePartners}
+              value={formData.partner_id || ''}
+              onValueChange={(v) => setFormData({ ...formData, partner_id: v })}
+            />
             <div className="grid gap-2">
               <Label>狀態</Label>
               <CodebookSelect
