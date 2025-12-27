@@ -9,7 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Trash2, RotateCcw, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { useRecycleBin } from '@/hooks/useRecycleBin';
+import { useRecycleBin, type DeletedRecord } from '@/hooks/useRecycleBin';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useAuth } from '@/contexts/AuthContext';
 import { tableDisplayNames, softDeleteTables, type SoftDeleteTable } from '@/hooks/useDeletionPolicy';
@@ -22,31 +22,51 @@ export default function RecycleBin() {
   const tableFilter = selectedTable === 'all' ? undefined : selectedTable;
   const { data: deletedRecords = [], isLoading, refetch } = useRecycleBin(tableFilter);
 
-  // Create soft delete hooks for each table type
-  const getDeleteHook = (tableName: SoftDeleteTable) => {
-    return useSoftDelete({
-      tableName,
-      queryKey: ['recycle-bin'],
-    });
+  // Create soft delete hooks for all table types at component level (respecting Rules of Hooks)
+  const projectsHook = useSoftDelete({ tableName: 'projects', queryKey: ['recycle-bin'] });
+  const investorsHook = useSoftDelete({ tableName: 'investors', queryKey: ['recycle-bin'] });
+  const partnersHook = useSoftDelete({ tableName: 'partners', queryKey: ['recycle-bin'] });
+  const documentsHook = useSoftDelete({ tableName: 'documents', queryKey: ['recycle-bin'] });
+  const partnerContactsHook = useSoftDelete({ tableName: 'partner_contacts', queryKey: ['recycle-bin'] });
+  const investorContactsHook = useSoftDelete({ tableName: 'investor_contacts', queryKey: ['recycle-bin'] });
+  const investorPaymentMethodsHook = useSoftDelete({ tableName: 'investor_payment_methods', queryKey: ['recycle-bin'] });
+  const documentFilesHook = useSoftDelete({ tableName: 'document_files', queryKey: ['recycle-bin'] });
+  const constructionAssignmentsHook = useSoftDelete({ tableName: 'project_construction_assignments', queryKey: ['recycle-bin'] });
+
+  // Map table names to their hooks
+  const hookMap: Partial<Record<SoftDeleteTable, ReturnType<typeof useSoftDelete>>> = {
+    projects: projectsHook,
+    investors: investorsHook,
+    partners: partnersHook,
+    documents: documentsHook,
+    partner_contacts: partnerContactsHook,
+    investor_contacts: investorContactsHook,
+    investor_payment_methods: investorPaymentMethodsHook,
+    document_files: documentFilesHook,
+    project_construction_assignments: constructionAssignmentsHook,
   };
 
-  const handleRestore = async (record: typeof deletedRecords[0]) => {
+  const handleRestore = async (record: DeletedRecord) => {
     setOperatingId(record.id);
     try {
-      const hook = getDeleteHook(record.table_name);
-      await hook.restore({ id: record.id });
-      refetch();
+      const hook = hookMap[record.table_name];
+      if (hook) {
+        await hook.restore({ id: record.id });
+        refetch();
+      }
     } finally {
       setOperatingId(null);
     }
   };
 
-  const handlePurge = async (record: typeof deletedRecords[0]) => {
+  const handlePurge = async (record: DeletedRecord) => {
     setOperatingId(record.id);
     try {
-      const hook = getDeleteHook(record.table_name);
-      await hook.purge({ id: record.id });
-      refetch();
+      const hook = hookMap[record.table_name];
+      if (hook) {
+        await hook.purge({ id: record.id });
+        refetch();
+      }
     } finally {
       setOperatingId(null);
     }

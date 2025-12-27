@@ -57,7 +57,7 @@ export const tableDisplayNames: Record<string, string> = {
   system_options: '系統選項',
 };
 
-// Tables that support soft delete
+// Tables that support soft delete (only tables with is_deleted column)
 export const softDeleteTables = [
   'projects',
   'documents', 
@@ -68,9 +68,6 @@ export const softDeleteTables = [
   'investor_contacts',
   'investor_payment_methods',
   'project_construction_assignments',
-  'project_status_history',
-  'construction_status_history',
-  'system_options',
 ] as const;
 
 // Tables that support archive

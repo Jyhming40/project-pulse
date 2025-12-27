@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { tableDisplayNames, softDeleteTables, type SoftDeleteTable } from './useDeletionPolicy';
 
-interface DeletedRecord {
+export interface DeletedRecord {
   id: string;
   table_name: SoftDeleteTable;
   display_name: string;
