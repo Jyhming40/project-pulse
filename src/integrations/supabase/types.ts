@@ -841,6 +841,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "staff" | "viewer"
+      audit_action: "DELETE" | "RESTORE" | "PURGE" | "ARCHIVE" | "UNARCHIVE"
       construction_status:
         | "已開工"
         | "尚未開工"
@@ -856,6 +857,7 @@ export type Database = {
         | "行政"
         | "業務"
         | "其他"
+      deletion_mode: "soft_delete" | "archive" | "hard_delete" | "disable_only"
       doc_status: "未開始" | "進行中" | "已完成" | "退件補正"
       doc_type:
         | "台電審查意見書"
@@ -1039,6 +1041,7 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "staff", "viewer"],
+      audit_action: ["DELETE", "RESTORE", "PURGE", "ARCHIVE", "UNARCHIVE"],
       construction_status: [
         "已開工",
         "尚未開工",
@@ -1056,6 +1059,7 @@ export const Constants = {
         "業務",
         "其他",
       ],
+      deletion_mode: ["soft_delete", "archive", "hard_delete", "disable_only"],
       doc_status: ["未開始", "進行中", "已完成", "退件補正"],
       doc_type: [
         "台電審查意見書",
