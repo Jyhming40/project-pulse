@@ -292,14 +292,14 @@ export default function Partners() {
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-muted-foreground" />
           <Select
-            value={filterWorkType}
-            onValueChange={setFilterWorkType}
+            value={filterWorkType || '__all__'}
+            onValueChange={(val) => setFilterWorkType(val === '__all__' ? '' : val)}
           >
             <SelectTrigger className="w-[200px]">
               <SelectValue placeholder="依工程能力篩選" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">全部</SelectItem>
+              <SelectItem value="__all__">全部</SelectItem>
               {workTypeOptions.map((opt) => (
                 <SelectItem key={opt.value} value={opt.value}>
                   {opt.label}
