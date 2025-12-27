@@ -16,7 +16,8 @@ import {
   HardHat,
   Database,
   Trash2,
-  Shield
+  Shield,
+  ClipboardList
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -117,6 +118,16 @@ export default function Layout({ children }: LayoutProps) {
               >
                 <Shield className="w-5 h-5 flex-shrink-0" />
                 {!collapsed && <span className="animate-fade-in">刪除政策</span>}
+              </NavLink>
+              <NavLink
+                to="/audit-logs"
+                className={cn(
+                  "sidebar-link",
+                  location.pathname === '/audit-logs' && "sidebar-link-active"
+                )}
+              >
+                <ClipboardList className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span className="animate-fade-in">稽核日誌</span>}
               </NavLink>
               <NavLink
                 to="/settings"
