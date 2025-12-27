@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Edit, Phone, Mail, MessageCircle, Star, UserX, UserCheck, Download } from 'lucide-react';
+import { useSoftDelete } from '@/hooks/useSoftDelete';
+import { Plus, Edit, Phone, Mail, MessageCircle, Star, UserX, UserCheck, Download, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +25,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvestorContact = Database['public']['Tables']['investor_contacts']['Row'];
@@ -53,8 +55,16 @@ export function InvestorContacts({ investorId, investorCode, onExport }: Investo
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<InvestorContact | null>(null);
   const [formData, setFormData] = useState<Partial<InvestorContactInsert>>({});
+  const [deletingContact, setDeletingContact] = useState<InvestorContact | null>(null);
 
-  // Fetch contacts
+  // Soft delete hook
+  const { softDelete, isDeleting } = useSoftDelete({
+    tableName: 'investor_contacts',
+    queryKey: ['investor-contacts', investorId],
+    onSuccess: () => setDeletingContact(null),
+  });
+
+  // Fetch contacts (exclude soft deleted)
   const { data: contacts = [], isLoading } = useQuery({
     queryKey: ['investor-contacts', investorId],
     queryFn: async () => {
@@ -62,6 +72,7 @@ export function InvestorContacts({ investorId, investorCode, onExport }: Investo
         .from('investor_contacts')
         .select('*')
         .eq('investor_id', investorId)
+        .eq('is_deleted', false)
         .order('is_primary', { ascending: false })
         .order('is_active', { ascending: false })
         .order('created_at', { ascending: false });
@@ -352,6 +363,14 @@ export function InvestorContacts({ investorId, investorCode, onExport }: Investo
                     >
                       <Edit className="w-4 h-4" />
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                      onClick={() => setDeletingContact(contact)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 )}
               </div>
@@ -497,6 +516,18 @@ export function InvestorContacts({ investorId, investorCode, onExport }: Investo
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirm Dialog */}
+      <DeleteConfirmDialog
+        open={!!deletingContact}
+        onOpenChange={(open) => !open && setDeletingContact(null)}
+        onConfirm={(reason) => deletingContact && softDelete({ id: deletingContact.id, reason })}
+        title="刪除聯絡人"
+        description="確定要刪除此聯絡人嗎？"
+        itemName={deletingContact?.contact_name}
+        tableName="investor_contacts"
+        isPending={isDeleting}
+      />
     </div>
   );
 }
