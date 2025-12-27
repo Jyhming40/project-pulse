@@ -352,6 +352,59 @@ export type Database = {
         }
         Relationships: []
       }
+      partner_contacts: {
+        Row: {
+          contact_name: string
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          is_active: boolean | null
+          is_primary: boolean | null
+          note: string | null
+          partner_id: string
+          phone: string | null
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          contact_name: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          note?: string | null
+          partner_id: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          contact_name?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          note?: string | null
+          partner_id?: string
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_contacts_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partners: {
         Row: {
           address: string | null
@@ -365,6 +418,7 @@ export type Database = {
           name: string
           note: string | null
           partner_type: string | null
+          tax_id: string | null
           updated_at: string
         }
         Insert: {
@@ -379,6 +433,7 @@ export type Database = {
           name: string
           note?: string | null
           partner_type?: string | null
+          tax_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -393,6 +448,7 @@ export type Database = {
           name?: string
           note?: string | null
           partner_type?: string | null
+          tax_id?: string | null
           updated_at?: string
         }
         Relationships: []

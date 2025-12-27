@@ -7,6 +7,7 @@ export interface Partner {
   id: string;
   name: string;
   partner_type: string | null;
+  tax_id: string | null;
   contact_person: string | null;
   contact_phone: string | null;
   email: string | null;
@@ -20,6 +21,7 @@ export interface Partner {
 export interface CreatePartnerInput {
   name: string;
   partner_type?: string;
+  tax_id?: string;
   contact_person?: string;
   contact_phone?: string;
   email?: string;
