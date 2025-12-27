@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: Database["public"]["Enums"]["audit_action"]
+          actor_user_id: string | null
+          created_at: string | null
+          id: string
+          new_data: Json | null
+          old_data: Json | null
+          reason: string | null
+          record_id: string
+          table_name: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["audit_action"]
+          actor_user_id?: string | null
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          reason?: string | null
+          record_id: string
+          table_name: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["audit_action"]
+          actor_user_id?: string | null
+          created_at?: string | null
+          id?: string
+          new_data?: Json | null
+          old_data?: Json | null
+          reason?: string | null
+          record_id?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       construction_status_history: {
         Row: {
           changed_at: string
@@ -48,6 +84,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      deletion_policies: {
+        Row: {
+          allow_auto_purge: boolean | null
+          created_at: string | null
+          created_by: string | null
+          deletion_mode: Database["public"]["Enums"]["deletion_mode"]
+          id: string
+          require_confirmation: boolean | null
+          require_reason: boolean | null
+          retention_days: number | null
+          table_name: string
+          updated_at: string | null
+        }
+        Insert: {
+          allow_auto_purge?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          deletion_mode?: Database["public"]["Enums"]["deletion_mode"]
+          id?: string
+          require_confirmation?: boolean | null
+          require_reason?: boolean | null
+          retention_days?: number | null
+          table_name: string
+          updated_at?: string | null
+        }
+        Update: {
+          allow_auto_purge?: boolean | null
+          created_at?: string | null
+          created_by?: string | null
+          deletion_mode?: Database["public"]["Enums"]["deletion_mode"]
+          id?: string
+          require_confirmation?: boolean | null
+          require_reason?: boolean | null
+          retention_days?: number | null
+          table_name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       document_files: {
         Row: {
