@@ -14,7 +14,9 @@ import {
   Menu,
   BookOpen,
   HardHat,
-  Database
+  Database,
+  Trash2,
+  Shield
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -32,6 +34,7 @@ const navItems = [
   { to: '/partners', icon: HardHat, label: '外包夥伴' },
   { to: '/investor-codes', icon: BookOpen, label: '代碼對照表' },
   { to: '/documents', icon: FileText, label: '文件管理' },
+  { to: '/recycle-bin', icon: Trash2, label: '回收區' },
 ];
 
 export default function Layout({ children }: LayoutProps) {
@@ -104,6 +107,16 @@ export default function Layout({ children }: LayoutProps) {
               >
                 <Settings2 className="w-5 h-5 flex-shrink-0" />
                 {!collapsed && <span className="animate-fade-in">選項設定</span>}
+              </NavLink>
+              <NavLink
+                to="/deletion-policies"
+                className={cn(
+                  "sidebar-link",
+                  location.pathname === '/deletion-policies' && "sidebar-link-active"
+                )}
+              >
+                <Shield className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span className="animate-fade-in">刪除政策</span>}
               </NavLink>
               <NavLink
                 to="/settings"

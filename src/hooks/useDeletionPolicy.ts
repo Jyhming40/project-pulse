@@ -101,7 +101,48 @@ const defaultGlobalPolicy: Omit<DeletionPolicy, 'id' | 'created_at' | 'updated_a
 
 // Hook: Get effective deletion policy for a table
 export function useEffectivePolicy(tableName: string) {
-  return {
+  const { data: policy } = useQuery({
+    queryKey: ['deletion-policy', tableName],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('deletion_policies')
+        .select('*')
+        .eq('table_name', tableName)
+        .maybeSingle();
+      
+      if (error || !data) {
+        // Return default policy if not found
+        return {
+          softDeleteEnabled: true,
+          retentionDays: 30,
+          autoPurgeEnabled: false,
+          requireDeleteReason: true,
+          requirePurgeConfirmation: true,
+          deletionMode: 'soft_delete' as DeletionMode,
+          rolesCanDelete: ['admin', 'staff'],
+          rolesCanRestore: ['admin', 'staff'],
+          rolesCanPurge: ['admin'],
+          rolesCanArchive: ['admin', 'staff'],
+        };
+      }
+      
+      return {
+        softDeleteEnabled: data.deletion_mode === 'soft_delete',
+        retentionDays: data.retention_days || 30,
+        autoPurgeEnabled: data.allow_auto_purge || false,
+        requireDeleteReason: data.require_reason || false,
+        requirePurgeConfirmation: data.require_confirmation || true,
+        deletionMode: data.deletion_mode as DeletionMode,
+        rolesCanDelete: ['admin', 'staff'],
+        rolesCanRestore: ['admin', 'staff'],
+        rolesCanPurge: ['admin'],
+        rolesCanArchive: ['admin', 'staff'],
+      };
+    },
+    staleTime: 60000,
+  });
+
+  return policy || {
     softDeleteEnabled: true,
     retentionDays: 30,
     autoPurgeEnabled: false,
@@ -115,20 +156,30 @@ export function useEffectivePolicy(tableName: string) {
   };
 }
 
-// Hook: Log audit action (safe - doesn't fail if table doesn't exist)
+// Hook: Log audit action
 export function useLogAudit() {
-  const { user } = useAuth();
-
   const logAction = async (
     tableName: string,
     recordId: string,
     action: AuditAction,
     reason?: string,
-    oldData?: Record<string, unknown>,
-    newData?: Record<string, unknown>
+    _oldData?: Record<string, unknown>,
+    _newData?: Record<string, unknown>
   ) => {
-    // Audit logging is optional - silently skip if not available
-    console.log(`[Audit] ${action} on ${tableName}:${recordId}`, { reason, oldData, newData });
+    try {
+      // Use direct insert instead of RPC to avoid type issues
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (supabase as any)
+        .from('audit_logs')
+        .insert({
+          table_name: tableName,
+          record_id: recordId,
+          action: action,
+          reason: reason || null,
+        });
+    } catch (error) {
+      console.warn('[Audit] Failed to log action:', error);
+    }
   };
 
   return { logAction };
@@ -139,20 +190,18 @@ export function useDeletionPolicyStatus() {
   const { data: isAvailable = false, isLoading } = useQuery({
     queryKey: ['deletion-policy-status'],
     queryFn: async () => {
-      // Check if the deletion_policies table exists by trying a simple query
       try {
         const { error } = await supabase
-          .from('projects')
-          .select('is_deleted')
+          .from('deletion_policies')
+          .select('id')
           .limit(1);
         
-        // If the column exists, the system is available
         return !error;
       } catch {
         return false;
       }
     },
-    staleTime: 60000, // Cache for 1 minute
+    staleTime: 60000,
   });
 
   return { isAvailable, isLoading };

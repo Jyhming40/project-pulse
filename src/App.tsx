@@ -17,6 +17,8 @@ import Documents from "./pages/Documents";
 import Settings from "./pages/Settings";
 import SystemOptions from "./pages/SystemOptions";
 import Partners from "./pages/Partners";
+import RecycleBin from "./pages/RecycleBin";
+import DeletionPolicies from "./pages/DeletionPolicies";
 
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
@@ -40,6 +42,8 @@ const App = () => (
             <Route path="/partners" element={<ProtectedRoute><Layout><Partners /></Layout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Layout><Settings /></Layout></ProtectedRoute>} />
             <Route path="/system-options" element={<ProtectedRoute adminOnly><Layout><SystemOptions /></Layout></ProtectedRoute>} />
+            <Route path="/recycle-bin" element={<ProtectedRoute><RecycleBin /></ProtectedRoute>} />
+            <Route path="/deletion-policies" element={<ProtectedRoute adminOnly><DeletionPolicies /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
