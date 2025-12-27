@@ -420,6 +420,7 @@ export type Database = {
           partner_type: string | null
           tax_id: string | null
           updated_at: string
+          work_capabilities: string[] | null
         }
         Insert: {
           address?: string | null
@@ -435,6 +436,7 @@ export type Database = {
           partner_type?: string | null
           tax_id?: string | null
           updated_at?: string
+          work_capabilities?: string[] | null
         }
         Update: {
           address?: string | null
@@ -450,6 +452,7 @@ export type Database = {
           partner_type?: string | null
           tax_id?: string | null
           updated_at?: string
+          work_capabilities?: string[] | null
         }
         Relationships: []
       }

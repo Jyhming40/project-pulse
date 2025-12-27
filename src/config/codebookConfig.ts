@@ -140,6 +140,7 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
     description: '案場工程項目分類（模組支架、機電、土建等）',
     usageMapping: [
       { table: 'project_construction_assignments', column: 'construction_work_type' },
+      { table: 'partners', column: 'work_capabilities' },
     ],
   },
   construction_assignment_status: {

@@ -14,6 +14,7 @@ export interface Partner {
   address: string | null;
   note: string | null;
   is_active: boolean;
+  work_capabilities: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -27,6 +28,7 @@ export interface CreatePartnerInput {
   email?: string;
   address?: string;
   note?: string;
+  work_capabilities?: string[];
 }
 
 export interface UpdatePartnerInput extends Partial<CreatePartnerInput> {
