@@ -509,15 +509,19 @@ export default function BrandingSettings() {
                   <Input
                     id="primary_color"
                     type="color"
-                    value={formData.primary_color || '#3b82f6'}
+                    value={formData.primary_color || '#2a9d8f'}
                     onChange={(e) => handleChange('primary_color', e.target.value)}
                     className="w-16 h-10 p-1 cursor-pointer"
                   />
                   <Input
                     value={formData.primary_color || ''}
                     onChange={(e) => handleChange('primary_color', e.target.value)}
-                    placeholder="#3b82f6"
+                    placeholder="#2a9d8f"
                     className="w-32"
+                  />
+                  <div 
+                    className="w-10 h-10 rounded-lg border"
+                    style={{ backgroundColor: formData.primary_color || '#2a9d8f' }}
                   />
                   {formData.primary_color && (
                     <Button
@@ -526,12 +530,12 @@ export default function BrandingSettings() {
                       onClick={() => handleChange('primary_color', '')}
                     >
                       <X className="w-4 h-4" />
-                      清除
+                      恢復預設
                     </Button>
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  此功能為保留功能，目前尚未套用至系統主題
+                  變更將套用至系統的主色調（按鈕、連結、強調色等）
                 </p>
               </div>
             </CardContent>
