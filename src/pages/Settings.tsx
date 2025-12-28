@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link as RouterLink } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
@@ -653,9 +654,11 @@ export default function Settings() {
               <p className="text-sm text-muted-foreground mb-4">
                 工程介面已升級為獨立模組，包含系統狀態監控、資料完整性檢查、資料庫備份與重置等功能。
               </p>
-              <Button onClick={() => window.location.href = '/engineering'}>
-                <Wrench className="w-4 h-4 mr-2" />
-                進入工程介面
+              <Button asChild>
+                <RouterLink to="/engineering">
+                  <Wrench className="w-4 h-4 mr-2" />
+                  進入工程介面
+                </RouterLink>
               </Button>
             </CardContent>
           </Card>
