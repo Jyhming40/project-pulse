@@ -1,6 +1,7 @@
 import { ReactNode } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppSettingsRead } from '@/hooks/useAppSettings';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -40,6 +41,7 @@ const navItems = [
 
 export default function Layout({ children }: LayoutProps) {
   const { user, signOut, isAdmin, role } = useAuth();
+  const { settings } = useAppSettingsRead();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
 
@@ -57,6 +59,10 @@ export default function Layout({ children }: LayoutProps) {
     }
   };
 
+  // Get system name from settings or use defaults
+  const systemNameMain = settings?.company_name_zh || '明群環能';
+  const systemNameSub = settings?.system_name_zh?.replace(systemNameMain, '').trim() || '管理系統';
+
   return (
     <div className="min-h-screen flex w-full bg-background">
       {/* Sidebar */}
@@ -66,13 +72,21 @@ export default function Layout({ children }: LayoutProps) {
       )}>
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-sidebar-border">
-          <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center flex-shrink-0">
-            <Zap className="w-5 h-5 text-sidebar-primary-foreground" />
-          </div>
+          {settings?.logo_light_url ? (
+            <img 
+              src={settings.logo_light_url} 
+              alt="Logo" 
+              className="w-9 h-9 rounded-lg object-contain flex-shrink-0"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-lg bg-sidebar-primary flex items-center justify-center flex-shrink-0">
+              <Zap className="w-5 h-5 text-sidebar-primary-foreground" />
+            </div>
+          )}
           {!collapsed && (
             <div className="animate-fade-in">
-              <h1 className="font-display font-semibold text-sidebar-foreground text-sm">明群環能</h1>
-              <p className="text-xs text-sidebar-muted">管理系統</p>
+              <h1 className="font-display font-semibold text-sidebar-foreground text-sm">{systemNameMain}</h1>
+              <p className="text-xs text-sidebar-muted">{systemNameSub}</p>
             </div>
           )}
         </div>
