@@ -5,6 +5,7 @@ import Layout from '@/components/Layout';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Loader2 } from 'lucide-react';
 import { 
   Wrench, 
   Activity, 
@@ -24,11 +25,22 @@ import {
 } from '@/components/engineering';
 
 export default function Engineering() {
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin, loading, role } = useAuth();
   const [activeTab, setActiveTab] = useState('health');
 
-  // Redirect non-admin users
-  if (!loading && !isAdmin) {
+  // Show loading while checking auth
+  if (loading) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-[50vh]">
+          <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+        </div>
+      </Layout>
+    );
+  }
+
+  // Redirect non-admin users only after loading is complete and role is determined
+  if (!isAdmin) {
     return <Navigate to="/" replace />;
   }
 
