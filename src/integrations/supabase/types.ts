@@ -1104,7 +1104,17 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "staff" | "viewer"
-      audit_action: "DELETE" | "RESTORE" | "PURGE" | "ARCHIVE" | "UNARCHIVE"
+      audit_action:
+        | "DELETE"
+        | "RESTORE"
+        | "PURGE"
+        | "ARCHIVE"
+        | "UNARCHIVE"
+        | "CREATE"
+        | "UPDATE"
+        | "DB_RESET"
+        | "DB_EXPORT"
+        | "DB_IMPORT"
       construction_status:
         | "已開工"
         | "尚未開工"
@@ -1304,7 +1314,18 @@ export const Constants = {
   public: {
     Enums: {
       app_role: ["admin", "staff", "viewer"],
-      audit_action: ["DELETE", "RESTORE", "PURGE", "ARCHIVE", "UNARCHIVE"],
+      audit_action: [
+        "DELETE",
+        "RESTORE",
+        "PURGE",
+        "ARCHIVE",
+        "UNARCHIVE",
+        "CREATE",
+        "UPDATE",
+        "DB_RESET",
+        "DB_EXPORT",
+        "DB_IMPORT",
+      ],
       construction_status: [
         "已開工",
         "尚未開工",

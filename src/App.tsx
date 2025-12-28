@@ -20,6 +20,7 @@ import Partners from "./pages/Partners";
 import RecycleBin from "./pages/RecycleBin";
 import DeletionPolicies from "./pages/DeletionPolicies";
 import AuditLogs from "./pages/AuditLogs";
+import Engineering from "./pages/Engineering";
 
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="/recycle-bin" element={<ProtectedRoute><RecycleBin /></ProtectedRoute>} />
             <Route path="/deletion-policies" element={<ProtectedRoute adminOnly><DeletionPolicies /></ProtectedRoute>} />
             <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
+            <Route path="/engineering" element={<ProtectedRoute adminOnly><Engineering /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
