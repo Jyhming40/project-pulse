@@ -16,7 +16,10 @@ import {
   Copy,
   AlertCircle,
   TestTube,
-  ExternalLink
+  ExternalLink,
+  Wrench,
+  Trash2,
+  RefreshCw
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -60,6 +63,8 @@ export default function Settings() {
   } = useDriveAuth();
   const [isRevoking, setIsRevoking] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetConfirmText, setResetConfirmText] = useState('');
   const [testResult, setTestResult] = useState<{ 
     success: boolean; 
     message?: string; 
@@ -630,6 +635,147 @@ export default function Settings() {
                   ))}
                 </TableBody>
               </Table>
+            </CardContent>
+          </Card>
+
+          {/* Engineering Interface */}
+          <Card className="border-amber-500/50">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wrench className="w-5 h-5 text-amber-500" />
+                工程介面
+              </CardTitle>
+              <CardDescription>
+                進階系統維護功能，僅供授權人員使用
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Database Reset */}
+              <div className="p-4 border border-destructive/30 rounded-lg bg-destructive/5">
+                <div className="flex items-start gap-3">
+                  <Database className="w-5 h-5 text-destructive mt-0.5" />
+                  <div className="flex-1 space-y-3">
+                    <div>
+                      <h4 className="font-medium text-destructive">重置業務資料</h4>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        清除所有業務資料（專案、投資人、文件等），保留系統設定與代碼對照表。此操作無法復原！
+                      </p>
+                    </div>
+                    
+                    <Alert variant="destructive" className="py-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-xs">
+                        <strong>將會刪除：</strong>專案、文件、投資人、合作廠商、聯絡人、付款方式、施工分配、狀態歷程、稽核日誌<br />
+                        <strong>將會保留：</strong>系統選項 (system_options)、刪除政策 (deletion_policies)、使用者資料
+                      </AlertDescription>
+                    </Alert>
+
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="destructive" size="sm">
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          重置業務資料
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-destructive flex items-center gap-2">
+                            <AlertCircle className="w-5 h-5" />
+                            危險操作確認
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="space-y-3">
+                            <p>此操作將永久刪除所有業務資料，包括：</p>
+                            <ul className="list-disc list-inside text-sm space-y-1">
+                              <li>所有專案及相關歷程記錄</li>
+                              <li>所有文件及附件</li>
+                              <li>所有投資人及聯絡人</li>
+                              <li>所有合作廠商資料</li>
+                              <li>所有稽核日誌</li>
+                            </ul>
+                            <div className="pt-2">
+                              <p className="text-sm font-medium mb-2">請輸入「RESET」確認操作：</p>
+                              <input
+                                type="text"
+                                value={resetConfirmText}
+                                onChange={(e) => setResetConfirmText(e.target.value)}
+                                className="w-full px-3 py-2 border rounded-md text-sm"
+                                placeholder="輸入 RESET"
+                              />
+                            </div>
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel onClick={() => setResetConfirmText('')}>
+                            取消
+                          </AlertDialogCancel>
+                          <AlertDialogAction
+                            disabled={resetConfirmText !== 'RESET' || isResetting}
+                            onClick={async () => {
+                              setIsResetting(true);
+                              try {
+                                // Delete in order to respect foreign key constraints
+                                const tables = [
+                                  'document_files',
+                                  'documents',
+                                  'project_construction_assignments',
+                                  'construction_status_history',
+                                  'project_status_history',
+                                  'projects',
+                                  'investor_contacts',
+                                  'investor_payment_methods',
+                                  'investors',
+                                  'partner_contacts',
+                                  'partners',
+                                  'investor_year_counters',
+                                  'audit_logs',
+                                ];
+                                
+                                for (const table of tables) {
+                                  const { error } = await supabase
+                                    .from(table as any)
+                                    .delete()
+                                    .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all
+                                  if (error) {
+                                    console.error(`Error deleting from ${table}:`, error);
+                                    throw error;
+                                  }
+                                }
+                                
+                                toast.success('業務資料已重置');
+                                setResetConfirmText('');
+                                queryClient.invalidateQueries();
+                              } catch (err) {
+                                console.error('Reset error:', err);
+                                toast.error('重置失敗：' + (err as Error).message);
+                              } finally {
+                                setIsResetting(false);
+                              }
+                            }}
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          >
+                            {isResetting ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                                重置中...
+                              </>
+                            ) : (
+                              <>
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                確認重置
+                              </>
+                            )}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              </div>
+
+              {/* Future features placeholder */}
+              <div className="text-xs text-muted-foreground border-t pt-4">
+                <p>未來功能預留區：資料匯入/匯出、系統診斷、快取清除等</p>
+              </div>
             </CardContent>
           </Card>
 
