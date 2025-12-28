@@ -14,6 +14,66 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          address: string | null
+          company_name_en: string | null
+          company_name_zh: string | null
+          created_at: string
+          email: string | null
+          favicon_url: string | null
+          id: string
+          logo_dark_url: string | null
+          logo_light_url: string | null
+          phone: string | null
+          primary_color: string | null
+          system_name_en: string | null
+          system_name_zh: string
+          tax_id: string | null
+          updated_at: string
+          updated_by: string | null
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          company_name_en?: string | null
+          company_name_zh?: string | null
+          created_at?: string
+          email?: string | null
+          favicon_url?: string | null
+          id?: string
+          logo_dark_url?: string | null
+          logo_light_url?: string | null
+          phone?: string | null
+          primary_color?: string | null
+          system_name_en?: string | null
+          system_name_zh?: string
+          tax_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          company_name_en?: string | null
+          company_name_zh?: string | null
+          created_at?: string
+          email?: string | null
+          favicon_url?: string | null
+          id?: string
+          logo_dark_url?: string | null
+          logo_light_url?: string | null
+          phone?: string | null
+          primary_color?: string | null
+          system_name_en?: string | null
+          system_name_zh?: string
+          tax_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
       audit_logs: {
         Row: {
           action: Database["public"]["Enums"]["audit_action"]
@@ -1115,6 +1175,7 @@ export type Database = {
         | "DB_RESET"
         | "DB_EXPORT"
         | "DB_IMPORT"
+        | "BRANDING_UPDATE"
       construction_status:
         | "已開工"
         | "尚未開工"
@@ -1325,6 +1386,7 @@ export const Constants = {
         "DB_RESET",
         "DB_EXPORT",
         "DB_IMPORT",
+        "BRANDING_UPDATE",
       ],
       construction_status: [
         "已開工",
