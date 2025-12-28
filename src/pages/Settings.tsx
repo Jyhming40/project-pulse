@@ -20,7 +20,8 @@ import {
   ExternalLink,
   Wrench,
   Trash2,
-  RefreshCw
+  RefreshCw,
+  Palette
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
 import type { Database as DB } from '@/integrations/supabase/types';
+import BrandingSettings from '@/components/BrandingSettings';
 
 type AppRole = DB['public']['Enums']['app_role'];
 
@@ -177,6 +179,24 @@ export default function Settings() {
         <h1 className="text-2xl font-display font-bold">系統設定</h1>
         <p className="text-muted-foreground mt-1">管理個人設定與系統配置</p>
       </div>
+
+      {/* Branding Settings - Admin Only */}
+      {isAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Palette className="w-5 h-5" />
+              品牌與公司資訊
+            </CardTitle>
+            <CardDescription>
+              設定系統名稱、Logo 與公司基本資訊
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <BrandingSettings />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Google Drive Authorization Card */}
       <Card>
