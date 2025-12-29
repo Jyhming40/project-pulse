@@ -39,22 +39,56 @@ export interface ProjectMilestone {
   note: string | null;
 }
 
+// Helper to execute raw queries for tables not yet in generated types
+async function queryTable<T>(tableName: string, options?: { 
+  select?: string;
+  eq?: { column: string; value: unknown }[];
+  order?: { column: string; ascending?: boolean };
+}): Promise<T[]> {
+  let query = `SELECT ${options?.select || '*'} FROM ${tableName}`;
+  const conditions: string[] = [];
+  
+  if (options?.eq) {
+    options.eq.forEach(({ column, value }) => {
+      if (typeof value === 'string') {
+        conditions.push(`${column} = '${value}'`);
+      } else {
+        conditions.push(`${column} = ${value}`);
+      }
+    });
+  }
+  
+  if (conditions.length > 0) {
+    query += ` WHERE ${conditions.join(' AND ')}`;
+  }
+  
+  if (options?.order) {
+    query += ` ORDER BY ${options.order.column} ${options.order.ascending !== false ? 'ASC' : 'DESC'}`;
+  }
+  
+  const { data, error } = await supabase.rpc('execute_sql' as any, { query_text: query });
+  if (error) throw error;
+  return (data || []) as T[];
+}
+
 export function useProgressMilestones(type?: 'admin' | 'engineering') {
   return useQuery({
     queryKey: ['progress-milestones', type],
     queryFn: async () => {
-      let query = supabase
-        .from('progress_milestones')
-        .select('*')
-        .order('sort_order');
+      const conditions = type ? [{ column: 'milestone_type', value: type }] : undefined;
       
-      if (type) {
-        query = query.eq('milestone_type', type);
-      }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      return data as ProgressMilestone[];
+      // Use direct fetch with proper typing workaround
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/progress_milestones?${type ? `milestone_type=eq.${type}&` : ''}order=sort_order.asc`,
+        {
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+        }
+      );
+      if (!response.ok) throw new Error('Failed to fetch progress milestones');
+      return (await response.json()) as ProgressMilestone[];
     },
   });
 }
@@ -63,11 +97,17 @@ export function useProgressSettings() {
   return useQuery({
     queryKey: ['progress-settings'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('progress_settings')
-        .select('*');
-      if (error) throw error;
-      return data as ProgressSettings[];
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/progress_settings`,
+        {
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+        }
+      );
+      if (!response.ok) throw new Error('Failed to fetch progress settings');
+      return (await response.json()) as ProgressSettings[];
     },
   });
 }
@@ -76,12 +116,17 @@ export function useProjectMilestones(projectId: string) {
   return useQuery({
     queryKey: ['project-milestones', projectId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('project_milestones')
-        .select('*')
-        .eq('project_id', projectId);
-      if (error) throw error;
-      return data as ProjectMilestone[];
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/project_milestones?project_id=eq.${projectId}`,
+        {
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+        }
+      );
+      if (!response.ok) throw new Error('Failed to fetch project milestones');
+      return (await response.json()) as ProjectMilestone[];
     },
     enabled: !!projectId,
   });
@@ -93,14 +138,24 @@ export function useUpdateMilestone() {
 
   return useMutation({
     mutationFn: async (milestone: Partial<ProgressMilestone> & { id: string }) => {
-      const { data, error } = await supabase
-        .from('progress_milestones')
-        .update(milestone)
-        .eq('id', milestone.id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      const { id, ...updates } = milestone;
+      const session = await supabase.auth.getSession();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/progress_milestones?id=eq.${id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${session.data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+          },
+          body: JSON.stringify(updates),
+        }
+      );
+      if (!response.ok) throw new Error('Failed to update milestone');
+      const data = await response.json();
+      return data[0] as ProgressMilestone;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['progress-milestones'] });
@@ -118,14 +173,23 @@ export function useUpdateProgressSettings() {
 
   return useMutation({
     mutationFn: async ({ key, value }: { key: string; value: Record<string, unknown> }) => {
-      const { data, error } = await supabase
-        .from('progress_settings')
-        .update({ setting_value: value })
-        .eq('setting_key', key)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      const session = await supabase.auth.getSession();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/progress_settings?setting_key=eq.${key}`,
+        {
+          method: 'PATCH',
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${session.data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+          },
+          body: JSON.stringify({ setting_value: value }),
+        }
+      );
+      if (!response.ok) throw new Error('Failed to update settings');
+      const data = await response.json();
+      return data[0] as ProgressSettings;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['progress-settings'] });
@@ -153,34 +217,61 @@ export function useToggleProjectMilestone() {
       isCompleted: boolean;
       note?: string;
     }) => {
-      const { data: existing } = await supabase
-        .from('project_milestones')
-        .select('id')
-        .eq('project_id', projectId)
-        .eq('milestone_code', milestoneCode)
-        .maybeSingle();
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      // Check if record exists
+      const checkResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/project_milestones?project_id=eq.${projectId}&milestone_code=eq.${milestoneCode}&select=id`,
+        {
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+      const existing = await checkResponse.json();
 
-      if (existing) {
-        const { error } = await supabase
-          .from('project_milestones')
-          .update({
-            is_completed: isCompleted,
-            completed_at: isCompleted ? new Date().toISOString() : null,
-            note,
-          })
-          .eq('id', existing.id);
-        if (error) throw error;
+      if (existing && existing.length > 0) {
+        // Update existing
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/project_milestones?id=eq.${existing[0].id}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              is_completed: isCompleted,
+              completed_at: isCompleted ? new Date().toISOString() : null,
+              note,
+            }),
+          }
+        );
+        if (!response.ok) throw new Error('Failed to update milestone');
       } else {
-        const { error } = await supabase
-          .from('project_milestones')
-          .insert({
-            project_id: projectId,
-            milestone_code: milestoneCode,
-            is_completed: isCompleted,
-            completed_at: isCompleted ? new Date().toISOString() : null,
-            note,
-          });
-        if (error) throw error;
+        // Insert new
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/project_milestones`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              project_id: projectId,
+              milestone_code: milestoneCode,
+              is_completed: isCompleted,
+              completed_at: isCompleted ? new Date().toISOString() : null,
+              note,
+            }),
+          }
+        );
+        if (!response.ok) throw new Error('Failed to create milestone');
       }
     },
     onSuccess: (_, variables) => {
@@ -200,13 +291,23 @@ export function useCreateMilestone() {
 
   return useMutation({
     mutationFn: async (milestone: Omit<ProgressMilestone, 'id' | 'created_at' | 'updated_at'>) => {
-      const { data, error } = await supabase
-        .from('progress_milestones')
-        .insert(milestone)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
+      const session = await supabase.auth.getSession();
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/progress_milestones`,
+        {
+          method: 'POST',
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${session.data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+          },
+          body: JSON.stringify(milestone),
+        }
+      );
+      if (!response.ok) throw new Error('Failed to create milestone');
+      const data = await response.json();
+      return data[0] as ProgressMilestone;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['progress-milestones'] });
