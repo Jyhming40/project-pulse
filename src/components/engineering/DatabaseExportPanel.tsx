@@ -42,6 +42,8 @@ const EXPORT_TABLES = [
   'system_options',
   'deletion_policies',
   'audit_logs',
+  'module_permissions',
+  'user_preferences',
 ];
 
 // Excel sheet name max length is 31 characters

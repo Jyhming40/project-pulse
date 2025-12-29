@@ -44,6 +44,7 @@ const RESET_SCOPES: Record<string, string[]> = {
     "partners",
     "investor_year_counters",
     "audit_logs",
+    "module_permissions",
   ],
 };
 
@@ -156,6 +157,8 @@ async function handleGetTableStats(supabase: any, corsHeaders: Record<string, st
     "audit_logs",
     "profiles",
     "user_roles",
+    "module_permissions",
+    "user_preferences",
   ];
 
   const stats: Record<string, { count: number; deletedCount?: number }> = {};

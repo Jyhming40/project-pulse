@@ -55,6 +55,13 @@ export const tableDisplayNames: Record<string, string> = {
   project_status_history: '案場狀態歷程',
   construction_status_history: '施工狀態歷程',
   system_options: '系統選項',
+  deletion_policies: '刪除政策',
+  audit_logs: '稽核日誌',
+  module_permissions: '模組權限',
+  user_preferences: '使用者偏好設定',
+  profiles: '使用者資料',
+  user_roles: '使用者角色',
+  investor_year_counters: '投資方年度計數器',
 };
 
 // Tables that support soft delete (only tables with is_deleted column)
