@@ -1,7 +1,9 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppSettingsRead } from '@/hooks/useAppSettings';
+import { useTheme } from '@/hooks/useTheme';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
   LayoutDashboard, 
   Building2, 
@@ -12,17 +14,13 @@ import {
   LogOut,
   Zap,
   ChevronLeft,
-  Menu,
   BookOpen,
   HardHat,
-  Database,
   Trash2,
   Shield,
   ClipboardList
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
 import { toast } from 'sonner';
 
 interface LayoutProps {
@@ -157,8 +155,12 @@ export default function Layout({ children }: LayoutProps) {
           )}
         </nav>
 
-        {/* User Info & Sign Out */}
+        {/* Theme Toggle & User Info */}
         <div className="px-3 py-4 border-t border-sidebar-border space-y-2">
+          <div className={cn("flex items-center", collapsed ? "justify-center" : "justify-between px-3")}>
+            {!collapsed && <span className="text-xs text-sidebar-muted">主題</span>}
+            <ThemeToggle collapsed={collapsed} />
+          </div>
           {!collapsed && (
             <div className="px-3 py-2 animate-fade-in">
               <p className="text-sm font-medium text-sidebar-foreground truncate">
