@@ -7,7 +7,9 @@ import {
   CheckCircle2, 
   Clock, 
   PauseCircle,
-  Filter
+  Filter,
+  TrendingUp,
+  Target
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -17,6 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { 
@@ -126,6 +129,60 @@ export default function Dashboard() {
       completed,
       inProgress,
       suspendedOrCancelled,
+    };
+  }, [filteredProjects]);
+
+  // Calculate Progress Statistics
+  const progressStats = useMemo(() => {
+    const validProjects = filteredProjects.filter(p => !['暫緩', '取消'].includes(p.status));
+    const total = validProjects.length;
+    
+    if (total === 0) {
+      return {
+        avgOverall: 0,
+        avgAdmin: 0,
+        avgEngineering: 0,
+        distribution: { notStarted: 0, early: 0, midway: 0, advanced: 0, completed: 0 },
+        distributionPercent: { notStarted: 0, early: 0, midway: 0, advanced: 0, completed: 0 },
+      };
+    }
+
+    const avgOverall = validProjects.reduce((sum, p) => sum + (Number(p.overall_progress) || 0), 0) / total;
+    const avgAdmin = validProjects.reduce((sum, p) => sum + (Number(p.admin_progress) || 0), 0) / total;
+    const avgEngineering = validProjects.reduce((sum, p) => sum + (Number(p.engineering_progress) || 0), 0) / total;
+
+    // Progress distribution buckets
+    const distribution = {
+      notStarted: 0, // 0%
+      early: 0,      // 1-25%
+      midway: 0,     // 26-50%
+      advanced: 0,   // 51-75%
+      completed: 0,  // 76-100%
+    };
+
+    validProjects.forEach(p => {
+      const progress = Number(p.overall_progress) || 0;
+      if (progress === 0) distribution.notStarted++;
+      else if (progress <= 25) distribution.early++;
+      else if (progress <= 50) distribution.midway++;
+      else if (progress <= 75) distribution.advanced++;
+      else distribution.completed++;
+    });
+
+    const distributionPercent = {
+      notStarted: (distribution.notStarted / total) * 100,
+      early: (distribution.early / total) * 100,
+      midway: (distribution.midway / total) * 100,
+      advanced: (distribution.advanced / total) * 100,
+      completed: (distribution.completed / total) * 100,
+    };
+
+    return {
+      avgOverall,
+      avgAdmin,
+      avgEngineering,
+      distribution,
+      distributionPercent,
     };
   }, [filteredProjects]);
 
@@ -374,6 +431,126 @@ export default function Dashboard() {
               </div>
               <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
                 <PauseCircle className="w-4 h-4 text-muted-foreground" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Progress Statistics Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Average Progress Card */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" />
+              平均進度
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">總體進度</span>
+                <span className="font-medium">{progressStats.avgOverall.toFixed(1)}%</span>
+              </div>
+              <Progress value={progressStats.avgOverall} className="h-2" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">行政進度</span>
+                <span className="font-medium">{progressStats.avgAdmin.toFixed(1)}%</span>
+              </div>
+              <Progress value={progressStats.avgAdmin} className="h-2" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">工程進度</span>
+                <span className="font-medium">{progressStats.avgEngineering.toFixed(1)}%</span>
+              </div>
+              <Progress value={progressStats.avgEngineering} className="h-2" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Progress Distribution Card */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium flex items-center gap-2">
+              <Target className="w-4 h-4" />
+              進度分布統計
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-5 gap-2">
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <div className="text-2xl font-bold text-muted-foreground">{progressStats.distribution.notStarted}</div>
+                <div className="text-xs text-muted-foreground mt-1">未開始</div>
+                <div className="text-[10px] text-muted-foreground">(0%)</div>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-destructive/10">
+                <div className="text-2xl font-bold text-destructive">{progressStats.distribution.early}</div>
+                <div className="text-xs text-muted-foreground mt-1">初期</div>
+                <div className="text-[10px] text-muted-foreground">(1-25%)</div>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-warning/10">
+                <div className="text-2xl font-bold text-warning">{progressStats.distribution.midway}</div>
+                <div className="text-xs text-muted-foreground mt-1">進行中</div>
+                <div className="text-[10px] text-muted-foreground">(26-50%)</div>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-info/10">
+                <div className="text-2xl font-bold text-info">{progressStats.distribution.advanced}</div>
+                <div className="text-xs text-muted-foreground mt-1">後期</div>
+                <div className="text-[10px] text-muted-foreground">(51-75%)</div>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-success/10">
+                <div className="text-2xl font-bold text-success">{progressStats.distribution.completed}</div>
+                <div className="text-xs text-muted-foreground mt-1">即將完成</div>
+                <div className="text-[10px] text-muted-foreground">(76-100%)</div>
+              </div>
+            </div>
+            
+            {/* Stacked bar visualization */}
+            <div className="mt-4">
+              <div className="h-4 rounded-full overflow-hidden flex bg-muted/30">
+                {progressStats.distributionPercent.notStarted > 0 && (
+                  <div 
+                    className="bg-muted-foreground/40 transition-all" 
+                    style={{ width: `${progressStats.distributionPercent.notStarted}%` }}
+                    title={`未開始: ${progressStats.distribution.notStarted}件`}
+                  />
+                )}
+                {progressStats.distributionPercent.early > 0 && (
+                  <div 
+                    className="bg-destructive transition-all" 
+                    style={{ width: `${progressStats.distributionPercent.early}%` }}
+                    title={`初期: ${progressStats.distribution.early}件`}
+                  />
+                )}
+                {progressStats.distributionPercent.midway > 0 && (
+                  <div 
+                    className="bg-warning transition-all" 
+                    style={{ width: `${progressStats.distributionPercent.midway}%` }}
+                    title={`進行中: ${progressStats.distribution.midway}件`}
+                  />
+                )}
+                {progressStats.distributionPercent.advanced > 0 && (
+                  <div 
+                    className="bg-info transition-all" 
+                    style={{ width: `${progressStats.distributionPercent.advanced}%` }}
+                    title={`後期: ${progressStats.distribution.advanced}件`}
+                  />
+                )}
+                {progressStats.distributionPercent.completed > 0 && (
+                  <div 
+                    className="bg-success transition-all" 
+                    style={{ width: `${progressStats.distributionPercent.completed}%` }}
+                    title={`即將完成: ${progressStats.distribution.completed}件`}
+                  />
+                )}
+              </div>
+              <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                <span>0%</span>
+                <span>100%</span>
               </div>
             </div>
           </CardContent>
