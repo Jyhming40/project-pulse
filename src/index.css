@@ -127,6 +127,40 @@
     --chart-4: 142 72% 50%;
     --chart-5: 280 60% 55%;
   }
+
+  /* Fire Theme - Light Mode */
+  [data-theme-color="fire"]:root,
+  :root[data-theme-color="fire"] {
+    --primary: 16 100% 50%; /* #FF4500 OrangeRed */
+    --primary-foreground: 0 0% 100%;
+    --ring: 16 100% 50%;
+    --accent: 11 100% 93%;
+    --accent-foreground: 16 100% 35%;
+    --sidebar-primary: 11 100% 63%; /* #FF6347 Tomato */
+    --sidebar-ring: 11 100% 63%;
+    --chart-1: 16 100% 50%;
+    --chart-2: 11 100% 63%;
+    --chart-3: 0 100% 50%; /* #FF0000 Red */
+    --chart-4: 25 100% 55%;
+    --chart-5: 350 80% 50%;
+  }
+
+  /* Fire Theme - Dark Mode */
+  [data-theme-color="fire"].dark,
+  .dark[data-theme-color="fire"] {
+    --primary: 16 100% 55%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 16 100% 55%;
+    --accent: 16 60% 18%;
+    --accent-foreground: 16 100% 65%;
+    --sidebar-primary: 11 100% 65%;
+    --sidebar-ring: 11 100% 65%;
+    --chart-1: 16 100% 55%;
+    --chart-2: 11 100% 65%;
+    --chart-3: 0 100% 55%;
+    --chart-4: 25 100% 60%;
+    --chart-5: 350 80% 55%;
+  }
 }
 
 @layer base {
