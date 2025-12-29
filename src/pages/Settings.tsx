@@ -32,6 +32,7 @@ import {
 import { toast } from 'sonner';
 import BrandingSettings from '@/components/BrandingSettings';
 import UserManagement from '@/components/UserManagement';
+import PermissionManagement from '@/components/PermissionManagement';
 
 export default function Settings() {
   const { isAdmin } = useAuth();
@@ -546,6 +547,9 @@ export default function Settings() {
         <>
           {/* User Management */}
           <UserManagement />
+
+          {/* Permission Management */}
+          <PermissionManagement />
 
           {/* Engineering Interface - Redirect to dedicated page */}
           <Card className="border-amber-500/50">

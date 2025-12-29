@@ -15,6 +15,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   isAdmin: boolean;
   isStaff: boolean;
+  isViewer: boolean;
   canEdit: boolean;
 }
 
@@ -95,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAdmin = role === 'admin';
   const isStaff = role === 'staff';
+  const isViewer = role === 'viewer';
   const canEdit = isAdmin || isStaff;
 
   return (
@@ -108,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       signOut,
       isAdmin,
       isStaff,
+      isViewer,
       canEdit,
     }}>
       {children}
