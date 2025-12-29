@@ -21,6 +21,7 @@ import RecycleBin from "./pages/RecycleBin";
 import DeletionPolicies from "./pages/DeletionPolicies";
 import AuditLogs from "./pages/AuditLogs";
 import Engineering from "./pages/Engineering";
+import ProgressSettings from "./pages/ProgressSettings";
 
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
@@ -44,6 +45,7 @@ const App = () => (
             <Route path="/partners" element={<ProtectedRoute><Layout><Partners /></Layout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Layout><Settings /></Layout></ProtectedRoute>} />
             <Route path="/system-options" element={<ProtectedRoute adminOnly><Layout><SystemOptions /></Layout></ProtectedRoute>} />
+            <Route path="/progress-settings" element={<ProtectedRoute adminOnly><Layout><ProgressSettings /></Layout></ProtectedRoute>} />
             <Route path="/recycle-bin" element={<ProtectedRoute><RecycleBin /></ProtectedRoute>} />
             <Route path="/deletion-policies" element={<ProtectedRoute adminOnly><DeletionPolicies /></ProtectedRoute>} />
             <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />

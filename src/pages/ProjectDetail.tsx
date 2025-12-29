@@ -67,6 +67,7 @@ import {
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 import ProjectConstructionAssignments from '@/components/ProjectConstructionAssignments';
+import { ProjectMilestones } from '@/components/ProjectMilestones';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 type DocType = Database['public']['Enums']['doc_type'];
@@ -436,6 +437,7 @@ export default function ProjectDetail() {
       <Tabs defaultValue="info" className="w-full">
         <TabsList>
           <TabsTrigger value="info">基本資料</TabsTrigger>
+          <TabsTrigger value="progress">進度追蹤</TabsTrigger>
           <TabsTrigger value="power">用電資訊</TabsTrigger>
           <TabsTrigger value="construction">施工進度</TabsTrigger>
           <TabsTrigger value="partners">施工工班</TabsTrigger>
@@ -706,6 +708,18 @@ export default function ProjectDetail() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* Progress Tracking Tab */}
+        <TabsContent value="progress" className="mt-6">
+          <ProjectMilestones 
+            projectId={id!}
+            adminProgress={(project as any).admin_progress || 0}
+            engineeringProgress={(project as any).engineering_progress || 0}
+            overallProgress={(project as any).overall_progress || 0}
+            adminStage={(project as any).admin_stage}
+            engineeringStage={(project as any).engineering_stage}
+          />
         </TabsContent>
 
         {/* Power Information Tab */}
