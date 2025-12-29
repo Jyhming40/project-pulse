@@ -617,45 +617,103 @@ export default function Settings() {
         <>
           <Card>
             <CardHeader>
-              <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> 使用者管理</CardTitle>
-              <CardDescription>管理系統使用者角色</CardDescription>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" /> 
+                使用者管理
+              </CardTitle>
+              <CardDescription>
+                管理系統使用者與角色權限。共 {users.length} 位使用者
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Email</TableHead>
-                    <TableHead>姓名</TableHead>
-                    <TableHead>角色</TableHead>
-                    <TableHead>操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map(u => (
-                    <TableRow key={u.id}>
-                      <TableCell>{u.email}</TableCell>
-                      <TableCell>{u.full_name || '-'}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{(u.user_roles as any)?.[0]?.role || 'viewer'}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          defaultValue={(u.user_roles as any)?.[0]?.role || 'viewer'}
-                          onValueChange={(role) => updateRoleMutation.mutate({ userId: u.id, role: role as AppRole })}
-                          disabled={u.id === user?.id}
-                        >
-                          <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">管理員</SelectItem>
-                            <SelectItem value="staff">員工</SelectItem>
-                            <SelectItem value="viewer">檢視者</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
+            <CardContent className="space-y-4">
+              {/* Role Legend */}
+              <div className="flex flex-wrap gap-4 p-3 bg-muted/50 rounded-lg text-sm">
+                <div className="flex items-center gap-2">
+                  <Badge variant="default">管理員</Badge>
+                  <span className="text-muted-foreground">完整系統權限</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary">員工</Badge>
+                  <span className="text-muted-foreground">資料編輯權限</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">檢視者</Badge>
+                  <span className="text-muted-foreground">僅能查看資料</span>
+                </div>
+              </div>
+
+              {/* Users Table */}
+              <div className="border rounded-lg overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50">
+                      <TableHead className="w-[300px]">Email</TableHead>
+                      <TableHead className="w-[150px]">姓名</TableHead>
+                      <TableHead className="w-[120px]">目前角色</TableHead>
+                      <TableHead className="w-[150px]">註冊時間</TableHead>
+                      <TableHead className="w-[140px]">變更角色</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {users.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                          尚無使用者資料
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      users.map(u => {
+                        const userRole = (u.user_roles as any)?.[0]?.role || 'viewer';
+                        const isCurrentUser = u.id === user?.id;
+                        return (
+                          <TableRow key={u.id} className={isCurrentUser ? 'bg-primary/5' : ''}>
+                            <TableCell className="font-medium">
+                              <div className="flex items-center gap-2">
+                                {u.email}
+                                {isCurrentUser && (
+                                  <Badge variant="outline" className="text-xs">您</Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{u.full_name || '-'}</TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={userRole === 'admin' ? 'default' : userRole === 'staff' ? 'secondary' : 'outline'}
+                              >
+                                {userRole === 'admin' ? '管理員' : userRole === 'staff' ? '員工' : '檢視者'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-muted-foreground text-sm">
+                              {u.created_at ? new Date(u.created_at).toLocaleDateString('zh-TW') : '-'}
+                            </TableCell>
+                            <TableCell>
+                              <Select
+                                value={userRole}
+                                onValueChange={(role) => updateRoleMutation.mutate({ userId: u.id, role: role as AppRole })}
+                                disabled={isCurrentUser || updateRoleMutation.isPending}
+                              >
+                                <SelectTrigger className="w-[120px]">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="admin">管理員</SelectItem>
+                                  <SelectItem value="staff">員工</SelectItem>
+                                  <SelectItem value="viewer">檢視者</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Help text */}
+              <p className="text-xs text-muted-foreground">
+                * 您無法變更自己的角色。若需變更，請聯繫其他管理員。
+              </p>
             </CardContent>
           </Card>
 
