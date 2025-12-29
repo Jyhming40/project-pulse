@@ -14,6 +14,7 @@ const RESET_SCOPES: Record<string, string[]> = {
     "project_construction_assignments",
     "construction_status_history",
     "project_status_history",
+    "project_milestones",
     "projects",
   ],
   business: [
@@ -22,6 +23,7 @@ const RESET_SCOPES: Record<string, string[]> = {
     "project_construction_assignments",
     "construction_status_history",
     "project_status_history",
+    "project_milestones",
     "projects",
     "investor_contacts",
     "investor_payment_methods",
@@ -36,6 +38,7 @@ const RESET_SCOPES: Record<string, string[]> = {
     "project_construction_assignments",
     "construction_status_history",
     "project_status_history",
+    "project_milestones",
     "projects",
     "investor_contacts",
     "investor_payment_methods",
@@ -45,6 +48,8 @@ const RESET_SCOPES: Record<string, string[]> = {
     "investor_year_counters",
     "audit_logs",
     "module_permissions",
+    "progress_milestones",
+    "progress_settings",
   ],
 };
 
@@ -152,6 +157,9 @@ async function handleGetTableStats(supabase: any, corsHeaders: Record<string, st
     "project_construction_assignments",
     "project_status_history",
     "construction_status_history",
+    "project_milestones",
+    "progress_milestones",
+    "progress_settings",
     "system_options",
     "deletion_policies",
     "audit_logs",
