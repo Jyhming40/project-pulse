@@ -14,6 +14,8 @@ import {
   Trash2,
   Check,
   X,
+  FileText,
+  Zap,
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,6 +46,104 @@ interface ModulePermission {
 }
 
 const ALL_MODULES = Object.values(MODULES) as ModuleName[];
+
+// Permission templates
+interface PermissionTemplate {
+  id: string;
+  name: string;
+  description: string;
+  icon: React.ReactNode;
+  permissions: Record<ModuleName, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }>;
+}
+
+const ADMIN_MODULES: string[] = [MODULES.SYSTEM_OPTIONS, MODULES.DELETION_POLICIES, MODULES.SETTINGS, MODULES.ENGINEERING];
+const PROJECT_MODULES: string[] = [MODULES.PROJECTS, MODULES.DOCUMENTS];
+const RESTRICTED_MODULES: string[] = [MODULES.SYSTEM_OPTIONS, MODULES.DELETION_POLICIES, MODULES.SETTINGS, MODULES.ENGINEERING, MODULES.AUDIT_LOGS, MODULES.RECYCLE_BIN];
+
+const PERMISSION_TEMPLATES: PermissionTemplate[] = [
+  {
+    id: 'full_access',
+    name: '完整存取',
+    description: '所有模組的完整權限（查看、新增、編輯、刪除）',
+    icon: <Shield className="w-4 h-4 text-primary" />,
+    permissions: Object.fromEntries(
+      ALL_MODULES.map(m => [m, { can_view: true, can_create: true, can_edit: true, can_delete: true }])
+    ) as Record<ModuleName, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }>,
+  },
+  {
+    id: 'staff_default',
+    name: '員工預設',
+    description: '可編輯核心資料，但無法刪除或存取系統設定',
+    icon: <Edit2 className="w-4 h-4 text-blue-500" />,
+    permissions: Object.fromEntries(
+      ALL_MODULES.map(m => {
+        const isAdminModule = ADMIN_MODULES.includes(m);
+        if (isAdminModule) {
+          return [m, { can_view: false, can_create: false, can_edit: false, can_delete: false }];
+        }
+        return [m, { can_view: true, can_create: true, can_edit: true, can_delete: false }];
+      })
+    ) as Record<ModuleName, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }>,
+  },
+  {
+    id: 'read_only',
+    name: '僅供查看',
+    description: '所有模組只能查看，無法進行任何修改',
+    icon: <Eye className="w-4 h-4 text-muted-foreground" />,
+    permissions: Object.fromEntries(
+      ALL_MODULES.map(m => {
+        const isAdminModule = ADMIN_MODULES.includes(m);
+        if (isAdminModule) {
+          return [m, { can_view: false, can_create: false, can_edit: false, can_delete: false }];
+        }
+        return [m, { can_view: true, can_create: false, can_edit: false, can_delete: false }];
+      })
+    ) as Record<ModuleName, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }>,
+  },
+  {
+    id: 'project_manager',
+    name: '專案管理員',
+    description: '專案與文件的完整權限，其他模組僅供查看',
+    icon: <FileText className="w-4 h-4 text-green-500" />,
+    permissions: Object.fromEntries(
+      ALL_MODULES.map(m => {
+        const isAdminModule = ADMIN_MODULES.includes(m);
+        const isProjectModule = PROJECT_MODULES.includes(m);
+        if (isAdminModule) {
+          return [m, { can_view: false, can_create: false, can_edit: false, can_delete: false }];
+        }
+        if (isProjectModule) {
+          return [m, { can_view: true, can_create: true, can_edit: true, can_delete: true }];
+        }
+        return [m, { can_view: true, can_create: false, can_edit: false, can_delete: false }];
+      })
+    ) as Record<ModuleName, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }>,
+  },
+  {
+    id: 'data_entry',
+    name: '資料登錄員',
+    description: '可新增與編輯資料，但無法刪除',
+    icon: <Plus className="w-4 h-4 text-orange-500" />,
+    permissions: Object.fromEntries(
+      ALL_MODULES.map(m => {
+        const isRestrictedModule = RESTRICTED_MODULES.includes(m);
+        if (isRestrictedModule) {
+          return [m, { can_view: m === MODULES.AUDIT_LOGS, can_create: false, can_edit: false, can_delete: false }];
+        }
+        return [m, { can_view: true, can_create: true, can_edit: true, can_delete: false }];
+      })
+    ) as Record<ModuleName, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }>,
+  },
+  {
+    id: 'clear_all',
+    name: '清除所有',
+    description: '移除所有自訂權限，回到角色預設值',
+    icon: <X className="w-4 h-4 text-destructive" />,
+    permissions: Object.fromEntries(
+      ALL_MODULES.map(m => [m, { can_view: false, can_create: false, can_edit: false, can_delete: false }])
+    ) as Record<ModuleName, { can_view: boolean; can_create: boolean; can_edit: boolean; can_delete: boolean }>,
+  },
+];
 
 export default function PermissionManagement() {
   const { isAdmin } = useAuth();
@@ -195,6 +295,32 @@ export default function PermissionManagement() {
     setHasChanges(true);
   };
 
+  // Apply template to current user
+  const applyTemplate = (template: PermissionTemplate) => {
+    if (!selectedUserId) return;
+
+    const newMap = new Map<string, ModulePermission>();
+    
+    ALL_MODULES.forEach(module => {
+      const templatePerm = template.permissions[module];
+      const existing = editedPermissions.get(module);
+      
+      newMap.set(module, {
+        id: existing?.id,
+        user_id: selectedUserId,
+        module_name: module,
+        can_view: templatePerm.can_view,
+        can_create: templatePerm.can_create,
+        can_edit: templatePerm.can_edit,
+        can_delete: templatePerm.can_delete,
+      });
+    });
+
+    setEditedPermissions(newMap);
+    setHasChanges(true);
+    toast.success(`已套用「${template.name}」範本`, { description: '請記得儲存變更' });
+  };
+
   const getPermission = (module: ModuleName, field: 'can_view' | 'can_create' | 'can_edit' | 'can_delete'): boolean => {
     const perm = editedPermissions.get(module);
     return perm?.[field] ?? false;
@@ -274,7 +400,30 @@ export default function PermissionManagement() {
 
             {!isSelectedUserAdmin && (
               <>
-                <div className="text-sm text-muted-foreground mb-2">
+                {/* Template Quick Apply */}
+                <div className="space-y-2">
+                  <p className="text-sm font-medium">快速套用範本</p>
+                  <div className="flex flex-wrap gap-2">
+                    {PERMISSION_TEMPLATES.map(template => (
+                      <Button
+                        key={template.id}
+                        variant="outline"
+                        size="sm"
+                        onClick={() => applyTemplate(template)}
+                        className="flex items-center gap-2"
+                        title={template.description}
+                      >
+                        {template.icon}
+                        {template.name}
+                      </Button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    套用範本後請記得點擊「儲存變更」
+                  </p>
+                </div>
+
+                <div className="text-sm text-muted-foreground">
                   勾選的權限會覆蓋角色預設值。未設定的模組將使用角色預設權限。
                 </div>
                 
