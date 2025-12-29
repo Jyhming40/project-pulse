@@ -1,33 +1,21 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link as RouterLink } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { 
-  Settings as SettingsIcon, 
-  Users, 
-  Database, 
-  Shield, 
   FolderOpen, 
-  Link, 
-  Unlink, 
+  Link,
+  Unlink,
   CheckCircle2,
   Loader2,
   Copy,
   AlertCircle,
   TestTube,
-  ExternalLink,
   Wrench,
-  Trash2,
-  RefreshCw,
   Palette
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -42,14 +30,11 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { toast } from 'sonner';
-import type { Database as DB } from '@/integrations/supabase/types';
 import BrandingSettings from '@/components/BrandingSettings';
-
-type AppRole = DB['public']['Enums']['app_role'];
+import UserManagement from '@/components/UserManagement';
 
 export default function Settings() {
-  const { isAdmin, user } = useAuth();
-  const queryClient = useQueryClient();
+  const { isAdmin } = useAuth();
   const { 
     isAuthorized: isDriveAuthorized, 
     isLoading: isDriveLoading, 
@@ -66,8 +51,6 @@ export default function Settings() {
   } = useDriveAuth();
   const [isRevoking, setIsRevoking] = useState(false);
   const [isTesting, setIsTesting] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
-  const [resetConfirmText, setResetConfirmText] = useState('');
   const [testResult, setTestResult] = useState<{ 
     success: boolean; 
     message?: string; 
@@ -95,31 +78,6 @@ export default function Settings() {
       }>;
     };
   } | null>(null);
-
-  const { data: users = [] } = useQuery({
-    queryKey: ['all-users'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*, user_roles(role)');
-      if (error) throw error;
-      return data;
-    },
-    enabled: isAdmin,
-  });
-
-  const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
-      const { error: deleteError } = await supabase.from('user_roles').delete().eq('user_id', userId);
-      if (deleteError) throw deleteError;
-      const { error } = await supabase.from('user_roles').insert({ user_id: userId, role });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['all-users'] });
-      toast.success('角色已更新');
-    },
-  });
 
 
   const handleAuthorizeDrive = async () => {
@@ -431,71 +389,65 @@ export default function Settings() {
                           {testResult.rootFolderId && !testResult.rootFolderAccess && (
                             <Alert variant="destructive" className="mt-2">
                               <AlertCircle className="h-4 w-4" />
-                              <AlertTitle>Root Folder 存取失敗</AlertTitle>
-                              <AlertDescription>
-                                授權帳號 ({testResult.googleEmail}) 無法存取設定的 Root Folder。
-                                請確認該帳號對 Shared Drive 具有 Content Manager 或以上權限。
+                              <AlertTitle>Root Folder 無法存取</AlertTitle>
+                              <AlertDescription className="text-xs">
+                                <p>授權帳號 <strong>{testResult.googleEmail}</strong> 無法存取指定的 Root Folder。</p>
+                                <p className="mt-1">可能原因：</p>
+                                <ul className="list-disc list-inside">
+                                  <li>該帳號未被加入 Shared Drive</li>
+                                  <li>該帳號權限不足（需要 Content Manager 或以上）</li>
+                                  <li>Root Folder ID 設定錯誤</li>
+                                </ul>
                               </AlertDescription>
                             </Alert>
-                          )}
-                          
-                          {testResult.files && testResult.files.length > 0 && (
-                            <div className="mt-2">
-                              <p className="text-sm font-medium">找到的檔案/資料夾：</p>
-                              <ul className="text-sm list-disc list-inside">
-                                {testResult.files.slice(0, 5).map((file: any) => (
-                                  <li key={file.id}>{file.name}</li>
-                                ))}
-                              </ul>
-                            </div>
                           )}
                         </div>
                       ) : (
                         <div className="space-y-2">
                           <p>{testResult.message || testResult.error}</p>
-                          {testResult.googleEmail && (
-                            <p className="text-sm">授權帳號：{testResult.googleEmail}</p>
-                          )}
                           {testResult.errorStatus && (
-                            <p className="text-sm"><strong>HTTP Status:</strong> {testResult.errorStatus}</p>
+                            <p className="text-xs">HTTP 狀態碼: {testResult.errorStatus}</p>
                           )}
                           {testResult.errorResponse && (
-                            <div className="mt-2">
-                              <p className="text-sm font-medium">錯誤回應 (完整 JSON)：</p>
-                              <pre className="mt-1 p-2 bg-destructive/10 rounded text-xs overflow-auto max-h-60 whitespace-pre-wrap">
-                                {typeof testResult.errorResponse === 'object' 
-                                  ? JSON.stringify(testResult.errorResponse, null, 2) 
-                                  : testResult.errorResponse}
-                              </pre>
-                            </div>
+                            <pre className="text-xs mt-2 p-2 bg-destructive/10 rounded overflow-auto max-h-40 whitespace-pre-wrap">
+                              {typeof testResult.errorResponse === 'object' 
+                                ? JSON.stringify(testResult.errorResponse, null, 2) 
+                                : testResult.errorResponse}
+                            </pre>
                           )}
                         </div>
                       )}
                     </AlertDescription>
                   </Alert>
-
-                  {/* Debug Info Section */}
+                  
+                  {/* Debug Info */}
                   {testResult.debug && (
-                    <div className="p-4 border rounded-lg bg-muted/30">
-                      <p className="text-sm font-medium mb-2">🔍 Debug 資訊（供除錯用）</p>
-                      <div className="space-y-2 text-xs">
-                        <p><strong>授權帳號 (google_email)：</strong>{testResult.debug.authorizedEmail || '(未知)'}</p>
-                        <p><strong>Root Folder ID (env)：</strong>{testResult.debug.rootFolderId || '(未設定)'}</p>
-                        <p><strong>Root Folder 名稱：</strong>{testResult.debug.rootFolderName || '(未知)'}</p>
-                        <p><strong>Shared Drive ID：</strong>{testResult.debug.sharedDriveId || '(非 Shared Drive)'}</p>
+                    <div className="p-3 border rounded-lg bg-muted/30">
+                      <p className="text-sm font-medium mb-2">🔍 除錯資訊</p>
+                      <div className="text-xs font-mono space-y-2">
+                        {testResult.debug.authorizedEmail && (
+                          <p><strong>授權帳號：</strong>{testResult.debug.authorizedEmail}</p>
+                        )}
+                        {testResult.debug.rootFolderId && (
+                          <p><strong>Root Folder ID：</strong>{testResult.debug.rootFolderId}</p>
+                        )}
+                        {testResult.debug.rootFolderName && (
+                          <p><strong>Root Folder 名稱：</strong>{testResult.debug.rootFolderName}</p>
+                        )}
+                        {testResult.debug.sharedDriveId && (
+                          <p><strong>Shared Drive ID：</strong>{testResult.debug.sharedDriveId}</p>
+                        )}
                         
+                        {/* API Calls Log */}
                         {testResult.debug.apiCalls && testResult.debug.apiCalls.length > 0 && (
-                          <div className="mt-3">
-                            <p className="font-medium mb-1">API 呼叫紀錄：</p>
-                            {testResult.debug.apiCalls.map((call, idx) => (
-                              <div key={idx} className="mt-2 p-2 bg-background rounded border">
-                                <p><strong>#{idx + 1} Endpoint：</strong>{call.endpoint}</p>
-                                {call.folderId && <p><strong>Folder ID：</strong>{call.folderId}</p>}
-                                <p><strong>HTTP Status：</strong>{call.status}</p>
-                                <p><strong>參數：</strong></p>
-                                <pre className="p-1 bg-muted rounded overflow-auto whitespace-pre-wrap">
-                                  {JSON.stringify(call.params, null, 2)}
-                                </pre>
+                          <div className="mt-2 space-y-2">
+                            <p className="font-medium">API 呼叫紀錄：</p>
+                            {testResult.debug.apiCalls.map((call, index) => (
+                              <div key={index} className="p-2 bg-background rounded border">
+                                <p><strong>#{index + 1}</strong> {call.endpoint}</p>
+                                <p><strong>參數：</strong>{JSON.stringify(call.params)}</p>
+                                <p><strong>狀態：</strong><span className={call.status >= 200 && call.status < 300 ? 'text-success' : 'text-destructive'}>{call.status}</span></p>
+                                {call.folderId && <p><strong>資料夾 ID：</strong>{call.folderId}</p>}
                                 <p className="mt-1"><strong>回應：</strong></p>
                                 <pre className="p-1 bg-muted rounded overflow-auto max-h-32 whitespace-pre-wrap">
                                   {(() => {
@@ -567,33 +519,10 @@ export default function Settings() {
                 <div className="flex-1">
                   <p className="font-medium">尚未連結 Google Drive</p>
                   <p className="text-sm text-muted-foreground">
-                    連結後可在新增案場時自動建立 Drive 資料夾
+                    連結後，系統將自動為每個案場建立專屬資料夾
                   </p>
                 </div>
               </div>
-
-              {/* Debug Info - Always Show */}
-              <div className="p-4 border rounded-lg bg-muted/30">
-                <p className="text-sm font-medium mb-2">🔧 目前環境資訊（除錯用）</p>
-                <div className="space-y-1 text-xs font-mono">
-                  <p><strong>目前登入 User ID：</strong>{user?.id || '(未登入)'}</p>
-                  <p><strong>目前登入 Email：</strong>{user?.email || '(未登入)'}</p>
-                  <p>
-                    <strong>user_drive_tokens row：</strong>
-                    {tokenInfo?.hasToken ? (
-                      <span className="text-success ml-1">✓ 存在</span>
-                    ) : (
-                      <span className="text-destructive ml-1">✗ 不存在</span>
-                    )}
-                  </p>
-                  <p><strong>google_email (DB)：</strong>{tokenInfo?.google_email || '(尚未授權)'}</p>
-                  <p><strong>Callback URL：</strong>{callbackUrl}</p>
-                  <p className="text-muted-foreground mt-2">
-                    * GOOGLE_DRIVE_ROOT_FOLDER_ID 為後端 secret，需透過測試連線查看
-                  </p>
-                </div>
-              </div>
-              
               <Button onClick={handleAuthorizeDrive} disabled={isAuthorizing}>
                 {isAuthorizing ? (
                   <>
@@ -615,107 +544,8 @@ export default function Settings() {
       {/* Admin-only sections */}
       {isAdmin && (
         <>
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="w-5 h-5" /> 
-                使用者管理
-              </CardTitle>
-              <CardDescription>
-                管理系統使用者與角色權限。共 {users.length} 位使用者
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Role Legend */}
-              <div className="flex flex-wrap gap-4 p-3 bg-muted/50 rounded-lg text-sm">
-                <div className="flex items-center gap-2">
-                  <Badge variant="default">管理員</Badge>
-                  <span className="text-muted-foreground">完整系統權限</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary">員工</Badge>
-                  <span className="text-muted-foreground">資料編輯權限</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">檢視者</Badge>
-                  <span className="text-muted-foreground">僅能查看資料</span>
-                </div>
-              </div>
-
-              {/* Users Table */}
-              <div className="border rounded-lg overflow-hidden">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-muted/50">
-                      <TableHead className="w-[300px]">Email</TableHead>
-                      <TableHead className="w-[150px]">姓名</TableHead>
-                      <TableHead className="w-[120px]">目前角色</TableHead>
-                      <TableHead className="w-[150px]">註冊時間</TableHead>
-                      <TableHead className="w-[140px]">變更角色</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                          尚無使用者資料
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      users.map(u => {
-                        const userRole = (u.user_roles as any)?.[0]?.role || 'viewer';
-                        const isCurrentUser = u.id === user?.id;
-                        return (
-                          <TableRow key={u.id} className={isCurrentUser ? 'bg-primary/5' : ''}>
-                            <TableCell className="font-medium">
-                              <div className="flex items-center gap-2">
-                                {u.email}
-                                {isCurrentUser && (
-                                  <Badge variant="outline" className="text-xs">您</Badge>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>{u.full_name || '-'}</TableCell>
-                            <TableCell>
-                              <Badge 
-                                variant={userRole === 'admin' ? 'default' : userRole === 'staff' ? 'secondary' : 'outline'}
-                              >
-                                {userRole === 'admin' ? '管理員' : userRole === 'staff' ? '員工' : '檢視者'}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-muted-foreground text-sm">
-                              {u.created_at ? new Date(u.created_at).toLocaleDateString('zh-TW') : '-'}
-                            </TableCell>
-                            <TableCell>
-                              <Select
-                                value={userRole}
-                                onValueChange={(role) => updateRoleMutation.mutate({ userId: u.id, role: role as AppRole })}
-                                disabled={isCurrentUser || updateRoleMutation.isPending}
-                              >
-                                <SelectTrigger className="w-[120px]">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="admin">管理員</SelectItem>
-                                  <SelectItem value="staff">員工</SelectItem>
-                                  <SelectItem value="viewer">檢視者</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Help text */}
-              <p className="text-xs text-muted-foreground">
-                * 您無法變更自己的角色。若需變更，請聯繫其他管理員。
-              </p>
-            </CardContent>
-          </Card>
+          {/* User Management */}
+          <UserManagement />
 
           {/* Engineering Interface - Redirect to dedicated page */}
           <Card className="border-amber-500/50">
