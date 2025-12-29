@@ -84,16 +84,30 @@ Deno.serve(async (req) => {
       );
     }
 
-    // If a specific role is provided, update the user_roles table
-    if (role && role !== 'viewer' && newUser.user) {
+    if (newUser.user) {
+      // Create profile record
+      const { error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .upsert({
+          id: newUser.user.id,
+          email: newUser.user.email,
+          full_name: fullName || null
+        }, { onConflict: 'id' });
+
+      if (profileError) {
+        console.error('Error creating profile:', profileError);
+      }
+
+      // Create user_role record
       const { error: roleError } = await supabaseAdmin
         .from('user_roles')
-        .update({ role })
-        .eq('user_id', newUser.user.id);
+        .upsert({
+          user_id: newUser.user.id,
+          role: role || 'viewer'
+        }, { onConflict: 'user_id' });
 
       if (roleError) {
-        console.error('Error updating role:', roleError);
-        // User is created but role update failed - still return success
+        console.error('Error setting role:', roleError);
       }
     }
 

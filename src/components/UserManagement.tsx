@@ -73,12 +73,28 @@ export default function UserManagement() {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['all-users'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      // Fetch profiles separately
+      const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
-        .select('*, user_roles(role)')
+        .select('*')
         .order('created_at', { ascending: false });
-      if (error) throw error;
-      return data as unknown as UserWithRole[];
+      
+      if (profilesError) throw profilesError;
+      
+      // Fetch all user roles
+      const { data: roles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id, role');
+      
+      if (rolesError) throw rolesError;
+      
+      // Map roles to profiles
+      const rolesMap = new Map(roles?.map(r => [r.user_id, r.role]) || []);
+      
+      return (profiles || []).map(p => ({
+        ...p,
+        user_roles: rolesMap.has(p.id) ? [{ role: rolesMap.get(p.id)! }] : []
+      })) as unknown as UserWithRole[];
     },
     enabled: isAdmin,
   });
