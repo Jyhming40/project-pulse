@@ -17,6 +17,7 @@ type InvestorPaymentMethod = Database['public']['Tables']['investor_payment_meth
 type Partner = Database['public']['Tables']['partners']['Row'];
 type ProjectConstructionAssignment = Database['public']['Tables']['project_construction_assignments']['Row'];
 type SystemOption = Database['public']['Tables']['system_options']['Row'];
+type ModulePermission = Database['public']['Tables']['module_permissions']['Row'];
 
 export type ImportMode = 'insert' | 'upsert' | 'skip';
 
@@ -32,6 +33,7 @@ export interface ExportStats {
   documents: number;
   documentFiles: number;
   systemOptions: number;
+  modulePermissions: number;
 }
 
 export interface BackupProgress {
@@ -63,6 +65,7 @@ export interface ImportSummary {
   documents: { inserted: number; updated: number; skipped: number; errors: number };
   documentFiles: { inserted: number; updated: number; skipped: number; errors: number };
   systemOptions: { inserted: number; updated: number; skipped: number; errors: number };
+  modulePermissions: { inserted: number; updated: number; skipped: number; errors: number };
   errorList: ImportError[];
 }
 
@@ -160,6 +163,14 @@ const systemOptionLabels: Record<string, string> = {
   is_active: '啟用', created_at: '建立時間', updated_at: '更新時間'
 };
 
+// Module permissions columns
+const modulePermissionColumns = ['id', 'user_email', 'module_name', 'can_view', 'can_create', 'can_edit', 'can_delete', 'created_at', 'updated_at'];
+const modulePermissionLabels: Record<string, string> = {
+  id: 'ID', user_email: '使用者Email', module_name: '模組名稱', can_view: '可檢視',
+  can_create: '可新增', can_edit: '可編輯', can_delete: '可刪除',
+  created_at: '建立時間', updated_at: '更新時間'
+};
+
 function formatDate(value: any): string {
   if (!value) return '';
   if (value instanceof Date) return value.toISOString().split('T')[0];
@@ -217,7 +228,7 @@ function downloadFile(blob: Blob, filename: string) {
 }
 
 // Fetch all records with pagination
-type TableName = 'projects' | 'project_status_history' | 'construction_status_history' | 'documents' | 'document_files' | 'investors' | 'investor_contacts' | 'investor_payment_methods' | 'partners' | 'project_construction_assignments' | 'system_options';
+type TableName = 'projects' | 'project_status_history' | 'construction_status_history' | 'documents' | 'document_files' | 'investors' | 'investor_contacts' | 'investor_payment_methods' | 'partners' | 'project_construction_assignments' | 'system_options' | 'module_permissions';
 
 async function fetchAllRecords<T>(
   tableName: TableName,
@@ -258,31 +269,31 @@ export function useProjectBackup() {
   // Export all project data to Excel with multiple sheets
   const exportFullBackup = useCallback(async () => {
     setIsProcessing(true);
-    setProgress({ current: 0, total: 11, phase: 'preparing' });
+    setProgress({ current: 0, total: 12, phase: 'preparing' });
 
     try {
       // 1. Fetch investors
-      setProgress({ current: 1, total: 11, phase: 'exporting', currentSheet: '投資方' });
+      setProgress({ current: 1, total: 12, phase: 'exporting', currentSheet: '投資方' });
       const investors = await fetchAllRecords<Investor>('investors', '*', 'created_at');
       const investorIdToCode = new Map<string, string>();
       investors.forEach(i => investorIdToCode.set(i.id, i.investor_code));
 
       // 2. Fetch investor contacts
-      setProgress({ current: 2, total: 11, phase: 'exporting', currentSheet: '投資方聯絡人' });
+      setProgress({ current: 2, total: 12, phase: 'exporting', currentSheet: '投資方聯絡人' });
       const investorContacts = await fetchAllRecords<InvestorContact>('investor_contacts', '*', 'created_at');
 
       // 3. Fetch investor payment methods
-      setProgress({ current: 3, total: 11, phase: 'exporting', currentSheet: '投資方付款方式' });
+      setProgress({ current: 3, total: 12, phase: 'exporting', currentSheet: '投資方付款方式' });
       const investorPayments = await fetchAllRecords<InvestorPaymentMethod>('investor_payment_methods', '*', 'created_at');
 
       // 4. Fetch partners
-      setProgress({ current: 4, total: 11, phase: 'exporting', currentSheet: '廠商' });
+      setProgress({ current: 4, total: 12, phase: 'exporting', currentSheet: '廠商' });
       const partners = await fetchAllRecords<Partner>('partners', '*', 'created_at');
       const partnerIdToName = new Map<string, string>();
       partners.forEach(p => partnerIdToName.set(p.id, p.name));
 
       // 5. Fetch projects with investor info
-      setProgress({ current: 5, total: 11, phase: 'exporting', currentSheet: '案場主表' });
+      setProgress({ current: 5, total: 12, phase: 'exporting', currentSheet: '案場主表' });
       const projects = await fetchAllRecords<Project & { investors?: { investor_code: string } | null }>(
         'projects',
         '*, investors(investor_code)',
@@ -292,28 +303,37 @@ export function useProjectBackup() {
       projects.forEach(p => projectIdToCode.set(p.id, p.project_code));
 
       // 6. Fetch status history
-      setProgress({ current: 6, total: 11, phase: 'exporting', currentSheet: '狀態歷程' });
+      setProgress({ current: 6, total: 12, phase: 'exporting', currentSheet: '狀態歷程' });
       const statusHistory = await fetchAllRecords<ProjectStatusHistory>('project_status_history', '*', 'changed_at');
 
       // 7. Fetch construction history
-      setProgress({ current: 7, total: 11, phase: 'exporting', currentSheet: '施工歷程' });
+      setProgress({ current: 7, total: 12, phase: 'exporting', currentSheet: '施工歷程' });
       const constructionHistory = await fetchAllRecords<ConstructionStatusHistory>('construction_status_history', '*', 'changed_at');
 
       // 8. Fetch construction assignments
-      setProgress({ current: 8, total: 11, phase: 'exporting', currentSheet: '施工派工' });
+      setProgress({ current: 8, total: 12, phase: 'exporting', currentSheet: '施工派工' });
       const constructionAssignments = await fetchAllRecords<ProjectConstructionAssignment>('project_construction_assignments', '*', 'created_at');
 
       // 9. Fetch documents
-      setProgress({ current: 9, total: 11, phase: 'exporting', currentSheet: '文件' });
+      setProgress({ current: 9, total: 12, phase: 'exporting', currentSheet: '文件' });
       const documents = await fetchAllRecords<Document>('documents', '*', 'created_at');
 
       // 10. Fetch document files
-      setProgress({ current: 10, total: 11, phase: 'exporting', currentSheet: '文件附件' });
+      setProgress({ current: 10, total: 12, phase: 'exporting', currentSheet: '文件附件' });
       const documentFiles = await fetchAllRecords<DocumentFile>('document_files', '*', 'uploaded_at');
 
       // 11. Fetch system options
-      setProgress({ current: 11, total: 11, phase: 'exporting', currentSheet: '系統選項' });
+      setProgress({ current: 11, total: 12, phase: 'exporting', currentSheet: '系統選項' });
       const systemOptions = await fetchAllRecords<SystemOption>('system_options', '*', 'created_at');
+
+      // 12. Fetch module permissions with user info
+      setProgress({ current: 12, total: 12, phase: 'exporting', currentSheet: '模組權限' });
+      const modulePermissions = await fetchAllRecords<ModulePermission>('module_permissions', '*', 'created_at');
+      
+      // Build user ID to email map for permissions
+      const { data: profiles } = await supabase.from('profiles').select('id, email');
+      const userIdToEmail = new Map<string, string>();
+      profiles?.forEach(p => userIdToEmail.set(p.id, p.email || ''));
 
       // Create workbook
       const workbook = XLSX.utils.book_new();
@@ -485,6 +505,20 @@ export function useProjectBackup() {
       });
       XLSX.utils.book_append_sheet(workbook, createSheet(optionData, systemOptionColumns, systemOptionLabels), '系統選項');
 
+      // 12. Module permissions sheet
+      const permissionData = modulePermissions.map(p => {
+        const row: Record<string, any> = {};
+        modulePermissionColumns.forEach(col => {
+          if (col === 'user_email') {
+            row[modulePermissionLabels[col]] = userIdToEmail.get(p.user_id) || '';
+          } else {
+            row[modulePermissionLabels[col]] = (p as any)[col] ?? '';
+          }
+        });
+        return row;
+      });
+      XLSX.utils.book_append_sheet(workbook, createSheet(permissionData, modulePermissionColumns, modulePermissionLabels), '模組權限');
+
       // Build export stats
       const exportStats: ExportStats = {
         investors: investors.length,
@@ -498,6 +532,7 @@ export function useProjectBackup() {
         documents: documents.length,
         documentFiles: documentFiles.length,
         systemOptions: systemOptions.length,
+        modulePermissions: modulePermissions.length,
       };
 
       // Download
@@ -506,9 +541,9 @@ export function useProjectBackup() {
       const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
       downloadFile(blob, `案場完整備份_${timestamp}.xlsx`);
 
-      setProgress({ current: 11, total: 11, phase: 'done', exportStats });
+      setProgress({ current: 12, total: 12, phase: 'done', exportStats });
       toast.success('備份匯出完成', {
-        description: `投資方 ${investors.length}、廠商 ${partners.length}、案場 ${projects.length}、文件 ${documents.length} 筆`
+        description: `投資方 ${investors.length}、廠商 ${partners.length}、案場 ${projects.length}、權限 ${modulePermissions.length} 筆`
       });
     } catch (error) {
       console.error('Export error:', error);
@@ -540,6 +575,7 @@ export function useProjectBackup() {
     XLSX.utils.book_append_sheet(workbook, createTemplateSheet(documentColumns, documentLabels), '文件');
     XLSX.utils.book_append_sheet(workbook, createTemplateSheet(documentFileColumns, documentFileLabels), '文件附件');
     XLSX.utils.book_append_sheet(workbook, createTemplateSheet(systemOptionColumns, systemOptionLabels), '系統選項');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(modulePermissionColumns, modulePermissionLabels), '模組權限');
 
     const buffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -565,11 +601,12 @@ export function useProjectBackup() {
       documents: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
       documentFiles: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
       systemOptions: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
+      modulePermissions: { inserted: 0, updated: 0, skipped: 0, errors: 0 },
       errorList: [],
     };
 
     try {
-      setProgress({ current: 0, total: 11, phase: 'preparing' });
+      setProgress({ current: 0, total: 12, phase: 'preparing' });
 
       // Read Excel file
       const data = await file.arrayBuffer();
@@ -1385,14 +1422,14 @@ export function useProjectBackup() {
       // 10. Import Document Files (skip - informational only)
       const fileSheetName = workbook.SheetNames.find(s => s.includes('文件附件'));
       if (fileSheetName) {
-        setProgress({ current: 10, total: 11, phase: 'importing', currentSheet: '文件附件' });
+        setProgress({ current: 10, total: 12, phase: 'importing', currentSheet: '文件附件' });
         summary.documentFiles.skipped = XLSX.utils.sheet_to_json(workbook.Sheets[fileSheetName]).length;
       }
 
       // 11. Import System Options
       const optionSheetName = workbook.SheetNames.find(s => s === '系統選項');
       if (optionSheetName) {
-        setProgress({ current: 11, total: 11, phase: 'importing', currentSheet: '系統選項' });
+        setProgress({ current: 11, total: 12, phase: 'importing', currentSheet: '系統選項' });
         const sheet = workbook.Sheets[optionSheetName];
         const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
         const reversedLabels = reverseLabels(systemOptionLabels);
@@ -1460,24 +1497,124 @@ export function useProjectBackup() {
         }
       }
 
-      setProgress({ current: 11, total: 11, phase: 'done' });
+      // 12. Import Module Permissions
+      const permissionSheetName = workbook.SheetNames.find(s => s === '模組權限');
+      if (permissionSheetName) {
+        setProgress({ current: 12, total: 12, phase: 'importing', currentSheet: '模組權限' });
+        const sheet = workbook.Sheets[permissionSheetName];
+        const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
+        const reversedLabels = reverseLabels(modulePermissionLabels);
+
+        // Build email to user ID map
+        const { data: profiles } = await supabase.from('profiles').select('id, email');
+        const emailToUserId = new Map<string, string>();
+        profiles?.forEach(p => {
+          if (p.email) emailToUserId.set(p.email.toLowerCase(), p.id);
+        });
+
+        const { data: existingData } = await supabase.from('module_permissions').select('id, user_id, module_name');
+        const existingIds = new Set(existingData?.map(p => p.id) || []);
+        const existingKeys = new Map<string, string>();
+        existingData?.forEach(p => existingKeys.set(`${p.user_id}-${p.module_name}`, p.id));
+
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          const rowNum = i + 2;
+          try {
+            const mapped: Record<string, any> = {};
+            let providedId: string | null = null;
+            let userEmail: string | null = null;
+            let moduleName: string | null = null;
+
+            Object.entries(row).forEach(([label, value]) => {
+              const key = reversedLabels[label];
+              if (!key || value === '' || value === null) return;
+              if (key === 'id') providedId = String(value);
+              else if (key === 'user_email') userEmail = String(value).toLowerCase();
+              else if (key === 'module_name') {
+                moduleName = String(value);
+                mapped[key] = moduleName;
+              } else if (['can_view', 'can_create', 'can_edit', 'can_delete'].includes(key)) {
+                mapped[key] = String(value).toLowerCase() === 'true' || value === true;
+              } else if (!['created_at', 'updated_at', 'created_by'].includes(key)) {
+                mapped[key] = String(value);
+              }
+            });
+
+            if (!userEmail) {
+              summary.errorList.push({ row: rowNum, sheet: '模組權限', message: '缺少使用者Email', errorType: 'validation' });
+              summary.modulePermissions.errors++;
+              continue;
+            }
+            if (!moduleName) {
+              summary.errorList.push({ row: rowNum, sheet: '模組權限', message: '缺少模組名稱', errorType: 'validation', code: userEmail });
+              summary.modulePermissions.errors++;
+              continue;
+            }
+
+            const userId = emailToUserId.get(userEmail);
+            if (!userId) {
+              summary.errorList.push({ row: rowNum, sheet: '模組權限', message: `找不到使用者「${userEmail}」`, errorType: 'not_found', code: userEmail });
+              summary.modulePermissions.errors++;
+              continue;
+            }
+            mapped.user_id = userId;
+
+            // Determine existing ID by provided ID or user_id + module_name combination
+            let existingId = providedId && existingIds.has(providedId) ? providedId : null;
+            if (!existingId) {
+              existingId = existingKeys.get(`${userId}-${moduleName}`) || null;
+            }
+
+            if (existingId) {
+              if (mode === 'insert') {
+                summary.errorList.push({ row: rowNum, sheet: '模組權限', message: '權限記錄已存在（僅新增模式）', errorType: 'unique_constraint', code: `${userEmail}-${moduleName}` });
+                summary.modulePermissions.errors++;
+              } else if (mode === 'skip') {
+                summary.modulePermissions.skipped++;
+              } else {
+                const { error } = await supabase.from('module_permissions').update(mapped).eq('id', existingId);
+                if (error) {
+                  summary.errorList.push({ row: rowNum, sheet: '模組權限', message: error.message, errorType: 'unknown', code: `${userEmail}-${moduleName}` });
+                  summary.modulePermissions.errors++;
+                } else {
+                  summary.modulePermissions.updated++;
+                }
+              }
+            } else {
+              const { error } = await supabase.from('module_permissions').insert(mapped as any);
+              if (error) {
+                summary.errorList.push({ row: rowNum, sheet: '模組權限', message: error.message, errorType: 'unknown', code: `${userEmail}-${moduleName}` });
+                summary.modulePermissions.errors++;
+              } else {
+                summary.modulePermissions.inserted++;
+              }
+            }
+          } catch (err) {
+            summary.errorList.push({ row: rowNum, sheet: '模組權限', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.modulePermissions.errors++;
+          }
+        }
+      }
+
+      setProgress({ current: 12, total: 12, phase: 'done' });
       setImportSummary(summary);
 
       const totalInserted = 
         summary.investors.inserted + summary.investorContacts.inserted + summary.investorPaymentMethods.inserted +
         summary.partners.inserted + summary.projects.inserted + summary.statusHistory.inserted + 
         summary.constructionHistory.inserted + summary.constructionAssignments.inserted + 
-        summary.documents.inserted + summary.systemOptions.inserted;
+        summary.documents.inserted + summary.systemOptions.inserted + summary.modulePermissions.inserted;
       const totalUpdated = 
         summary.investors.updated + summary.investorContacts.updated + summary.investorPaymentMethods.updated +
         summary.partners.updated + summary.projects.updated + summary.statusHistory.updated + 
         summary.constructionHistory.updated + summary.constructionAssignments.updated + 
-        summary.documents.updated + summary.systemOptions.updated;
+        summary.documents.updated + summary.systemOptions.updated + summary.modulePermissions.updated;
       const totalErrors = 
         summary.investors.errors + summary.investorContacts.errors + summary.investorPaymentMethods.errors +
         summary.partners.errors + summary.projects.errors + summary.statusHistory.errors + 
         summary.constructionHistory.errors + summary.constructionAssignments.errors + 
-        summary.documents.errors + summary.systemOptions.errors;
+        summary.documents.errors + summary.systemOptions.errors + summary.modulePermissions.errors;
 
       if (totalErrors > 0) {
         toast.warning('匯入完成（部分失敗）', { 
