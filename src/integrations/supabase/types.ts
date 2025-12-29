@@ -792,6 +792,110 @@ export type Database = {
         }
         Relationships: []
       }
+      progress_milestones: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          is_required: boolean
+          milestone_code: string
+          milestone_name: string
+          milestone_type: Database["public"]["Enums"]["milestone_type"]
+          sort_order: number
+          stage_label: string | null
+          updated_at: string
+          updated_by: string | null
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          milestone_code: string
+          milestone_name: string
+          milestone_type: Database["public"]["Enums"]["milestone_type"]
+          sort_order?: number
+          stage_label?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          is_required?: boolean
+          milestone_code?: string
+          milestone_name?: string
+          milestone_type?: Database["public"]["Enums"]["milestone_type"]
+          sort_order?: number
+          stage_label?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progress_milestones_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "progress_milestones_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      progress_settings: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          setting_key: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "progress_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_construction_assignments: {
         Row: {
           actual_end_date: string | null
@@ -867,6 +971,57 @@ export type Database = {
           },
         ]
       }
+      project_milestones: {
+        Row: {
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          is_completed: boolean
+          milestone_code: string
+          note: string | null
+          project_id: string
+          updated_at: string
+        }
+        Insert: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          milestone_code: string
+          note?: string | null
+          project_id: string
+          updated_at?: string
+        }
+        Update: {
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean
+          milestone_code?: string
+          note?: string | null
+          project_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_milestones_completed_by_fkey"
+            columns: ["completed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_status_history: {
         Row: {
           attachment_path: string | null
@@ -909,6 +1064,8 @@ export type Database = {
         Row: {
           actual_installed_capacity: number | null
           address: string | null
+          admin_progress: number | null
+          admin_stage: string | null
           approval_date: string | null
           archive_reason: string | null
           archived_at: string | null
@@ -927,6 +1084,8 @@ export type Database = {
           district: string | null
           drive_folder_id: string | null
           drive_folder_url: string | null
+          engineering_progress: number | null
+          engineering_stage: string | null
           feeder_code: string | null
           fiscal_year: number | null
           folder_error: string | null
@@ -941,6 +1100,7 @@ export type Database = {
           land_owner: string | null
           land_owner_contact: string | null
           note: string | null
+          overall_progress: number | null
           pole_status: string | null
           power_phase_type: string | null
           power_voltage: string | null
@@ -955,6 +1115,8 @@ export type Database = {
         Insert: {
           actual_installed_capacity?: number | null
           address?: string | null
+          admin_progress?: number | null
+          admin_stage?: string | null
           approval_date?: string | null
           archive_reason?: string | null
           archived_at?: string | null
@@ -973,6 +1135,8 @@ export type Database = {
           district?: string | null
           drive_folder_id?: string | null
           drive_folder_url?: string | null
+          engineering_progress?: number | null
+          engineering_stage?: string | null
           feeder_code?: string | null
           fiscal_year?: number | null
           folder_error?: string | null
@@ -987,6 +1151,7 @@ export type Database = {
           land_owner?: string | null
           land_owner_contact?: string | null
           note?: string | null
+          overall_progress?: number | null
           pole_status?: string | null
           power_phase_type?: string | null
           power_voltage?: string | null
@@ -1001,6 +1166,8 @@ export type Database = {
         Update: {
           actual_installed_capacity?: number | null
           address?: string | null
+          admin_progress?: number | null
+          admin_stage?: string | null
           approval_date?: string | null
           archive_reason?: string | null
           archived_at?: string | null
@@ -1019,6 +1186,8 @@ export type Database = {
           district?: string | null
           drive_folder_id?: string | null
           drive_folder_url?: string | null
+          engineering_progress?: number | null
+          engineering_stage?: string | null
           feeder_code?: string | null
           fiscal_year?: number | null
           folder_error?: string | null
@@ -1033,6 +1202,7 @@ export type Database = {
           land_owner?: string | null
           land_owner_contact?: string | null
           note?: string | null
+          overall_progress?: number | null
           pole_status?: string | null
           power_phase_type?: string | null
           power_voltage?: string | null
@@ -1312,6 +1482,7 @@ export type Database = {
         | "新建物（農業）"
         | "新建物（其他）"
       investor_type: "自有投資" | "租賃投資" | "SPC" | "個人" | "其他"
+      milestone_type: "admin" | "engineering"
       payment_method_type: "銀行轉帳" | "支票" | "現金" | "信用卡" | "其他"
       pole_status:
         | "已立桿"
@@ -1529,6 +1700,7 @@ export const Constants = {
         "新建物（其他）",
       ],
       investor_type: ["自有投資", "租賃投資", "SPC", "個人", "其他"],
+      milestone_type: ["admin", "engineering"],
       payment_method_type: ["銀行轉帳", "支票", "現金", "信用卡", "其他"],
       pole_status: ["已立桿", "未立桿", "基礎完成", "無須", "需移桿", "亭置式"],
       power_phase_type: ["單相三線式", "三相三線式", "三相四線式"],
