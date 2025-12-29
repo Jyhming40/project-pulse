@@ -18,7 +18,8 @@ import {
   HardHat,
   Trash2,
   Shield,
-  ClipboardList
+  ClipboardList,
+  TrendingUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -111,6 +112,16 @@ export default function Layout({ children }: LayoutProps) {
 
           {isAdmin && (
             <>
+              <NavLink
+                to="/progress-settings"
+                className={cn(
+                  "sidebar-link",
+                  location.pathname === '/progress-settings' && "sidebar-link-active"
+                )}
+              >
+                <TrendingUp className="w-5 h-5 flex-shrink-0" />
+                {!collapsed && <span className="animate-fade-in">進度設定</span>}
+              </NavLink>
               <NavLink
                 to="/system-options"
                 className={cn(
