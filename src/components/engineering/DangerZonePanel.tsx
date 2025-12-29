@@ -69,7 +69,7 @@ const RESET_SCOPES = {
   },
   factory: {
     label: '完整重置',
-    description: '清除所有業務資料及稽核日誌（保留系統設定）',
+    description: '清除所有業務資料及稽核日誌（保留系統設定與權限）',
     tables: [
       'document_files',
       'documents',
@@ -84,9 +84,13 @@ const RESET_SCOPES = {
       'partners',
       'investor_year_counters',
       'audit_logs',
+      'module_permissions',
     ],
   },
 };
+
+// Preserved tables that should be displayed in all reset scopes
+const PRESERVED_TABLES = ['system_options', 'deletion_policies', 'profiles', 'user_roles', 'user_preferences'];
 
 const ENVIRONMENT_ID = 'MQTSOLAR-DEV'; // This should be configurable
 
@@ -285,12 +289,20 @@ export function DangerZonePanel() {
             <Label>將會保留的資料表</Label>
             <div className="p-3 rounded-lg border bg-green-500/5 border-green-500/20">
               <div className="flex flex-wrap gap-2">
-                <Badge variant="secondary" className="text-xs">system_options</Badge>
-                <Badge variant="secondary" className="text-xs">deletion_policies</Badge>
-                <Badge variant="secondary" className="text-xs">profiles</Badge>
-                <Badge variant="secondary" className="text-xs">user_roles</Badge>
+                {PRESERVED_TABLES.map((table) => (
+                  <Badge key={table} variant="secondary" className="text-xs">
+                    {tableDisplayNames[table] || table}
+                  </Badge>
+                ))}
                 {resetScope !== 'factory' && (
-                  <Badge variant="secondary" className="text-xs">audit_logs</Badge>
+                  <>
+                    <Badge variant="secondary" className="text-xs">
+                      {tableDisplayNames['audit_logs'] || 'audit_logs'}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      {tableDisplayNames['module_permissions'] || 'module_permissions'}
+                    </Badge>
+                  </>
                 )}
               </div>
             </div>
