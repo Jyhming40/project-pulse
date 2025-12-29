@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useModuleAccess, MODULES } from '@/hooks/usePermissions';
+import { PermissionGate, PermissionButton } from '@/components/PermissionGate';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { CodebookSelect } from '@/components/CodebookSelect';
@@ -112,6 +114,7 @@ const cities = [
 export default function Projects() {
   const navigate = useNavigate();
   const { canEdit, isAdmin, user } = useAuth();
+  const { canCreate, canEdit: canEditProjects, canDelete } = useModuleAccess(MODULES.PROJECTS);
   const queryClient = useQueryClient();
   
   // Fetch dynamic options from Codebook (for filter dropdowns only)
@@ -345,24 +348,24 @@ export default function Projects() {
           <p className="text-muted-foreground mt-1">共 {projects.length} 個案場</p>
         </div>
         <div className="flex gap-2">
-          {canEdit && (
+          <PermissionGate module={MODULES.PROJECTS} action="edit">
             <Button variant="outline" onClick={() => setIsBackupOpen(true)}>
               <DatabaseIcon className="w-4 h-4 mr-2" />
               完整備份
             </Button>
-          )}
-          {canEdit && (
+          </PermissionGate>
+          <PermissionGate module={MODULES.PROJECTS} action="edit">
             <Button variant="outline" onClick={() => setIsImportExportOpen(true)}>
               <FileDown className="w-4 h-4 mr-2" />
               匯入/匯出
             </Button>
-          )}
-          {canEdit && (
+          </PermissionGate>
+          <PermissionGate module={MODULES.PROJECTS} action="create">
             <Button onClick={() => setIsCreateOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
               新增案場
             </Button>
-          )}
+          </PermissionGate>
         </div>
       </div>
 
