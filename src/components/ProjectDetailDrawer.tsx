@@ -391,60 +391,16 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
 
                 {/* 行政流程 / 進度 Tab */}
                 <TabsContent value="admin-progress" className="p-6 space-y-4 mt-0">
-                  {/* 進度總覽 */}
-                  <Card>
-                    <CardHeader className="py-3">
-                      <CardTitle className="text-sm">進度總覽</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0 space-y-3">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-12">總進度</span>
-                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary rounded-full transition-all"
-                            style={{ width: `${(project as any).overall_progress || 0}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-medium w-10 text-right">
-                          {Math.round((project as any).overall_progress || 0)}%
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-12">行政</span>
-                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-info rounded-full transition-all"
-                            style={{ width: `${(project as any).admin_progress || 0}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-medium w-10 text-right">
-                          {Math.round((project as any).admin_progress || 0)}%
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-12">工程</span>
-                        <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-success rounded-full transition-all"
-                            style={{ width: `${(project as any).engineering_progress || 0}%` }}
-                          />
-                        </div>
-                        <span className="text-xs font-medium w-10 text-right">
-                          {Math.round((project as any).engineering_progress || 0)}%
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
 
-                  {/* 里程碑 */}
-                  <Card>
-                    <CardHeader className="py-3">
-                      <CardTitle className="text-sm">里程碑進度</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <ProjectMilestones projectId={projectId!} />
-                    </CardContent>
-                  </Card>
+                  {/* 里程碑 - 不再重複顯示進度條 */}
+                  <ProjectMilestones 
+                    projectId={projectId!} 
+                    adminProgress={(project as any).admin_progress || 0}
+                    engineeringProgress={(project as any).engineering_progress || 0}
+                    overallProgress={(project as any).overall_progress || 0}
+                    adminStage={(project as any).admin_stage}
+                    engineeringStage={(project as any).engineering_stage}
+                  />
 
                   {/* 狀態歷史 */}
                   <Card>
