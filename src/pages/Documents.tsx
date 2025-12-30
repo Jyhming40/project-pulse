@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { useTableSort } from '@/hooks/useTableSort';
 import { format, isWithinInterval, subDays } from 'date-fns';
 import { 
   Search, 
@@ -31,6 +32,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
@@ -117,6 +119,12 @@ export default function Documents() {
     const matchesStatus = statusFilter === 'all' || doc.doc_status === statusFilter;
     
     return matchesSearch && matchesType && matchesStatus;
+  });
+
+  // Sorting
+  const { sortedData: sortedDocuments, sortConfig, handleSort } = useTableSort(filteredDocuments, {
+    key: 'updated_at',
+    direction: 'desc',
   });
 
   // Stats
@@ -238,24 +246,24 @@ export default function Documents() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>案場</TableHead>
-              <TableHead>文件類型</TableHead>
-              <TableHead>狀態</TableHead>
-              <TableHead>送件日</TableHead>
-              <TableHead>核發日</TableHead>
-              <TableHead>到期日</TableHead>
-              <TableHead>負責人</TableHead>
+              <SortableTableHead sortKey="projects.project_name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>案場</SortableTableHead>
+              <SortableTableHead sortKey="doc_type" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>文件類型</SortableTableHead>
+              <SortableTableHead sortKey="doc_status" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>狀態</SortableTableHead>
+              <SortableTableHead sortKey="submitted_at" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>送件日</SortableTableHead>
+              <SortableTableHead sortKey="issued_at" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>核發日</SortableTableHead>
+              <SortableTableHead sortKey="due_at" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>到期日</SortableTableHead>
+              <SortableTableHead sortKey="owner.full_name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>負責人</SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredDocuments.length === 0 ? (
+            {sortedDocuments.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                   {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
             ) : (
-              filteredDocuments.map(doc => {
+              sortedDocuments.map(doc => {
                 const project = doc.projects as any;
                 const owner = doc.owner as any;
                 const isDueSoon = doc.due_at && isWithinInterval(new Date(doc.due_at), {

@@ -6,6 +6,7 @@ import { useModuleAccess, MODULES } from '@/hooks/usePermissions';
 import { PermissionGate, PermissionButton } from '@/components/PermissionGate';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
+import { useTableSort } from '@/hooks/useTableSort';
 import { CodebookSelect } from '@/components/CodebookSelect';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { 
@@ -39,10 +40,11 @@ import {
   Table, 
   TableBody, 
   TableCell, 
-  TableHead, 
+  TableHead,
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -298,6 +300,12 @@ export default function Projects() {
     return matchesSearch && matchesStatus && matchesCity && matchesConstruction;
   });
 
+  // Sorting
+  const { sortedData: sortedProjects, sortConfig, handleSort } = useTableSort(filteredProjects, {
+    key: 'updated_at',
+    direction: 'desc',
+  });
+
   // Handle investor selection - auto-fill investor code
   const handleInvestorChange = (investorId: string) => {
     const investor = investors.find(inv => inv.id === investorId);
@@ -420,28 +428,28 @@ export default function Projects() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>案場編號</TableHead>
-              <TableHead>案場名稱</TableHead>
-              <TableHead>投資方</TableHead>
-              <TableHead>狀態</TableHead>
-              <TableHead>總進度</TableHead>
-              <TableHead>行政</TableHead>
-              <TableHead>工程</TableHead>
-              <TableHead>施工狀態</TableHead>
-              <TableHead>容量 (kWp)</TableHead>
-              <TableHead>縣市</TableHead>
+              <SortableTableHead sortKey="site_code_display" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>案場編號</SortableTableHead>
+              <SortableTableHead sortKey="project_name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>案場名稱</SortableTableHead>
+              <SortableTableHead sortKey="investors.company_name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>投資方</SortableTableHead>
+              <SortableTableHead sortKey="status" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>狀態</SortableTableHead>
+              <SortableTableHead sortKey="overall_progress" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>總進度</SortableTableHead>
+              <SortableTableHead sortKey="admin_progress" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>行政</SortableTableHead>
+              <SortableTableHead sortKey="engineering_progress" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>工程</SortableTableHead>
+              <SortableTableHead sortKey="construction_status" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>施工狀態</SortableTableHead>
+              <SortableTableHead sortKey="capacity_kwp" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>容量 (kWp)</SortableTableHead>
+              <SortableTableHead sortKey="city" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>縣市</SortableTableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredProjects.length === 0 ? (
+            {sortedProjects.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                   {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
             ) : (
-              filteredProjects.map(project => (
+              sortedProjects.map(project => (
                 <TableRow 
                   key={project.id} 
                   className="cursor-pointer hover:bg-muted/50"

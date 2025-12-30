@@ -4,6 +4,7 @@ import { usePartners, type Partner, type CreatePartnerInput } from '@/hooks/useP
 import { usePartnersImport } from '@/hooks/usePartnersImport';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useCodebookOptions } from '@/hooks/useCodebook';
+import { useTableSort } from '@/hooks/useTableSort';
 import { CodebookSelect, CodebookValue } from '@/components/CodebookSelect';
 import { PartnerContacts } from '@/components/PartnerContacts';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
@@ -50,6 +51,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Dialog,
   DialogContent,
@@ -141,6 +143,12 @@ export default function Partners() {
       (p.work_capabilities && p.work_capabilities.includes(filterWorkType));
     
     return matchesSearch && matchesWorkType;
+  });
+
+  // Sorting
+  const { sortedData: sortedPartners, sortConfig, handleSort } = useTableSort(filteredPartners, {
+    key: 'name',
+    direction: 'asc',
   });
 
   const handleOpenForm = (partner?: Partner) => {
@@ -350,17 +358,17 @@ export default function Partners() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10"></TableHead>
-                  <TableHead>名稱</TableHead>
-                  <TableHead>類型</TableHead>
-                  <TableHead>統編</TableHead>
+                  <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>名稱</SortableTableHead>
+                  <SortableTableHead sortKey="partner_type" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>類型</SortableTableHead>
+                  <SortableTableHead sortKey="tax_id" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>統編</SortableTableHead>
                   <TableHead>工程能力</TableHead>
-                  <TableHead>聯絡人</TableHead>
-                  <TableHead>狀態</TableHead>
+                  <SortableTableHead sortKey="contact_person" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>聯絡人</SortableTableHead>
+                  <SortableTableHead sortKey="is_active" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>狀態</SortableTableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredPartners.map((partner) => (
+                {sortedPartners.map((partner) => (
                   <Fragment key={partner.id}>
                     <TableRow className={!partner.is_active ? 'opacity-50' : ''}>
                       <TableCell>
