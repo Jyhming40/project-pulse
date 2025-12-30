@@ -27,6 +27,7 @@ import ProgressSettings from "./pages/ProgressSettings";
 import ChangePassword from "./pages/ChangePassword";
 import Branding from "./pages/Branding";
 import Integrations from "./pages/Integrations";
+import PendingApproval from "./pages/PendingApproval";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/change-password" element={<ChangePassword />} />
+            <Route path="/pending-approval" element={<PendingApproval />} />
             
             {/* 日常工作 */}
             <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
