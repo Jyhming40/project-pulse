@@ -342,6 +342,62 @@ export type Database = {
           },
         ]
       }
+      duplicate_ignore_pairs: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          note: string | null
+          project_id_a: string
+          project_id_b: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          project_id_a: string
+          project_id_b: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          note?: string | null
+          project_id_a?: string
+          project_id_b?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duplicate_ignore_pairs_project_id_a_fkey"
+            columns: ["project_id_a"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "duplicate_ignore_pairs_project_id_a_fkey"
+            columns: ["project_id_a"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplicate_ignore_pairs_project_id_b_fkey"
+            columns: ["project_id_b"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "duplicate_ignore_pairs_project_id_b_fkey"
+            columns: ["project_id_b"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       investor_contacts: {
         Row: {
           contact_name: string
