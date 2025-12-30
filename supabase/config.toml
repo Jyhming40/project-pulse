@@ -23,3 +23,12 @@ verify_jwt = true
 
 [functions.admin-delete-user]
 verify_jwt = true
+
+[functions.admin-update-role]
+verify_jwt = true
+
+[functions.admin-reset-password]
+verify_jwt = true
+
+[functions.user-change-password]
+verify_jwt = true

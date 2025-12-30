@@ -22,6 +22,7 @@ import DeletionPolicies from "./pages/DeletionPolicies";
 import AuditLogs from "./pages/AuditLogs";
 import Engineering from "./pages/Engineering";
 import ProgressSettings from "./pages/ProgressSettings";
+import ChangePassword from "./pages/ChangePassword";
 
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
@@ -35,6 +36,7 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/auth" element={<Auth />} />
+            <Route path="/change-password" element={<ChangePassword />} />
             <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
             <Route path="/projects" element={<ProtectedRoute><Layout><Projects /></Layout></ProtectedRoute>} />
             <Route path="/projects/:id" element={<ProtectedRoute><Layout><ProjectDetail /></Layout></ProtectedRoute>} />
