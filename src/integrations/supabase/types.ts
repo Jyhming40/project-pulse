@@ -398,6 +398,68 @@ export type Database = {
           },
         ]
       }
+      duplicate_reviews: {
+        Row: {
+          created_at: string
+          decision: string
+          id: string
+          project_id_a: string
+          project_id_b: string
+          reason: string | null
+          reviewed_at: string
+          reviewed_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          decision: string
+          id?: string
+          project_id_a: string
+          project_id_b: string
+          reason?: string | null
+          reviewed_at?: string
+          reviewed_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          decision?: string
+          id?: string
+          project_id_a?: string
+          project_id_b?: string
+          reason?: string | null
+          reviewed_at?: string
+          reviewed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "duplicate_reviews_project_id_a_fkey"
+            columns: ["project_id_a"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "duplicate_reviews_project_id_a_fkey"
+            columns: ["project_id_a"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplicate_reviews_project_id_b_fkey"
+            columns: ["project_id_b"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "duplicate_reviews_project_id_b_fkey"
+            columns: ["project_id_b"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       investor_contacts: {
         Row: {
           contact_name: string

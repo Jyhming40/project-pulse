@@ -283,46 +283,68 @@ export function useDuplicateScanner() {
         const sameInvestor = !!(p1.investor_id && p2.investor_id && p1.investor_id === p2.investor_id);
         const sameCity = !!(p1.city && p2.city && p1.city === p2.city);
         const sameTownship = !!(p1.district && p2.district && p1.district === p2.district);
-        const sameSiteCode = !!(p1.site_code_display && p2.site_code_display && 
-          p1.site_code_display === p2.site_code_display);
-        const sameInvestorYearSeq = !!(p1.investor_code && p2.investor_code &&
+        
+        // ===== NULL SAFETY: Only match if BOTH values are non-null =====
+        const sameSiteCode = !!(
+          p1.site_code_display && 
+          p2.site_code_display && 
+          p1.site_code_display === p2.site_code_display
+        );
+        
+        // For investor+year+seq, ALL THREE fields must be non-null on BOTH projects
+        const hasValidInvestorYearSeq1 = !!(p1.investor_code && p1.intake_year != null && p1.seq != null);
+        const hasValidInvestorYearSeq2 = !!(p2.investor_code && p2.intake_year != null && p2.seq != null);
+        const sameInvestorYearSeq = hasValidInvestorYearSeq1 && hasValidInvestorYearSeq2 &&
           p1.investor_code === p2.investor_code &&
           p1.intake_year === p2.intake_year &&
-          p1.seq === p2.seq);
+          p1.seq === p2.seq;
 
-        // ======= HARD EXCLUSIONS =======
-        // Rule 1: If both address_similarity < 40 AND name_similarity < 40, exclude
-        if (addressSimilarity < 40 && nameSimilarity < 40) {
-          // Only exception: high confidence matches (site_code or investor+year+seq)
-          if (!sameSiteCode && !sameInvestorYearSeq) {
-            continue;
+        // Track why high confidence is not available
+        const highConfidenceBlockers: string[] = [];
+        if (!p1.site_code_display || !p2.site_code_display) {
+          highConfidenceBlockers.push('案場代碼有空值');
+        }
+        if (!hasValidInvestorYearSeq1 || !hasValidInvestorYearSeq2) {
+          if (!p1.seq || !p2.seq) {
+            highConfidenceBlockers.push('序號為空');
+          }
+          if (!p1.investor_code || !p2.investor_code) {
+            highConfidenceBlockers.push('投資代碼為空');
+          }
+          if (p1.intake_year == null || p2.intake_year == null) {
+            highConfidenceBlockers.push('年份為空');
           }
         }
 
-        // Rule 2: If different township, only allow high confidence matches
-        if (!sameTownship && !sameSiteCode && !sameInvestorYearSeq) {
+        // ======= HARD EXCLUSIONS (A, B rules) =======
+        // Rule 1: If BOTH address_similarity < 40 AND name_similarity < 40 → EXCLUDE
+        if (addressSimilarity < 40 && nameSimilarity < 40) {
           continue;
         }
 
-        // Rule 3: If address token overlap is very low (< 0.2) and not high confidence, exclude
-        if (addressTokenOverlap < 0.2 && !sameSiteCode && !sameInvestorYearSeq) {
-          // Unless name similarity is very high
-          if (nameSimilarity < 75) {
-            continue;
-          }
+        // Rule 2: Capacity difference > 50% → EXCLUDE
+        if (capacityDiff > 50) {
+          continue;
         }
+
+        // Rule 3: Different township → EXCLUDE
+        if (!sameTownship) {
+          continue;
+        }
+
+        // Rule 4: Any identifier field is null on either side → cannot be high confidence
+        // (handled by null checks above, but we continue if no other criteria can match)
 
         // ======= CONFIDENCE LEVEL DETERMINATION =======
         const matchedCriteria: MatchCriteria[] = [];
         const unmatchedCriteria: MatchCriteria[] = [];
         let confidenceLevel: ConfidenceLevel | null = null;
 
-        // --- HIGH CONFIDENCE CHECKS ---
+        // --- HIGH CONFIDENCE CHECKS (C rules) ---
+        // High confidence ONLY for strong identifiers with non-null values
         if (sameSiteCode) {
           matchedCriteria.push({ name: '案場代碼完全相同', matched: true, value: p1.site_code_display! });
           confidenceLevel = 'high';
-        } else {
-          unmatchedCriteria.push({ name: '案場代碼相同', matched: false });
         }
 
         if (sameInvestorYearSeq) {
@@ -332,18 +354,32 @@ export function useDuplicateScanner() {
             value: `${p1.investor_code}-${p1.intake_year}-${p1.seq}`
           });
           confidenceLevel = 'high';
-        } else if (p1.investor_code && p2.investor_code) {
-          unmatchedCriteria.push({ name: '投資代碼+年份+序號相同', matched: false });
         }
 
-        // --- MEDIUM CONFIDENCE CHECKS ---
+        // Add blockers to unmatched criteria for UI display
+        if (!sameSiteCode) {
+          unmatchedCriteria.push({ name: '案場代碼相同', matched: false });
+        }
+        if (!sameInvestorYearSeq) {
+          const reason = highConfidenceBlockers.length > 0 
+            ? highConfidenceBlockers.join('、') 
+            : '值不相同';
+          unmatchedCriteria.push({ 
+            name: '投資代碼+年份+序號相同', 
+            matched: false,
+            value: reason
+          });
+        }
+
+        // --- MEDIUM CONFIDENCE CHECKS (D rules) ---
         // Must satisfy at least one PRIMARY condition: address_similarity >= 80 OR name_similarity >= 75
         if (!confidenceLevel) {
-          const hasPrimaryCondition = addressSimilarity >= 80 || nameSimilarity >= 75;
+          const hasAddressPrimary = addressSimilarity >= 80;
+          const hasNamePrimary = nameSimilarity >= 75;
+          const hasPrimaryCondition = hasAddressPrimary || hasNamePrimary;
           
           if (hasPrimaryCondition) {
-            // Check auxiliary conditions for scoring
-            if (addressSimilarity >= 80) {
+            if (hasAddressPrimary) {
               matchedCriteria.push({ 
                 name: '地址高度相似', 
                 matched: true, 
@@ -352,7 +388,7 @@ export function useDuplicateScanner() {
               });
             }
             
-            if (nameSimilarity >= 75) {
+            if (hasNamePrimary) {
               matchedCriteria.push({ 
                 name: '名稱高度相似', 
                 matched: true, 
@@ -368,8 +404,6 @@ export function useDuplicateScanner() {
 
             if (sameTownship) {
               matchedCriteria.push({ name: '同鄉鎮市區', matched: true, value: `${p1.city}${p1.district}` });
-            } else if (sameCity) {
-              matchedCriteria.push({ name: '同縣市', matched: true, value: p1.city || '' });
             }
 
             if (capacityDiff <= 15) {
@@ -387,26 +421,23 @@ export function useDuplicateScanner() {
         // --- LOW CONFIDENCE CHECKS ---
         if (!confidenceLevel) {
           // Low confidence: same investor + same township + capacity within 15%
+          // But must NOT have extremely low similarity (already filtered by hard exclusion)
           if (sameInvestor && sameTownship && capacityDiff <= 15) {
             matchedCriteria.push({ name: '同投資方', matched: true, value: p1.investor_name || '' });
             matchedCriteria.push({ name: '同鄉鎮市區', matched: true, value: `${p1.city}${p1.district}` });
             matchedCriteria.push({ name: '容量接近', matched: true, value: `差距 ${capacityDiff.toFixed(1)}%` });
             
             // Add similarity scores as unmatched since they didn't meet threshold
-            if (addressSimilarity > 0) {
-              unmatchedCriteria.push({ 
-                name: '地址相似度', 
-                matched: false, 
-                value: `${Math.round(addressSimilarity)}% (需≥80%)`
-              });
-            }
-            if (nameSimilarity > 0) {
-              unmatchedCriteria.push({ 
-                name: '名稱相似度', 
-                matched: false, 
-                value: `${Math.round(nameSimilarity)}% (需≥75%)`
-              });
-            }
+            unmatchedCriteria.push({ 
+              name: '地址相似度', 
+              matched: false, 
+              value: `${Math.round(addressSimilarity)}% (需≥80%)`
+            });
+            unmatchedCriteria.push({ 
+              name: '名稱相似度', 
+              matched: false, 
+              value: `${Math.round(nameSimilarity)}% (需≥75%)`
+            });
             
             confidenceLevel = 'low';
           }
@@ -416,9 +447,6 @@ export function useDuplicateScanner() {
         if (confidenceLevel) {
           if (!sameInvestor && !matchedCriteria.some(c => c.name === '同投資方')) {
             unmatchedCriteria.push({ name: '同投資方', matched: false });
-          }
-          if (!sameTownship && !matchedCriteria.some(c => c.name.includes('鄉鎮市區'))) {
-            unmatchedCriteria.push({ name: '同鄉鎮市區', matched: false });
           }
           if (capacityDiff > 15 && !matchedCriteria.some(c => c.name === '容量接近')) {
             unmatchedCriteria.push({ name: '容量接近', matched: false, value: `差距 ${capacityDiff.toFixed(1)}%` });
