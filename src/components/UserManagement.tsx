@@ -15,7 +15,11 @@ import {
   X,
   AlertTriangle,
   KeyRound,
-  RefreshCw
+  RefreshCw,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Ban
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -24,6 +28,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -46,23 +51,27 @@ import { toast } from 'sonner';
 import type { Database as DB } from '@/integrations/supabase/types';
 
 type AppRole = DB['public']['Enums']['app_role'];
+type UserStatus = 'pending' | 'active' | 'rejected' | 'disabled';
 
 interface UserWithRole {
   id: string;
   email: string | null;
   full_name: string | null;
   created_at: string;
-  user_roles: { role: AppRole }[];
+  user_roles: { role: AppRole; status: UserStatus }[];
 }
 
 export default function UserManagement() {
   const { user, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState('active');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
+  const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
+  const [isRejectDialogOpen, setIsRejectDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   
   // Form states
@@ -72,6 +81,8 @@ export default function UserManagement() {
   const [newUserRole, setNewUserRole] = useState<AppRole>('viewer');
   const [editUserName, setEditUserName] = useState('');
   const [editUserRole, setEditUserRole] = useState<AppRole>('viewer');
+  const [approveRole, setApproveRole] = useState<AppRole>('viewer');
+  const [rejectReason, setRejectReason] = useState('');
   
   // Password reset states
   const [resetMode, setResetMode] = useState<'force_change' | 'set_password'>('force_change');
@@ -81,35 +92,98 @@ export default function UserManagement() {
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['all-users'],
     queryFn: async () => {
-      // First get profiles
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('id, email, full_name, created_at')
         .order('created_at', { ascending: false });
       if (profilesError) throw profilesError;
       
-      // Then get all roles separately to avoid RLS issues
       const { data: roles, error: rolesError } = await supabase
         .from('user_roles')
-        .select('user_id, role');
+        .select('user_id, role, status');
       if (rolesError) throw rolesError;
       
-      // Merge roles into profiles
-      const rolesMap = new Map(roles?.map(r => [r.user_id, r.role]) || []);
+      const rolesMap = new Map(roles?.map(r => [r.user_id, { role: r.role, status: r.status as UserStatus }]) || []);
       
       return (profiles || []).map(p => ({
         ...p,
-        user_roles: rolesMap.has(p.id) ? [{ role: rolesMap.get(p.id)! }] : []
+        user_roles: rolesMap.has(p.id) ? [rolesMap.get(p.id)!] : [{ role: 'viewer' as AppRole, status: 'pending' as UserStatus }]
       })) as UserWithRole[];
     },
     enabled: isAdmin,
   });
 
-  // Filter users by search term
-  const filteredUsers = users.filter(u => 
+  // Filter users by status and search
+  const activeUsers = users.filter(u => u.user_roles?.[0]?.status === 'active');
+  const pendingUsers = users.filter(u => u.user_roles?.[0]?.status === 'pending');
+  const disabledUsers = users.filter(u => ['rejected', 'disabled'].includes(u.user_roles?.[0]?.status || ''));
+
+  const filterBySearch = (list: UserWithRole[]) => list.filter(u => 
     u.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     u.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // Approve user mutation
+  const approveUserMutation = useMutation({
+    mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
+      const { data, error } = await supabase.functions.invoke('admin-approve-user', {
+        body: { userId, action: 'approve', role }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-users'] });
+      toast.success('使用者已核准');
+      setIsApproveDialogOpen(false);
+      setSelectedUser(null);
+    },
+    onError: (error) => {
+      toast.error('核准失敗: ' + error.message);
+    }
+  });
+
+  // Reject user mutation
+  const rejectUserMutation = useMutation({
+    mutationFn: async ({ userId, reason }: { userId: string; reason?: string }) => {
+      const { data, error } = await supabase.functions.invoke('admin-approve-user', {
+        body: { userId, action: 'reject', reason }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-users'] });
+      toast.success('使用者已拒絕');
+      setIsRejectDialogOpen(false);
+      setSelectedUser(null);
+      setRejectReason('');
+    },
+    onError: (error) => {
+      toast.error('拒絕失敗: ' + error.message);
+    }
+  });
+
+  // Disable user mutation
+  const disableUserMutation = useMutation({
+    mutationFn: async ({ userId, reason }: { userId: string; reason?: string }) => {
+      const { data, error } = await supabase.functions.invoke('admin-approve-user', {
+        body: { userId, action: 'disable', reason }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-users'] });
+      toast.success('使用者已停用');
+    },
+    onError: (error) => {
+      toast.error('停用失敗: ' + error.message);
+    }
+  });
 
   // Update role mutation using Edge Function
   const updateRoleMutation = useMutation({
@@ -267,7 +341,6 @@ export default function UserManagement() {
     
     const promises: Promise<void>[] = [];
     
-    // Update name if changed
     if (editUserName !== (selectedUser.full_name || '')) {
       promises.push(
         updateProfileMutation.mutateAsync({ 
@@ -277,7 +350,6 @@ export default function UserManagement() {
       );
     }
     
-    // Update role if changed and not current user
     const currentRole = (selectedUser.user_roles?.[0]?.role as AppRole) || 'viewer';
     if (editUserRole !== currentRole && selectedUser.id !== user?.id) {
       promises.push(
@@ -330,6 +402,36 @@ export default function UserManagement() {
     });
   };
 
+  const handleApproveClick = (u: UserWithRole) => {
+    setSelectedUser(u);
+    setApproveRole('viewer');
+    setIsApproveDialogOpen(true);
+  };
+
+  const handleRejectClick = (u: UserWithRole) => {
+    setSelectedUser(u);
+    setRejectReason('');
+    setIsRejectDialogOpen(true);
+  };
+
+  const handleConfirmApprove = () => {
+    if (!selectedUser) return;
+    approveUserMutation.mutate({ userId: selectedUser.id, role: approveRole });
+  };
+
+  const handleConfirmReject = () => {
+    if (!selectedUser) return;
+    rejectUserMutation.mutate({ userId: selectedUser.id, reason: rejectReason || undefined });
+  };
+
+  const handleDisableUser = (u: UserWithRole) => {
+    if (u.id === user?.id) {
+      toast.error('無法停用自己的帳號');
+      return;
+    }
+    disableUserMutation.mutate({ userId: u.id });
+  };
+
   const getRoleBadge = (role: AppRole) => {
     switch (role) {
       case 'admin':
@@ -341,7 +443,150 @@ export default function UserManagement() {
     }
   };
 
+  const getStatusBadge = (status: UserStatus) => {
+    switch (status) {
+      case 'active':
+        return <Badge className="bg-green-500/10 text-green-600 border-green-500/20">啟用</Badge>;
+      case 'pending':
+        return <Badge className="bg-yellow-500/10 text-yellow-600 border-yellow-500/20">待審核</Badge>;
+      case 'rejected':
+        return <Badge className="bg-red-500/10 text-red-600 border-red-500/20">已拒絕</Badge>;
+      case 'disabled':
+        return <Badge className="bg-gray-500/10 text-gray-600 border-gray-500/20">已停用</Badge>;
+      default:
+        return <Badge variant="outline">未知</Badge>;
+    }
+  };
+
   if (!isAdmin) return null;
+
+  const renderUserTable = (userList: UserWithRole[], showApprovalActions = false) => (
+    <div className="border rounded-lg overflow-hidden">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            <TableHead className="w-[250px]">Email</TableHead>
+            <TableHead className="w-[120px]">姓名</TableHead>
+            <TableHead className="w-[80px]">角色</TableHead>
+            <TableHead className="w-[80px]">狀態</TableHead>
+            <TableHead className="w-[100px]">註冊時間</TableHead>
+            <TableHead className="w-[140px] text-center">操作</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {isLoading ? (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin mx-auto" />
+              </TableCell>
+            </TableRow>
+          ) : userList.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
+                {searchTerm ? '找不到符合的使用者' : '沒有使用者'}
+              </TableCell>
+            </TableRow>
+          ) : (
+            userList.map(u => {
+              const userRole = (u.user_roles?.[0]?.role as AppRole) || 'viewer';
+              const userStatus = (u.user_roles?.[0]?.status as UserStatus) || 'pending';
+              const isCurrentUser = u.id === user?.id;
+              return (
+                <TableRow key={u.id} className={isCurrentUser ? 'bg-primary/5' : ''}>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <span className="truncate">{u.email}</span>
+                      {isCurrentUser && (
+                        <Badge variant="outline" className="text-xs shrink-0">您</Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell>{u.full_name || '-'}</TableCell>
+                  <TableCell>{getRoleBadge(userRole)}</TableCell>
+                  <TableCell>{getStatusBadge(userStatus)}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">
+                    {u.created_at ? new Date(u.created_at).toLocaleDateString('zh-TW') : '-'}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-center gap-1">
+                      {showApprovalActions ? (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-green-600 hover:text-green-700 hover:bg-green-50"
+                            onClick={() => handleApproveClick(u)}
+                            title="核准"
+                          >
+                            <CheckCircle2 className="w-4 h-4 mr-1" />
+                            核准
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => handleRejectClick(u)}
+                            title="拒絕"
+                          >
+                            <XCircle className="w-4 h-4 mr-1" />
+                            拒絕
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleEditClick(u)}
+                            title="編輯"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleResetPasswordClick(u)}
+                            disabled={isCurrentUser}
+                            title={isCurrentUser ? '請使用個人設定更改自己的密碼' : '重設密碼'}
+                          >
+                            <KeyRound className="w-4 h-4" />
+                          </Button>
+                          {userStatus === 'active' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-orange-600 hover:text-orange-700"
+                              onClick={() => handleDisableUser(u)}
+                              disabled={isCurrentUser}
+                              title={isCurrentUser ? '無法停用自己' : '停用帳號'}
+                            >
+                              <Ban className="w-4 h-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive"
+                            onClick={() => handleDeleteClick(u)}
+                            disabled={isCurrentUser}
+                            title={isCurrentUser ? '無法刪除自己' : '刪除'}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
 
   return (
     <Card>
@@ -354,6 +599,11 @@ export default function UserManagement() {
             </CardTitle>
             <CardDescription>
               管理系統使用者與角色權限。共 {users.length} 位使用者
+              {pendingUsers.length > 0 && (
+                <span className="ml-2 text-yellow-600 font-medium">
+                  （{pendingUsers.length} 位待審核）
+                </span>
+              )}
             </CardDescription>
           </div>
           <Button onClick={() => setIsAddDialogOpen(true)}>
@@ -400,90 +650,47 @@ export default function UserManagement() {
           )}
         </div>
 
-        {/* Users Table */}
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="w-[280px]">Email</TableHead>
-                <TableHead className="w-[150px]">姓名</TableHead>
-                <TableHead className="w-[100px]">角色</TableHead>
-                <TableHead className="w-[120px]">註冊時間</TableHead>
-                <TableHead className="w-[120px] text-center">操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin mx-auto" />
-                  </TableCell>
-                </TableRow>
-              ) : filteredUsers.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                    {searchTerm ? '找不到符合的使用者' : '尚無使用者資料'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredUsers.map(u => {
-                  const userRole = (u.user_roles?.[0]?.role as AppRole) || 'viewer';
-                  const isCurrentUser = u.id === user?.id;
-                  return (
-                    <TableRow key={u.id} className={isCurrentUser ? 'bg-primary/5' : ''}>
-                      <TableCell className="font-medium">
-                        <div className="flex items-center gap-2">
-                          <span className="truncate">{u.email}</span>
-                          {isCurrentUser && (
-                            <Badge variant="outline" className="text-xs shrink-0">您</Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{u.full_name || '-'}</TableCell>
-                      <TableCell>{getRoleBadge(userRole)}</TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {u.created_at ? new Date(u.created_at).toLocaleDateString('zh-TW') : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center justify-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleEditClick(u)}
-                            title="編輯"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleResetPasswordClick(u)}
-                            disabled={isCurrentUser}
-                            title={isCurrentUser ? '請使用個人設定更改自己的密碼' : '重設密碼'}
-                          >
-                            <KeyRound className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-destructive hover:text-destructive"
-                            onClick={() => handleDeleteClick(u)}
-                            disabled={isCurrentUser}
-                            title={isCurrentUser ? '無法刪除自己' : '刪除'}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList>
+            <TabsTrigger value="active" className="gap-2">
+              <CheckCircle2 className="w-4 h-4" />
+              已啟用 ({activeUsers.length})
+            </TabsTrigger>
+            <TabsTrigger value="pending" className="gap-2">
+              <Clock className="w-4 h-4" />
+              待審核
+              {pendingUsers.length > 0 && (
+                <Badge variant="destructive" className="ml-1 h-5 w-5 p-0 flex items-center justify-center text-xs">
+                  {pendingUsers.length}
+                </Badge>
               )}
-            </TableBody>
-          </Table>
-        </div>
+            </TabsTrigger>
+            <TabsTrigger value="disabled" className="gap-2">
+              <Ban className="w-4 h-4" />
+              已停用 ({disabledUsers.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="active" className="mt-4">
+            {renderUserTable(filterBySearch(activeUsers))}
+          </TabsContent>
+
+          <TabsContent value="pending" className="mt-4">
+            {pendingUsers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Clock className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>目前沒有待審核的使用者</p>
+              </div>
+            ) : (
+              renderUserTable(filterBySearch(pendingUsers), true)
+            )}
+          </TabsContent>
+
+          <TabsContent value="disabled" className="mt-4">
+            {renderUserTable(filterBySearch(disabledUsers))}
+          </TabsContent>
+        </Tabs>
 
         <p className="text-xs text-muted-foreground">
           * 您無法刪除自己的帳號或變更自己的角色。若需變更，請聯繫其他管理員。
@@ -499,7 +706,7 @@ export default function UserManagement() {
               新增使用者
             </DialogTitle>
             <DialogDescription>
-              建立新的系統使用者帳號
+              建立新的系統使用者帳號（直接啟用，不需審核）
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -751,6 +958,92 @@ export default function UserManagement() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Approve User Dialog */}
+      <Dialog open={isApproveDialogOpen} onOpenChange={setIsApproveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-green-600">
+              <CheckCircle2 className="w-5 h-5" />
+              核准使用者
+            </DialogTitle>
+            <DialogDescription>
+              核准 {selectedUser?.email} 的帳號申請
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>
+                <Shield className="w-4 h-4 inline mr-1" />
+                指定角色
+              </Label>
+              <Select value={approveRole} onValueChange={(v) => setApproveRole(v as AppRole)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">管理員</SelectItem>
+                  <SelectItem value="staff">員工</SelectItem>
+                  <SelectItem value="viewer">檢視者</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-sm text-muted-foreground bg-green-50 dark:bg-green-950/20 p-3 rounded-lg border border-green-200 dark:border-green-800">
+              核准後，該使用者將可以正常登入並使用系統功能。
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsApproveDialogOpen(false)}>
+              取消
+            </Button>
+            <Button 
+              onClick={handleConfirmApprove}
+              disabled={approveUserMutation.isPending}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              {approveUserMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              確認核准
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reject User Dialog */}
+      <AlertDialog open={isRejectDialogOpen} onOpenChange={setIsRejectDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-600">
+              <XCircle className="w-5 h-5" />
+              拒絕使用者申請
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-4">
+              <p>
+                您確定要拒絕 <strong>{selectedUser?.email}</strong> 的帳號申請嗎？
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="reject-reason">拒絕原因（選填）</Label>
+                <Input
+                  id="reject-reason"
+                  placeholder="請輸入拒絕原因"
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                />
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmReject}
+              className="bg-red-600 text-white hover:bg-red-700"
+              disabled={rejectUserMutation.isPending}
+            >
+              {rejectUserMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              確認拒絕
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }
