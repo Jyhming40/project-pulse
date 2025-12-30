@@ -248,17 +248,37 @@ export default function Investors() {
     '取消': 'bg-destructive/15 text-destructive',
   };
 
-  // Batch update handler
+  // Batch update handler with audit logging
   const handleBatchUpdate = async (field: string, value: string) => {
     setIsBatchUpdating(true);
     try {
       const ids = Array.from(batchSelect.selectedIds);
+      
+      // Get old data for audit
+      const { data: oldData } = await supabase
+        .from('investors')
+        .select('id, company_name, investor_type')
+        .in('id', ids);
+      
       if (field === 'investor_type') {
         const { error } = await supabase
           .from('investors')
           .update({ investor_type: value })
           .in('id', ids);
         if (error) throw error;
+        
+        // Log batch update to audit_logs
+        for (const id of ids) {
+          const oldRecord = oldData?.find(r => r.id === id);
+          await supabase.rpc('log_audit_action', {
+            p_table_name: 'investors',
+            p_record_id: id,
+            p_action: 'UPDATE',
+            p_old_data: oldRecord || null,
+            p_new_data: { ...oldRecord, investor_type: value },
+            p_reason: `批次更新 ${ids.length} 筆資料`,
+          });
+        }
       }
       toast.success(`已更新 ${ids.length} 筆資料`);
       queryClient.invalidateQueries({ queryKey: ['investors'] });
@@ -271,13 +291,13 @@ export default function Investors() {
     }
   };
 
-  // Batch delete handler
+  // Batch delete handler (softDelete already logs to audit)
   const handleBatchDelete = async (reason?: string) => {
     const ids = Array.from(batchSelect.selectedIds);
     let successCount = 0;
     for (const id of ids) {
       try {
-        await softDelete({ id, reason });
+        await softDelete({ id, reason: reason || `批次刪除 ${ids.length} 筆資料` });
         successCount++;
       } catch (error) {
         // Continue with others
