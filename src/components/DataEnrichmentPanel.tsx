@@ -28,6 +28,116 @@ import { Separator } from '@/components/ui/separator';
 import { X, CheckCircle2, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+interface ProgressMilestone {
+  id: string;
+  milestone_type: 'admin' | 'engineering';
+  milestone_code: string;
+  milestone_name: string;
+  weight: number;
+  sort_order: number;
+  is_active: boolean;
+}
+
+interface ProjectMilestone {
+  id: string;
+  project_id: string;
+  milestone_code: string;
+  is_completed: boolean;
+}
+
+// Helper function to recalculate and update project progress
+async function recalculateProjectProgress(projectId: string, token: string) {
+  // Fetch all progress milestones
+  const milestonesResponse = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/progress_milestones?is_active=eq.true`,
+    {
+      headers: {
+        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        'Authorization': `Bearer ${token}`,
+      },
+    }
+  );
+  const allMilestones = await milestonesResponse.json() as ProgressMilestone[];
+
+  // Fetch project's completed milestones
+  const projectMilestonesResponse = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/project_milestones?project_id=eq.${projectId}&is_completed=eq.true`,
+    {
+      headers: {
+        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        'Authorization': `Bearer ${token}`,
+      },
+    }
+  );
+  const completedMilestones = await projectMilestonesResponse.json() as ProjectMilestone[];
+  const completedCodes = new Set(completedMilestones.map(m => m.milestone_code));
+
+  // Fetch weight settings
+  const settingsResponse = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/progress_settings?setting_key=eq.weights`,
+    {
+      headers: {
+        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        'Authorization': `Bearer ${token}`,
+      },
+    }
+  );
+  const settingsData = await settingsResponse.json();
+  const weightSettings = settingsData?.[0]?.setting_value || { admin_weight: 50, engineering_weight: 50 };
+  const adminWeight = weightSettings.admin_weight ?? 50;
+  const engineeringWeight = weightSettings.engineering_weight ?? 50;
+
+  // Calculate admin progress
+  const adminMilestones = allMilestones.filter(m => m.milestone_type === 'admin');
+  const adminTotalWeight = adminMilestones.reduce((sum, m) => sum + m.weight, 0);
+  const adminCompletedWeight = adminMilestones
+    .filter(m => completedCodes.has(m.milestone_code))
+    .reduce((sum, m) => sum + m.weight, 0);
+  const adminProgress = adminTotalWeight > 0 ? (adminCompletedWeight / adminTotalWeight) * 100 : 0;
+
+  // Calculate engineering progress
+  const engMilestones = allMilestones.filter(m => m.milestone_type === 'engineering');
+  const engTotalWeight = engMilestones.reduce((sum, m) => sum + m.weight, 0);
+  const engCompletedWeight = engMilestones
+    .filter(m => completedCodes.has(m.milestone_code))
+    .reduce((sum, m) => sum + m.weight, 0);
+  const engineeringProgress = engTotalWeight > 0 ? (engCompletedWeight / engTotalWeight) * 100 : 0;
+
+  // Calculate overall progress using configured weights
+  const overallProgress = 
+    (adminProgress * adminWeight / 100) + 
+    (engineeringProgress * engineeringWeight / 100);
+
+  // Find current stage for admin and engineering
+  const sortedAdminMilestones = adminMilestones.sort((a, b) => a.sort_order - b.sort_order);
+  const sortedEngMilestones = engMilestones.sort((a, b) => a.sort_order - b.sort_order);
+  
+  const adminStage = sortedAdminMilestones.find(m => !completedCodes.has(m.milestone_code))?.milestone_name || 
+    (sortedAdminMilestones.length > 0 ? '已完成' : null);
+  const engineeringStage = sortedEngMilestones.find(m => !completedCodes.has(m.milestone_code))?.milestone_name || 
+    (sortedEngMilestones.length > 0 ? '已完成' : null);
+
+  // Update project with new progress values
+  await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/projects?id=eq.${projectId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        admin_progress: Math.round(adminProgress * 100) / 100,
+        engineering_progress: Math.round(engineeringProgress * 100) / 100,
+        overall_progress: Math.round(overallProgress * 100) / 100,
+        admin_stage: adminStage,
+        engineering_stage: engineeringStage,
+      }),
+    }
+  );
+}
+
 interface DataEnrichmentPanelProps {
   selectedIds: Set<string>;
   onClose: () => void;
@@ -197,6 +307,14 @@ export function DataEnrichmentPanel({
                 });
             }
           }
+        }
+
+        // Recalculate progress for all affected projects
+        const session = await supabase.auth.getSession();
+        const token = session.data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+        
+        for (const projectId of projectIds) {
+          await recalculateProjectProgress(projectId, token);
         }
       }
 
