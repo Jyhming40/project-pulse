@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { Constants } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -33,20 +34,11 @@ interface DataEnrichmentPanelProps {
   onSuccess: () => void;
 }
 
-// Admin progress options
-const ADMIN_PROGRESS_OPTIONS = [
-  { value: 'not_started', label: '未開始', stage: null },
-  { value: 'in_progress', label: '進行中', stage: '行政作業中' },
-  { value: 'completed', label: '已完成', stage: '行政結案' },
-];
+// Project status options from database enum (案場狀態)
+const PROJECT_STATUS_OPTIONS = Constants.public.Enums.project_status;
 
-// Engineering stage options
-const ENGINEERING_STAGE_OPTIONS = [
-  { value: 'design', label: '設計', stage: '設計階段' },
-  { value: 'procurement', label: '採購', stage: '材料採購' },
-  { value: 'construction', label: '施工', stage: '現場施工' },
-  { value: 'completed', label: '完工', stage: '工程完工' },
-];
+// Construction status options from database enum (施工狀態)
+const CONSTRUCTION_STATUS_OPTIONS = Constants.public.Enums.construction_status;
 
 export function DataEnrichmentPanel({
   selectedIds,
@@ -58,14 +50,14 @@ export function DataEnrichmentPanel({
 
   // Form state - only checked fields will be applied
   const [enabledFields, setEnabledFields] = useState<Record<string, boolean>>({
-    admin_progress: false,
-    engineering_stage: false,
+    project_status: false,
+    construction_status: false,
     milestones: false,
     overall_progress: false,
   });
 
-  const [adminProgress, setAdminProgress] = useState<string>('');
-  const [engineeringStage, setEngineeringStage] = useState<string>('');
+  const [projectStatus, setProjectStatus] = useState<string>('');
+  const [constructionStatus, setConstructionStatus] = useState<string>('');
   const [overallProgress, setOverallProgress] = useState<string>('');
   const [selectedMilestones, setSelectedMilestones] = useState<Set<string>>(new Set());
   
@@ -112,8 +104,8 @@ export function DataEnrichmentPanel({
   // Get fields that will be updated
   const getActiveFields = () => {
     const fields: string[] = [];
-    if (enabledFields.admin_progress && adminProgress) fields.push('行政進度');
-    if (enabledFields.engineering_stage && engineeringStage) fields.push('工程階段');
+    if (enabledFields.project_status && projectStatus) fields.push('案場狀態');
+    if (enabledFields.construction_status && constructionStatus) fields.push('施工狀態');
     if (enabledFields.milestones && selectedMilestones.size > 0) fields.push('里程碑完成度');
     if (enabledFields.overall_progress && overallProgress) fields.push('整體進度百分比');
     return fields;
@@ -126,27 +118,12 @@ export function DataEnrichmentPanel({
       const updates: Record<string, any> = {};
       
       // Build updates based on enabled fields
-      if (enabledFields.admin_progress && adminProgress) {
-        const option = ADMIN_PROGRESS_OPTIONS.find(o => o.value === adminProgress);
-        if (option) {
-          updates.admin_stage = option.stage;
-          // Set admin_progress percentage based on selection
-          if (adminProgress === 'not_started') updates.admin_progress = 0;
-          else if (adminProgress === 'in_progress') updates.admin_progress = 50;
-          else if (adminProgress === 'completed') updates.admin_progress = 100;
-        }
+      if (enabledFields.project_status && projectStatus) {
+        updates.status = projectStatus;
       }
       
-      if (enabledFields.engineering_stage && engineeringStage) {
-        const option = ENGINEERING_STAGE_OPTIONS.find(o => o.value === engineeringStage);
-        if (option) {
-          updates.engineering_stage = option.stage;
-          // Set engineering_progress percentage based on selection
-          if (engineeringStage === 'design') updates.engineering_progress = 25;
-          else if (engineeringStage === 'procurement') updates.engineering_progress = 50;
-          else if (engineeringStage === 'construction') updates.engineering_progress = 75;
-          else if (engineeringStage === 'completed') updates.engineering_progress = 100;
-        }
+      if (enabledFields.construction_status && constructionStatus) {
+        updates.construction_status = constructionStatus;
       }
       
       if (enabledFields.overall_progress && overallProgress) {
@@ -263,27 +240,27 @@ export function DataEnrichmentPanel({
         {/* Content */}
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-6">
-            {/* Admin Progress */}
+            {/* Project Status (案場狀態) */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Checkbox
-                  id="enable-admin"
-                  checked={enabledFields.admin_progress}
-                  onCheckedChange={() => toggleField('admin_progress')}
+                  id="enable-status"
+                  checked={enabledFields.project_status}
+                  onCheckedChange={() => toggleField('project_status')}
                 />
-                <Label htmlFor="enable-admin" className="font-medium cursor-pointer">
-                  行政進度
+                <Label htmlFor="enable-status" className="font-medium cursor-pointer">
+                  案場狀態
                 </Label>
               </div>
-              {enabledFields.admin_progress && (
-                <Select value={adminProgress} onValueChange={setAdminProgress}>
+              {enabledFields.project_status && (
+                <Select value={projectStatus} onValueChange={setProjectStatus}>
                   <SelectTrigger>
-                    <SelectValue placeholder="選擇行政進度" />
+                    <SelectValue placeholder="選擇案場狀態" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ADMIN_PROGRESS_OPTIONS.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
+                    {PROJECT_STATUS_OPTIONS.map(status => (
+                      <SelectItem key={status} value={status}>
+                        {status}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -293,27 +270,27 @@ export function DataEnrichmentPanel({
 
             <Separator />
 
-            {/* Engineering Stage */}
+            {/* Construction Status (施工狀態) */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Checkbox
-                  id="enable-engineering"
-                  checked={enabledFields.engineering_stage}
-                  onCheckedChange={() => toggleField('engineering_stage')}
+                  id="enable-construction"
+                  checked={enabledFields.construction_status}
+                  onCheckedChange={() => toggleField('construction_status')}
                 />
-                <Label htmlFor="enable-engineering" className="font-medium cursor-pointer">
-                  工程階段
+                <Label htmlFor="enable-construction" className="font-medium cursor-pointer">
+                  施工狀態
                 </Label>
               </div>
-              {enabledFields.engineering_stage && (
-                <Select value={engineeringStage} onValueChange={setEngineeringStage}>
+              {enabledFields.construction_status && (
+                <Select value={constructionStatus} onValueChange={setConstructionStatus}>
                   <SelectTrigger>
-                    <SelectValue placeholder="選擇工程階段" />
+                    <SelectValue placeholder="選擇施工狀態" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ENGINEERING_STAGE_OPTIONS.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
+                    {CONSTRUCTION_STATUS_OPTIONS.map(status => (
+                      <SelectItem key={status} value={status}>
+                        {status}
                       </SelectItem>
                     ))}
                   </SelectContent>
