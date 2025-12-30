@@ -1,12 +1,16 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
+import { useBatchSelect } from '@/hooks/useBatchSelect';
 import { format, isWithinInterval, subDays } from 'date-fns';
 import { TablePagination } from '@/components/ui/table-pagination';
+import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
+import { BatchUpdateDialog, BatchUpdateField } from '@/components/BatchUpdateDialog';
+import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { 
   Search, 
   FileText, 
@@ -18,6 +22,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ImportExportDialog } from '@/components/ImportExportDialog';
 import { 
   Select, 
@@ -38,7 +43,7 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 
 type DocType = Database['public']['Enums']['doc_type'];
@@ -58,7 +63,7 @@ const getDocStatusColor = (status: string) => {
 export default function Documents() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { canEdit } = useAuth();
+  const { canEdit, isAdmin } = useAuth();
   
   // Fetch dynamic options
   const { options: docTypeOptions } = useOptionsForCategory('doc_type');
@@ -68,12 +73,13 @@ export default function Documents() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
+  const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false);
+  const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
 
-  // Fetch documents with project info - use range to get all records (no 1000 limit)
+  // Fetch documents with project info
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['all-documents'],
     queryFn: async () => {
-      // First get total count
       const { count, error: countError } = await supabase
         .from('documents')
         .select('*', { count: 'exact', head: true });
@@ -84,7 +90,6 @@ export default function Documents() {
       const pageSize = 1000;
       const pages = Math.ceil(totalCount / pageSize);
       
-      // Fetch all pages in parallel
       const promises = [];
       for (let i = 0; i < pages; i++) {
         promises.push(
@@ -98,7 +103,6 @@ export default function Documents() {
       
       const results = await Promise.all(promises);
       
-      // Combine all results
       const allData: any[] = [];
       for (const result of results) {
         if (result.error) throw result.error;
@@ -123,7 +127,7 @@ export default function Documents() {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  // Sorting (multi-column support)
+  // Sorting
   const { sortedData: sortedDocuments, sortConfig, handleSort, getSortInfo } = useTableSort(filteredDocuments, {
     key: 'updated_at',
     direction: 'desc',
@@ -131,6 +135,64 @@ export default function Documents() {
 
   // Pagination
   const pagination = usePagination(sortedDocuments, { pageSize: 20 });
+
+  // Batch selection
+  const batchSelect = useBatchSelect(pagination.paginatedData);
+
+  // Batch update mutation
+  const batchUpdateMutation = useMutation({
+    mutationFn: async (values: Record<string, string>) => {
+      const selectedIds = Array.from(batchSelect.selectedIds);
+      const { error } = await supabase
+        .from('documents')
+        .update(values)
+        .in('id', selectedIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+      toast.success('批次更新成功');
+      batchSelect.deselectAll();
+    },
+    onError: (error: Error) => {
+      toast.error('批次更新失敗', { description: error.message });
+    },
+  });
+
+  // Batch delete mutation
+  const batchDeleteMutation = useMutation({
+    mutationFn: async (reason?: string) => {
+      const selectedIds = Array.from(batchSelect.selectedIds);
+      const { error } = await supabase
+        .from('documents')
+        .update({
+          is_deleted: true,
+          deleted_at: new Date().toISOString(),
+          delete_reason: reason || null,
+        })
+        .in('id', selectedIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+      toast.success('批次刪除成功');
+      batchSelect.deselectAll();
+    },
+    onError: (error: Error) => {
+      toast.error('批次刪除失敗', { description: error.message });
+    },
+  });
+
+  // Batch update fields
+  const batchUpdateFields: BatchUpdateField[] = [
+    {
+      key: 'doc_status',
+      label: '文件狀態',
+      type: 'select',
+      options: docStatusOptions,
+      placeholder: '選擇狀態',
+    },
+  ];
 
   // Stats
   const pendingCount = documents.filter(d => d.doc_status === '退件補正').length;
@@ -146,7 +208,7 @@ export default function Documents() {
   }).length;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-24">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -251,6 +313,15 @@ export default function Documents() {
         <Table>
           <TableHeader>
             <TableRow>
+              {canEdit && (
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={batchSelect.isAllSelected}
+                    onCheckedChange={() => batchSelect.toggleAll()}
+                    aria-label="全選"
+                  />
+                </TableHead>
+              )}
               <SortableTableHead sortKey="projects.project_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('projects.project_name').direction} sortIndex={getSortInfo('projects.project_name').index} onSort={handleSort}>案場</SortableTableHead>
               <SortableTableHead sortKey="doc_type" currentSortKey={sortConfig.key} currentDirection={getSortInfo('doc_type').direction} sortIndex={getSortInfo('doc_type').index} onSort={handleSort}>文件類型</SortableTableHead>
               <SortableTableHead sortKey="doc_status" currentSortKey={sortConfig.key} currentDirection={getSortInfo('doc_status').direction} sortIndex={getSortInfo('doc_status').index} onSort={handleSort}>狀態</SortableTableHead>
@@ -263,7 +334,7 @@ export default function Documents() {
           <TableBody>
             {sortedDocuments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={canEdit ? 8 : 7} className="text-center py-12 text-muted-foreground">
                   {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
@@ -280,32 +351,41 @@ export default function Documents() {
                   <TableRow 
                     key={doc.id}
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => navigate(`/projects/${doc.project_id}`)}
+                    data-selected={batchSelect.isSelected(doc.id)}
                   >
-                    <TableCell>
+                    {canEdit && (
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={batchSelect.isSelected(doc.id)}
+                          onCheckedChange={() => batchSelect.toggle(doc.id)}
+                          aria-label={`選取 ${doc.doc_type}`}
+                        />
+                      </TableCell>
+                    )}
+                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
                       <div>
                         <p className="font-medium">{project?.project_name}</p>
                         <p className="text-xs text-muted-foreground font-mono">{project?.project_code}</p>
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-muted-foreground" />
                         {doc.doc_type}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
                       <Badge className={getDocStatusColor(doc.doc_status)} variant="secondary">
                         {doc.doc_status}
                       </Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
                       {doc.submitted_at ? format(new Date(doc.submitted_at), 'yyyy/MM/dd') : '-'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
                       {doc.issued_at ? format(new Date(doc.issued_at), 'yyyy/MM/dd') : '-'}
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
                       {doc.due_at ? (
                         <span className={isDueSoon ? 'text-destructive font-medium' : ''}>
                           {format(new Date(doc.due_at), 'yyyy/MM/dd')}
@@ -313,7 +393,7 @@ export default function Documents() {
                         </span>
                       ) : '-'}
                     </TableCell>
-                    <TableCell>{owner?.full_name || '-'}</TableCell>
+                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>{owner?.full_name || '-'}</TableCell>
                   </TableRow>
                 );
               })
@@ -343,6 +423,55 @@ export default function Documents() {
         type="documents"
         data={documents as any}
         onImportComplete={() => queryClient.invalidateQueries({ queryKey: ['all-documents'] })}
+      />
+
+      {/* Batch Action Bar */}
+      {canEdit && (
+        <BatchActionBar
+          selectedCount={batchSelect.selectedCount}
+          onClear={batchSelect.deselectAll}
+          actions={[
+            {
+              key: 'edit',
+              label: '批次修改',
+              icon: BatchActionIcons.edit,
+              onClick: () => setIsBatchUpdateOpen(true),
+            },
+            ...(isAdmin ? [{
+              key: 'delete',
+              label: '批次刪除',
+              icon: BatchActionIcons.delete,
+              variant: 'destructive' as const,
+              onClick: () => setIsBatchDeleteOpen(true),
+            }] : []),
+          ]}
+        />
+      )}
+
+      {/* Batch Update Dialog */}
+      <BatchUpdateDialog
+        open={isBatchUpdateOpen}
+        onOpenChange={setIsBatchUpdateOpen}
+        title="批次更新文件"
+        selectedCount={batchSelect.selectedCount}
+        fields={batchUpdateFields}
+        onSubmit={async (values) => {
+          await batchUpdateMutation.mutateAsync(values);
+        }}
+        isLoading={batchUpdateMutation.isPending}
+      />
+
+      {/* Batch Delete Dialog */}
+      <BatchDeleteDialog
+        open={isBatchDeleteOpen}
+        onOpenChange={setIsBatchDeleteOpen}
+        selectedCount={batchSelect.selectedCount}
+        itemLabel="筆文件"
+        requireReason
+        onConfirm={async (reason) => {
+          await batchDeleteMutation.mutateAsync(reason);
+        }}
+        isLoading={batchDeleteMutation.isPending}
       />
     </div>
   );
