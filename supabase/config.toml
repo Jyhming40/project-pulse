@@ -32,3 +32,6 @@ verify_jwt = true
 
 [functions.user-change-password]
 verify_jwt = true
+
+[functions.send-notification-email]
+verify_jwt = true
