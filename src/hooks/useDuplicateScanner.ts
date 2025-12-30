@@ -5,18 +5,10 @@ import { toast } from 'sonner';
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 
-export interface MatchedCriterion {
-  key: string;
-  label: string;
-  matched: boolean;
-  detail?: string;
-}
-
 export interface DuplicateGroup {
   id: string;
   confidenceLevel: ConfidenceLevel;
   criteria: string[];
-  matchedCriteria: MatchedCriterion[];
   projects: ProjectForComparison[];
 }
 
@@ -76,12 +68,12 @@ function stringSimilarity(str1: string, str2: string): number {
   return (2 * intersection) / (s1.length - 1 + s2.length - 1);
 }
 
-// Check if capacity is similar (within 15%)
-function getCapacityDiffPercent(cap1: number | null, cap2: number | null): number | null {
-  if (!cap1 || !cap2) return null;
+// Check if capacity is similar (within 10%)
+function isCapacitySimilar(cap1: number | null, cap2: number | null): boolean {
+  if (!cap1 || !cap2) return false;
   const diff = Math.abs(cap1 - cap2);
   const avg = (cap1 + cap2) / 2;
-  return (diff / avg) * 100;
+  return diff / avg <= 0.1;
 }
 
 export function useDuplicateScanner() {
@@ -159,6 +151,7 @@ export function useDuplicateScanner() {
   const { data: ignoredPairs = [], isLoading: isLoadingIgnored } = useQuery({
     queryKey: ['duplicate-ignore-pairs'],
     queryFn: async () => {
+      // Use any cast since table was just created and types aren't regenerated yet
       const { data, error } = await (supabase as any)
         .from('duplicate_ignore_pairs')
         .select('project_id_a, project_id_b');
@@ -177,7 +170,7 @@ export function useDuplicateScanner() {
     return ignoredPairs.some(pair => pair.a === a && pair.b === b);
   };
 
-  // Scan for duplicates with stricter rules
+  // Scan for duplicates
   const scanForDuplicates = (): DuplicateGroup[] => {
     const groups: DuplicateGroup[] = [];
     const processedPairs = new Set<string>();
@@ -193,129 +186,63 @@ export function useDuplicateScanner() {
         const pairKey = `${p1.id}-${p2.id}`;
         if (processedPairs.has(pairKey)) continue;
 
-        const matchedCriteria: MatchedCriterion[] = [];
+        const criteria: string[] = [];
         let confidenceLevel: ConfidenceLevel | null = null;
 
-        // ========== HIGH CONFIDENCE (Hard Gate - Must match one of these) ==========
-        
-        // 1. Same site_code_display (完全相同)
-        const sameSiteCode = p1.site_code_display && p2.site_code_display && 
-                             p1.site_code_display === p2.site_code_display;
-        matchedCriteria.push({
-          key: 'site_code',
-          label: '案場代碼完全相同',
-          matched: !!sameSiteCode,
-          detail: sameSiteCode ? `${p1.site_code_display}` : undefined,
-        });
-
-        // 2. Same investor_code + year + seq (完全相同)
-        const sameInvestorYearSeq = p1.investor_code && p2.investor_code &&
-                                    p1.investor_code === p2.investor_code &&
-                                    p1.intake_year && p2.intake_year &&
-                                    p1.intake_year === p2.intake_year &&
-                                    p1.seq !== null && p2.seq !== null &&
-                                    p1.seq === p2.seq;
-        matchedCriteria.push({
-          key: 'investor_year_seq',
-          label: '投資代碼 + 年份 + 序號完全相同',
-          matched: !!sameInvestorYearSeq,
-          detail: sameInvestorYearSeq ? `${p1.investor_code}-${p1.intake_year}-${p1.seq}` : undefined,
-        });
-
-        // Only set high confidence if hard gate is met
-        if (sameSiteCode || sameInvestorYearSeq) {
+        // High confidence checks
+        // 1. Same site_code_display
+        if (p1.site_code_display && p2.site_code_display && 
+            p1.site_code_display === p2.site_code_display) {
+          criteria.push('案場代碼完全相同');
           confidenceLevel = 'high';
         }
 
-        // ========== MEDIUM CONFIDENCE (Multiple conditions required) ==========
-        // Only evaluate if NOT high confidence
+        // 2. Same investor_code + year + seq
+        if (p1.investor_code && p2.investor_code &&
+            p1.investor_code === p2.investor_code &&
+            p1.intake_year === p2.intake_year &&
+            p1.seq === p2.seq) {
+          criteria.push('投資代碼 + 年份 + 序號相同');
+          confidenceLevel = 'high';
+        }
+
+        // Medium confidence checks (only if not already high)
         if (!confidenceLevel) {
-          // Check individual conditions for medium confidence
-          const sameInvestor = p1.investor_id && p2.investor_id && p1.investor_id === p2.investor_id;
-          const addressSimilarity = stringSimilarity(p1.address, p2.address);
-          const nameSimilarity = stringSimilarity(p1.project_name, p2.project_name);
-          const capacityDiff = getCapacityDiffPercent(p1.capacity_kwp, p2.capacity_kwp);
-          const sameCity = p1.city && p2.city && p1.city === p2.city;
-          
-          matchedCriteria.push({
-            key: 'same_investor',
-            label: '同一投資方',
-            matched: !!sameInvestor,
-            detail: sameInvestor ? p1.investor_name || p1.investor_code || undefined : undefined,
-          });
+          // Same investor + similar address
+          if (p1.investor_id && p2.investor_id && 
+              p1.investor_id === p2.investor_id) {
+            const addressSimilarity = stringSimilarity(p1.address, p2.address);
+            if (addressSimilarity > 0.7) {
+              criteria.push('同投資方 + 地址相似');
+              confidenceLevel = 'medium';
+            }
+          }
 
-          matchedCriteria.push({
-            key: 'address_similar',
-            label: '地址相似度 ≥ 80%',
-            matched: addressSimilarity >= 0.8,
-            detail: `相似度: ${(addressSimilarity * 100).toFixed(0)}%`,
-          });
-
-          matchedCriteria.push({
-            key: 'name_similar',
-            label: '案場名稱相似度 ≥ 75%',
-            matched: nameSimilarity >= 0.75,
-            detail: `相似度: ${(nameSimilarity * 100).toFixed(0)}%`,
-          });
-
-          matchedCriteria.push({
-            key: 'capacity_similar',
-            label: '容量差距 ≤ 15%',
-            matched: capacityDiff !== null && capacityDiff <= 15,
-            detail: capacityDiff !== null ? `差距: ${capacityDiff.toFixed(1)}%` : '無容量資料',
-          });
-
-          matchedCriteria.push({
-            key: 'same_city',
-            label: '同一縣市',
-            matched: !!sameCity,
-            detail: sameCity ? p1.city || undefined : `${p1.city || '未知'} vs ${p2.city || '未知'}`,
-          });
-
-          // Count medium confidence matches (excluding city for now as it's a gate)
-          const mediumMatchCount = [
-            sameInvestor,
-            addressSimilarity >= 0.8,
-            nameSimilarity >= 0.75,
-            capacityDiff !== null && capacityDiff <= 15,
-          ].filter(Boolean).length;
-
-          // Medium confidence requires:
-          // - At least 2 conditions matched
-          // - AND same city (different city = auto downgrade or exclude)
-          if (mediumMatchCount >= 2 && sameCity) {
-            confidenceLevel = 'medium';
+          // Same investor + similar project name
+          if (p1.investor_id && p2.investor_id && 
+              p1.investor_id === p2.investor_id) {
+            const nameSimilarity = stringSimilarity(p1.project_name, p2.project_name);
+            if (nameSimilarity > 0.7) {
+              criteria.push('同投資方 + 案場名稱相似');
+              if (!confidenceLevel) confidenceLevel = 'medium';
+            }
           }
         }
 
-        // ========== LOW CONFIDENCE (Just hints) ==========
-        // Only evaluate if NOT high or medium confidence
+        // Low confidence checks (only if not already high or medium)
         if (!confidenceLevel) {
-          const sameInvestor = p1.investor_id && p2.investor_id && p1.investor_id === p2.investor_id;
-          const sameDistrict = p1.city === p2.city && p1.district && p2.district && p1.district === p2.district;
-          const capacityDiff = getCapacityDiffPercent(p1.capacity_kwp, p2.capacity_kwp);
-          
-          // Low confidence: same investor + same district + similar capacity
-          if (sameInvestor && sameDistrict && capacityDiff !== null && capacityDiff <= 15) {
+          if (p1.investor_id && p2.investor_id && 
+              p1.investor_id === p2.investor_id &&
+              p1.city === p2.city && p1.district === p2.district &&
+              isCapacitySimilar(p1.capacity_kwp, p2.capacity_kwp)) {
+            criteria.push('同投資方 + 同區域 + 容量相近');
             confidenceLevel = 'low';
-            
-            matchedCriteria.push({
-              key: 'same_district',
-              label: '同一鄉鎮市區',
-              matched: true,
-              detail: `${p1.city}${p1.district}`,
-            });
           }
         }
 
-        if (confidenceLevel) {
+        if (confidenceLevel && criteria.length > 0) {
           processedPairs.add(pairKey);
           
-          // Generate criteria labels for display
-          const criteriaLabels = matchedCriteria
-            .filter(c => c.matched)
-            .map(c => c.label);
-
           // Check if we can add to an existing group
           const existingGroup = groups.find(g => 
             g.confidenceLevel === confidenceLevel &&
@@ -329,7 +256,7 @@ export function useDuplicateScanner() {
             if (!existingGroup.projects.some(p => p.id === p2.id)) {
               existingGroup.projects.push(p2);
             }
-            criteriaLabels.forEach(c => {
+            criteria.forEach(c => {
               if (!existingGroup.criteria.includes(c)) {
                 existingGroup.criteria.push(c);
               }
@@ -338,8 +265,7 @@ export function useDuplicateScanner() {
             groups.push({
               id: `group-${groups.length + 1}`,
               confidenceLevel,
-              criteria: criteriaLabels,
-              matchedCriteria,
+              criteria,
               projects: [p1, p2],
             });
           }
@@ -372,6 +298,7 @@ export function useDuplicateScanner() {
         }
       }
 
+      // Use any cast since table was just created and types aren't regenerated yet
       const { error } = await (supabase as any)
         .from('duplicate_ignore_pairs')
         .upsert(pairs, { onConflict: 'project_id_a,project_id_b' });
