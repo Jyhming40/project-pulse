@@ -38,3 +38,6 @@ verify_jwt = true
 
 [functions.recalculate-project-progress]
 verify_jwt = true
+
+[functions.admin-approve-user]
+verify_jwt = true
