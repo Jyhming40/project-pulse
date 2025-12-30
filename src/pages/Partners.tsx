@@ -867,6 +867,7 @@ export default function Partners() {
         onOpenChange={setIsBatchUpdateOpen}
         title="批次修改外包夥伴"
         selectedCount={batchSelect.selectedCount}
+        selectedItems={batchSelect.selectedItems}
         fields={[
           {
             key: 'is_active',
@@ -884,6 +885,7 @@ export default function Partners() {
           }
         }}
         isLoading={isBatchUpdating}
+        getItemLabel={(item) => item.name as string}
       />
 
       {/* Batch Delete Dialog */}

@@ -1142,11 +1142,13 @@ export default function Projects() {
         onOpenChange={setIsBatchUpdateOpen}
         title="批次更新案場"
         selectedCount={batchSelect.selectedCount}
+        selectedItems={batchSelect.selectedItems}
         fields={batchUpdateFields}
         onSubmit={async (values) => {
           await batchUpdateMutation.mutateAsync(values);
         }}
         isLoading={batchUpdateMutation.isPending}
+        getItemLabel={(item) => item.project_name as string}
       />
 
       {/* Batch Delete Dialog */}

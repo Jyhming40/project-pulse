@@ -796,6 +796,7 @@ export default function Investors() {
         onOpenChange={setIsBatchUpdateOpen}
         title="批次修改投資方"
         selectedCount={batchSelect.selectedCount}
+        selectedItems={batchSelect.selectedItems}
         fields={[
           {
             key: 'investor_type',
@@ -810,6 +811,7 @@ export default function Investors() {
           }
         }}
         isLoading={isBatchUpdating}
+        getItemLabel={(item) => item.company_name as string}
       />
 
       {/* Batch Delete Dialog */}

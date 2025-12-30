@@ -16,7 +16,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Eye, EyeOff } from 'lucide-react';
+import { BatchUpdatePreview } from './BatchUpdatePreview';
 
 export interface BatchUpdateField {
   key: string;
@@ -26,28 +27,35 @@ export interface BatchUpdateField {
   placeholder?: string;
 }
 
-interface BatchUpdateDialogProps {
+interface BatchUpdateDialogProps<T = unknown> {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   description?: string;
   selectedCount: number;
+  selectedItems?: T[];
   fields: BatchUpdateField[];
   onSubmit: (values: Record<string, string>) => Promise<void>;
   isLoading?: boolean;
+  getDisplayValue?: (key: string, value: unknown) => string;
+  getItemLabel?: (item: T) => string;
 }
 
-export function BatchUpdateDialog({
+export function BatchUpdateDialog<T = unknown>({
   open,
   onOpenChange,
   title,
   description,
   selectedCount,
+  selectedItems = [],
   fields,
   onSubmit,
   isLoading = false,
-}: BatchUpdateDialogProps) {
+  getDisplayValue,
+  getItemLabel,
+}: BatchUpdateDialogProps<T>) {
   const [values, setValues] = useState<Record<string, string>>({});
+  const [showPreview, setShowPreview] = useState(false);
 
   const handleSubmit = async () => {
     // Filter out empty values
@@ -66,6 +74,7 @@ export function BatchUpdateDialog({
 
   const handleClose = () => {
     setValues({});
+    setShowPreview(false);
     onOpenChange(false);
   };
 
@@ -73,7 +82,7 @@ export function BatchUpdateDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
@@ -106,6 +115,38 @@ export function BatchUpdateDialog({
             </div>
           ))}
         </div>
+
+        {selectedItems.length > 0 && hasChanges && (
+          <div className="border-t pt-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mb-2"
+              onClick={() => setShowPreview(!showPreview)}
+            >
+              {showPreview ? (
+                <>
+                  <EyeOff className="mr-2 h-4 w-4" />
+                  隱藏預覽
+                </>
+              ) : (
+                <>
+                  <Eye className="mr-2 h-4 w-4" />
+                  顯示變更預覽
+                </>
+              )}
+            </Button>
+            {showPreview && (
+              <BatchUpdatePreview
+                selectedItems={selectedItems}
+                values={values}
+                fields={fields}
+                getDisplayValue={getDisplayValue}
+                getItemLabel={getItemLabel}
+              />
+            )}
+          </div>
+        )}
 
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={isLoading}>
