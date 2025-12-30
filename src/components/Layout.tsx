@@ -24,7 +24,9 @@ import {
   Palette,
   UserCog,
   Settings2,
-  Link2
+  Link2,
+  FolderOpen,
+  Briefcase
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -38,24 +40,46 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-// 日常工作模組 - 對所有登入使用者可見
-const dailyWorkItems = [
+// ==========================================
+// 1. Dashboard（總覽）- 儀表板入口
+// ==========================================
+const dashboardItems = [
   { to: '/', icon: LayoutDashboard, label: '儀表板', module: null },
-  { to: '/projects', icon: Building2, label: '案場管理', module: MODULES.PROJECTS },
-  { to: '/documents', icon: FileText, label: '文件管理', module: MODULES.DOCUMENTS },
-  { to: '/investors', icon: Users, label: '投資方 / 業主', module: MODULES.INVESTORS },
-  { to: '/partners', icon: HardHat, label: '外包夥伴 / 工班', module: MODULES.PARTNERS },
 ];
 
-// 管理與設定模組 - 重組為「人員」「系統」「整合」三區塊
-const managementItems = [
+// ==========================================
+// 2. 案場管理 - 案場相關功能
+// ==========================================
+const projectManagementItems = [
+  { to: '/projects', icon: Building2, label: '案場列表', module: MODULES.PROJECTS },
+  { to: '/partners', icon: HardHat, label: '施工夥伴', module: MODULES.PARTNERS },
+];
+
+// ==========================================
+// 3. 投資 / 客戶 - 投資方與業主管理
+// ==========================================
+const investorItems = [
+  { to: '/investors', icon: Users, label: '投資方 / 業主', module: MODULES.INVESTORS },
+];
+
+// ==========================================
+// 4. 文件與法規 - 文件管理與代碼參照
+// ==========================================
+const documentItems = [
+  { to: '/documents', icon: FileText, label: '文件管理', module: MODULES.DOCUMENTS },
+  { to: '/investor-codes', icon: BookOpen, label: '代碼對照表', adminOnly: true },
+];
+
+// ==========================================
+// 5. 系統設定 - 管理員設定與系統治理
+// ==========================================
+const systemSettingsItems = [
   // 人員管理
   { to: '/users', icon: UserCog, label: '使用者與角色', adminOnly: true },
   { to: '/permissions', icon: Shield, label: '權限設定', adminOnly: true },
   // 系統設定
   { to: '/progress-settings', icon: TrendingUp, label: '進度設定', adminOnly: true },
   { to: '/system-options', icon: Settings2, label: 'Codebook', adminOnly: true },
-  { to: '/investor-codes', icon: BookOpen, label: '代碼對照表', adminOnly: true },
   { to: '/branding', icon: Palette, label: '公司設定', adminOnly: true },
   // 外部整合
   { to: '/integrations', icon: Link2, label: '外部整合', adminOnly: true },
@@ -75,11 +99,25 @@ export default function Layout({ children }: LayoutProps) {
   const { settings } = useAppSettingsRead();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
-  const [managementOpen, setManagementOpen] = useState(false);
+  
+  // 展開狀態
+  const [projectsOpen, setProjectsOpen] = useState(false);
+  const [investorOpen, setInvestorOpen] = useState(false);
+  const [documentsOpen, setDocumentsOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [governanceOpen, setGovernanceOpen] = useState(false);
 
   // Auto-expand section if current route is within it
-  const isInManagement = managementItems.some(item => 
+  const isInProjects = projectManagementItems.some(item => 
+    location.pathname === item.to || location.pathname.startsWith(item.to + '/')
+  );
+  const isInInvestor = investorItems.some(item => 
+    location.pathname === item.to || location.pathname.startsWith(item.to + '/')
+  );
+  const isInDocuments = documentItems.some(item => 
+    location.pathname === item.to || location.pathname.startsWith(item.to + '/')
+  );
+  const isInSettings = systemSettingsItems.some(item => 
     location.pathname === item.to || location.pathname.startsWith(item.to + '/')
   );
   const isInGovernance = systemGovernanceItems.some(item => 
@@ -105,15 +143,17 @@ export default function Layout({ children }: LayoutProps) {
 
   // 檢查模組是否可見
   const isModuleVisible = (item: { module?: string | null; adminOnly?: boolean }) => {
-    // 如果模組設定 adminOnly，則只有管理員可見
     if (item.adminOnly && !isAdmin) return false;
-    // 如果有指定模組，檢查權限
     if (item.module && !canView(item.module as any)) return false;
     return true;
   };
 
+  // 檢查分類是否有任何可見項目
+  const hasVisibleItems = (items: Array<{ module?: string | null; adminOnly?: boolean }>) => {
+    return items.some(item => isModuleVisible(item));
+  };
+
   const renderNavItem = (item: { to: string; icon: React.ElementType; label: string; module?: string | null; adminOnly?: boolean }) => {
-    // 權限檢查
     if (!isModuleVisible(item)) return null;
 
     const isActive = location.pathname === item.to || 
@@ -130,6 +170,65 @@ export default function Layout({ children }: LayoutProps) {
         <item.icon className="w-5 h-5 flex-shrink-0" />
         {!collapsed && <span className="animate-fade-in">{item.label}</span>}
       </NavLink>
+    );
+  };
+
+  const renderCollapsibleSection = (
+    title: string,
+    items: Array<{ to: string; icon: React.ElementType; label: string; module?: string | null; adminOnly?: boolean }>,
+    icon: React.ElementType,
+    open: boolean,
+    setOpen: (open: boolean) => void,
+    isInSection: boolean,
+    isWarning?: boolean
+  ) => {
+    if (!hasVisibleItems(items)) return null;
+
+    const Icon = icon;
+
+    if (collapsed) {
+      // Collapsed mode: show items directly with separator
+      return (
+        <>
+          <div className="my-3 border-t border-sidebar-border" />
+          {items.map(renderNavItem)}
+        </>
+      );
+    }
+
+    // Expanded mode: show as collapsible group
+    return (
+      <Collapsible
+        open={open || isInSection}
+        onOpenChange={setOpen}
+        className="mt-2"
+      >
+        <CollapsibleTrigger className={cn(
+          "flex items-center justify-between w-full px-3 py-2 text-xs font-medium uppercase tracking-wider hover:text-sidebar-foreground transition-colors",
+          isWarning 
+            ? "text-amber-600 dark:text-amber-500 hover:text-amber-700 dark:hover:text-amber-400"
+            : "text-sidebar-muted"
+        )}>
+          <span className="flex items-center gap-1.5">
+            {isWarning && <AlertTriangle className="w-3.5 h-3.5" />}
+            {title}
+          </span>
+          <ChevronDown className={cn(
+            "w-4 h-4 transition-transform",
+            (open || isInSection) && "rotate-180"
+          )} />
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-1">
+          {isWarning && (
+            <div className="px-3 py-1.5 mb-1">
+              <p className="text-[10px] text-amber-600/80 dark:text-amber-500/80 leading-tight">
+                ⚠️ 高風險區域，請謹慎操作
+              </p>
+            </div>
+          )}
+          {items.map(renderNavItem)}
+        </CollapsibleContent>
+      </Collapsible>
     );
   };
 
@@ -163,114 +262,63 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {/* Section: 日常工作 */}
+          {/* 1. Dashboard（總覽） */}
           {!collapsed && (
             <div className="px-3 py-2">
-              <span className="text-xs font-medium text-sidebar-muted uppercase tracking-wider">日常工作</span>
+              <span className="text-xs font-medium text-sidebar-muted uppercase tracking-wider">總覽</span>
             </div>
           )}
-          {dailyWorkItems.map(renderNavItem)}
+          {dashboardItems.map(renderNavItem)}
 
-          {/* Section: 管理與設定 (Admin only) */}
-          {isAdmin && (
-            <>
-              {collapsed ? (
-                // Collapsed mode: show items directly
-                <>
-                  <div className="my-3 border-t border-sidebar-border" />
-                  {managementItems.map(renderNavItem)}
-                </>
-              ) : (
-                // Expanded mode: show as collapsible group
-                <Collapsible
-                  open={managementOpen || isInManagement}
-                  onOpenChange={setManagementOpen}
-                  className="mt-4"
-                >
-                  <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 text-xs font-medium text-sidebar-muted uppercase tracking-wider hover:text-sidebar-foreground transition-colors">
-                    <span>管理與設定</span>
-                    <ChevronDown className={cn(
-                      "w-4 h-4 transition-transform",
-                      (managementOpen || isInManagement) && "rotate-180"
-                    )} />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-1">
-                    {managementItems.map(renderNavItem)}
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </>
+          {/* 2. 案場管理 */}
+          {renderCollapsibleSection(
+            '案場管理',
+            projectManagementItems,
+            Building2,
+            projectsOpen,
+            setProjectsOpen,
+            isInProjects
           )}
 
-          {/* Section: 系統治理中心 (Admin only, high-risk) */}
-          {isAdmin && (
-            <>
-              {collapsed ? (
-                // Collapsed mode: show items with warning color
-                <>
-                  <div className="my-3 border-t border-sidebar-border" />
-                  {systemGovernanceItems.map((item) => {
-                    const isActive = location.pathname === item.to || 
-                      location.pathname.startsWith(item.to);
-                    return (
-                      <NavLink
-                        key={item.to}
-                        to={item.to}
-                        className={cn(
-                          "sidebar-link text-amber-600 dark:text-amber-500",
-                          isActive && "sidebar-link-active"
-                        )}
-                        title={item.label}
-                      >
-                        <item.icon className="w-5 h-5 flex-shrink-0" />
-                      </NavLink>
-                    );
-                  })}
-                </>
-              ) : (
-                // Expanded mode: show as collapsible group with warning
-                <Collapsible
-                  open={governanceOpen || isInGovernance}
-                  onOpenChange={setGovernanceOpen}
-                  className="mt-4"
-                >
-                  <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 text-xs font-medium text-amber-600 dark:text-amber-500 uppercase tracking-wider hover:text-amber-700 dark:hover:text-amber-400 transition-colors">
-                    <span className="flex items-center gap-1.5">
-                      <AlertTriangle className="w-3.5 h-3.5" />
-                      系統治理中心
-                    </span>
-                    <ChevronDown className={cn(
-                      "w-4 h-4 transition-transform",
-                      (governanceOpen || isInGovernance) && "rotate-180"
-                    )} />
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-1">
-                    <div className="px-3 py-1.5 mb-1">
-                      <p className="text-[10px] text-amber-600/80 dark:text-amber-500/80 leading-tight">
-                        ⚠️ 高風險區域，請謹慎操作
-                      </p>
-                    </div>
-                    {systemGovernanceItems.map((item) => {
-                      const isActive = location.pathname === item.to || 
-                        location.pathname.startsWith(item.to);
-                      return (
-                        <NavLink
-                          key={item.to}
-                          to={item.to}
-                          className={cn(
-                            "sidebar-link",
-                            isActive && "sidebar-link-active"
-                          )}
-                        >
-                          <item.icon className="w-5 h-5 flex-shrink-0" />
-                          <span className="animate-fade-in">{item.label}</span>
-                        </NavLink>
-                      );
-                    })}
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-            </>
+          {/* 3. 投資 / 客戶 */}
+          {renderCollapsibleSection(
+            '投資 / 客戶',
+            investorItems,
+            Briefcase,
+            investorOpen,
+            setInvestorOpen,
+            isInInvestor
+          )}
+
+          {/* 4. 文件與法規 */}
+          {renderCollapsibleSection(
+            '文件與法規',
+            documentItems,
+            FolderOpen,
+            documentsOpen,
+            setDocumentsOpen,
+            isInDocuments
+          )}
+
+          {/* 5. 系統設定 (Admin only) */}
+          {isAdmin && renderCollapsibleSection(
+            '系統設定',
+            systemSettingsItems,
+            Settings2,
+            settingsOpen,
+            setSettingsOpen,
+            isInSettings
+          )}
+
+          {/* 系統治理中心 (Admin only, high-risk) */}
+          {isAdmin && renderCollapsibleSection(
+            '系統治理中心',
+            systemGovernanceItems,
+            AlertTriangle,
+            governanceOpen,
+            setGovernanceOpen,
+            isInGovernance,
+            true // isWarning
           )}
         </nav>
 
