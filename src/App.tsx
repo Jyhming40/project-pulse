@@ -26,6 +26,7 @@ import Engineering from "./pages/Engineering";
 import ProgressSettings from "./pages/ProgressSettings";
 import ChangePassword from "./pages/ChangePassword";
 import Branding from "./pages/Branding";
+import Integrations from "./pages/Integrations";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -58,6 +59,8 @@ const App = () => (
             <Route path="/investor-codes" element={<ProtectedRoute adminOnly><Layout><InvestorCodeReference /></Layout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Layout><Settings /></Layout></ProtectedRoute>} />
             <Route path="/branding" element={<ProtectedRoute adminOnly><Layout><Branding /></Layout></ProtectedRoute>} />
+            {/* 管理與設定 (Admin) - 外部整合 */}
+            <Route path="/integrations" element={<ProtectedRoute adminOnly><Layout><Integrations /></Layout></ProtectedRoute>} />
             
             {/* 系統治理中心 (Admin) */}
             <Route path="/engineering" element={<ProtectedRoute adminOnly><Layout><Engineering /></Layout></ProtectedRoute>} />
