@@ -47,7 +47,9 @@ Deno.serve(async (req) => {
       );
     }
 
-    const { targetUserId, action, role, reason } = await req.json();
+    const body = await req.json();
+    const targetUserId = body.targetUserId || body.userId;
+    const { action, role, reason } = body;
 
     if (!targetUserId || !action) {
       return new Response(
