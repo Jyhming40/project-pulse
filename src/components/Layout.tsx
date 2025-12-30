@@ -2,14 +2,13 @@ import { ReactNode, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppSettingsRead } from '@/hooks/useAppSettings';
+import { usePermissions, MODULES } from '@/hooks/usePermissions';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
   LayoutDashboard, 
   Building2, 
   Users, 
   FileText, 
-  Settings, 
-  Settings2,
   LogOut,
   Zap,
   ChevronLeft,
@@ -21,11 +20,10 @@ import {
   ClipboardList,
   TrendingUp,
   AlertTriangle,
-  Database,
   Activity,
-  FileCheck,
   Palette,
-  UserCog
+  UserCog,
+  Settings2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -39,34 +37,35 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-// 日常工作模組
+// 日常工作模組 - 對所有登入使用者可見
 const dailyWorkItems = [
-  { to: '/', icon: LayoutDashboard, label: '儀表板' },
-  { to: '/projects', icon: Building2, label: '案場管理' },
-  { to: '/documents', icon: FileText, label: '文件管理' },
-  { to: '/investors', icon: Users, label: '投資方 / 業主' },
-  { to: '/partners', icon: HardHat, label: '外包夥伴 / 工班' },
+  { to: '/', icon: LayoutDashboard, label: '儀表板', module: null },
+  { to: '/projects', icon: Building2, label: '案場管理', module: MODULES.PROJECTS },
+  { to: '/documents', icon: FileText, label: '文件管理', module: MODULES.DOCUMENTS },
+  { to: '/investors', icon: Users, label: '投資方 / 業主', module: MODULES.INVESTORS },
+  { to: '/partners', icon: HardHat, label: '外包夥伴 / 工班', module: MODULES.PARTNERS },
 ];
 
-// 管理與設定模組（Admin only）
+// 管理與設定模組 - 依權限控制
 const managementItems = [
-  { to: '/progress-settings', icon: TrendingUp, label: '進度設定' },
-  { to: '/system-options', icon: Settings2, label: 'Codebook 選項' },
-  { to: '/investor-codes', icon: BookOpen, label: '代碼對照表' },
-  { to: '/settings', icon: UserCog, label: '使用者管理' },
-  { to: '/deletion-policies', icon: Shield, label: '刪除政策' },
-  { to: '/recycle-bin', icon: Trash2, label: '回收區' },
-  { to: '/branding', icon: Palette, label: '公司設定' },
+  { to: '/progress-settings', icon: TrendingUp, label: '進度設定', adminOnly: true },
+  { to: '/system-options', icon: Settings2, label: 'Codebook 選項', adminOnly: true },
+  { to: '/investor-codes', icon: BookOpen, label: '代碼對照表', adminOnly: true },
+  { to: '/settings', icon: UserCog, label: '使用者管理', adminOnly: true },
+  { to: '/deletion-policies', icon: Shield, label: '刪除政策', adminOnly: true },
+  { to: '/recycle-bin', icon: Trash2, label: '回收區', adminOnly: true },
+  { to: '/branding', icon: Palette, label: '公司設定', adminOnly: true },
 ];
 
-// 系統治理中心（Admin only, high-risk）
+// 系統治理中心 - 僅限管理員
 const systemGovernanceItems = [
-  { to: '/engineering', icon: Activity, label: '系統狀態' },
+  { to: '/engineering', icon: Activity, label: '系統治理中心' },
   { to: '/audit-logs', icon: ClipboardList, label: '稽核日誌' },
 ];
 
 export default function Layout({ children }: LayoutProps) {
   const { user, signOut, isAdmin, role } = useAuth();
+  const { canView } = usePermissions();
   const { settings } = useAppSettingsRead();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
@@ -98,7 +97,19 @@ export default function Layout({ children }: LayoutProps) {
   const systemNameMain = settings?.company_name_zh || '明群環能';
   const systemNameSub = settings?.system_name_zh?.replace(systemNameMain, '').trim() || '管理系統';
 
-  const renderNavItem = (item: { to: string; icon: React.ElementType; label: string }) => {
+  // 檢查模組是否可見
+  const isModuleVisible = (item: { module?: string | null; adminOnly?: boolean }) => {
+    // 如果模組設定 adminOnly，則只有管理員可見
+    if (item.adminOnly && !isAdmin) return false;
+    // 如果有指定模組，檢查權限
+    if (item.module && !canView(item.module as any)) return false;
+    return true;
+  };
+
+  const renderNavItem = (item: { to: string; icon: React.ElementType; label: string; module?: string | null; adminOnly?: boolean }) => {
+    // 權限檢查
+    if (!isModuleVisible(item)) return null;
+
     const isActive = location.pathname === item.to || 
       (item.to !== '/' && location.pathname.startsWith(item.to));
     return (
@@ -230,7 +241,7 @@ export default function Layout({ children }: LayoutProps) {
                   <CollapsibleContent className="space-y-1">
                     <div className="px-3 py-1.5 mb-1">
                       <p className="text-[10px] text-amber-600/80 dark:text-amber-500/80 leading-tight">
-                        ⚠️ 此區域包含高風險系統操作，請謹慎使用
+                        ⚠️ 高風險區域，請謹慎操作
                       </p>
                     </div>
                     {systemGovernanceItems.map((item) => {
