@@ -70,7 +70,7 @@ export default function ProgressSettings() {
   });
 
   // Get progress weights from settings
-  const weightSetting = settings.find(s => s.setting_key === 'progress_weights');
+  const weightSetting = settings.find(s => s.setting_key === 'weights');
   const adminWeight = (weightSetting?.setting_value?.admin_weight ?? 50) as number;
   const engineeringWeight = (weightSetting?.setting_value?.engineering_weight ?? 50) as number;
 
@@ -105,7 +105,7 @@ export default function ProgressSettings() {
   const handleWeightChange = (value: number[]) => {
     const newAdminWeight = value[0];
     updateSettings.mutate({
-      key: 'progress_weights',
+      key: 'weights',
       value: {
         admin_weight: newAdminWeight,
         engineering_weight: 100 - newAdminWeight,
