@@ -192,6 +192,13 @@ export default function Documents() {
       options: docStatusOptions,
       placeholder: '選擇狀態',
     },
+    {
+      key: 'doc_type',
+      label: '文件類型',
+      type: 'select',
+      options: docTypeOptions,
+      placeholder: '選擇類型',
+    },
   ];
 
   // Stats

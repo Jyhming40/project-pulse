@@ -383,6 +383,13 @@ export default function Projects() {
       options: constructionStatusOptions,
       placeholder: '選擇施工狀態',
     },
+    {
+      key: 'city',
+      label: '縣市',
+      type: 'select',
+      options: cities.map(c => ({ value: c, label: c })),
+      placeholder: '選擇縣市',
+    },
   ];
 
   // Handle investor selection - auto-fill investor code
