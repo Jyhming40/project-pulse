@@ -13,7 +13,8 @@ import {
   ShieldCheck, 
   ClipboardList, 
   Trash2, 
-  AlertTriangle 
+  AlertTriangle,
+  ShieldAlert
 } from 'lucide-react';
 
 import {
@@ -51,8 +52,8 @@ export default function Engineering() {
         <div className="flex items-start justify-between">
           <div>
             <h1 className="text-2xl font-display font-bold flex items-center gap-2">
-              <Wrench className="w-6 h-6 text-amber-500" />
-              系統治理與工程管理中心
+              <ShieldAlert className="w-6 h-6 text-amber-500" />
+              系統治理中心
             </h1>
             <p className="text-muted-foreground mt-1">
               系統除錯、資料安全、資料完整性檢查與高風險操作管控
@@ -60,12 +61,19 @@ export default function Engineering() {
           </div>
         </div>
 
-        {/* Admin Only Warning */}
-        <Alert className="border-amber-500/50 bg-amber-500/5">
-          <AlertTriangle className="w-4 h-4 text-amber-500" />
-          <AlertTitle>僅限管理員</AlertTitle>
-          <AlertDescription>
-            此模組僅供系統管理員使用。所有操作都會記錄到稽核日誌中。
+        {/* Critical Warning Banner */}
+        <Alert className="border-2 border-amber-500 bg-amber-500/10">
+          <AlertTriangle className="w-5 h-5 text-amber-600" />
+          <AlertTitle className="text-amber-700 dark:text-amber-400 font-bold">
+            ⚠️ 本區為系統治理與高風險操作區域
+          </AlertTitle>
+          <AlertDescription className="text-amber-700/90 dark:text-amber-400/90">
+            <ul className="list-disc list-inside mt-2 space-y-1">
+              <li>僅限具備完整權限且理解後果者使用</li>
+              <li>所有操作都會記錄到稽核日誌中，可供追溯</li>
+              <li>部分操作為不可逆，執行前請確保已完成備份</li>
+              <li>如有疑問，請先諮詢系統管理員</li>
+            </ul>
           </AlertDescription>
         </Alert>
 
@@ -102,7 +110,7 @@ export default function Engineering() {
             </TabsTrigger>
             <TabsTrigger 
               value="danger"
-              className="flex items-center gap-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground"
+              className="flex items-center gap-2 border-2 border-destructive/30 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground data-[state=active]:border-destructive"
             >
               <AlertTriangle className="w-4 h-4" />
               <span className="hidden sm:inline">危險操作區</span>
@@ -127,6 +135,22 @@ export default function Engineering() {
           </TabsContent>
 
           <TabsContent value="danger" className="mt-6">
+            {/* Additional Danger Zone warning before panel */}
+            <Alert variant="destructive" className="mb-6 border-2">
+              <AlertTriangle className="w-5 h-5" />
+              <AlertTitle className="text-lg font-bold">⚠️ 危險操作區</AlertTitle>
+              <AlertDescription className="mt-2">
+                <p className="font-medium mb-2">此區域的操作可能造成：</p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li><strong>不可復原的資料損失</strong> — 刪除後無法透過系統還原</li>
+                  <li><strong>業務中斷</strong> — 重置期間系統暫時無法使用</li>
+                  <li><strong>完整追溯紀錄</strong> — 所有操作將寫入 audit_logs</li>
+                </ul>
+                <p className="mt-3 text-sm">
+                  執行任何操作前，請務必：<strong>完成資料庫備份</strong>、<strong>確認操作範圍</strong>、<strong>取得必要授權</strong>
+                </p>
+              </AlertDescription>
+            </Alert>
             <DangerZonePanel />
           </TabsContent>
         </Tabs>
