@@ -4,3 +4,4 @@ export { DatabaseExportPanel } from './DatabaseExportPanel';
 export { DangerZonePanel } from './DangerZonePanel';
 export { AuditLogsPanel } from './AuditLogsPanel';
 export { DeletionPolicyPanel } from './DeletionPolicyPanel';
+export { default as DriveConnectionPanel } from './DriveConnectionPanel';
