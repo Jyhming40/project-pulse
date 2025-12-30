@@ -1367,21 +1367,39 @@ export type Database = {
       }
       user_roles: {
         Row: {
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           id: string
+          reject_reason: string | null
+          rejected_at: string | null
+          rejected_by: string | null
           role: Database["public"]["Enums"]["app_role"]
+          status: Database["public"]["Enums"]["user_status"]
           user_id: string
         }
         Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           id?: string
+          reject_reason?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          status?: Database["public"]["Enums"]["user_status"]
           user_id: string
         }
         Update: {
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           id?: string
+          reject_reason?: string | null
+          rejected_at?: string | null
+          rejected_by?: string | null
           role?: Database["public"]["Enums"]["app_role"]
+          status?: Database["public"]["Enums"]["user_status"]
           user_id?: string
         }
         Relationships: [
@@ -1557,6 +1575,7 @@ export type Database = {
         Args: { _user_id: string }
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      has_active_status: { Args: { _user_id: string }; Returns: boolean }
       has_any_role: {
         Args: {
           _roles: Database["public"]["Enums"]["app_role"][]
@@ -1669,6 +1688,7 @@ export type Database = {
         | "運維中"
         | "暫停"
         | "取消"
+      user_status: "pending" | "active" | "rejected" | "disabled"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1882,6 +1902,7 @@ export const Constants = {
         "暫停",
         "取消",
       ],
+      user_status: ["pending", "active", "rejected", "disabled"],
     },
   },
 } as const

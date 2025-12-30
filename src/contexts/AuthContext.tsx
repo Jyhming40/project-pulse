@@ -39,8 +39,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
     
     if (data && !error) {
-      setRole(data.role);
-      setStatus((data as { role: AppRole; status: UserStatus }).status || 'pending');
+      const roleData = data as unknown as { role: AppRole; status: UserStatus };
+      setRole(roleData.role);
+      setStatus(roleData.status || 'pending');
     } else {
       setRole('viewer');
       setStatus('pending');
