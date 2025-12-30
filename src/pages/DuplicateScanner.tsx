@@ -9,6 +9,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
 import { 
   Search, 
   AlertTriangle, 
@@ -19,7 +24,11 @@ import {
   RefreshCw,
   FileSearch,
   ChevronRight,
-  Info
+  Info,
+  Check,
+  X,
+  GitMerge,
+  Shield
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
@@ -34,29 +43,42 @@ const confidenceLevelConfig: Record<ConfidenceLevel, { label: string; color: str
   medium: { 
     label: '中可信度', 
     color: 'bg-amber-500 text-white',
-    description: '同投資方且地址或名稱相似'
+    description: '地址相似≥80% 或 名稱相似≥75%'
   },
   low: { 
     label: '低可信度', 
     color: 'bg-muted text-muted-foreground',
-    description: '同投資方、同區域、容量相近'
+    description: '同投資方、同鄉鎮市區、容量相近'
   },
 };
+
+type ActionMode = 'dismiss' | 'confirm' | 'merge' | null;
 
 export default function DuplicateScanner() {
   const { 
     isLoading, 
     scanForDuplicates, 
-    markNotDuplicate, 
-    softDeleteDuplicate,
-    isMarkingNotDuplicate,
-    isSoftDeleting
+    dismissPair,
+    confirmAndDelete,
+    mergeProjects,
+    isDismissing,
+    isConfirming,
+    isMerging
   } = useDuplicateScanner();
 
   const [hasScanned, setHasScanned] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<DuplicateGroup | null>(null);
-  const [projectToDelete, setProjectToDelete] = useState<ProjectForComparison | null>(null);
+  
+  // Action state
+  const [actionMode, setActionMode] = useState<ActionMode>(null);
+  const [selectedKeepProject, setSelectedKeepProject] = useState<string | null>(null);
+  const [mergeDocuments, setMergeDocuments] = useState(true);
+  const [mergeStatusHistory, setMergeStatusHistory] = useState(true);
+  const [actionReason, setActionReason] = useState('');
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  const isProcessing = isDismissing || isConfirming || isMerging;
 
   const handleScan = () => {
     const results = scanForDuplicates();
@@ -64,22 +86,69 @@ export default function DuplicateScanner() {
     setHasScanned(true);
   };
 
-  const handleMarkNotDuplicate = async (group: DuplicateGroup) => {
-    const projectIds = group.projects.map(p => p.id);
-    await markNotDuplicate({ projectIds });
-    // Rescan after marking
-    const results = scanForDuplicates();
-    setDuplicateGroups(results);
-    setSelectedGroup(null);
+  const resetActionState = () => {
+    setActionMode(null);
+    setSelectedKeepProject(null);
+    setMergeDocuments(true);
+    setMergeStatusHistory(true);
+    setActionReason('');
+    setShowConfirmDialog(false);
   };
 
-  const handleSoftDelete = async (project: ProjectForComparison) => {
-    await softDeleteDuplicate(project.id);
-    // Rescan after deletion
+  const handleCloseDialog = () => {
+    setSelectedGroup(null);
+    resetActionState();
+  };
+
+  const handleDismiss = async () => {
+    if (!selectedGroup) return;
+    const projectIds = selectedGroup.projects.map(p => p.id);
+    await dismissPair({ projectIds, reason: actionReason || undefined });
     const results = scanForDuplicates();
     setDuplicateGroups(results);
-    setProjectToDelete(null);
-    setSelectedGroup(null);
+    handleCloseDialog();
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedGroup || !selectedKeepProject) return;
+    const deleteProject = selectedGroup.projects.find(p => p.id !== selectedKeepProject);
+    if (!deleteProject) return;
+    
+    await confirmAndDelete({
+      keepProjectId: selectedKeepProject,
+      deleteProjectId: deleteProject.id,
+      reason: actionReason || undefined,
+    });
+    const results = scanForDuplicates();
+    setDuplicateGroups(results);
+    handleCloseDialog();
+  };
+
+  const handleMerge = async () => {
+    if (!selectedGroup || !selectedKeepProject) return;
+    const mergeProject = selectedGroup.projects.find(p => p.id !== selectedKeepProject);
+    if (!mergeProject) return;
+    
+    await mergeProjects({
+      keepProjectId: selectedKeepProject,
+      mergeProjectId: mergeProject.id,
+      mergeDocuments,
+      mergeStatusHistory,
+      reason: actionReason || undefined,
+    });
+    const results = scanForDuplicates();
+    setDuplicateGroups(results);
+    handleCloseDialog();
+  };
+
+  const executeAction = () => {
+    if (actionMode === 'dismiss') {
+      handleDismiss();
+    } else if (actionMode === 'confirm') {
+      handleConfirmDelete();
+    } else if (actionMode === 'merge') {
+      handleMerge();
+    }
   };
 
   const stats = useMemo(() => {
@@ -139,8 +208,8 @@ export default function DuplicateScanner() {
           <div className="text-sm">
             <p className="font-medium text-info">掃描說明</p>
             <p className="text-muted-foreground mt-1">
-              系統會根據案場代碼、投資方、地址、名稱、容量等資訊比對疑似重複的案場。
-              所有刪除操作皆為 Soft Delete，可於回收區復原。
+              系統會根據案場代碼、投資方、地址相似度≥80%、名稱相似度≥75%、同鄉鎮市區等條件比對疑似重複的案場。
+              地址相似度與名稱相似度皆低於40%的配對將被排除。所有刪除操作皆為 Soft Delete，可於回收區復原。
             </p>
           </div>
         </CardContent>
@@ -200,7 +269,7 @@ export default function DuplicateScanner() {
               <CardHeader>
                 <CardTitle>疑似重複群組列表</CardTitle>
                 <CardDescription>
-                  點擊群組查看詳細比對資訊
+                  點擊群組查看詳細比對資訊並進行處理
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -220,15 +289,20 @@ export default function DuplicateScanner() {
                             <div className="font-medium">
                               {group.projects.length} 個案場
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              {group.criteria.join('、')}
+                            <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                              {group.matchedCriteria.slice(0, 3).map((c, i) => (
+                                <span key={i} className="flex items-center gap-1">
+                                  <Check className="w-3 h-3 text-success" />
+                                  {c.name}
+                                  {c.value && <span className="text-xs">({c.value})</span>}
+                                </span>
+                              ))}
                             </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="text-sm text-muted-foreground">
                             {group.projects.slice(0, 2).map(p => p.project_code).join(', ')}
-                            {group.projects.length > 2 && ` +${group.projects.length - 2}`}
                           </div>
                           <ChevronRight className="w-4 h-4 text-muted-foreground" />
                         </div>
@@ -255,8 +329,8 @@ export default function DuplicateScanner() {
       )}
 
       {/* Comparison Dialog */}
-      <Dialog open={!!selectedGroup} onOpenChange={() => setSelectedGroup(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh]">
+      <Dialog open={!!selectedGroup} onOpenChange={() => handleCloseDialog()}>
+        <DialogContent className="max-w-6xl max-h-[95vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               案場比對
@@ -267,66 +341,121 @@ export default function DuplicateScanner() {
               )}
             </DialogTitle>
             <DialogDescription>
-              {selectedGroup && (
-                <>
-                  判斷依據：{selectedGroup.criteria.join('、')}
-                  <br />
-                  <span className="text-xs text-muted-foreground">
-                    {confidenceLevelConfig[selectedGroup.confidenceLevel].description}
-                  </span>
-                </>
-              )}
+              {confidenceLevelConfig[selectedGroup?.confidenceLevel || 'low'].description}
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[60vh]">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>案場編號</TableHead>
-                  <TableHead>案場名稱</TableHead>
-                  <TableHead>投資方</TableHead>
-                  <TableHead>地址</TableHead>
-                  <TableHead className="text-right">容量 (kWp)</TableHead>
-                  <TableHead>建檔時間</TableHead>
-                  <TableHead className="text-right">文件數</TableHead>
-                  <TableHead>操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {selectedGroup?.projects.map((project) => (
-                  <TableRow key={project.id}>
-                    <TableCell className="font-mono text-sm">
-                      {project.site_code_display || project.project_code}
-                    </TableCell>
-                    <TableCell className="font-medium">{project.project_name}</TableCell>
-                    <TableCell>
-                      <div className="text-sm">
-                        {project.investor_name || '-'}
-                        {project.investor_code && (
-                          <span className="text-muted-foreground ml-1">({project.investor_code})</span>
+          <ScrollArea className="max-h-[70vh]">
+            <div className="space-y-6">
+              {/* Criteria Display */}
+              {selectedGroup && (
+                <div className="grid grid-cols-2 gap-4">
+                  <Card className="border-success/50">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2 text-success">
+                        <Check className="w-4 h-4" />
+                        命中條件
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-1">
+                        {selectedGroup.matchedCriteria.map((c, i) => (
+                          <div key={i} className="text-sm flex items-center justify-between">
+                            <span>{c.name}</span>
+                            {c.value && <span className="text-muted-foreground text-xs">{c.value}</span>}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-muted">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm flex items-center gap-2 text-muted-foreground">
+                        <X className="w-4 h-4" />
+                        未命中條件
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-1">
+                        {selectedGroup.unmatchedCriteria.length > 0 ? (
+                          selectedGroup.unmatchedCriteria.map((c, i) => (
+                            <div key={i} className="text-sm flex items-center justify-between text-muted-foreground">
+                              <span>{c.name}</span>
+                              {c.value && <span className="text-xs">{c.value}</span>}
+                            </div>
+                          ))
+                        ) : (
+                          <span className="text-sm text-muted-foreground">無</span>
                         )}
                       </div>
-                    </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <span>{project.address || '-'}</span>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{project.address || '無地址資料'}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TableCell>
-                    <TableCell className="text-right font-mono">
-                      {project.capacity_kwp?.toFixed(2) || '-'}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(project.created_at), 'yyyy/MM/dd', { locale: zhTW })}
-                    </TableCell>
-                    <TableCell className="text-right">{project.document_count}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Project Comparison Table */}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[50px]">選擇保留</TableHead>
+                    <TableHead>案場編號</TableHead>
+                    <TableHead>案場名稱</TableHead>
+                    <TableHead>投資方</TableHead>
+                    <TableHead>地址</TableHead>
+                    <TableHead className="text-right">容量</TableHead>
+                    <TableHead>建檔時間</TableHead>
+                    <TableHead className="text-right">文件數</TableHead>
+                    <TableHead className="text-right">狀態數</TableHead>
+                    <TableHead>操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedGroup?.projects.map((project) => (
+                    <TableRow 
+                      key={project.id}
+                      className={cn(
+                        selectedKeepProject === project.id && "bg-success/10"
+                      )}
+                    >
+                      <TableCell>
+                        <RadioGroup 
+                          value={selectedKeepProject || ''} 
+                          onValueChange={setSelectedKeepProject}
+                        >
+                          <RadioGroupItem value={project.id} id={project.id} />
+                        </RadioGroup>
+                      </TableCell>
+                      <TableCell className="font-mono text-sm">
+                        {project.site_code_display || project.project_code}
+                      </TableCell>
+                      <TableCell className="font-medium">{project.project_name}</TableCell>
+                      <TableCell>
+                        <div className="text-sm">
+                          {project.investor_name || '-'}
+                          {project.investor_code && (
+                            <span className="text-muted-foreground ml-1">({project.investor_code})</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="max-w-[200px]">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="truncate block">{project.address || '-'}</span>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-[300px]">
+                            <p>{project.address || '無地址資料'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {project.capacity_kwp?.toFixed(2) || '-'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {format(new Date(project.created_at), 'yyyy/MM/dd', { locale: zhTW })}
+                      </TableCell>
+                      <TableCell className="text-right">{project.document_count}</TableCell>
+                      <TableCell className="text-right">{project.status_history_count}</TableCell>
+                      <TableCell>
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <Button
@@ -340,73 +469,184 @@ export default function DuplicateScanner() {
                           </TooltipTrigger>
                           <TooltipContent>查看案場</TooltipContent>
                         </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-destructive hover:text-destructive"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setProjectToDelete(project);
-                              }}
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>標記刪除（移至回收區）</TooltipContent>
-                        </Tooltip>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+
+              <Separator />
+
+              {/* Action Section */}
+              <div className="space-y-4">
+                <h4 className="font-medium flex items-center gap-2">
+                  <Shield className="w-4 h-4" />
+                  處理動作
+                </h4>
+                
+                <div className="grid grid-cols-3 gap-3">
+                  <Card 
+                    className={cn(
+                      "cursor-pointer transition-all hover:border-primary",
+                      actionMode === 'dismiss' && "border-primary bg-primary/5"
+                    )}
+                    onClick={() => setActionMode('dismiss')}
+                  >
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <XCircle className="w-5 h-5 text-muted-foreground" />
+                        <span className="font-medium">標記不是重複</span>
                       </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                      <p className="text-xs text-muted-foreground">
+                        此組合不會再出現於掃描結果
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card 
+                    className={cn(
+                      "cursor-pointer transition-all hover:border-destructive",
+                      actionMode === 'confirm' && "border-destructive bg-destructive/5",
+                      !selectedKeepProject && "opacity-50"
+                    )}
+                    onClick={() => selectedKeepProject && setActionMode('confirm')}
+                  >
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Trash2 className="w-5 h-5 text-destructive" />
+                        <span className="font-medium">確認重複並刪除</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        保留選中案場，刪除另一案場（可復原）
+                      </p>
+                    </CardContent>
+                  </Card>
+
+                  <Card 
+                    className={cn(
+                      "cursor-pointer transition-all hover:border-info",
+                      actionMode === 'merge' && "border-info bg-info/5",
+                      !selectedKeepProject && "opacity-50"
+                    )}
+                    onClick={() => selectedKeepProject && setActionMode('merge')}
+                  >
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <GitMerge className="w-5 h-5 text-info" />
+                        <span className="font-medium">合併案場</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        將文件與狀態歷史合併至選中案場
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Action Options */}
+                {actionMode === 'merge' && (
+                  <Card className="border-info/50">
+                    <CardContent className="pt-4 space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="mergeDocuments" 
+                          checked={mergeDocuments}
+                          onCheckedChange={(checked) => setMergeDocuments(checked as boolean)}
+                        />
+                        <Label htmlFor="mergeDocuments">合併文件</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Checkbox 
+                          id="mergeStatusHistory" 
+                          checked={mergeStatusHistory}
+                          onCheckedChange={(checked) => setMergeStatusHistory(checked as boolean)}
+                        />
+                        <Label htmlFor="mergeStatusHistory">合併狀態歷史</Label>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {actionMode && (
+                  <div className="space-y-2">
+                    <Label>備註（選填）</Label>
+                    <Textarea 
+                      placeholder="輸入處理原因或備註..."
+                      value={actionReason}
+                      onChange={(e) => setActionReason(e.target.value)}
+                      rows={2}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
           </ScrollArea>
 
           <DialogFooter className="flex gap-2 sm:gap-0">
-            <Button
-              variant="outline"
-              onClick={() => selectedGroup && handleMarkNotDuplicate(selectedGroup)}
-              disabled={isMarkingNotDuplicate}
-            >
-              <XCircle className="w-4 h-4 mr-2" />
-              標記「不是重複」
-            </Button>
-            <Button variant="ghost" onClick={() => setSelectedGroup(null)}>
+            {actionMode && (
+              <Button
+                variant={actionMode === 'dismiss' ? 'outline' : actionMode === 'confirm' ? 'destructive' : 'default'}
+                onClick={() => setShowConfirmDialog(true)}
+                disabled={isProcessing || ((actionMode === 'confirm' || actionMode === 'merge') && !selectedKeepProject)}
+              >
+                {isProcessing ? '處理中...' : (
+                  actionMode === 'dismiss' ? '確認標記不是重複' :
+                  actionMode === 'confirm' ? '確認刪除' :
+                  '確認合併'
+                )}
+              </Button>
+            )}
+            <Button variant="ghost" onClick={handleCloseDialog}>
               關閉
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!projectToDelete} onOpenChange={() => setProjectToDelete(null)}>
+      {/* Final Confirmation Dialog */}
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5 text-destructive" />
-              確認刪除此案場？
+              {actionMode === 'dismiss' && <XCircle className="w-5 h-5" />}
+              {actionMode === 'confirm' && <AlertTriangle className="w-5 h-5 text-destructive" />}
+              {actionMode === 'merge' && <GitMerge className="w-5 h-5 text-info" />}
+              {actionMode === 'dismiss' && '確認標記為非重複？'}
+              {actionMode === 'confirm' && '確認刪除案場？'}
+              {actionMode === 'merge' && '確認合併案場？'}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {projectToDelete && (
+              {actionMode === 'dismiss' && (
+                '標記後，此組合將不會再出現於未來的掃描結果中。'
+              )}
+              {actionMode === 'confirm' && selectedGroup && (
                 <>
-                  您即將將案場 <strong>{projectToDelete.project_code}</strong> ({projectToDelete.project_name}) 
-                  標記為重複資料並移至回收區。
-                  <br /><br />
-                  刪除原因將記錄為「重複資料清理」，您可以在回收區中復原此操作。
+                  將保留案場 <strong>{selectedGroup.projects.find(p => p.id === selectedKeepProject)?.project_code}</strong>，
+                  並刪除案場 <strong>{selectedGroup.projects.find(p => p.id !== selectedKeepProject)?.project_code}</strong>。
+                  刪除的案場可在回收區中復原。
+                </>
+              )}
+              {actionMode === 'merge' && selectedGroup && (
+                <>
+                  將案場 <strong>{selectedGroup.projects.find(p => p.id !== selectedKeepProject)?.project_code}</strong> 的
+                  {mergeDocuments && '文件'}
+                  {mergeDocuments && mergeStatusHistory && '、'}
+                  {mergeStatusHistory && '狀態歷史'}
+                  合併至 <strong>{selectedGroup.projects.find(p => p.id === selectedKeepProject)?.project_code}</strong>，
+                  並刪除原案場。
                 </>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isSoftDeleting}>取消</AlertDialogCancel>
+            <AlertDialogCancel disabled={isProcessing}>取消</AlertDialogCancel>
             <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={() => projectToDelete && handleSoftDelete(projectToDelete)}
-              disabled={isSoftDeleting}
+              className={cn(
+                actionMode === 'confirm' && "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              )}
+              onClick={() => executeAction()}
+              disabled={isProcessing}
             >
-              {isSoftDeleting ? '處理中...' : '確認刪除'}
+              {isProcessing ? '處理中...' : '確認'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
