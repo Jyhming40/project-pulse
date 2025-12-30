@@ -5,8 +5,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
+import { useBatchSelect } from '@/hooks/useBatchSelect';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { TablePagination } from '@/components/ui/table-pagination';
+import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
+import { BatchUpdateDialog } from '@/components/BatchUpdateDialog';
+import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Plus, 
   Search, 
@@ -190,6 +195,13 @@ export default function Investors() {
   // Pagination
   const pagination = usePagination(sortedInvestors, { pageSize: 20 });
 
+  // Batch selection
+  const batchSelect = useBatchSelect(sortedInvestors);
+  const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false);
+  const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
+  const [batchUpdateField, setBatchUpdateField] = useState<string>('');
+  const [isBatchUpdating, setIsBatchUpdating] = useState(false);
+
   const handleCreate = () => {
     if (!formData.investor_code || !formData.company_name) {
       toast.error('請填寫必填欄位');
@@ -236,6 +248,46 @@ export default function Investors() {
     '取消': 'bg-destructive/15 text-destructive',
   };
 
+  // Batch update handler
+  const handleBatchUpdate = async (field: string, value: string) => {
+    setIsBatchUpdating(true);
+    try {
+      const ids = Array.from(batchSelect.selectedIds);
+      if (field === 'investor_type') {
+        const { error } = await supabase
+          .from('investors')
+          .update({ investor_type: value })
+          .in('id', ids);
+        if (error) throw error;
+      }
+      toast.success(`已更新 ${ids.length} 筆資料`);
+      queryClient.invalidateQueries({ queryKey: ['investors'] });
+      batchSelect.deselectAll();
+      setIsBatchUpdateOpen(false);
+    } catch (error: any) {
+      toast.error('批次更新失敗', { description: error.message });
+    } finally {
+      setIsBatchUpdating(false);
+    }
+  };
+
+  // Batch delete handler
+  const handleBatchDelete = async (reason?: string) => {
+    const ids = Array.from(batchSelect.selectedIds);
+    let successCount = 0;
+    for (const id of ids) {
+      try {
+        await softDelete({ id, reason });
+        successCount++;
+      } catch (error) {
+        // Continue with others
+      }
+    }
+    toast.success(`已刪除 ${successCount} 筆資料`);
+    batchSelect.deselectAll();
+    setIsBatchDeleteOpen(false);
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -276,6 +328,13 @@ export default function Investors() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={batchSelect.isAllSelected}
+                  onCheckedChange={batchSelect.toggleAll}
+                  aria-label="全選"
+                />
+              </TableHead>
               <SortableTableHead sortKey="investor_code" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investor_code').direction} sortIndex={getSortInfo('investor_code').index} onSort={handleSort}>投資方編號</SortableTableHead>
               <SortableTableHead sortKey="company_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('company_name').direction} sortIndex={getSortInfo('company_name').index} onSort={handleSort}>公司名稱</SortableTableHead>
               <SortableTableHead sortKey="investor_type" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investor_type').direction} sortIndex={getSortInfo('investor_type').index} onSort={handleSort}>類型</SortableTableHead>
@@ -288,7 +347,7 @@ export default function Investors() {
           <TableBody>
             {sortedInvestors.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
                   {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
@@ -299,6 +358,13 @@ export default function Investors() {
                   className="cursor-pointer hover:bg-muted/50"
                   onClick={() => openViewDialog(investor)}
                 >
+                  <TableCell onClick={(e) => e.stopPropagation()}>
+                    <Checkbox
+                      checked={batchSelect.isSelected(investor.id)}
+                      onCheckedChange={() => batchSelect.toggle(investor.id)}
+                      aria-label={`選取 ${investor.company_name}`}
+                    />
+                  </TableCell>
                   <TableCell className="font-mono text-sm">{investor.investor_code}</TableCell>
                   <TableCell className="font-medium">{investor.company_name}</TableCell>
                   <TableCell>
@@ -674,6 +740,67 @@ export default function Investors() {
         tableName="investors"
         itemName={deletingInvestor?.company_name}
         isPending={isDeleting}
+      />
+
+      {/* Batch Action Bar */}
+      <BatchActionBar
+        selectedCount={batchSelect.selectedCount}
+        onClear={batchSelect.deselectAll}
+        actions={[
+          {
+            key: 'update',
+            label: '批次修改',
+            icon: BatchActionIcons.edit,
+            onClick: () => {
+              setBatchUpdateField('investor_type');
+              setIsBatchUpdateOpen(true);
+            },
+          },
+          ...(isAdmin
+            ? [
+                {
+                  key: 'delete',
+                  label: '批次刪除',
+                  icon: BatchActionIcons.delete,
+                  variant: 'destructive' as const,
+                  onClick: () => setIsBatchDeleteOpen(true),
+                },
+              ]
+            : []),
+        ]}
+      />
+
+      {/* Batch Update Dialog */}
+      <BatchUpdateDialog
+        open={isBatchUpdateOpen}
+        onOpenChange={setIsBatchUpdateOpen}
+        title="批次修改投資方"
+        selectedCount={batchSelect.selectedCount}
+        fields={[
+          {
+            key: 'investor_type',
+            label: '投資方類型',
+            type: 'select',
+            options: INVESTOR_TYPE_OPTIONS.map((t) => ({ value: t, label: t })),
+          },
+        ]}
+        onSubmit={async (values) => {
+          if (values.investor_type) {
+            await handleBatchUpdate('investor_type', values.investor_type);
+          }
+        }}
+        isLoading={isBatchUpdating}
+      />
+
+      {/* Batch Delete Dialog */}
+      <BatchDeleteDialog
+        open={isBatchDeleteOpen}
+        onOpenChange={setIsBatchDeleteOpen}
+        selectedCount={batchSelect.selectedCount}
+        itemLabel="筆投資方"
+        requireReason={false}
+        onConfirm={handleBatchDelete}
+        isLoading={isDeleting}
       />
     </div>
   );
