@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useDuplicateScanner, DuplicateGroup, ConfidenceLevel, ProjectForComparison } from '@/hooks/useDuplicateScanner';
+import { useDuplicateScanner, DuplicateGroup, ConfidenceLevel, ProjectForComparison, MatchedCriterion } from '@/hooks/useDuplicateScanner';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +19,9 @@ import {
   RefreshCw,
   FileSearch,
   ChevronRight,
-  Info
+  Info,
+  Check,
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
@@ -29,19 +31,45 @@ const confidenceLevelConfig: Record<ConfidenceLevel, { label: string; color: str
   high: { 
     label: '高可信度', 
     color: 'bg-destructive text-destructive-foreground',
-    description: '案場代碼或投資代碼+年份+序號完全相同'
+    description: '硬性唯一鍵匹配：案場代碼完全相同，或投資代碼+年份+序號完全相同'
   },
   medium: { 
     label: '中可信度', 
     color: 'bg-amber-500 text-white',
-    description: '同投資方且地址或名稱相似'
+    description: '同縣市且滿足至少2項：同投資方、地址相似度≥80%、名稱相似度≥75%、容量差距≤15%'
   },
   low: { 
     label: '低可信度', 
     color: 'bg-muted text-muted-foreground',
-    description: '同投資方、同區域、容量相近'
+    description: '僅提示：同投資方 + 同鄉鎮市區 + 容量相近'
   },
 };
+
+function CriteriaList({ criteria }: { criteria: MatchedCriterion[] }) {
+  return (
+    <div className="space-y-1.5">
+      {criteria.map((c) => (
+        <div 
+          key={c.key} 
+          className={cn(
+            "flex items-center gap-2 text-sm px-2 py-1 rounded",
+            c.matched ? "bg-success/10 text-success" : "bg-muted/50 text-muted-foreground"
+          )}
+        >
+          {c.matched ? (
+            <Check className="w-4 h-4 shrink-0" />
+          ) : (
+            <X className="w-4 h-4 shrink-0" />
+          )}
+          <span className="font-medium">{c.label}</span>
+          {c.detail && (
+            <span className="text-xs opacity-75 ml-auto">{c.detail}</span>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function DuplicateScanner() {
   const { 
@@ -137,11 +165,21 @@ export default function DuplicateScanner() {
         <CardContent className="flex items-start gap-3 pt-4">
           <Info className="w-5 h-5 text-info mt-0.5" />
           <div className="text-sm">
-            <p className="font-medium text-info">掃描說明</p>
-            <p className="text-muted-foreground mt-1">
-              系統會根據案場代碼、投資方、地址、名稱、容量等資訊比對疑似重複的案場。
-              所有刪除操作皆為 Soft Delete，可於回收區復原。
-            </p>
+            <p className="font-medium text-info">掃描規則說明</p>
+            <div className="text-muted-foreground mt-2 space-y-2">
+              <div className="flex items-start gap-2">
+                <Badge className={cn("shrink-0 mt-0.5", confidenceLevelConfig.high.color)}>高可信度</Badge>
+                <span>硬性唯一鍵：案場代碼完全相同，或投資代碼+年份+序號完全相同</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Badge className={cn("shrink-0 mt-0.5", confidenceLevelConfig.medium.color)}>中可信度</Badge>
+                <span>需同縣市 + 至少滿足2項輔助條件（同投資方、地址相似≥80%、名稱相似≥75%、容量差距≤15%）</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <Badge className={cn("shrink-0 mt-0.5", confidenceLevelConfig.low.color)}>低可信度</Badge>
+                <span>僅提示：同投資方 + 同鄉鎮市區 + 容量相近</span>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -200,7 +238,7 @@ export default function DuplicateScanner() {
               <CardHeader>
                 <CardTitle>疑似重複群組列表</CardTitle>
                 <CardDescription>
-                  點擊群組查看詳細比對資訊
+                  點擊群組查看詳細比對資訊，每個群組都會顯示完整的命中條件
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -209,29 +247,31 @@ export default function DuplicateScanner() {
                     {duplicateGroups.map((group) => (
                       <div
                         key={group.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 cursor-pointer transition-colors"
+                        className="flex items-start justify-between p-4 border rounded-lg hover:bg-accent/50 cursor-pointer transition-colors"
                         onClick={() => setSelectedGroup(group)}
                       >
-                        <div className="flex items-center gap-4">
-                          <Badge className={cn("px-2 py-1", confidenceLevelConfig[group.confidenceLevel].color)}>
+                        <div className="flex items-start gap-4">
+                          <Badge className={cn("px-2 py-1 shrink-0", confidenceLevelConfig[group.confidenceLevel].color)}>
                             {confidenceLevelConfig[group.confidenceLevel].label}
                           </Badge>
-                          <div>
+                          <div className="space-y-2">
                             <div className="font-medium">
                               {group.projects.length} 個案場
                             </div>
-                            <div className="text-sm text-muted-foreground">
-                              {group.criteria.join('、')}
+                            <div className="flex flex-wrap gap-1">
+                              {group.criteria.map((c, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs bg-success/10 border-success/30 text-success">
+                                  <Check className="w-3 h-3 mr-1" />
+                                  {c}
+                                </Badge>
+                              ))}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {group.projects.map(p => p.project_code).join(' vs ')}
                             </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="text-sm text-muted-foreground">
-                            {group.projects.slice(0, 2).map(p => p.project_code).join(', ')}
-                            {group.projects.length > 2 && ` +${group.projects.length - 2}`}
-                          </div>
-                          <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                        </div>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground mt-1" />
                       </div>
                     ))}
                   </div>
@@ -256,7 +296,7 @@ export default function DuplicateScanner() {
 
       {/* Comparison Dialog */}
       <Dialog open={!!selectedGroup} onOpenChange={() => setSelectedGroup(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh]">
+        <DialogContent className="max-w-6xl max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               案場比對
@@ -267,28 +307,36 @@ export default function DuplicateScanner() {
               )}
             </DialogTitle>
             <DialogDescription>
-              {selectedGroup && (
-                <>
-                  判斷依據：{selectedGroup.criteria.join('、')}
-                  <br />
-                  <span className="text-xs text-muted-foreground">
-                    {confidenceLevelConfig[selectedGroup.confidenceLevel].description}
-                  </span>
-                </>
-              )}
+              {selectedGroup && confidenceLevelConfig[selectedGroup.confidenceLevel].description}
             </DialogDescription>
           </DialogHeader>
 
-          <ScrollArea className="max-h-[60vh]">
+          {/* Matched Criteria Explanation */}
+          {selectedGroup && (
+            <Card className="bg-muted/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Info className="w-4 h-4" />
+                  為什麼被判定為重複？
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <CriteriaList criteria={selectedGroup.matchedCriteria} />
+              </CardContent>
+            </Card>
+          )}
+
+          <ScrollArea className="max-h-[45vh]">
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>案場編號</TableHead>
                   <TableHead>案場名稱</TableHead>
                   <TableHead>投資方</TableHead>
+                  <TableHead>縣市區</TableHead>
                   <TableHead>地址</TableHead>
                   <TableHead className="text-right">容量 (kWp)</TableHead>
-                  <TableHead>建檔時間</TableHead>
+                  <TableHead>年度/序號</TableHead>
                   <TableHead className="text-right">文件數</TableHead>
                   <TableHead>操作</TableHead>
                 </TableRow>
@@ -299,7 +347,16 @@ export default function DuplicateScanner() {
                     <TableCell className="font-mono text-sm">
                       {project.site_code_display || project.project_code}
                     </TableCell>
-                    <TableCell className="font-medium">{project.project_name}</TableCell>
+                    <TableCell className="font-medium max-w-[150px] truncate">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span>{project.project_name}</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{project.project_name}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TableCell>
                     <TableCell>
                       <div className="text-sm">
                         {project.investor_name || '-'}
@@ -308,7 +365,10 @@ export default function DuplicateScanner() {
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="max-w-[200px] truncate">
+                    <TableCell className="text-sm">
+                      {project.city || '-'}{project.district || ''}
+                    </TableCell>
+                    <TableCell className="max-w-[150px] truncate">
                       <Tooltip>
                         <TooltipTrigger asChild>
                           <span>{project.address || '-'}</span>
@@ -322,7 +382,7 @@ export default function DuplicateScanner() {
                       {project.capacity_kwp?.toFixed(2) || '-'}
                     </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {format(new Date(project.created_at), 'yyyy/MM/dd', { locale: zhTW })}
+                      {project.intake_year || '-'} / {project.seq ?? '-'}
                     </TableCell>
                     <TableCell className="text-right">{project.document_count}</TableCell>
                     <TableCell>
