@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Constants } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
@@ -23,9 +22,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { X, CheckCircle2, Loader2 } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { X, CheckCircle2, Loader2, TrendingUp, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface ProgressMilestone {
@@ -43,6 +50,23 @@ interface ProjectMilestone {
   project_id: string;
   milestone_code: string;
   is_completed: boolean;
+}
+
+// Result item for showing progress update results
+interface ProgressUpdateResult {
+  projectId: string;
+  projectCode: string;
+  projectName: string;
+  oldProgress: {
+    admin: number;
+    engineering: number;
+    overall: number;
+  };
+  newProgress: {
+    admin: number;
+    engineering: number;
+    overall: number;
+  };
 }
 
 // Helper function to recalculate and update project progress
@@ -180,6 +204,8 @@ export function DataEnrichmentPanel({
   const [selectedMilestones, setSelectedMilestones] = useState<Set<string>>(new Set());
   
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [updateResults, setUpdateResults] = useState<ProgressUpdateResult[]>([]);
 
   // Fetch available milestones
   const { data: milestones = [] } = useQuery({
@@ -253,13 +279,14 @@ export function DataEnrichmentPanel({
         updates.grid_connection_type = gridConnectionType;
       }
 
+      // Fetch old progress data BEFORE any updates
+      const { data: oldProjectsData } = await supabase
+        .from('projects')
+        .select('id, project_code, project_name, admin_progress, engineering_progress, overall_progress')
+        .in('id', projectIds);
+
       // Update projects if there are field changes
       if (Object.keys(updates).length > 0) {
-        const { data: oldData } = await supabase
-          .from('projects')
-          .select('id, admin_stage, engineering_stage, admin_progress, engineering_progress, overall_progress')
-          .in('id', projectIds);
-
         const { error } = await supabase
           .from('projects')
           .update(updates)
@@ -268,7 +295,7 @@ export function DataEnrichmentPanel({
 
         // Log audit for each project
         for (const id of projectIds) {
-          const oldRecord = oldData?.find(r => r.id === id);
+          const oldRecord = oldProjectsData?.find(r => r.id === id);
           await supabase.rpc('log_audit_action', {
             p_table_name: 'projects',
             p_record_id: id,
@@ -318,7 +345,34 @@ export function DataEnrichmentPanel({
         }
       }
 
-      return { count: projectIds.length };
+      // Fetch new progress data AFTER all updates
+      const { data: newProjectsData } = await supabase
+        .from('projects')
+        .select('id, project_code, project_name, admin_progress, engineering_progress, overall_progress')
+        .in('id', projectIds);
+
+      // Build results array
+      const results: ProgressUpdateResult[] = projectIds.map(id => {
+        const oldProject = oldProjectsData?.find(p => p.id === id);
+        const newProject = newProjectsData?.find(p => p.id === id);
+        return {
+          projectId: id,
+          projectCode: newProject?.project_code || oldProject?.project_code || '',
+          projectName: newProject?.project_name || oldProject?.project_name || '',
+          oldProgress: {
+            admin: oldProject?.admin_progress ?? 0,
+            engineering: oldProject?.engineering_progress ?? 0,
+            overall: oldProject?.overall_progress ?? 0,
+          },
+          newProgress: {
+            admin: newProject?.admin_progress ?? 0,
+            engineering: newProject?.engineering_progress ?? 0,
+            overall: newProject?.overall_progress ?? 0,
+          },
+        };
+      });
+
+      return { count: projectIds.length, results };
     },
     onSuccess: (data) => {
       // Invalidate all related queries to ensure progress bars update
@@ -326,10 +380,14 @@ export function DataEnrichmentPanel({
       queryClient.invalidateQueries({ queryKey: ['project-milestones'] });
       queryClient.invalidateQueries({ queryKey: ['project-drawer'] });
       queryClient.invalidateQueries({ queryKey: ['project-analytics'] });
+      
+      // Show results dialog
+      setUpdateResults(data.results);
+      setShowResults(true);
+      
       toast.success('批次更新成功', {
         description: `已更新 ${data.count} 筆案場資料`,
       });
-      onSuccess();
     },
     onError: (error: Error) => {
       toast.error('更新失敗', { description: error.message });
@@ -604,6 +662,102 @@ export function DataEnrichmentPanel({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Results Dialog */}
+      <Dialog open={showResults} onOpenChange={(open) => {
+        setShowResults(open);
+        if (!open) {
+          onSuccess();
+        }
+      }}>
+        <DialogContent className="max-w-2xl max-h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5 text-primary" />
+              批次更新完成
+            </DialogTitle>
+            <DialogDescription>
+              已成功更新 {updateResults.length} 筆案場資料，以下是進度變化：
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[50vh] pr-4">
+            <div className="space-y-4">
+              {updateResults.map((result) => {
+                const overallChange = result.newProgress.overall - result.oldProgress.overall;
+                const adminChange = result.newProgress.admin - result.oldProgress.admin;
+                const engChange = result.newProgress.engineering - result.oldProgress.engineering;
+                const hasChange = overallChange !== 0 || adminChange !== 0 || engChange !== 0;
+                
+                return (
+                  <div 
+                    key={result.projectId} 
+                    className="p-3 border rounded-lg space-y-3"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-sm">{result.projectCode}</p>
+                        <p className="text-xs text-muted-foreground">{result.projectName}</p>
+                      </div>
+                      {hasChange && (
+                        <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full">
+                          +{overallChange.toFixed(1)}%
+                        </span>
+                      )}
+                    </div>
+                    
+                    {/* Overall Progress */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">整體進度</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{result.oldProgress.overall.toFixed(1)}%</span>
+                          <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                          <span className="font-medium">{result.newProgress.overall.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                      <Progress value={result.newProgress.overall} className="h-2" />
+                    </div>
+
+                    {/* Admin Progress */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">行政進度</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{result.oldProgress.admin.toFixed(1)}%</span>
+                          <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                          <span className="font-medium">{result.newProgress.admin.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                      <Progress value={result.newProgress.admin} className="h-1.5 bg-muted" />
+                    </div>
+
+                    {/* Engineering Progress */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">工程進度</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">{result.oldProgress.engineering.toFixed(1)}%</span>
+                          <ArrowRight className="w-3 h-3 text-muted-foreground" />
+                          <span className="font-medium">{result.newProgress.engineering.toFixed(1)}%</span>
+                        </div>
+                      </div>
+                      <Progress value={result.newProgress.engineering} className="h-1.5 bg-muted" />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </ScrollArea>
+          <div className="flex justify-end pt-2">
+            <Button onClick={() => {
+              setShowResults(false);
+              onSuccess();
+            }}>
+              關閉
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
