@@ -23,7 +23,8 @@ import {
   Activity,
   Palette,
   UserCog,
-  Settings2
+  Settings2,
+  Link2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -46,7 +47,7 @@ const dailyWorkItems = [
   { to: '/partners', icon: HardHat, label: '外包夥伴 / 工班', module: MODULES.PARTNERS },
 ];
 
-// 管理與設定模組 - 重組為「人員」「系統」兩區塊
+// 管理與設定模組 - 重組為「人員」「系統」「整合」三區塊
 const managementItems = [
   // 人員管理
   { to: '/users', icon: UserCog, label: '使用者與角色', adminOnly: true },
@@ -56,6 +57,8 @@ const managementItems = [
   { to: '/system-options', icon: Settings2, label: 'Codebook', adminOnly: true },
   { to: '/investor-codes', icon: BookOpen, label: '代碼對照表', adminOnly: true },
   { to: '/branding', icon: Palette, label: '公司設定', adminOnly: true },
+  // 外部整合
+  { to: '/integrations', icon: Link2, label: '外部整合', adminOnly: true },
 ];
 
 // 系統治理中心 - 僅限管理員，含高風險操作

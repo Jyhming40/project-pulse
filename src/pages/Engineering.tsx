@@ -11,8 +11,7 @@ import {
   ClipboardList, 
   Trash2, 
   AlertTriangle,
-  ShieldAlert,
-  FolderOpen
+  ShieldAlert
 } from 'lucide-react';
 
 import {
@@ -21,7 +20,6 @@ import {
   DangerZonePanel,
   AuditLogsPanel,
   DeletionPolicyPanel,
-  DriveConnectionPanel,
 } from '@/components/engineering';
 
 export default function Engineering() {
@@ -78,20 +76,13 @@ export default function Engineering() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6 h-auto gap-2 bg-transparent p-0">
+          <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-5 h-auto gap-2 bg-transparent p-0">
             <TabsTrigger 
               value="health" 
               className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
             >
               <Activity className="w-4 h-4" />
               <span className="hidden sm:inline">系統狀態</span>
-            </TabsTrigger>
-            <TabsTrigger 
-              value="drive"
-              className="flex items-center gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-            >
-              <FolderOpen className="w-4 h-4" />
-              <span className="hidden sm:inline">雲端連結</span>
             </TabsTrigger>
             <TabsTrigger 
               value="integrity"
@@ -128,9 +119,6 @@ export default function Engineering() {
             <SystemHealthPanel />
           </TabsContent>
 
-          <TabsContent value="drive" className="mt-6">
-            <DriveConnectionPanel />
-          </TabsContent>
 
           <TabsContent value="integrity" className="mt-6">
             <IntegrityCheckPanel />
