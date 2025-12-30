@@ -26,6 +26,7 @@ import {
   Settings2,
   Link2,
   FolderOpen,
+  Copy,
   Briefcase
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -88,6 +89,7 @@ const systemSettingsItems = [
 // 系統治理中心 - 僅限管理員，含高風險操作
 const systemGovernanceItems = [
   { to: '/engineering', icon: Activity, label: '系統狀態' },
+  { to: '/duplicate-scanner', icon: Copy, label: '重複案件掃描' },
   { to: '/deletion-policies', icon: Shield, label: '刪除政策' },
   { to: '/recycle-bin', icon: Trash2, label: '回收區' },
   { to: '/audit-logs', icon: ClipboardList, label: '稽核日誌' },
