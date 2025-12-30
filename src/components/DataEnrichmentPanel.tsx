@@ -321,8 +321,11 @@ export function DataEnrichmentPanel({
       return { count: projectIds.length };
     },
     onSuccess: (data) => {
+      // Invalidate all related queries to ensure progress bars update
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       queryClient.invalidateQueries({ queryKey: ['project-milestones'] });
+      queryClient.invalidateQueries({ queryKey: ['project-drawer'] });
+      queryClient.invalidateQueries({ queryKey: ['project-analytics'] });
       toast.success('批次更新成功', {
         description: `已更新 ${data.count} 筆案場資料`,
       });
