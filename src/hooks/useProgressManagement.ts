@@ -286,6 +286,7 @@ export function useToggleProjectMilestone() {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['project-milestones', variables.projectId] });
       queryClient.invalidateQueries({ queryKey: ['project', variables.projectId] });
+      queryClient.invalidateQueries({ queryKey: ['project-drawer', variables.projectId] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast({ title: variables.isCompleted ? '里程碑已完成' : '里程碑已取消' });
     },
