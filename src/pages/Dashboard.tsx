@@ -21,7 +21,11 @@ import {
   AdministrativeSection,
   EngineeringSection,
   RiskSection,
+  ProgressOverviewCards,
+  StatusDistributionChart,
+  RiskProjectsList,
 } from '@/components/dashboard';
+import { useAnalyticsSummary, useRiskProjects } from '@/hooks/useProjectAnalytics';
 
 export default function Dashboard() {
   const { isAdmin } = useAuth();
@@ -30,6 +34,10 @@ export default function Dashboard() {
   const [selectedInvestor, setSelectedInvestor] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedConstructionStatus, setSelectedConstructionStatus] = useState<string>('all');
+
+  // Analytics data
+  const { data: summary, isLoading: summaryLoading } = useAnalyticsSummary();
+  const { data: riskProjects = [], isLoading: riskLoading } = useRiskProjects(10);
 
   // Fetch projects with investors
   const { data: projects = [] } = useQuery({
@@ -99,6 +107,35 @@ export default function Dashboard() {
       <div>
         <h1 className="text-2xl font-display font-bold text-foreground">儀表板</h1>
         <p className="text-muted-foreground mt-1">每日作戰圖 — 行政推進、工程進度、風險追蹤</p>
+      </div>
+
+      {/* Progress Overview Cards */}
+      <ProgressOverviewCards
+        totalProjects={summary?.total_projects ?? 0}
+        atRiskCount={summary?.at_risk_count ?? 0}
+        averageProgress={summary?.average_progress ?? 0}
+        averageAdminProgress={summary?.average_admin_progress ?? 0}
+        averageEngineeringProgress={summary?.average_engineering_progress ?? 0}
+        isLoading={summaryLoading}
+      />
+
+      {/* Charts and Risk List */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <StatusDistributionChart
+          title="案場狀態分佈"
+          distribution={summary?.status_distribution ?? {}}
+          isLoading={summaryLoading}
+        />
+        <StatusDistributionChart
+          title="施工狀態分佈"
+          distribution={summary?.construction_status_distribution ?? {}}
+          isLoading={summaryLoading}
+        />
+        <RiskProjectsList
+          projects={riskProjects}
+          isLoading={riskLoading}
+          limit={5}
+        />
       </div>
 
       {/* Quick Access */}
