@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +8,14 @@ import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { CodebookSelect } from '@/components/CodebookSelect';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import {
   ArrowLeft,
   Building2,
@@ -29,7 +37,7 @@ import {
   RefreshCw,
   AlertCircle,
   CheckCircle2,
-  Link,
+  Link as LinkIcon,
   Wrench,
   Plug,
   HardHat
@@ -433,6 +441,27 @@ export default function ProjectDetail() {
         )}
       </div>
 
+      {/* Breadcrumb Navigation */}
+      <Breadcrumb className="mb-4">
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to="/projects">案場列表</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink asChild>
+              <Link to={`/projects/${id}`}>{project.project_name}</Link>
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>案場詳情</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+
       {/* Tabs - 重組為：基本資料、技術/設備資料、行政流程/進度、金流/投資資訊、關聯文件 */}
       <Tabs defaultValue="basic" className="w-full">
         <TabsList className="flex flex-wrap h-auto gap-1">
@@ -584,7 +613,7 @@ export default function ProjectDetail() {
                     ) : (
                       <>
                         <div className="flex items-center gap-2 text-muted-foreground">
-                          <Link className="w-4 h-4" />
+                          <LinkIcon className="w-4 h-4" />
                           <span className="text-sm">尚未連結 Google Drive</span>
                         </div>
                         <Button 
