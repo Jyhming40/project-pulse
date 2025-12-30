@@ -8,9 +8,14 @@ import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
+import { useBatchSelect } from '@/hooks/useBatchSelect';
 import { CodebookSelect } from '@/components/CodebookSelect';
 import { TablePagination } from '@/components/ui/table-pagination';
+import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
+import { BatchUpdateDialog, BatchUpdateField } from '@/components/BatchUpdateDialog';
+import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Plus, 
   Search, 
@@ -158,6 +163,10 @@ export default function Projects() {
   
   // Delete dialog state
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  
+  // Batch dialogs
+  const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false);
+  const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
   
   // Soft delete hook
   const { softDelete, isDeleting } = useSoftDelete({
@@ -311,6 +320,71 @@ export default function Projects() {
   // Pagination
   const pagination = usePagination(sortedProjects, { pageSize: 20 });
 
+  // Batch selection
+  const batchSelect = useBatchSelect(pagination.paginatedData);
+
+  // Batch update mutation
+  const batchUpdateMutation = useMutation({
+    mutationFn: async (values: Record<string, string>) => {
+      const selectedIds = Array.from(batchSelect.selectedIds);
+      const { error } = await supabase
+        .from('projects')
+        .update(values)
+        .in('id', selectedIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast.success('批次更新成功');
+      batchSelect.deselectAll();
+    },
+    onError: (error: Error) => {
+      toast.error('批次更新失敗', { description: error.message });
+    },
+  });
+
+  // Batch delete mutation
+  const batchDeleteMutation = useMutation({
+    mutationFn: async (reason?: string) => {
+      const selectedIds = Array.from(batchSelect.selectedIds);
+      const { error } = await supabase
+        .from('projects')
+        .update({
+          is_deleted: true,
+          deleted_at: new Date().toISOString(),
+          delete_reason: reason || null,
+        })
+        .in('id', selectedIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast.success('批次刪除成功');
+      batchSelect.deselectAll();
+    },
+    onError: (error: Error) => {
+      toast.error('批次刪除失敗', { description: error.message });
+    },
+  });
+
+  // Batch update fields for projects
+  const batchUpdateFields: BatchUpdateField[] = [
+    {
+      key: 'status',
+      label: '案場狀態',
+      type: 'select',
+      options: statusOptions,
+      placeholder: '選擇狀態',
+    },
+    {
+      key: 'construction_status',
+      label: '施工狀態',
+      type: 'select',
+      options: constructionStatusOptions,
+      placeholder: '選擇施工狀態',
+    },
+  ];
+
   // Handle investor selection - auto-fill investor code
   const handleInvestorChange = (investorId: string) => {
     const investor = investors.find(inv => inv.id === investorId);
@@ -353,7 +427,7 @@ export default function Projects() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-24">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -433,6 +507,15 @@ export default function Projects() {
         <Table>
           <TableHeader>
             <TableRow>
+              {canEditProjects && (
+                <TableHead className="w-12">
+                  <Checkbox
+                    checked={batchSelect.isAllSelected}
+                    onCheckedChange={() => batchSelect.toggleAll()}
+                    aria-label="全選"
+                  />
+                </TableHead>
+              )}
               <SortableTableHead sortKey="site_code_display" currentSortKey={sortConfig.key} currentDirection={getSortInfo('site_code_display').direction} sortIndex={getSortInfo('site_code_display').index} onSort={handleSort}>案場編號</SortableTableHead>
               <SortableTableHead sortKey="project_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('project_name').direction} sortIndex={getSortInfo('project_name').index} onSort={handleSort}>案場名稱</SortableTableHead>
               <SortableTableHead sortKey="investors.company_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investors.company_name').direction} sortIndex={getSortInfo('investors.company_name').index} onSort={handleSort}>投資方</SortableTableHead>
@@ -449,7 +532,7 @@ export default function Projects() {
           <TableBody>
             {sortedProjects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={canEditProjects ? 12 : 11} className="text-center py-12 text-muted-foreground">
                   {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
@@ -458,12 +541,20 @@ export default function Projects() {
                 <TableRow 
                   key={project.id} 
                   className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`/projects/${project.id}`)}
                 >
-                  <TableCell className="font-mono text-sm">{(project as any).site_code_display || project.project_code}</TableCell>
-                  <TableCell className="font-medium">{project.project_name}</TableCell>
-                  <TableCell>{(project.investors as any)?.company_name || '-'}</TableCell>
-                  <TableCell>
+                  {canEditProjects && (
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={batchSelect.isSelected(project.id)}
+                        onCheckedChange={() => batchSelect.toggle(project.id)}
+                        aria-label={`選取 ${project.project_name}`}
+                      />
+                    </TableCell>
+                  )}
+                  <TableCell onClick={() => navigate(`/projects/${project.id}`)} className="font-mono text-sm">{(project as any).site_code_display || project.project_code}</TableCell>
+                  <TableCell onClick={() => navigate(`/projects/${project.id}`)} className="font-medium">{project.project_name}</TableCell>
+                  <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{(project.investors as any)?.company_name || '-'}</TableCell>
+                  <TableCell onClick={() => navigate(`/projects/${project.id}`)}>
                     <Badge className={getStatusColor(project.status)} variant="secondary">
                       {project.status}
                     </Badge>
@@ -940,6 +1031,55 @@ export default function Projects() {
         tableName="projects"
         itemName={deletingProject?.project_name}
         isPending={isDeleting}
+      />
+
+      {/* Batch Action Bar */}
+      {canEditProjects && (
+        <BatchActionBar
+          selectedCount={batchSelect.selectedCount}
+          onClear={batchSelect.deselectAll}
+          actions={[
+            {
+              key: 'edit',
+              label: '批次修改',
+              icon: BatchActionIcons.edit,
+              onClick: () => setIsBatchUpdateOpen(true),
+            },
+            ...(isAdmin ? [{
+              key: 'delete',
+              label: '批次刪除',
+              icon: BatchActionIcons.delete,
+              variant: 'destructive' as const,
+              onClick: () => setIsBatchDeleteOpen(true),
+            }] : []),
+          ]}
+        />
+      )}
+
+      {/* Batch Update Dialog */}
+      <BatchUpdateDialog
+        open={isBatchUpdateOpen}
+        onOpenChange={setIsBatchUpdateOpen}
+        title="批次更新案場"
+        selectedCount={batchSelect.selectedCount}
+        fields={batchUpdateFields}
+        onSubmit={async (values) => {
+          await batchUpdateMutation.mutateAsync(values);
+        }}
+        isLoading={batchUpdateMutation.isPending}
+      />
+
+      {/* Batch Delete Dialog */}
+      <BatchDeleteDialog
+        open={isBatchDeleteOpen}
+        onOpenChange={setIsBatchDeleteOpen}
+        selectedCount={batchSelect.selectedCount}
+        itemLabel="個案場"
+        requireReason
+        onConfirm={async (reason) => {
+          await batchDeleteMutation.mutateAsync(reason);
+        }}
+        isLoading={batchDeleteMutation.isPending}
       />
     </div>
   );
