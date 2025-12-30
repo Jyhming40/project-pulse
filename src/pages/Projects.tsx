@@ -17,6 +17,7 @@ import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ProjectDetailDrawer } from '@/components/ProjectDetailDrawer';
+import { DataEnrichmentPanel } from '@/components/DataEnrichmentPanel';
 import { 
   Plus, 
   Search, 
@@ -30,7 +31,7 @@ import {
   Trash2,
   FileDown,
   FileUp,
-  Wrench,
+  ClipboardEdit,
   Database as DatabaseIcon,
   ExternalLink
 } from 'lucide-react';
@@ -177,6 +178,9 @@ export default function Projects() {
   // Batch dialogs
   const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false);
   const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
+  
+  // Data Enrichment Mode (Admin only)
+  const [isEnrichmentMode, setIsEnrichmentMode] = useState(false);
   
   // Soft delete hook
   const { softDelete, isDeleting } = useSoftDelete({
@@ -513,34 +517,68 @@ export default function Projects() {
   };
 
   return (
-    <div className="space-y-6 animate-fade-in pb-24">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-display font-bold text-foreground">案場管理</h1>
-          <p className="text-muted-foreground mt-1">共 {projects.length} 個案場</p>
+    <div className={`flex h-full ${isEnrichmentMode ? 'gap-0' : ''}`}>
+      {/* Main content area */}
+      <div className={`flex-1 space-y-6 animate-fade-in pb-24 ${isEnrichmentMode ? 'pr-4' : ''}`}>
+        {/* Enrichment Mode Banner */}
+        {isEnrichmentMode && (
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-3 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ClipboardEdit className="w-5 h-5 text-warning" />
+              <span className="font-medium text-warning">資料補齊模式</span>
+              <span className="text-sm text-muted-foreground">- 點擊列可選取案場，勾選欄位後批次更新</span>
+            </div>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                setIsEnrichmentMode(false);
+                batchSelect.deselectAll();
+              }}
+            >
+              退出補齊模式
+            </Button>
+          </div>
+        )}
+
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-display font-bold text-foreground">案場管理</h1>
+            <p className="text-muted-foreground mt-1">共 {projects.length} 個案場</p>
+          </div>
+          <div className="flex gap-2">
+            {/* Admin-only Enrichment Mode Button */}
+            {isAdmin && !isEnrichmentMode && (
+              <Button 
+                variant="outline" 
+                onClick={() => setIsEnrichmentMode(true)}
+                className="border-warning/50 text-warning hover:bg-warning/10"
+              >
+                <ClipboardEdit className="w-4 h-4 mr-2" />
+                資料補齊模式
+              </Button>
+            )}
+            <PermissionGate module={MODULES.PROJECTS} action="edit">
+              <Button variant="outline" onClick={() => setIsBackupOpen(true)}>
+                <DatabaseIcon className="w-4 h-4 mr-2" />
+                完整備份
+              </Button>
+            </PermissionGate>
+            <PermissionGate module={MODULES.PROJECTS} action="edit">
+              <Button variant="outline" onClick={() => setIsImportExportOpen(true)}>
+                <FileDown className="w-4 h-4 mr-2" />
+                匯入/匯出
+              </Button>
+            </PermissionGate>
+            <PermissionGate module={MODULES.PROJECTS} action="create">
+              <Button onClick={() => setIsCreateOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                新增案場
+              </Button>
+            </PermissionGate>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <PermissionGate module={MODULES.PROJECTS} action="edit">
-            <Button variant="outline" onClick={() => setIsBackupOpen(true)}>
-              <DatabaseIcon className="w-4 h-4 mr-2" />
-              完整備份
-            </Button>
-          </PermissionGate>
-          <PermissionGate module={MODULES.PROJECTS} action="edit">
-            <Button variant="outline" onClick={() => setIsImportExportOpen(true)}>
-              <FileDown className="w-4 h-4 mr-2" />
-              匯入/匯出
-            </Button>
-          </PermissionGate>
-          <PermissionGate module={MODULES.PROJECTS} action="create">
-            <Button onClick={() => setIsCreateOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              新增案場
-            </Button>
-          </PermissionGate>
-        </div>
-      </div>
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
@@ -593,7 +631,7 @@ export default function Projects() {
         <Table>
           <TableHeader>
             <TableRow>
-              {canEditProjects && (
+              {(canEditProjects || isEnrichmentMode) && (
                 <TableHead className="w-12">
                   <Checkbox
                     checked={batchSelect.isAllSelected}
@@ -618,23 +656,34 @@ export default function Projects() {
           <TableBody>
             {sortedProjects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={canEditProjects ? 12 : 11} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={(canEditProjects || isEnrichmentMode) ? 12 : 11} className="text-center py-12 text-muted-foreground">
                   {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
             ) : (
               pagination.paginatedData.map(project => {
+                // In enrichment mode: clicking row toggles selection
+                // In normal mode: clicking row opens drawer
                 const handleRowClick = () => {
-                  setDrawerProjectId(project.id);
-                  setIsDrawerOpen(true);
+                  if (isEnrichmentMode) {
+                    batchSelect.toggle(project.id);
+                  } else {
+                    setDrawerProjectId(project.id);
+                    setIsDrawerOpen(true);
+                  }
                 };
                 
                 return (
                   <TableRow 
                     key={project.id} 
-                    className="cursor-pointer hover:bg-muted/50"
+                    className={`cursor-pointer hover:bg-muted/50 ${
+                      isEnrichmentMode && batchSelect.isSelected(project.id) 
+                        ? 'bg-warning/10 hover:bg-warning/15' 
+                        : ''
+                    }`}
+                    onClick={handleRowClick}
                   >
-                    {canEditProjects && (
+                    {(canEditProjects || isEnrichmentMode) && (
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <Checkbox
                           checked={batchSelect.isSelected(project.id)}
@@ -643,15 +692,15 @@ export default function Projects() {
                         />
                       </TableCell>
                     )}
-                    <TableCell onClick={handleRowClick} className="font-mono text-sm">{(project as any).site_code_display || project.project_code}</TableCell>
-                    <TableCell onClick={handleRowClick} className="font-medium">{project.project_name}</TableCell>
-                    <TableCell onClick={handleRowClick}>{(project.investors as any)?.company_name || '-'}</TableCell>
-                    <TableCell onClick={handleRowClick}>
+                    <TableCell className="font-mono text-sm">{(project as any).site_code_display || project.project_code}</TableCell>
+                    <TableCell className="font-medium">{project.project_name}</TableCell>
+                    <TableCell>{(project.investors as any)?.company_name || '-'}</TableCell>
+                    <TableCell>
                       <Badge className={getStatusColor(project.status)} variant="secondary">
                         {project.status}
                       </Badge>
                     </TableCell>
-                    <TableCell onClick={handleRowClick}>
+                    <TableCell>
                       <div className="flex items-center gap-2">
                         <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
                           <div 
@@ -662,21 +711,21 @@ export default function Projects() {
                         <span className="text-xs text-muted-foreground w-8">{Math.round((project as any).overall_progress || 0)}%</span>
                       </div>
                     </TableCell>
-                    <TableCell onClick={handleRowClick}>
+                    <TableCell>
                       <span className="text-xs">{Math.round((project as any).admin_progress || 0)}%</span>
                     </TableCell>
-                    <TableCell onClick={handleRowClick}>
+                    <TableCell>
                       <span className="text-xs">{Math.round((project as any).engineering_progress || 0)}%</span>
                     </TableCell>
-                    <TableCell onClick={handleRowClick}>
+                    <TableCell>
                       {(project as any).construction_status ? (
                         <Badge className={getConstructionStatusColor((project as any).construction_status)} variant="secondary">
                           {(project as any).construction_status}
                         </Badge>
                       ) : '-'}
                     </TableCell>
-                    <TableCell onClick={handleRowClick}>{project.capacity_kwp || '-'}</TableCell>
-                    <TableCell onClick={handleRowClick}>{project.city || '-'}</TableCell>
+                    <TableCell>{project.capacity_kwp || '-'}</TableCell>
+                    <TableCell>{project.city || '-'}</TableCell>
                     <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -685,7 +734,10 @@ export default function Projects() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={handleRowClick}>
+                          <DropdownMenuItem onClick={() => {
+                            setDrawerProjectId(project.id);
+                            setIsDrawerOpen(true);
+                          }}>
                             <Eye className="w-4 h-4 mr-2" />
                             快速檢視
                           </DropdownMenuItem>
@@ -1130,8 +1182,8 @@ export default function Projects() {
         isPending={isDeleting}
       />
 
-      {/* Batch Action Bar */}
-      {canEditProjects && (
+      {/* Batch Action Bar (hidden in enrichment mode) */}
+      {canEditProjects && !isEnrichmentMode && (
         <BatchActionBar
           selectedCount={batchSelect.selectedCount}
           onClear={batchSelect.deselectAll}
@@ -1187,6 +1239,23 @@ export default function Projects() {
         open={isDrawerOpen}
         onOpenChange={setIsDrawerOpen}
       />
+      </div>
+
+      {/* Data Enrichment Panel (Admin only) */}
+      {isAdmin && isEnrichmentMode && (
+        <div className="w-80 flex-shrink-0 border-l bg-background">
+          <DataEnrichmentPanel
+            selectedIds={batchSelect.selectedIds}
+            onClose={() => {
+              setIsEnrichmentMode(false);
+              batchSelect.deselectAll();
+            }}
+            onSuccess={() => {
+              // Keep mode open, just clear selection after success
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
