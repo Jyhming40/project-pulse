@@ -139,15 +139,35 @@ export default function Documents() {
   // Batch selection
   const batchSelect = useBatchSelect(pagination.paginatedData);
 
-  // Batch update mutation
+  // Batch update mutation with audit logging
   const batchUpdateMutation = useMutation({
     mutationFn: async (values: Record<string, string>) => {
       const selectedIds = Array.from(batchSelect.selectedIds);
+      
+      // Get old data for audit
+      const { data: oldData } = await supabase
+        .from('documents')
+        .select('id, doc_status, doc_type')
+        .in('id', selectedIds);
+      
       const { error } = await supabase
         .from('documents')
         .update(values)
         .in('id', selectedIds);
       if (error) throw error;
+      
+      // Log batch update to audit_logs
+      for (const id of selectedIds) {
+        const oldRecord = oldData?.find(r => r.id === id);
+        await supabase.rpc('log_audit_action', {
+          p_table_name: 'documents',
+          p_record_id: id,
+          p_action: 'UPDATE',
+          p_old_data: oldRecord || null,
+          p_new_data: { ...oldRecord, ...values },
+          p_reason: `批次更新 ${selectedIds.length} 筆資料`,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['all-documents'] });
@@ -159,10 +179,17 @@ export default function Documents() {
     },
   });
 
-  // Batch delete mutation
+  // Batch delete mutation with audit logging
   const batchDeleteMutation = useMutation({
     mutationFn: async (reason?: string) => {
       const selectedIds = Array.from(batchSelect.selectedIds);
+      
+      // Get old data for audit
+      const { data: oldData } = await supabase
+        .from('documents')
+        .select('id, doc_type, doc_status')
+        .in('id', selectedIds);
+      
       const { error } = await supabase
         .from('documents')
         .update({
@@ -172,6 +199,19 @@ export default function Documents() {
         })
         .in('id', selectedIds);
       if (error) throw error;
+      
+      // Log batch delete to audit_logs
+      for (const id of selectedIds) {
+        const oldRecord = oldData?.find(r => r.id === id);
+        await supabase.rpc('log_audit_action', {
+          p_table_name: 'documents',
+          p_record_id: id,
+          p_action: 'DELETE',
+          p_old_data: oldRecord || null,
+          p_new_data: null,
+          p_reason: reason || `批次刪除 ${selectedIds.length} 筆資料`,
+        });
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['all-documents'] });
