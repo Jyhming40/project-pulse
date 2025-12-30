@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
+import { useTableSort } from '@/hooks/useTableSort';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import {
   Plus, 
@@ -35,6 +36,7 @@ import {
   TableHeader, 
   TableRow 
 } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
@@ -177,6 +179,12 @@ export default function Investors() {
     return matchesSearch;
   });
 
+  // Sorting
+  const { sortedData: sortedInvestors, sortConfig, handleSort } = useTableSort(filteredInvestors, {
+    key: 'updated_at',
+    direction: 'desc',
+  });
+
   const handleCreate = () => {
     if (!formData.investor_code || !formData.company_name) {
       toast.error('請填寫必填欄位');
@@ -263,24 +271,24 @@ export default function Investors() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>投資方編號</TableHead>
-              <TableHead>公司名稱</TableHead>
-              <TableHead>類型</TableHead>
-              <TableHead>負責人</TableHead>
-              <TableHead>聯絡人</TableHead>
-              <TableHead>電話</TableHead>
+              <SortableTableHead sortKey="investor_code" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>投資方編號</SortableTableHead>
+              <SortableTableHead sortKey="company_name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>公司名稱</SortableTableHead>
+              <SortableTableHead sortKey="investor_type" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>類型</SortableTableHead>
+              <SortableTableHead sortKey="owner_name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>負責人</SortableTableHead>
+              <SortableTableHead sortKey="contact_person" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>聯絡人</SortableTableHead>
+              <SortableTableHead sortKey="phone" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>電話</SortableTableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredInvestors.length === 0 ? (
+            {sortedInvestors.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">
                   {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
             ) : (
-              filteredInvestors.map(investor => (
+              sortedInvestors.map(investor => (
                 <TableRow 
                   key={investor.id}
                   className="cursor-pointer hover:bg-muted/50"
