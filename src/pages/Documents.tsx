@@ -4,7 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useTableSort } from '@/hooks/useTableSort';
+import { usePagination } from '@/hooks/usePagination';
 import { format, isWithinInterval, subDays } from 'date-fns';
+import { TablePagination } from '@/components/ui/table-pagination';
 import { 
   Search, 
   FileText, 
@@ -121,11 +123,14 @@ export default function Documents() {
     return matchesSearch && matchesType && matchesStatus;
   });
 
-  // Sorting
-  const { sortedData: sortedDocuments, sortConfig, handleSort } = useTableSort(filteredDocuments, {
+  // Sorting (multi-column support)
+  const { sortedData: sortedDocuments, sortConfig, handleSort, getSortInfo } = useTableSort(filteredDocuments, {
     key: 'updated_at',
     direction: 'desc',
   });
+
+  // Pagination
+  const pagination = usePagination(sortedDocuments, { pageSize: 20 });
 
   // Stats
   const pendingCount = documents.filter(d => d.doc_status === '退件補正').length;
@@ -246,13 +251,13 @@ export default function Documents() {
         <Table>
           <TableHeader>
             <TableRow>
-              <SortableTableHead sortKey="projects.project_name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>案場</SortableTableHead>
-              <SortableTableHead sortKey="doc_type" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>文件類型</SortableTableHead>
-              <SortableTableHead sortKey="doc_status" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>狀態</SortableTableHead>
-              <SortableTableHead sortKey="submitted_at" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>送件日</SortableTableHead>
-              <SortableTableHead sortKey="issued_at" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>核發日</SortableTableHead>
-              <SortableTableHead sortKey="due_at" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>到期日</SortableTableHead>
-              <SortableTableHead sortKey="owner.full_name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>負責人</SortableTableHead>
+              <SortableTableHead sortKey="projects.project_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('projects.project_name').direction} sortIndex={getSortInfo('projects.project_name').index} onSort={handleSort}>案場</SortableTableHead>
+              <SortableTableHead sortKey="doc_type" currentSortKey={sortConfig.key} currentDirection={getSortInfo('doc_type').direction} sortIndex={getSortInfo('doc_type').index} onSort={handleSort}>文件類型</SortableTableHead>
+              <SortableTableHead sortKey="doc_status" currentSortKey={sortConfig.key} currentDirection={getSortInfo('doc_status').direction} sortIndex={getSortInfo('doc_status').index} onSort={handleSort}>狀態</SortableTableHead>
+              <SortableTableHead sortKey="submitted_at" currentSortKey={sortConfig.key} currentDirection={getSortInfo('submitted_at').direction} sortIndex={getSortInfo('submitted_at').index} onSort={handleSort}>送件日</SortableTableHead>
+              <SortableTableHead sortKey="issued_at" currentSortKey={sortConfig.key} currentDirection={getSortInfo('issued_at').direction} sortIndex={getSortInfo('issued_at').index} onSort={handleSort}>核發日</SortableTableHead>
+              <SortableTableHead sortKey="due_at" currentSortKey={sortConfig.key} currentDirection={getSortInfo('due_at').direction} sortIndex={getSortInfo('due_at').index} onSort={handleSort}>到期日</SortableTableHead>
+              <SortableTableHead sortKey="owner.full_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('owner.full_name').direction} sortIndex={getSortInfo('owner.full_name').index} onSort={handleSort}>負責人</SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -263,7 +268,7 @@ export default function Documents() {
                 </TableCell>
               </TableRow>
             ) : (
-              sortedDocuments.map(doc => {
+              pagination.paginatedData.map(doc => {
                 const project = doc.projects as any;
                 const owner = doc.owner as any;
                 const isDueSoon = doc.due_at && isWithinInterval(new Date(doc.due_at), {
@@ -315,6 +320,20 @@ export default function Documents() {
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          pageSize={pagination.pageSize}
+          pageSizeOptions={pagination.pageSizeOptions}
+          startIndex={pagination.startIndex}
+          endIndex={pagination.endIndex}
+          hasNextPage={pagination.hasNextPage}
+          hasPreviousPage={pagination.hasPreviousPage}
+          onPageChange={pagination.goToPage}
+          onPageSizeChange={pagination.changePageSize}
+          getPageNumbers={pagination.getPageNumbers}
+        />
       </div>
 
       {/* Import/Export Dialog */}

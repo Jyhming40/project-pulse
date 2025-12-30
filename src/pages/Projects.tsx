@@ -7,7 +7,9 @@ import { PermissionGate, PermissionButton } from '@/components/PermissionGate';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useTableSort } from '@/hooks/useTableSort';
+import { usePagination } from '@/hooks/usePagination';
 import { CodebookSelect } from '@/components/CodebookSelect';
+import { TablePagination } from '@/components/ui/table-pagination';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { 
   Plus, 
@@ -300,11 +302,14 @@ export default function Projects() {
     return matchesSearch && matchesStatus && matchesCity && matchesConstruction;
   });
 
-  // Sorting
-  const { sortedData: sortedProjects, sortConfig, handleSort } = useTableSort(filteredProjects, {
+  // Sorting (multi-column support)
+  const { sortedData: sortedProjects, sortConfig, handleSort, getSortInfo } = useTableSort(filteredProjects, {
     key: 'updated_at',
     direction: 'desc',
   });
+
+  // Pagination
+  const pagination = usePagination(sortedProjects, { pageSize: 20 });
 
   // Handle investor selection - auto-fill investor code
   const handleInvestorChange = (investorId: string) => {
@@ -428,16 +433,16 @@ export default function Projects() {
         <Table>
           <TableHeader>
             <TableRow>
-              <SortableTableHead sortKey="site_code_display" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>案場編號</SortableTableHead>
-              <SortableTableHead sortKey="project_name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>案場名稱</SortableTableHead>
-              <SortableTableHead sortKey="investors.company_name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>投資方</SortableTableHead>
-              <SortableTableHead sortKey="status" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>狀態</SortableTableHead>
-              <SortableTableHead sortKey="overall_progress" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>總進度</SortableTableHead>
-              <SortableTableHead sortKey="admin_progress" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>行政</SortableTableHead>
-              <SortableTableHead sortKey="engineering_progress" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>工程</SortableTableHead>
-              <SortableTableHead sortKey="construction_status" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>施工狀態</SortableTableHead>
-              <SortableTableHead sortKey="capacity_kwp" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>容量 (kWp)</SortableTableHead>
-              <SortableTableHead sortKey="city" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>縣市</SortableTableHead>
+              <SortableTableHead sortKey="site_code_display" currentSortKey={sortConfig.key} currentDirection={getSortInfo('site_code_display').direction} sortIndex={getSortInfo('site_code_display').index} onSort={handleSort}>案場編號</SortableTableHead>
+              <SortableTableHead sortKey="project_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('project_name').direction} sortIndex={getSortInfo('project_name').index} onSort={handleSort}>案場名稱</SortableTableHead>
+              <SortableTableHead sortKey="investors.company_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investors.company_name').direction} sortIndex={getSortInfo('investors.company_name').index} onSort={handleSort}>投資方</SortableTableHead>
+              <SortableTableHead sortKey="status" currentSortKey={sortConfig.key} currentDirection={getSortInfo('status').direction} sortIndex={getSortInfo('status').index} onSort={handleSort}>狀態</SortableTableHead>
+              <SortableTableHead sortKey="overall_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('overall_progress').direction} sortIndex={getSortInfo('overall_progress').index} onSort={handleSort}>總進度</SortableTableHead>
+              <SortableTableHead sortKey="admin_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('admin_progress').direction} sortIndex={getSortInfo('admin_progress').index} onSort={handleSort}>行政</SortableTableHead>
+              <SortableTableHead sortKey="engineering_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('engineering_progress').direction} sortIndex={getSortInfo('engineering_progress').index} onSort={handleSort}>工程</SortableTableHead>
+              <SortableTableHead sortKey="construction_status" currentSortKey={sortConfig.key} currentDirection={getSortInfo('construction_status').direction} sortIndex={getSortInfo('construction_status').index} onSort={handleSort}>施工狀態</SortableTableHead>
+              <SortableTableHead sortKey="capacity_kwp" currentSortKey={sortConfig.key} currentDirection={getSortInfo('capacity_kwp').direction} sortIndex={getSortInfo('capacity_kwp').index} onSort={handleSort}>容量 (kWp)</SortableTableHead>
+              <SortableTableHead sortKey="city" currentSortKey={sortConfig.key} currentDirection={getSortInfo('city').direction} sortIndex={getSortInfo('city').index} onSort={handleSort}>縣市</SortableTableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -449,7 +454,7 @@ export default function Projects() {
                 </TableCell>
               </TableRow>
             ) : (
-              sortedProjects.map(project => (
+              pagination.paginatedData.map(project => (
                 <TableRow 
                   key={project.id} 
                   className="cursor-pointer hover:bg-muted/50"
@@ -524,6 +529,20 @@ export default function Projects() {
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          pageSize={pagination.pageSize}
+          pageSizeOptions={pagination.pageSizeOptions}
+          startIndex={pagination.startIndex}
+          endIndex={pagination.endIndex}
+          hasNextPage={pagination.hasNextPage}
+          hasPreviousPage={pagination.hasPreviousPage}
+          onPageChange={pagination.goToPage}
+          onPageSizeChange={pagination.changePageSize}
+          getPageNumbers={pagination.getPageNumbers}
+        />
       </div>
 
       {/* Create/Edit Dialog */}
