@@ -433,20 +433,20 @@ export default function ProjectDetail() {
         )}
       </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="info" className="w-full">
-        <TabsList>
-          <TabsTrigger value="info">基本資料</TabsTrigger>
-          <TabsTrigger value="progress">進度追蹤</TabsTrigger>
-          <TabsTrigger value="power">用電資訊</TabsTrigger>
-          <TabsTrigger value="construction">施工進度</TabsTrigger>
-          <TabsTrigger value="partners">施工工班</TabsTrigger>
-          <TabsTrigger value="status">狀態紀錄</TabsTrigger>
-          <TabsTrigger value="documents">文件</TabsTrigger>
+      {/* Tabs - 重組為：基本資料、技術/設備資料、行政流程/進度、金流/投資資訊、關聯文件 */}
+      <Tabs defaultValue="basic" className="w-full">
+        <TabsList className="flex flex-wrap h-auto gap-1">
+          <TabsTrigger value="basic">基本資料</TabsTrigger>
+          <TabsTrigger value="technical">技術 / 設備資料</TabsTrigger>
+          <TabsTrigger value="admin-progress">行政流程 / 進度</TabsTrigger>
+          <TabsTrigger value="financial">金流 / 投資資訊</TabsTrigger>
+          <TabsTrigger value="documents">關聯文件</TabsTrigger>
         </TabsList>
 
-        {/* Basic Info Tab */}
-        <TabsContent value="info" className="space-y-6 mt-6">
+        {/* ========================================== */}
+        {/* 基本資料 Tab - 案場基本資訊、聯絡人、土地資訊 */}
+        {/* ========================================== */}
+        <TabsContent value="basic" className="space-y-6 mt-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Project Info */}
             <Card>
@@ -467,18 +467,6 @@ export default function ProjectDetail() {
                   <div>
                     <p className="text-sm text-muted-foreground">進件年度</p>
                     <p>{(project as any).intake_year || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">容量 (kWp)</p>
-                    <p>{project.capacity_kwp || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">實際裝置容量 (kWp)</p>
-                    <p>{(project as any).actual_installed_capacity || '-'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">饋線代號</p>
-                    <p>{project.feeder_code || '-'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">業績年度</p>
@@ -524,42 +512,6 @@ export default function ProjectDetail() {
               </CardContent>
             </Card>
 
-            {/* Investor Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <User className="w-5 h-5 text-primary" />
-                  投資方資訊
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {investor ? (
-                  <>
-                    <div>
-                      <p className="text-sm text-muted-foreground">公司名稱</p>
-                      <p className="font-medium">{investor.company_name}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">聯絡人</p>
-                        <p>{investor.contact_person || '-'}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">電話</p>
-                        <p>{investor.phone || '-'}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Email</p>
-                      <p>{investor.email || '-'}</p>
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-muted-foreground">尚未指定投資方</p>
-                )}
-              </CardContent>
-            </Card>
-
             {/* Land Owner Info */}
             <Card>
               <CardHeader>
@@ -587,7 +539,7 @@ export default function ProjectDetail() {
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Phone className="w-5 h-5 text-primary" />
-                  聯絡資訊
+                  案場聯絡資訊
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -611,7 +563,7 @@ export default function ProjectDetail() {
             </Card>
 
             {/* Google Drive Folder Card */}
-            <Card className="lg:col-span-2">
+            <Card>
               <CardHeader>
                 <CardTitle className="text-lg flex items-center gap-2">
                   <FolderOpen className="w-5 h-5 text-primary" />
@@ -710,25 +662,42 @@ export default function ProjectDetail() {
           </div>
         </TabsContent>
 
-        {/* Progress Tracking Tab */}
-        <TabsContent value="progress" className="mt-6">
-          <ProjectMilestones 
-            projectId={id!}
-            adminProgress={(project as any).admin_progress || 0}
-            engineeringProgress={(project as any).engineering_progress || 0}
-            overallProgress={(project as any).overall_progress || 0}
-            adminStage={(project as any).admin_stage}
-            engineeringStage={(project as any).engineering_stage}
-          />
-        </TabsContent>
+        {/* ========================================== */}
+        {/* 技術 / 設備資料 Tab - 容量、用電資訊、施工狀態 */}
+        {/* ========================================== */}
+        <TabsContent value="technical" className="space-y-6 mt-6">
+          {/* Capacity & Power Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Zap className="w-5 h-5 text-primary" />
+                容量與設備資訊
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div>
+                  <p className="text-sm text-muted-foreground">容量 (kWp)</p>
+                  <p className="text-lg font-semibold">{project.capacity_kwp || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">實際裝置容量 (kWp)</p>
+                  <p className="text-lg font-semibold">{(project as any).actual_installed_capacity || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">饋線代號</p>
+                  <p>{project.feeder_code || '-'}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Power Information Tab */}
-        <TabsContent value="power" className="mt-6">
+          {/* Power/Grid Info */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <Plug className="w-5 h-5 text-primary" />
-                用電資訊
+                用電與併聯資訊
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -756,15 +725,13 @@ export default function ProjectDetail() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* Construction Status Tab */}
-        <TabsContent value="construction" className="mt-6">
+          {/* Construction Status */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <Wrench className="w-5 h-5 text-primary" />
-                施工進度狀況
+                施工狀態
               </CardTitle>
               {canEdit && (
                 <Button 
@@ -830,20 +797,31 @@ export default function ProjectDetail() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        {/* Partners/Construction Assignments Tab */}
-        <TabsContent value="partners" className="mt-6">
+          {/* Construction Partners/Assignments */}
           <ProjectConstructionAssignments projectId={id!} />
         </TabsContent>
 
-        {/* Status History Tab */}
-        <TabsContent value="status" className="mt-6">
+        {/* ========================================== */}
+        {/* 行政流程 / 進度 Tab - 進度追蹤、狀態紀錄 */}
+        {/* ========================================== */}
+        <TabsContent value="admin-progress" className="space-y-6 mt-6">
+          {/* Progress Milestones */}
+          <ProjectMilestones 
+            projectId={id!}
+            adminProgress={(project as any).admin_progress || 0}
+            engineeringProgress={(project as any).engineering_progress || 0}
+            overallProgress={(project as any).overall_progress || 0}
+            adminStage={(project as any).admin_stage}
+            engineeringStage={(project as any).engineering_stage}
+          />
+
+          {/* Status History */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <History className="w-5 h-5 text-primary" />
-                狀態變更紀錄
+                案場狀態變更紀錄
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -881,13 +859,81 @@ export default function ProjectDetail() {
           </Card>
         </TabsContent>
 
-        {/* Documents Tab */}
+        {/* ========================================== */}
+        {/* 金流 / 投資資訊 Tab - 投資方資訊 */}
+        {/* ========================================== */}
+        <TabsContent value="financial" className="space-y-6 mt-6">
+          {/* Investor Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <User className="w-5 h-5 text-primary" />
+                投資方資訊
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {investor ? (
+                <>
+                  <div>
+                    <p className="text-sm text-muted-foreground">公司名稱</p>
+                    <p className="font-medium text-lg">{investor.company_name}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground">聯絡人</p>
+                      <p>{investor.contact_person || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">電話</p>
+                      <p>{investor.phone || '-'}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Email</p>
+                    <p>{investor.email || '-'}</p>
+                  </div>
+                  <div className="pt-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => navigate(`/investors/${project.investor_id}`)}
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      查看投資方詳情
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <p className="text-muted-foreground">尚未指定投資方</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Placeholder for future financial info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" />
+                財務資訊
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-center py-8">
+                金流與財務資訊將在後續版本中新增
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ========================================== */}
+        {/* 關聯文件 Tab - 文件列表 */}
+        {/* ========================================== */}
         <TabsContent value="documents" className="mt-6">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle className="text-lg flex items-center gap-2">
                 <FileText className="w-5 h-5 text-primary" />
-                文件列表
+                關聯文件列表
               </CardTitle>
               {canEdit && (
                 <Button size="sm" onClick={() => setIsAddDocOpen(true)}>
