@@ -28,6 +28,7 @@ import ChangePassword from "./pages/ChangePassword";
 import Branding from "./pages/Branding";
 import Integrations from "./pages/Integrations";
 import PendingApproval from "./pages/PendingApproval";
+import DuplicateScanner from "./pages/DuplicateScanner";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -69,6 +70,7 @@ const App = () => (
             <Route path="/deletion-policies" element={<ProtectedRoute adminOnly><Layout><DeletionPolicies /></Layout></ProtectedRoute>} />
             <Route path="/recycle-bin" element={<ProtectedRoute adminOnly><Layout><RecycleBin /></Layout></ProtectedRoute>} />
             <Route path="/audit-logs" element={<ProtectedRoute adminOnly><Layout><AuditLogs /></Layout></ProtectedRoute>} />
+            <Route path="/duplicate-scanner" element={<ProtectedRoute adminOnly><Layout><DuplicateScanner /></Layout></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
