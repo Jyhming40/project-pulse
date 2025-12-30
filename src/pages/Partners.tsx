@@ -6,9 +6,13 @@ import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useCodebookOptions } from '@/hooks/useCodebook';
 import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
+import { useBatchSelect } from '@/hooks/useBatchSelect';
 import { CodebookSelect, CodebookValue } from '@/components/CodebookSelect';
 import { PartnerContacts } from '@/components/PartnerContacts';
 import { TablePagination } from '@/components/ui/table-pagination';
+import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
+import { BatchUpdateDialog } from '@/components/BatchUpdateDialog';
+import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import {
   Plus,
@@ -80,8 +84,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 
 export default function Partners() {
+  const queryClient = useQueryClient();
   const { canEdit, isAdmin } = useAuth();
   const {
     partners,
@@ -155,6 +162,13 @@ export default function Partners() {
 
   // Pagination
   const pagination = usePagination(sortedPartners, { pageSize: 20 });
+
+  // Batch selection
+  const batchSelect = useBatchSelect(sortedPartners);
+  const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false);
+  const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
+  const [batchUpdateField, setBatchUpdateField] = useState<string>('');
+  const [isBatchUpdating, setIsBatchUpdating] = useState(false);
 
   const handleOpenForm = (partner?: Partner) => {
     if (partner) {
@@ -253,6 +267,47 @@ export default function Partners() {
     insert: importPreview.filter((i) => i.status === 'insert').length,
     update: importPreview.filter((i) => i.status === 'update').length,
     error: importPreview.filter((i) => i.status === 'error').length,
+  };
+
+  // Batch update handler
+  const handleBatchUpdate = async (field: string, value: string) => {
+    setIsBatchUpdating(true);
+    try {
+      const ids = Array.from(batchSelect.selectedIds);
+      if (field === 'is_active') {
+        const boolValue = value === 'true';
+        const { error } = await supabase
+          .from('partners')
+          .update({ is_active: boolValue })
+          .in('id', ids);
+        if (error) throw error;
+      }
+      toast.success(`已更新 ${ids.length} 筆資料`);
+      queryClient.invalidateQueries({ queryKey: ['partners'] });
+      batchSelect.deselectAll();
+      setIsBatchUpdateOpen(false);
+    } catch (error: any) {
+      toast.error('批次更新失敗', { description: error.message });
+    } finally {
+      setIsBatchUpdating(false);
+    }
+  };
+
+  // Batch delete handler
+  const handleBatchDelete = async (reason?: string) => {
+    const ids = Array.from(batchSelect.selectedIds);
+    let successCount = 0;
+    for (const id of ids) {
+      try {
+        await softDelete({ id, reason });
+        successCount++;
+      } catch (error) {
+        // Continue with others
+      }
+    }
+    toast.success(`已刪除 ${successCount} 筆資料`);
+    batchSelect.deselectAll();
+    setIsBatchDeleteOpen(false);
   };
 
   if (!canEdit) {
@@ -363,6 +418,13 @@ export default function Partners() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={batchSelect.isAllSelected}
+                        onCheckedChange={batchSelect.toggleAll}
+                        aria-label="全選"
+                      />
+                    </TableHead>
                     <TableHead className="w-10"></TableHead>
                     <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('name').direction} sortIndex={getSortInfo('name').index} onSort={handleSort}>名稱</SortableTableHead>
                     <SortableTableHead sortKey="partner_type" currentSortKey={sortConfig.key} currentDirection={getSortInfo('partner_type').direction} sortIndex={getSortInfo('partner_type').index} onSort={handleSort}>類型</SortableTableHead>
@@ -377,6 +439,13 @@ export default function Partners() {
                   {pagination.paginatedData.map((partner) => (
                     <Fragment key={partner.id}>
                       <TableRow className={!partner.is_active ? 'opacity-50' : ''}>
+                        <TableCell>
+                          <Checkbox
+                            checked={batchSelect.isSelected(partner.id)}
+                            onCheckedChange={() => batchSelect.toggle(partner.id)}
+                            aria-label={`選取 ${partner.name}`}
+                          />
+                        </TableCell>
                         <TableCell>
                           <Button
                             variant="ghost"
@@ -463,7 +532,7 @@ export default function Partners() {
                       {/* Expanded contacts row */}
                       {expandedPartner === partner.id && (
                         <TableRow>
-                          <TableCell colSpan={8} className="bg-muted/30 p-4">
+                          <TableCell colSpan={9} className="bg-muted/30 p-4">
                             <PartnerContacts partnerId={partner.id} partnerName={partner.name} />
                           </TableCell>
                         </TableRow>
@@ -742,6 +811,70 @@ export default function Partners() {
         tableName="partners"
         itemName={deletingPartner?.name}
         isPending={isDeleting}
+      />
+
+      {/* Batch Action Bar */}
+      <BatchActionBar
+        selectedCount={batchSelect.selectedCount}
+        onClear={batchSelect.deselectAll}
+        actions={[
+          {
+            key: 'update',
+            label: '批次修改',
+            icon: BatchActionIcons.edit,
+            onClick: () => {
+              setBatchUpdateField('is_active');
+              setIsBatchUpdateOpen(true);
+            },
+          },
+          ...(isAdmin
+            ? [
+                {
+                  key: 'delete',
+                  label: '批次刪除',
+                  icon: BatchActionIcons.delete,
+                  variant: 'destructive' as const,
+                  onClick: () => setIsBatchDeleteOpen(true),
+                },
+              ]
+            : []),
+        ]}
+      />
+
+      {/* Batch Update Dialog */}
+      <BatchUpdateDialog
+        open={isBatchUpdateOpen}
+        onOpenChange={setIsBatchUpdateOpen}
+        title="批次修改外包夥伴"
+        selectedCount={batchSelect.selectedCount}
+        fields={[
+          {
+            key: 'is_active',
+            label: '狀態',
+            type: 'select',
+            options: [
+              { value: 'true', label: '啟用' },
+              { value: 'false', label: '停用' },
+            ],
+          },
+        ]}
+        onSubmit={async (values) => {
+          if (values.is_active) {
+            await handleBatchUpdate('is_active', values.is_active);
+          }
+        }}
+        isLoading={isBatchUpdating}
+      />
+
+      {/* Batch Delete Dialog */}
+      <BatchDeleteDialog
+        open={isBatchDeleteOpen}
+        onOpenChange={setIsBatchDeleteOpen}
+        selectedCount={batchSelect.selectedCount}
+        itemLabel="筆外包夥伴"
+        requireReason={false}
+        onConfirm={handleBatchDelete}
+        isLoading={isDeleting}
       />
     </div>
   );
