@@ -16,6 +16,7 @@ import { BatchUpdateDialog, BatchUpdateField } from '@/components/BatchUpdateDia
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { ProjectDetailDrawer } from '@/components/ProjectDetailDrawer';
 import { 
   Plus, 
   Search, 
@@ -30,7 +31,8 @@ import {
   FileDown,
   FileUp,
   Wrench,
-  Database as DatabaseIcon
+  Database as DatabaseIcon,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -167,6 +169,10 @@ export default function Projects() {
   
   // Delete dialog state
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+  
+  // Drawer state for project details
+  const [drawerProjectId, setDrawerProjectId] = useState<string | null>(null);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   
   // Batch dialogs
   const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false);
@@ -617,86 +623,97 @@ export default function Projects() {
                 </TableCell>
               </TableRow>
             ) : (
-              pagination.paginatedData.map(project => (
-                <TableRow 
-                  key={project.id} 
-                  className="cursor-pointer hover:bg-muted/50"
-                >
-                  {canEditProjects && (
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={batchSelect.isSelected(project.id)}
-                        onCheckedChange={() => batchSelect.toggle(project.id)}
-                        aria-label={`選取 ${project.project_name}`}
-                      />
-                    </TableCell>
-                  )}
-                  <TableCell onClick={() => navigate(`/projects/${project.id}`)} className="font-mono text-sm">{(project as any).site_code_display || project.project_code}</TableCell>
-                  <TableCell onClick={() => navigate(`/projects/${project.id}`)} className="font-medium">{project.project_name}</TableCell>
-                  <TableCell onClick={() => navigate(`/projects/${project.id}`)}>{(project.investors as any)?.company_name || '-'}</TableCell>
-                  <TableCell onClick={() => navigate(`/projects/${project.id}`)}>
-                    <Badge className={getStatusColor(project.status)} variant="secondary">
-                      {project.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
-                          className="h-full bg-primary rounded-full transition-all"
-                          style={{ width: `${(project as any).overall_progress || 0}%` }}
+              pagination.paginatedData.map(project => {
+                const handleRowClick = () => {
+                  setDrawerProjectId(project.id);
+                  setIsDrawerOpen(true);
+                };
+                
+                return (
+                  <TableRow 
+                    key={project.id} 
+                    className="cursor-pointer hover:bg-muted/50"
+                  >
+                    {canEditProjects && (
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={batchSelect.isSelected(project.id)}
+                          onCheckedChange={() => batchSelect.toggle(project.id)}
+                          aria-label={`選取 ${project.project_name}`}
                         />
-                      </div>
-                      <span className="text-xs text-muted-foreground w-8">{Math.round((project as any).overall_progress || 0)}%</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs">{Math.round((project as any).admin_progress || 0)}%</span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs">{Math.round((project as any).engineering_progress || 0)}%</span>
-                  </TableCell>
-                  <TableCell>
-                    {(project as any).construction_status ? (
-                      <Badge className={getConstructionStatusColor((project as any).construction_status)} variant="secondary">
-                        {(project as any).construction_status}
+                      </TableCell>
+                    )}
+                    <TableCell onClick={handleRowClick} className="font-mono text-sm">{(project as any).site_code_display || project.project_code}</TableCell>
+                    <TableCell onClick={handleRowClick} className="font-medium">{project.project_name}</TableCell>
+                    <TableCell onClick={handleRowClick}>{(project.investors as any)?.company_name || '-'}</TableCell>
+                    <TableCell onClick={handleRowClick}>
+                      <Badge className={getStatusColor(project.status)} variant="secondary">
+                        {project.status}
                       </Badge>
-                    ) : '-'}
-                  </TableCell>
-                  <TableCell>{project.capacity_kwp || '-'}</TableCell>
-                  <TableCell>{project.city || '-'}</TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}`)}>
-                          <Eye className="w-4 h-4 mr-2" />
-                          檢視
-                        </DropdownMenuItem>
-                        {canEdit && (
-                          <DropdownMenuItem onClick={() => openEditDialog(project)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            編輯
+                    </TableCell>
+                    <TableCell onClick={handleRowClick}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-primary rounded-full transition-all"
+                            style={{ width: `${(project as any).overall_progress || 0}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-muted-foreground w-8">{Math.round((project as any).overall_progress || 0)}%</span>
+                      </div>
+                    </TableCell>
+                    <TableCell onClick={handleRowClick}>
+                      <span className="text-xs">{Math.round((project as any).admin_progress || 0)}%</span>
+                    </TableCell>
+                    <TableCell onClick={handleRowClick}>
+                      <span className="text-xs">{Math.round((project as any).engineering_progress || 0)}%</span>
+                    </TableCell>
+                    <TableCell onClick={handleRowClick}>
+                      {(project as any).construction_status ? (
+                        <Badge className={getConstructionStatusColor((project as any).construction_status)} variant="secondary">
+                          {(project as any).construction_status}
+                        </Badge>
+                      ) : '-'}
+                    </TableCell>
+                    <TableCell onClick={handleRowClick}>{project.capacity_kwp || '-'}</TableCell>
+                    <TableCell onClick={handleRowClick}>{project.city || '-'}</TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={handleRowClick}>
+                            <Eye className="w-4 h-4 mr-2" />
+                            快速檢視
                           </DropdownMenuItem>
-                        )}
-                        {isAdmin && (
-                          <DropdownMenuItem 
-                            className="text-destructive"
-                            onClick={() => setDeletingProject(project)}
-                          >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            刪除
+                          <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}`)}>
+                            <ExternalLink className="w-4 h-4 mr-2" />
+                            完整頁面
                           </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))
+                          {canEdit && (
+                            <DropdownMenuItem onClick={() => openEditDialog(project)}>
+                              <Edit className="w-4 h-4 mr-2" />
+                              編輯
+                            </DropdownMenuItem>
+                          )}
+                          {isAdmin && (
+                            <DropdownMenuItem 
+                              className="text-destructive"
+                              onClick={() => setDeletingProject(project)}
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />
+                              刪除
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
@@ -1162,6 +1179,13 @@ export default function Projects() {
           await batchDeleteMutation.mutateAsync(reason);
         }}
         isLoading={batchDeleteMutation.isPending}
+      />
+
+      {/* Project Detail Drawer */}
+      <ProjectDetailDrawer
+        projectId={drawerProjectId}
+        open={isDrawerOpen}
+        onOpenChange={setIsDrawerOpen}
       />
     </div>
   );
