@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, Link } from 'react-router-dom';
+import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import {
@@ -65,15 +66,7 @@ const getStatusColor = (status: string) => {
   return statusColorMap[status] || 'bg-muted text-muted-foreground';
 };
 
-const getDocStatusColor = (status: string) => {
-  const docStatusColorMap: Record<string, string> = {
-    '未開始': 'bg-muted text-muted-foreground',
-    '進行中': 'bg-info/15 text-info',
-    '已完成': 'bg-success/15 text-success',
-    '退件補正': 'bg-warning/15 text-warning',
-  };
-  return docStatusColorMap[status] || 'bg-muted text-muted-foreground';
-};
+// Document status is now derived from dates - use getDerivedDocStatus from lib
 
 const getConstructionStatusColor = (status: string) => {
   const colorMap: Record<string, string> = {
@@ -512,7 +505,9 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                         <p className="text-xs text-muted-foreground text-center py-4">尚無文件</p>
                       ) : (
                         <div className="space-y-2">
-                          {documents.map((doc: any) => (
+                          {documents.map((doc: any) => {
+                            const derivedStatus = getDerivedDocStatus(doc);
+                            return (
                             <div 
                               key={doc.id} 
                               className="flex items-center justify-between gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors"
@@ -521,11 +516,12 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                                 <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                 <span className="text-sm truncate">{doc.doc_type}</span>
                               </div>
-                              <Badge className={`${getDocStatusColor(doc.doc_status)} text-xs flex-shrink-0`} variant="secondary">
-                                {doc.doc_status}
+                              <Badge className={`${getDerivedDocStatusColor(derivedStatus)} text-xs flex-shrink-0`} variant="secondary">
+                                {derivedStatus}
                               </Badge>
                             </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                       <Button 
