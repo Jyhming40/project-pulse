@@ -4,7 +4,9 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useTableSort } from '@/hooks/useTableSort';
+import { usePagination } from '@/hooks/usePagination';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
+import { TablePagination } from '@/components/ui/table-pagination';
 import {
   Plus, 
   Search, 
@@ -179,11 +181,14 @@ export default function Investors() {
     return matchesSearch;
   });
 
-  // Sorting
-  const { sortedData: sortedInvestors, sortConfig, handleSort } = useTableSort(filteredInvestors, {
+  // Sorting (multi-column support)
+  const { sortedData: sortedInvestors, sortConfig, handleSort, getSortInfo } = useTableSort(filteredInvestors, {
     key: 'updated_at',
     direction: 'desc',
   });
+
+  // Pagination
+  const pagination = usePagination(sortedInvestors, { pageSize: 20 });
 
   const handleCreate = () => {
     if (!formData.investor_code || !formData.company_name) {
@@ -271,12 +276,12 @@ export default function Investors() {
         <Table>
           <TableHeader>
             <TableRow>
-              <SortableTableHead sortKey="investor_code" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>投資方編號</SortableTableHead>
-              <SortableTableHead sortKey="company_name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>公司名稱</SortableTableHead>
-              <SortableTableHead sortKey="investor_type" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>類型</SortableTableHead>
-              <SortableTableHead sortKey="owner_name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>負責人</SortableTableHead>
-              <SortableTableHead sortKey="contact_person" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>聯絡人</SortableTableHead>
-              <SortableTableHead sortKey="phone" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>電話</SortableTableHead>
+              <SortableTableHead sortKey="investor_code" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investor_code').direction} sortIndex={getSortInfo('investor_code').index} onSort={handleSort}>投資方編號</SortableTableHead>
+              <SortableTableHead sortKey="company_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('company_name').direction} sortIndex={getSortInfo('company_name').index} onSort={handleSort}>公司名稱</SortableTableHead>
+              <SortableTableHead sortKey="investor_type" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investor_type').direction} sortIndex={getSortInfo('investor_type').index} onSort={handleSort}>類型</SortableTableHead>
+              <SortableTableHead sortKey="owner_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('owner_name').direction} sortIndex={getSortInfo('owner_name').index} onSort={handleSort}>負責人</SortableTableHead>
+              <SortableTableHead sortKey="contact_person" currentSortKey={sortConfig.key} currentDirection={getSortInfo('contact_person').direction} sortIndex={getSortInfo('contact_person').index} onSort={handleSort}>聯絡人</SortableTableHead>
+              <SortableTableHead sortKey="phone" currentSortKey={sortConfig.key} currentDirection={getSortInfo('phone').direction} sortIndex={getSortInfo('phone').index} onSort={handleSort}>電話</SortableTableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -288,7 +293,7 @@ export default function Investors() {
                 </TableCell>
               </TableRow>
             ) : (
-              sortedInvestors.map(investor => (
+              pagination.paginatedData.map(investor => (
                 <TableRow 
                   key={investor.id}
                   className="cursor-pointer hover:bg-muted/50"
@@ -341,6 +346,20 @@ export default function Investors() {
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          currentPage={pagination.currentPage}
+          totalPages={pagination.totalPages}
+          totalItems={pagination.totalItems}
+          pageSize={pagination.pageSize}
+          pageSizeOptions={pagination.pageSizeOptions}
+          startIndex={pagination.startIndex}
+          endIndex={pagination.endIndex}
+          hasNextPage={pagination.hasNextPage}
+          hasPreviousPage={pagination.hasPreviousPage}
+          onPageChange={pagination.goToPage}
+          onPageSizeChange={pagination.changePageSize}
+          getPageNumbers={pagination.getPageNumbers}
+        />
       </div>
 
       {/* View Investor Dialog with Tabs */}

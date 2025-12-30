@@ -5,8 +5,10 @@ import { usePartnersImport } from '@/hooks/usePartnersImport';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useCodebookOptions } from '@/hooks/useCodebook';
 import { useTableSort } from '@/hooks/useTableSort';
+import { usePagination } from '@/hooks/usePagination';
 import { CodebookSelect, CodebookValue } from '@/components/CodebookSelect';
 import { PartnerContacts } from '@/components/PartnerContacts';
+import { TablePagination } from '@/components/ui/table-pagination';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import {
   Plus,
@@ -145,11 +147,14 @@ export default function Partners() {
     return matchesSearch && matchesWorkType;
   });
 
-  // Sorting
-  const { sortedData: sortedPartners, sortConfig, handleSort } = useTableSort(filteredPartners, {
+  // Sorting (multi-column support)
+  const { sortedData: sortedPartners, sortConfig, handleSort, getSortInfo } = useTableSort(filteredPartners, {
     key: 'name',
     direction: 'asc',
   });
+
+  // Pagination
+  const pagination = usePagination(sortedPartners, { pageSize: 20 });
 
   const handleOpenForm = (partner?: Partner) => {
     if (partner) {
@@ -354,118 +359,134 @@ export default function Partners() {
               {searchQuery ? '找不到符合的夥伴' : '尚無資料，請新增外包夥伴'}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10"></TableHead>
-                  <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>名稱</SortableTableHead>
-                  <SortableTableHead sortKey="partner_type" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>類型</SortableTableHead>
-                  <SortableTableHead sortKey="tax_id" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>統編</SortableTableHead>
-                  <TableHead>工程能力</TableHead>
-                  <SortableTableHead sortKey="contact_person" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>聯絡人</SortableTableHead>
-                  <SortableTableHead sortKey="is_active" currentSortKey={sortConfig.key} currentDirection={sortConfig.direction} onSort={handleSort}>狀態</SortableTableHead>
-                  <TableHead className="text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedPartners.map((partner) => (
-                  <Fragment key={partner.id}>
-                    <TableRow className={!partner.is_active ? 'opacity-50' : ''}>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => setExpandedPartner(
-                            expandedPartner === partner.id ? null : partner.id
-                          )}
-                        >
-                          {expandedPartner === partner.id ? (
-                            <ChevronUp className="w-4 h-4" />
-                          ) : (
-                            <ChevronDown className="w-4 h-4" />
-                          )}
-                        </Button>
-                      </TableCell>
-                      <TableCell className="font-medium">{partner.name}</TableCell>
-                      <TableCell>
-                        <CodebookValue category="partner_type" value={partner.partner_type} />
-                      </TableCell>
-                      <TableCell>{partner.tax_id || '-'}</TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1 max-w-[200px]">
-                          {partner.work_capabilities && partner.work_capabilities.length > 0 ? (
-                            partner.work_capabilities.slice(0, 2).map((cap) => (
-                              <Badge key={cap} variant="outline" className="text-xs">
-                                {cap.length > 10 ? cap.substring(0, 10) + '...' : cap}
-                              </Badge>
-                            ))
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                          {partner.work_capabilities && partner.work_capabilities.length > 2 && (
-                            <Badge variant="secondary" className="text-xs">
-                              +{partner.work_capabilities.length - 2}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{partner.contact_person || '-'}</TableCell>
-                      <TableCell>
-                        <Badge variant={partner.is_active ? 'default' : 'secondary'}>
-                          {partner.is_active ? '啟用' : '停用'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-1">
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10"></TableHead>
+                    <SortableTableHead sortKey="name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('name').direction} sortIndex={getSortInfo('name').index} onSort={handleSort}>名稱</SortableTableHead>
+                    <SortableTableHead sortKey="partner_type" currentSortKey={sortConfig.key} currentDirection={getSortInfo('partner_type').direction} sortIndex={getSortInfo('partner_type').index} onSort={handleSort}>類型</SortableTableHead>
+                    <SortableTableHead sortKey="tax_id" currentSortKey={sortConfig.key} currentDirection={getSortInfo('tax_id').direction} sortIndex={getSortInfo('tax_id').index} onSort={handleSort}>統編</SortableTableHead>
+                    <TableHead>工程能力</TableHead>
+                    <SortableTableHead sortKey="contact_person" currentSortKey={sortConfig.key} currentDirection={getSortInfo('contact_person').direction} sortIndex={getSortInfo('contact_person').index} onSort={handleSort}>聯絡人</SortableTableHead>
+                    <SortableTableHead sortKey="is_active" currentSortKey={sortConfig.key} currentDirection={getSortInfo('is_active').direction} sortIndex={getSortInfo('is_active').index} onSort={handleSort}>狀態</SortableTableHead>
+                    <TableHead className="text-right">操作</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {pagination.paginatedData.map((partner) => (
+                    <Fragment key={partner.id}>
+                      <TableRow className={!partner.is_active ? 'opacity-50' : ''}>
+                        <TableCell>
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => handleOpenForm(partner)}
-                            title="編輯"
+                            className="h-6 w-6"
+                            onClick={() => setExpandedPartner(
+                              expandedPartner === partner.id ? null : partner.id
+                            )}
                           >
-                            <Edit className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleToggleActive(partner)}
-                            title={partner.is_active ? '停用' : '啟用'}
-                          >
-                            {partner.is_active ? (
-                              <PowerOff className="w-4 h-4 text-warning" />
+                            {expandedPartner === partner.id ? (
+                              <ChevronUp className="w-4 h-4" />
                             ) : (
-                              <Power className="w-4 h-4 text-success" />
+                              <ChevronDown className="w-4 h-4" />
                             )}
                           </Button>
-                          {isAdmin && (
+                        </TableCell>
+                        <TableCell className="font-medium">{partner.name}</TableCell>
+                        <TableCell>
+                          <CodebookValue category="partner_type" value={partner.partner_type} />
+                        </TableCell>
+                        <TableCell>{partner.tax_id || '-'}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-wrap gap-1 max-w-[200px]">
+                            {partner.work_capabilities && partner.work_capabilities.length > 0 ? (
+                              partner.work_capabilities.slice(0, 2).map((cap) => (
+                                <Badge key={cap} variant="outline" className="text-xs">
+                                  {cap.length > 10 ? cap.substring(0, 10) + '...' : cap}
+                                </Badge>
+                              ))
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                            {partner.work_capabilities && partner.work_capabilities.length > 2 && (
+                              <Badge variant="secondary" className="text-xs">
+                                +{partner.work_capabilities.length - 2}
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>{partner.contact_person || '-'}</TableCell>
+                        <TableCell>
+                          <Badge variant={partner.is_active ? 'default' : 'secondary'}>
+                            {partner.is_active ? '啟用' : '停用'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-1">
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => {
-                                setDeletingPartner(partner);
-                                setIsDeleteOpen(true);
-                              }}
-                              title="刪除"
+                              onClick={() => handleOpenForm(partner)}
+                              title="編輯"
                             >
-                              <Trash2 className="w-4 h-4 text-destructive" />
+                              <Edit className="w-4 h-4" />
                             </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {/* Expanded contacts row */}
-                    {expandedPartner === partner.id && (
-                      <TableRow>
-                        <TableCell colSpan={8} className="bg-muted/30 p-4">
-                          <PartnerContacts partnerId={partner.id} partnerName={partner.name} />
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handleToggleActive(partner)}
+                              title={partner.is_active ? '停用' : '啟用'}
+                            >
+                              {partner.is_active ? (
+                                <PowerOff className="w-4 h-4 text-warning" />
+                              ) : (
+                                <Power className="w-4 h-4 text-success" />
+                              )}
+                            </Button>
+                            {isAdmin && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => {
+                                  setDeletingPartner(partner);
+                                  setIsDeleteOpen(true);
+                                }}
+                                title="刪除"
+                              >
+                                <Trash2 className="w-4 h-4 text-destructive" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
-                    )}
-                  </Fragment>
-                ))}
-              </TableBody>
-            </Table>
+                      {/* Expanded contacts row */}
+                      {expandedPartner === partner.id && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="bg-muted/30 p-4">
+                            <PartnerContacts partnerId={partner.id} partnerName={partner.name} />
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  ))}
+                </TableBody>
+              </Table>
+              <TablePagination
+                currentPage={pagination.currentPage}
+                totalPages={pagination.totalPages}
+                totalItems={pagination.totalItems}
+                pageSize={pagination.pageSize}
+                pageSizeOptions={pagination.pageSizeOptions}
+                startIndex={pagination.startIndex}
+                endIndex={pagination.endIndex}
+                hasNextPage={pagination.hasNextPage}
+                hasPreviousPage={pagination.hasPreviousPage}
+                onPageChange={pagination.goToPage}
+                onPageSizeChange={pagination.changePageSize}
+                getPageNumbers={pagination.getPageNumbers}
+              />
+            </>
           )}
         </CardContent>
       </Card>
