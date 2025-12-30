@@ -140,6 +140,13 @@ export type Database = {
             foreignKeyName: "construction_status_history_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "construction_status_history_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
@@ -232,6 +239,13 @@ export type Database = {
             foreignKeyName: "document_files_document_id_fkey"
             columns: ["document_id"]
             isOneToOne: false
+            referencedRelation: "document_analytics_view"
+            referencedColumns: ["document_id"]
+          },
+          {
+            foreignKeyName: "document_files_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
             referencedRelation: "documents"
             referencedColumns: ["id"]
           },
@@ -311,6 +325,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
           },
           {
             foreignKeyName: "documents_project_id_fkey"
@@ -966,6 +987,13 @@ export type Database = {
             foreignKeyName: "project_construction_assignments_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_construction_assignments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
@@ -1017,6 +1045,13 @@ export type Database = {
             foreignKeyName: "project_milestones_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
             referencedRelation: "projects"
             referencedColumns: ["id"]
           },
@@ -1051,6 +1086,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "project_status_history_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
           {
             foreignKeyName: "project_status_history_project_id_fkey"
             columns: ["project_id"]
@@ -1384,7 +1426,89 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      document_analytics_view: {
+        Row: {
+          approved_at: string | null
+          created_by: string | null
+          document_id: string | null
+          document_status: string | null
+          document_type: string | null
+          due_at: string | null
+          is_archived: boolean | null
+          is_overdue: boolean | null
+          is_pending: boolean | null
+          owner_user_id: string | null
+          project_code: string | null
+          project_id: string | null
+          project_name: string | null
+          submitted_at: string | null
+          uploaded_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_owner_user_id_fkey"
+            columns: ["owner_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "documents_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_analytics_view: {
+        Row: {
+          admin_progress_percent: number | null
+          admin_stage: string | null
+          approval_date: string | null
+          capacity_kwp: number | null
+          city: string | null
+          completed_documents: number | null
+          construction_status: string | null
+          created_at: string | null
+          current_project_status: string | null
+          district: string | null
+          engineering_progress_percent: number | null
+          engineering_stage: string | null
+          fiscal_year: number | null
+          grid_connection_type: string | null
+          has_risk: boolean | null
+          installation_type: string | null
+          intake_year: number | null
+          investor_code: string | null
+          investor_id: string | null
+          investor_name: string | null
+          last_status_changed_at: string | null
+          overall_progress_percent: number | null
+          project_code: string | null
+          project_id: string | null
+          project_name: string | null
+          risk_reasons: string[] | null
+          total_documents: number | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "projects_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       generate_site_code_display: {
@@ -1420,6 +1544,14 @@ export type Database = {
       get_next_project_seq: {
         Args: { p_investor_code: string; p_year: number }
         Returns: number
+      }
+      get_project_risk_assessment: {
+        Args: { p_project_id: string }
+        Returns: {
+          has_risk: boolean
+          risk_level: string
+          risk_reasons: string[]
+        }[]
       }
       get_user_role: {
         Args: { _user_id: string }
