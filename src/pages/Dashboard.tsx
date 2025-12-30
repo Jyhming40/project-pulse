@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 import { 
   Building2, 
   Zap, 
@@ -9,7 +10,9 @@ import {
   PauseCircle,
   Filter,
   TrendingUp,
-  Target
+  Target,
+  AlertTriangle,
+  ExternalLink
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -51,7 +54,15 @@ const COLORS = [
 
 type MetricType = 'count' | 'capacity';
 
+// Project status order for chart display
+const PROJECT_STATUS_ORDER = [
+  '開發中', '土地確認', '結構簽證', '台電送件', '台電審查', 
+  '能源局送件', '同意備案', '工程施工', '報竣掛表', '設備登記', '運維中'
+];
+
 export default function Dashboard() {
+  const navigate = useNavigate();
+  
   // Filter states
   const [selectedInvestor, setSelectedInvestor] = useState<string>('all');
   const [selectedIntakeYear, setSelectedIntakeYear] = useState<string>('all');
@@ -248,6 +259,62 @@ export default function Dashboard() {
     return Object.entries(statusData)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
+  }, [filteredProjects]);
+
+  // Chart 4: Project status distribution (new)
+  const projectStatusData = useMemo(() => {
+    const statusData: Record<string, { count: number; capacity: number }> = {};
+    
+    // Initialize all statuses
+    PROJECT_STATUS_ORDER.forEach(status => {
+      statusData[status] = { count: 0, capacity: 0 };
+    });
+    
+    filteredProjects.forEach(p => {
+      const status = p.status;
+      // Only count non-suspended/cancelled projects
+      if (!['暫停', '取消'].includes(status)) {
+        if (statusData[status]) {
+          statusData[status].count += 1;
+          statusData[status].capacity += p.capacity_kwp || 0;
+        }
+      }
+    });
+
+    return PROJECT_STATUS_ORDER
+      .map(status => ({
+        name: status,
+        count: statusData[status]?.count || 0,
+        capacity: Math.round((statusData[status]?.capacity || 0) * 10) / 10,
+      }))
+      .filter(item => item.count > 0);
+  }, [filteredProjects]);
+
+  // Progress behind alert - projects with low progress compared to expected
+  const behindProjects = useMemo(() => {
+    const now = new Date();
+    const sixMonthsAgo = new Date(now);
+    sixMonthsAgo.setMonth(now.getMonth() - 6);
+    
+    return filteredProjects
+      .filter(p => {
+        // Exclude suspended/cancelled projects
+        if (['暫停', '取消'].includes(p.status)) return false;
+        
+        // Projects created more than 6 months ago with less than 25% progress
+        const createdDate = new Date(p.created_at);
+        const progress = Number(p.overall_progress) || 0;
+        
+        if (createdDate < sixMonthsAgo && progress < 25) return true;
+        
+        // Projects in later stages but with low progress
+        const lateStages = ['台電審查', '能源局送件', '同意備案', '工程施工', '報竣掛表'];
+        if (lateStages.includes(p.status) && progress < 50) return true;
+        
+        return false;
+      })
+      .sort((a, b) => (Number(a.overall_progress) || 0) - (Number(b.overall_progress) || 0))
+      .slice(0, 5); // Show top 5 most behind
   }, [filteredProjects]);
 
   // Reset filters
@@ -552,6 +619,108 @@ export default function Dashboard() {
                 <span>0%</span>
                 <span>100%</span>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Progress Behind Alert + Project Status Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Progress Behind Alert */}
+        <Card className="border-warning/30">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-warning" />
+              進度落後警示
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {behindProjects.length > 0 ? (
+              <div className="space-y-3">
+                {behindProjects.map((project) => {
+                  const investor = project.investors as { investor_code: string; company_name: string } | null;
+                  const progress = Number(project.overall_progress) || 0;
+                  
+                  return (
+                    <div 
+                      key={project.id} 
+                      className="flex items-center justify-between p-3 rounded-lg bg-warning/5 border border-warning/20 hover:bg-warning/10 transition-colors cursor-pointer"
+                      onClick={() => navigate(`/projects/${project.id}`)}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium truncate">{project.project_name}</span>
+                          <ExternalLink className="w-3 h-3 text-muted-foreground flex-shrink-0" />
+                        </div>
+                        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                          <span>{investor?.investor_code || '-'}</span>
+                          <span>•</span>
+                          <span>{project.status}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <div className="w-20">
+                          <Progress value={progress} className="h-2" />
+                        </div>
+                        <span className={`text-sm font-medium ${progress < 25 ? 'text-destructive' : 'text-warning'}`}>
+                          {progress.toFixed(0)}%
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <CheckCircle2 className="w-10 h-10 text-success mb-2" />
+                <p className="text-sm">所有案場進度正常</p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Project Status Distribution */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium">案場狀態分布</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[280px]">
+              {projectStatusData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={projectStatusData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                    <XAxis 
+                      dataKey="name" 
+                      tick={{ fontSize: 10 }} 
+                      angle={-45}
+                      textAnchor="end"
+                      height={60}
+                    />
+                    <YAxis tick={{ fontSize: 12 }} />
+                    <Tooltip 
+                      contentStyle={{ 
+                        backgroundColor: 'hsl(var(--card))', 
+                        border: '1px solid hsl(var(--border))',
+                        borderRadius: '8px'
+                      }}
+                      formatter={(value: number, name) => [
+                        value,
+                        '案件數'
+                      ]}
+                    />
+                    <Bar 
+                      dataKey="count" 
+                      fill="hsl(var(--primary))" 
+                      radius={[4, 4, 0, 0]} 
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="h-full flex items-center justify-center text-muted-foreground">
+                  暫無資料
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
