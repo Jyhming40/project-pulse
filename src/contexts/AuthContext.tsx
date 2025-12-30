@@ -4,11 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 
 type AppRole = Database['public']['Enums']['app_role'];
+type UserStatus = 'pending' | 'active' | 'rejected' | 'disabled';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   role: AppRole | null;
+  status: UserStatus | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
@@ -16,6 +18,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isStaff: boolean;
   isViewer: boolean;
+  isActive: boolean;
   canEdit: boolean;
 }
 
@@ -25,19 +28,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [role, setRole] = useState<AppRole | null>(null);
+  const [status, setStatus] = useState<UserStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchUserRole = async (userId: string) => {
     const { data, error } = await supabase
       .from('user_roles')
-      .select('role')
+      .select('role, status')
       .eq('user_id', userId)
       .maybeSingle();
     
     if (data && !error) {
       setRole(data.role);
+      setStatus((data as { role: AppRole; status: UserStatus }).status || 'pending');
     } else {
       setRole('viewer');
+      setStatus('pending');
     }
   };
 
@@ -92,11 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     await supabase.auth.signOut();
     setRole(null);
+    setStatus(null);
   };
 
   const isAdmin = role === 'admin';
   const isStaff = role === 'staff';
   const isViewer = role === 'viewer';
+  const isActive = status === 'active';
   const canEdit = isAdmin || isStaff;
 
   return (
@@ -104,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       session,
       role,
+      status,
       loading,
       signIn,
       signUp,
@@ -111,6 +120,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isAdmin,
       isStaff,
       isViewer,
+      isActive,
       canEdit,
     }}>
       {children}

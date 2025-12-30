@@ -8,7 +8,7 @@ interface ProtectedRouteProps {
 }
 
 export default function ProtectedRoute({ children, adminOnly = false }: ProtectedRouteProps) {
-  const { user, loading, isAdmin } = useAuth();
+  const { user, loading, isAdmin, isActive } = useAuth();
 
   if (loading) {
     return (
@@ -20,6 +20,11 @@ export default function ProtectedRoute({ children, adminOnly = false }: Protecte
 
   if (!user) {
     return <Navigate to="/auth" replace />;
+  }
+
+  // Redirect pending users to approval page
+  if (!isActive) {
+    return <Navigate to="/pending-approval" replace />;
   }
 
   if (adminOnly && !isAdmin) {
