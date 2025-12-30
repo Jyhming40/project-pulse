@@ -40,6 +40,12 @@ const PROJECT_STATUS_OPTIONS = Constants.public.Enums.project_status;
 // Construction status options from database enum (施工狀態)
 const CONSTRUCTION_STATUS_OPTIONS = Constants.public.Enums.construction_status;
 
+// Installation type options from database enum (裝置類型)
+const INSTALLATION_TYPE_OPTIONS = Constants.public.Enums.installation_type;
+
+// Grid connection type options from database enum (併網類型)
+const GRID_CONNECTION_TYPE_OPTIONS = Constants.public.Enums.grid_connection_type;
+
 export function DataEnrichmentPanel({
   selectedIds,
   onClose,
@@ -52,13 +58,15 @@ export function DataEnrichmentPanel({
   const [enabledFields, setEnabledFields] = useState<Record<string, boolean>>({
     project_status: false,
     construction_status: false,
+    installation_type: false,
+    grid_connection_type: false,
     milestones: false,
-    overall_progress: false,
   });
 
   const [projectStatus, setProjectStatus] = useState<string>('');
   const [constructionStatus, setConstructionStatus] = useState<string>('');
-  const [overallProgress, setOverallProgress] = useState<string>('');
+  const [installationType, setInstallationType] = useState<string>('');
+  const [gridConnectionType, setGridConnectionType] = useState<string>('');
   const [selectedMilestones, setSelectedMilestones] = useState<Set<string>>(new Set());
   
   const [showConfirm, setShowConfirm] = useState(false);
@@ -106,8 +114,9 @@ export function DataEnrichmentPanel({
     const fields: string[] = [];
     if (enabledFields.project_status && projectStatus) fields.push('案場狀態');
     if (enabledFields.construction_status && constructionStatus) fields.push('施工狀態');
+    if (enabledFields.installation_type && installationType) fields.push('裝置類型');
+    if (enabledFields.grid_connection_type && gridConnectionType) fields.push('併網類型');
     if (enabledFields.milestones && selectedMilestones.size > 0) fields.push('里程碑完成度');
-    if (enabledFields.overall_progress && overallProgress) fields.push('整體進度百分比');
     return fields;
   };
 
@@ -126,9 +135,12 @@ export function DataEnrichmentPanel({
         updates.construction_status = constructionStatus;
       }
       
-      if (enabledFields.overall_progress && overallProgress) {
-        const progress = Math.min(100, Math.max(0, parseInt(overallProgress) || 0));
-        updates.overall_progress = progress;
+      if (enabledFields.installation_type && installationType) {
+        updates.installation_type = installationType;
+      }
+      
+      if (enabledFields.grid_connection_type && gridConnectionType) {
+        updates.grid_connection_type = gridConnectionType;
       }
 
       // Update projects if there are field changes
@@ -362,32 +374,68 @@ export function DataEnrichmentPanel({
 
             <Separator />
 
-            {/* Overall Progress */}
+            {/* Installation Type (裝置類型) */}
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Checkbox
-                  id="enable-progress"
-                  checked={enabledFields.overall_progress}
-                  onCheckedChange={() => toggleField('overall_progress')}
+                  id="enable-installation-type"
+                  checked={enabledFields.installation_type}
+                  onCheckedChange={() => toggleField('installation_type')}
                 />
-                <Label htmlFor="enable-progress" className="font-medium cursor-pointer">
-                  整體進度百分比
+                <Label htmlFor="enable-installation-type" className="font-medium cursor-pointer">
+                  裝置類型
                 </Label>
               </div>
-              {enabledFields.overall_progress && (
-                <div className="flex items-center gap-2">
-                  <Input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={overallProgress}
-                    onChange={(e) => setOverallProgress(e.target.value)}
-                    placeholder="0-100"
-                    className="w-24"
-                  />
-                  <span className="text-sm text-muted-foreground">%</span>
-                </div>
+              {enabledFields.installation_type && (
+                <Select value={installationType} onValueChange={setInstallationType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇裝置類型" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {INSTALLATION_TYPE_OPTIONS.map(type => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
+            </div>
+
+            <Separator />
+
+            {/* Grid Connection Type (併網類型) */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="enable-grid-connection"
+                  checked={enabledFields.grid_connection_type}
+                  onCheckedChange={() => toggleField('grid_connection_type')}
+                />
+                <Label htmlFor="enable-grid-connection" className="font-medium cursor-pointer">
+                  併網類型
+                </Label>
+              </div>
+              {enabledFields.grid_connection_type && (
+                <Select value={gridConnectionType} onValueChange={setGridConnectionType}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇併網類型" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {GRID_CONNECTION_TYPE_OPTIONS.map(type => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Note about progress percentage */}
+            <div className="pt-2 text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
+              <p className="font-medium mb-1">📊 關於進度百分比</p>
+              <p>整體進度、行政進度、工程進度百分比由系統根據里程碑完成狀態自動計算，無法手動設定。</p>
             </div>
           </div>
         </ScrollArea>
