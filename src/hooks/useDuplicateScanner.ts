@@ -4,12 +4,23 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
+export type ReviewDecision = 'dismiss' | 'confirm' | 'merged';
+
+export interface MatchCriteria {
+  name: string;
+  matched: boolean;
+  value?: string;
+  score?: number;
+}
 
 export interface DuplicateGroup {
   id: string;
   confidenceLevel: ConfidenceLevel;
-  criteria: string[];
+  matchedCriteria: MatchCriteria[];
+  unmatchedCriteria: MatchCriteria[];
   projects: ProjectForComparison[];
+  addressSimilarity: number;
+  nameSimilarity: number;
 }
 
 export interface ProjectForComparison {
@@ -29,22 +40,21 @@ export interface ProjectForComparison {
   created_at: string;
   status: string;
   document_count: number;
+  status_history_count: number;
 }
 
 // Utility function to normalize strings for comparison
 function normalizeString(str: string | null): string {
   if (!str) return '';
-  // Remove common punctuation and whitespace, convert to lowercase
   return str
     .toLowerCase()
-    .replace(/[^\w\u4e00-\u9fff]/g, '') // Keep alphanumeric and Chinese characters
+    .replace(/[^\w\u4e00-\u9fff]/g, '')
     .trim();
 }
 
 // Calculate string similarity (Dice coefficient)
-function stringSimilarity(str1: string, str2: string): number {
+function stringSimilarity(str1: string | null, str2: string | null): number {
   if (!str1 || !str2) return 0;
-  if (str1 === str2) return 1;
   
   const s1 = normalizeString(str1);
   const s2 = normalizeString(str2);
@@ -52,7 +62,6 @@ function stringSimilarity(str1: string, str2: string): number {
   if (s1 === s2) return 1;
   if (s1.length < 2 || s2.length < 2) return 0;
 
-  // Create bigrams
   const bigrams1 = new Set<string>();
   for (let i = 0; i < s1.length - 1; i++) {
     bigrams1.add(s1.substring(i, i + 2));
@@ -68,12 +77,57 @@ function stringSimilarity(str1: string, str2: string): number {
   return (2 * intersection) / (s1.length - 1 + s2.length - 1);
 }
 
-// Check if capacity is similar (within 10%)
-function isCapacitySimilar(cap1: number | null, cap2: number | null): boolean {
-  if (!cap1 || !cap2) return false;
+// Extract address tokens for comparison
+function extractAddressTokens(address: string | null): Set<string> {
+  if (!address) return new Set();
+  
+  const tokens = new Set<string>();
+  const normalized = address.replace(/\s+/g, '');
+  
+  // Extract road/street names (路、街、巷、弄、段)
+  const roadMatch = normalized.match(/[\u4e00-\u9fff]+[路街]/);
+  if (roadMatch) tokens.add(roadMatch[0]);
+  
+  // Extract section (段)
+  const sectionMatch = normalized.match(/[\u4e00-\u9fff一二三四五六七八九十]+段/);
+  if (sectionMatch) tokens.add(sectionMatch[0]);
+  
+  // Extract lot numbers (地號)
+  const lotMatch = normalized.match(/\d+(-\d+)?地號/);
+  if (lotMatch) tokens.add(lotMatch[0]);
+  
+  // Extract lane (巷)
+  const laneMatch = normalized.match(/\d+巷/);
+  if (laneMatch) tokens.add(laneMatch[0]);
+  
+  // Extract alley (弄)
+  const alleyMatch = normalized.match(/\d+弄/);
+  if (alleyMatch) tokens.add(alleyMatch[0]);
+  
+  return tokens;
+}
+
+// Check address token overlap
+function getAddressTokenOverlap(addr1: string | null, addr2: string | null): number {
+  const tokens1 = extractAddressTokens(addr1);
+  const tokens2 = extractAddressTokens(addr2);
+  
+  if (tokens1.size === 0 || tokens2.size === 0) return 0;
+  
+  let overlap = 0;
+  tokens1.forEach(t => {
+    if (tokens2.has(t)) overlap++;
+  });
+  
+  return overlap / Math.max(tokens1.size, tokens2.size);
+}
+
+// Check if capacity is similar (within percentage threshold)
+function capacityDifferencePercent(cap1: number | null, cap2: number | null): number {
+  if (!cap1 || !cap2) return 100;
   const diff = Math.abs(cap1 - cap2);
   const avg = (cap1 + cap2) / 2;
-  return diff / avg <= 0.1;
+  return (diff / avg) * 100;
 }
 
 export function useDuplicateScanner() {
@@ -111,8 +165,9 @@ export function useDuplicateScanner() {
 
       if (error) throw error;
 
-      // Also fetch document counts for each project
       const projectIds = (data || []).map(p => p.id);
+      
+      // Fetch document counts
       const { data: docCounts, error: docError } = await supabase
         .from('documents')
         .select('project_id')
@@ -121,9 +176,22 @@ export function useDuplicateScanner() {
 
       if (docError) throw docError;
 
+      // Fetch status history counts
+      const { data: statusCounts, error: statusError } = await supabase
+        .from('project_status_history')
+        .select('project_id')
+        .in('project_id', projectIds);
+
+      if (statusError) throw statusError;
+
       const docCountMap: Record<string, number> = {};
       (docCounts || []).forEach(doc => {
         docCountMap[doc.project_id] = (docCountMap[doc.project_id] || 0) + 1;
+      });
+
+      const statusCountMap: Record<string, number> = {};
+      (statusCounts || []).forEach(s => {
+        statusCountMap[s.project_id] = (statusCountMap[s.project_id] || 0) + 1;
       });
 
       return (data || []).map(p => ({
@@ -143,34 +211,54 @@ export function useDuplicateScanner() {
         created_at: p.created_at,
         status: p.status,
         document_count: docCountMap[p.id] || 0,
+        status_history_count: statusCountMap[p.id] || 0,
       })) as ProjectForComparison[];
     },
   });
 
-  // Fetch ignored pairs
-  const { data: ignoredPairs = [], isLoading: isLoadingIgnored } = useQuery({
-    queryKey: ['duplicate-ignore-pairs'],
+  // Fetch reviewed pairs (both from duplicate_reviews and duplicate_ignore_pairs)
+  const { data: reviewedPairs = [], isLoading: isLoadingReviewed } = useQuery({
+    queryKey: ['duplicate-reviewed-pairs'],
     queryFn: async () => {
-      // Use any cast since table was just created and types aren't regenerated yet
-      const { data, error } = await (supabase as any)
+      // Fetch from duplicate_reviews
+      const { data: reviews, error: reviewError } = await (supabase as any)
+        .from('duplicate_reviews')
+        .select('project_id_a, project_id_b, decision');
+
+      if (reviewError) throw reviewError;
+
+      // Fetch from legacy duplicate_ignore_pairs
+      const { data: ignorePairs, error: ignoreError } = await (supabase as any)
         .from('duplicate_ignore_pairs')
         .select('project_id_a, project_id_b');
 
-      if (error) throw error;
-      return (data || []).map((p: { project_id_a: string; project_id_b: string }) => ({
-        a: p.project_id_a,
-        b: p.project_id_b,
-      }));
+      if (ignoreError) throw ignoreError;
+
+      const pairs: { a: string; b: string; decision?: string }[] = [];
+      
+      (reviews || []).forEach((r: any) => {
+        pairs.push({ a: r.project_id_a, b: r.project_id_b, decision: r.decision });
+      });
+
+      (ignorePairs || []).forEach((p: any) => {
+        // Check if not already in reviews
+        const exists = pairs.some(pair => pair.a === p.project_id_a && pair.b === p.project_id_b);
+        if (!exists) {
+          pairs.push({ a: p.project_id_a, b: p.project_id_b, decision: 'dismiss' });
+        }
+      });
+
+      return pairs;
     },
   });
 
-  // Check if a pair is ignored
-  const isPairIgnored = (id1: string, id2: string): boolean => {
+  // Check if a pair has been reviewed
+  const isPairReviewed = (id1: string, id2: string): boolean => {
     const [a, b] = id1 < id2 ? [id1, id2] : [id2, id1];
-    return ignoredPairs.some(pair => pair.a === a && pair.b === b);
+    return reviewedPairs.some(pair => pair.a === a && pair.b === b);
   };
 
-  // Scan for duplicates
+  // Scan for duplicates with improved rules
   const scanForDuplicates = (): DuplicateGroup[] => {
     const groups: DuplicateGroup[] = [];
     const processedPairs = new Set<string>();
@@ -180,95 +268,187 @@ export function useDuplicateScanner() {
         const p1 = projects[i];
         const p2 = projects[j];
         
-        // Skip if this pair is ignored
-        if (isPairIgnored(p1.id, p2.id)) continue;
+        // Skip if this pair has been reviewed
+        if (isPairReviewed(p1.id, p2.id)) continue;
 
         const pairKey = `${p1.id}-${p2.id}`;
         if (processedPairs.has(pairKey)) continue;
 
-        const criteria: string[] = [];
+        // Calculate similarities
+        const addressSimilarity = stringSimilarity(p1.address, p2.address) * 100;
+        const nameSimilarity = stringSimilarity(p1.project_name, p2.project_name) * 100;
+        const addressTokenOverlap = getAddressTokenOverlap(p1.address, p2.address);
+        const capacityDiff = capacityDifferencePercent(p1.capacity_kwp, p2.capacity_kwp);
+        
+        const sameInvestor = !!(p1.investor_id && p2.investor_id && p1.investor_id === p2.investor_id);
+        const sameCity = !!(p1.city && p2.city && p1.city === p2.city);
+        const sameTownship = !!(p1.district && p2.district && p1.district === p2.district);
+        const sameSiteCode = !!(p1.site_code_display && p2.site_code_display && 
+          p1.site_code_display === p2.site_code_display);
+        const sameInvestorYearSeq = !!(p1.investor_code && p2.investor_code &&
+          p1.investor_code === p2.investor_code &&
+          p1.intake_year === p2.intake_year &&
+          p1.seq === p2.seq);
+
+        // ======= HARD EXCLUSIONS =======
+        // Rule 1: If both address_similarity < 40 AND name_similarity < 40, exclude
+        if (addressSimilarity < 40 && nameSimilarity < 40) {
+          // Only exception: high confidence matches (site_code or investor+year+seq)
+          if (!sameSiteCode && !sameInvestorYearSeq) {
+            continue;
+          }
+        }
+
+        // Rule 2: If different township, only allow high confidence matches
+        if (!sameTownship && !sameSiteCode && !sameInvestorYearSeq) {
+          continue;
+        }
+
+        // Rule 3: If address token overlap is very low (< 0.2) and not high confidence, exclude
+        if (addressTokenOverlap < 0.2 && !sameSiteCode && !sameInvestorYearSeq) {
+          // Unless name similarity is very high
+          if (nameSimilarity < 75) {
+            continue;
+          }
+        }
+
+        // ======= CONFIDENCE LEVEL DETERMINATION =======
+        const matchedCriteria: MatchCriteria[] = [];
+        const unmatchedCriteria: MatchCriteria[] = [];
         let confidenceLevel: ConfidenceLevel | null = null;
 
-        // High confidence checks
-        // 1. Same site_code_display
-        if (p1.site_code_display && p2.site_code_display && 
-            p1.site_code_display === p2.site_code_display) {
-          criteria.push('案場代碼完全相同');
+        // --- HIGH CONFIDENCE CHECKS ---
+        if (sameSiteCode) {
+          matchedCriteria.push({ name: '案場代碼完全相同', matched: true, value: p1.site_code_display! });
           confidenceLevel = 'high';
+        } else {
+          unmatchedCriteria.push({ name: '案場代碼相同', matched: false });
         }
 
-        // 2. Same investor_code + year + seq
-        if (p1.investor_code && p2.investor_code &&
-            p1.investor_code === p2.investor_code &&
-            p1.intake_year === p2.intake_year &&
-            p1.seq === p2.seq) {
-          criteria.push('投資代碼 + 年份 + 序號相同');
+        if (sameInvestorYearSeq) {
+          matchedCriteria.push({ 
+            name: '投資代碼 + 年份 + 序號相同', 
+            matched: true, 
+            value: `${p1.investor_code}-${p1.intake_year}-${p1.seq}`
+          });
           confidenceLevel = 'high';
+        } else if (p1.investor_code && p2.investor_code) {
+          unmatchedCriteria.push({ name: '投資代碼+年份+序號相同', matched: false });
         }
 
-        // Medium confidence checks (only if not already high)
+        // --- MEDIUM CONFIDENCE CHECKS ---
+        // Must satisfy at least one PRIMARY condition: address_similarity >= 80 OR name_similarity >= 75
         if (!confidenceLevel) {
-          // Same investor + similar address
-          if (p1.investor_id && p2.investor_id && 
-              p1.investor_id === p2.investor_id) {
-            const addressSimilarity = stringSimilarity(p1.address, p2.address);
-            if (addressSimilarity > 0.7) {
-              criteria.push('同投資方 + 地址相似');
-              confidenceLevel = 'medium';
+          const hasPrimaryCondition = addressSimilarity >= 80 || nameSimilarity >= 75;
+          
+          if (hasPrimaryCondition) {
+            // Check auxiliary conditions for scoring
+            if (addressSimilarity >= 80) {
+              matchedCriteria.push({ 
+                name: '地址高度相似', 
+                matched: true, 
+                score: Math.round(addressSimilarity),
+                value: `${Math.round(addressSimilarity)}%`
+              });
             }
-          }
+            
+            if (nameSimilarity >= 75) {
+              matchedCriteria.push({ 
+                name: '名稱高度相似', 
+                matched: true, 
+                score: Math.round(nameSimilarity),
+                value: `${Math.round(nameSimilarity)}%`
+              });
+            }
 
-          // Same investor + similar project name
-          if (p1.investor_id && p2.investor_id && 
-              p1.investor_id === p2.investor_id) {
-            const nameSimilarity = stringSimilarity(p1.project_name, p2.project_name);
-            if (nameSimilarity > 0.7) {
-              criteria.push('同投資方 + 案場名稱相似');
-              if (!confidenceLevel) confidenceLevel = 'medium';
+            // Auxiliary conditions (add to matched list but don't determine confidence alone)
+            if (sameInvestor) {
+              matchedCriteria.push({ name: '同投資方', matched: true, value: p1.investor_name || p1.investor_code || '' });
             }
+
+            if (sameTownship) {
+              matchedCriteria.push({ name: '同鄉鎮市區', matched: true, value: `${p1.city}${p1.district}` });
+            } else if (sameCity) {
+              matchedCriteria.push({ name: '同縣市', matched: true, value: p1.city || '' });
+            }
+
+            if (capacityDiff <= 15) {
+              matchedCriteria.push({ 
+                name: '容量接近', 
+                matched: true, 
+                value: `差距 ${capacityDiff.toFixed(1)}%` 
+              });
+            }
+
+            confidenceLevel = 'medium';
           }
         }
 
-        // Low confidence checks (only if not already high or medium)
+        // --- LOW CONFIDENCE CHECKS ---
         if (!confidenceLevel) {
-          if (p1.investor_id && p2.investor_id && 
-              p1.investor_id === p2.investor_id &&
-              p1.city === p2.city && p1.district === p2.district &&
-              isCapacitySimilar(p1.capacity_kwp, p2.capacity_kwp)) {
-            criteria.push('同投資方 + 同區域 + 容量相近');
+          // Low confidence: same investor + same township + capacity within 15%
+          if (sameInvestor && sameTownship && capacityDiff <= 15) {
+            matchedCriteria.push({ name: '同投資方', matched: true, value: p1.investor_name || '' });
+            matchedCriteria.push({ name: '同鄉鎮市區', matched: true, value: `${p1.city}${p1.district}` });
+            matchedCriteria.push({ name: '容量接近', matched: true, value: `差距 ${capacityDiff.toFixed(1)}%` });
+            
+            // Add similarity scores as unmatched since they didn't meet threshold
+            if (addressSimilarity > 0) {
+              unmatchedCriteria.push({ 
+                name: '地址相似度', 
+                matched: false, 
+                value: `${Math.round(addressSimilarity)}% (需≥80%)`
+              });
+            }
+            if (nameSimilarity > 0) {
+              unmatchedCriteria.push({ 
+                name: '名稱相似度', 
+                matched: false, 
+                value: `${Math.round(nameSimilarity)}% (需≥75%)`
+              });
+            }
+            
             confidenceLevel = 'low';
           }
         }
 
-        if (confidenceLevel && criteria.length > 0) {
-          processedPairs.add(pairKey);
-          
-          // Check if we can add to an existing group
-          const existingGroup = groups.find(g => 
-            g.confidenceLevel === confidenceLevel &&
-            g.projects.some(p => p.id === p1.id || p.id === p2.id)
-          );
-
-          if (existingGroup) {
-            if (!existingGroup.projects.some(p => p.id === p1.id)) {
-              existingGroup.projects.push(p1);
-            }
-            if (!existingGroup.projects.some(p => p.id === p2.id)) {
-              existingGroup.projects.push(p2);
-            }
-            criteria.forEach(c => {
-              if (!existingGroup.criteria.includes(c)) {
-                existingGroup.criteria.push(c);
-              }
-            });
-          } else {
-            groups.push({
-              id: `group-${groups.length + 1}`,
-              confidenceLevel,
-              criteria,
-              projects: [p1, p2],
+        // Add remaining unmatched criteria for display
+        if (confidenceLevel) {
+          if (!sameInvestor && !matchedCriteria.some(c => c.name === '同投資方')) {
+            unmatchedCriteria.push({ name: '同投資方', matched: false });
+          }
+          if (!sameTownship && !matchedCriteria.some(c => c.name.includes('鄉鎮市區'))) {
+            unmatchedCriteria.push({ name: '同鄉鎮市區', matched: false });
+          }
+          if (capacityDiff > 15 && !matchedCriteria.some(c => c.name === '容量接近')) {
+            unmatchedCriteria.push({ name: '容量接近', matched: false, value: `差距 ${capacityDiff.toFixed(1)}%` });
+          }
+          if (addressSimilarity < 80 && !matchedCriteria.some(c => c.name === '地址高度相似') && !unmatchedCriteria.some(c => c.name === '地址相似度')) {
+            unmatchedCriteria.push({ 
+              name: '地址相似度', 
+              matched: false, 
+              value: `${Math.round(addressSimilarity)}%`
             });
           }
+          if (nameSimilarity < 75 && !matchedCriteria.some(c => c.name === '名稱高度相似') && !unmatchedCriteria.some(c => c.name === '名稱相似度')) {
+            unmatchedCriteria.push({ 
+              name: '名稱相似度', 
+              matched: false, 
+              value: `${Math.round(nameSimilarity)}%`
+            });
+          }
+
+          processedPairs.add(pairKey);
+          
+          groups.push({
+            id: `group-${groups.length + 1}`,
+            confidenceLevel,
+            matchedCriteria,
+            unmatchedCriteria,
+            projects: [p1, p2],
+            addressSimilarity,
+            nameSimilarity,
+          });
         }
       }
     }
@@ -278,11 +458,10 @@ export function useDuplicateScanner() {
     return groups.sort((a, b) => order[a.confidenceLevel] - order[b.confidenceLevel]);
   };
 
-  // Mark as not duplicate
-  const markNotDuplicateMutation = useMutation({
-    mutationFn: async ({ projectIds, note }: { projectIds: string[]; note?: string }) => {
-      // Create pairs from all projects in the group
-      const pairs: { project_id_a: string; project_id_b: string; created_by: string | undefined; note: string | undefined }[] = [];
+  // Dismiss pair (mark as not duplicate)
+  const dismissPairMutation = useMutation({
+    mutationFn: async ({ projectIds, reason }: { projectIds: string[]; reason?: string }) => {
+      const pairs: any[] = [];
       
       for (let i = 0; i < projectIds.length; i++) {
         for (let j = i + 1; j < projectIds.length; j++) {
@@ -292,68 +471,197 @@ export function useDuplicateScanner() {
           pairs.push({
             project_id_a: a,
             project_id_b: b,
-            created_by: user?.id,
-            note,
+            decision: 'dismiss',
+            reason: reason || '使用者判斷非重複',
+            reviewed_by: user?.id,
+            reviewed_at: new Date().toISOString(),
           });
         }
       }
 
-      // Use any cast since table was just created and types aren't regenerated yet
       const { error } = await (supabase as any)
-        .from('duplicate_ignore_pairs')
+        .from('duplicate_reviews')
         .upsert(pairs, { onConflict: 'project_id_a,project_id_b' });
 
       if (error) throw error;
+
+      // Log audit action for each pair
+      for (const pair of pairs) {
+        await supabase.rpc('log_audit_action', {
+          p_table_name: 'duplicate_reviews',
+          p_record_id: pair.project_id_a,
+          p_action: 'CREATE',
+          p_reason: `DEDUP_DISMISS: ${reason || '使用者判斷非重複'}`,
+          p_new_data: pair,
+        });
+      }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['duplicate-ignore-pairs'] });
-      toast.success('已標記為非重複');
+      queryClient.invalidateQueries({ queryKey: ['duplicate-reviewed-pairs'] });
+      toast.success('已標記為非重複，此組合不會再出現');
     },
     onError: (error: Error) => {
       toast.error('標記失敗', { description: error.message });
     },
   });
 
-  // Soft delete a project as duplicate
-  const softDeleteDuplicateMutation = useMutation({
-    mutationFn: async (projectId: string) => {
-      const { error } = await supabase
+  // Confirm duplicate and soft delete
+  const confirmAndDeleteMutation = useMutation({
+    mutationFn: async ({ 
+      keepProjectId, 
+      deleteProjectId, 
+      reason 
+    }: { 
+      keepProjectId: string; 
+      deleteProjectId: string; 
+      reason?: string;
+    }) => {
+      // Soft delete the duplicate project
+      const { error: deleteError } = await supabase
         .from('projects')
         .update({
           is_deleted: true,
           deleted_at: new Date().toISOString(),
           deleted_by: user?.id,
-          delete_reason: '重複資料清理',
+          delete_reason: reason || '確認重複資料清理',
         })
-        .eq('id', projectId);
+        .eq('id', deleteProjectId);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
 
-      // Log to audit
+      // Record the review decision
+      const [a, b] = keepProjectId < deleteProjectId 
+        ? [keepProjectId, deleteProjectId] 
+        : [deleteProjectId, keepProjectId];
+
+      const { error: reviewError } = await (supabase as any)
+        .from('duplicate_reviews')
+        .upsert({
+          project_id_a: a,
+          project_id_b: b,
+          decision: 'confirm',
+          reason: reason || `保留 ${keepProjectId}，刪除 ${deleteProjectId}`,
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+        }, { onConflict: 'project_id_a,project_id_b' });
+
+      if (reviewError) throw reviewError;
+
+      // Log audit action
       await supabase.rpc('log_audit_action', {
         p_table_name: 'projects',
-        p_record_id: projectId,
+        p_record_id: deleteProjectId,
         p_action: 'DELETE',
-        p_reason: '重複資料清理',
+        p_reason: `DEDUP_CONFIRM: 確認重複，保留案場 ${keepProjectId}`,
       });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['duplicate-scanner-projects'] });
+      queryClient.invalidateQueries({ queryKey: ['duplicate-reviewed-pairs'] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
-      toast.success('案場已移至回收區');
+      toast.success('已確認重複並刪除案場');
     },
     onError: (error: Error) => {
-      toast.error('刪除失敗', { description: error.message });
+      toast.error('處理失敗', { description: error.message });
+    },
+  });
+
+  // Merge projects
+  const mergeProjectsMutation = useMutation({
+    mutationFn: async ({ 
+      keepProjectId, 
+      mergeProjectId,
+      mergeDocuments,
+      mergeStatusHistory,
+      reason,
+    }: { 
+      keepProjectId: string; 
+      mergeProjectId: string;
+      mergeDocuments: boolean;
+      mergeStatusHistory: boolean;
+      reason?: string;
+    }) => {
+      // Merge documents if requested
+      if (mergeDocuments) {
+        const { error: docError } = await supabase
+          .from('documents')
+          .update({ project_id: keepProjectId })
+          .eq('project_id', mergeProjectId)
+          .eq('is_deleted', false);
+
+        if (docError) throw docError;
+      }
+
+      // Merge status history if requested
+      if (mergeStatusHistory) {
+        const { error: histError } = await supabase
+          .from('project_status_history')
+          .update({ project_id: keepProjectId })
+          .eq('project_id', mergeProjectId);
+
+        if (histError) throw histError;
+      }
+
+      // Soft delete the merged project
+      const { error: deleteError } = await supabase
+        .from('projects')
+        .update({
+          is_deleted: true,
+          deleted_at: new Date().toISOString(),
+          deleted_by: user?.id,
+          delete_reason: `已合併至案場 ${keepProjectId}`,
+        })
+        .eq('id', mergeProjectId);
+
+      if (deleteError) throw deleteError;
+
+      // Record the review decision
+      const [a, b] = keepProjectId < mergeProjectId 
+        ? [keepProjectId, mergeProjectId] 
+        : [mergeProjectId, keepProjectId];
+
+      const { error: reviewError } = await (supabase as any)
+        .from('duplicate_reviews')
+        .upsert({
+          project_id_a: a,
+          project_id_b: b,
+          decision: 'merged',
+          reason: reason || `已合併至 ${keepProjectId}`,
+          reviewed_by: user?.id,
+          reviewed_at: new Date().toISOString(),
+        }, { onConflict: 'project_id_a,project_id_b' });
+
+      if (reviewError) throw reviewError;
+
+      // Log audit action
+      await supabase.rpc('log_audit_action', {
+        p_table_name: 'projects',
+        p_record_id: mergeProjectId,
+        p_action: 'UPDATE',
+        p_reason: `DEDUP_MERGE: 已合併至案場 ${keepProjectId}${mergeDocuments ? '，含文件' : ''}${mergeStatusHistory ? '，含狀態歷史' : ''}`,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['duplicate-scanner-projects'] });
+      queryClient.invalidateQueries({ queryKey: ['duplicate-reviewed-pairs'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      queryClient.invalidateQueries({ queryKey: ['documents'] });
+      toast.success('案場合併完成');
+    },
+    onError: (error: Error) => {
+      toast.error('合併失敗', { description: error.message });
     },
   });
 
   return {
     projects,
-    isLoading: isLoadingProjects || isLoadingIgnored,
+    isLoading: isLoadingProjects || isLoadingReviewed,
     scanForDuplicates,
-    markNotDuplicate: markNotDuplicateMutation.mutateAsync,
-    softDeleteDuplicate: softDeleteDuplicateMutation.mutateAsync,
-    isMarkingNotDuplicate: markNotDuplicateMutation.isPending,
-    isSoftDeleting: softDeleteDuplicateMutation.isPending,
+    dismissPair: dismissPairMutation.mutateAsync,
+    confirmAndDelete: confirmAndDeleteMutation.mutateAsync,
+    mergeProjects: mergeProjectsMutation.mutateAsync,
+    isDismissing: dismissPairMutation.isPending,
+    isConfirming: confirmAndDeleteMutation.isPending,
+    isMerging: mergeProjectsMutation.isPending,
   };
 }
