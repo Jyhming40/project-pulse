@@ -25,6 +25,12 @@ export interface ProgressSettings {
     engineering_weight?: number;
     allow_skip?: boolean;
     require_sequence?: boolean;
+    // Alert threshold settings
+    months_threshold?: number;
+    min_progress_old_project?: number;
+    min_progress_late_stage?: number;
+    late_stages?: string[];
+    max_display_count?: number;
   };
   description: string | null;
 }

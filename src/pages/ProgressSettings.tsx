@@ -17,7 +17,8 @@ import {
   Save,
   X,
   AlertCircle,
-  Percent
+  Percent,
+  AlertTriangle
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -72,6 +73,26 @@ export default function ProgressSettings() {
   const weightSetting = settings.find(s => s.setting_key === 'progress_weights');
   const adminWeight = (weightSetting?.setting_value?.admin_weight ?? 50) as number;
   const engineeringWeight = (weightSetting?.setting_value?.engineering_weight ?? 50) as number;
+
+  // Get alert threshold settings
+  const alertSetting = settings.find(s => s.setting_key === 'alert_thresholds');
+  const alertThresholds = {
+    months_threshold: (alertSetting?.setting_value?.months_threshold ?? 6) as number,
+    min_progress_old_project: (alertSetting?.setting_value?.min_progress_old_project ?? 25) as number,
+    min_progress_late_stage: (alertSetting?.setting_value?.min_progress_late_stage ?? 50) as number,
+    late_stages: (alertSetting?.setting_value?.late_stages ?? ['台電審查', '能源局送件', '同意備案', '工程施工', '報竣掛表']) as string[],
+    max_display_count: (alertSetting?.setting_value?.max_display_count ?? 5) as number,
+  };
+
+  const handleAlertThresholdChange = (key: string, value: number | string[]) => {
+    updateSettings.mutate({
+      key: 'alert_thresholds',
+      value: {
+        ...alertThresholds,
+        [key]: value,
+      },
+    });
+  };
 
   // Filter milestones by type
   const adminMilestones = milestones.filter(m => m.milestone_type === 'admin').sort((a, b) => a.sort_order - b.sort_order);
@@ -194,6 +215,125 @@ export default function ProgressSettings() {
             </div>
             <p className="text-xs text-muted-foreground">
               總進度 = 行政進度 × {adminWeight}% + 工程進度 × {engineeringWeight}%
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Alert Threshold Settings */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5 text-warning" />
+            進度落後警示設定
+          </CardTitle>
+          <CardDescription>設定進度落後警示的判斷標準</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>案場建立時間門檻（月）</Label>
+                <div className="flex items-center gap-4">
+                  <Slider
+                    value={[alertThresholds.months_threshold]}
+                    min={1}
+                    max={24}
+                    step={1}
+                    onValueChange={(v) => handleAlertThresholdChange('months_threshold', v[0])}
+                    className="flex-1"
+                  />
+                  <span className="text-sm font-medium w-16 text-right">{alertThresholds.months_threshold} 個月</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  案場建立超過此時間將列入警示檢查
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>舊案場最低進度（%）</Label>
+                <div className="flex items-center gap-4">
+                  <Slider
+                    value={[alertThresholds.min_progress_old_project]}
+                    min={0}
+                    max={100}
+                    step={5}
+                    onValueChange={(v) => handleAlertThresholdChange('min_progress_old_project', v[0])}
+                    className="flex-1"
+                  />
+                  <span className="text-sm font-medium w-12 text-right">{alertThresholds.min_progress_old_project}%</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  超過建立時間門檻的案場，若進度低於此值則發出警示
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>後期階段最低進度（%）</Label>
+                <div className="flex items-center gap-4">
+                  <Slider
+                    value={[alertThresholds.min_progress_late_stage]}
+                    min={0}
+                    max={100}
+                    step={5}
+                    onValueChange={(v) => handleAlertThresholdChange('min_progress_late_stage', v[0])}
+                    className="flex-1"
+                  />
+                  <span className="text-sm font-medium w-12 text-right">{alertThresholds.min_progress_late_stage}%</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  處於後期階段的案場，若進度低於此值則發出警示
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label>最多顯示筆數</Label>
+                <div className="flex items-center gap-4">
+                  <Slider
+                    value={[alertThresholds.max_display_count]}
+                    min={1}
+                    max={20}
+                    step={1}
+                    onValueChange={(v) => handleAlertThresholdChange('max_display_count', v[0])}
+                    className="flex-1"
+                  />
+                  <span className="text-sm font-medium w-12 text-right">{alertThresholds.max_display_count} 筆</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  儀表板上最多顯示的落後案場數量
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-2">
+            <Label>後期階段定義</Label>
+            <div className="flex flex-wrap gap-2">
+              {['台電審查', '能源局送件', '同意備案', '工程施工', '報竣掛表', '設備登記'].map((stage) => {
+                const isSelected = alertThresholds.late_stages.includes(stage);
+                return (
+                  <Button
+                    key={stage}
+                    variant={isSelected ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => {
+                      const newStages = isSelected
+                        ? alertThresholds.late_stages.filter(s => s !== stage)
+                        : [...alertThresholds.late_stages, stage];
+                      handleAlertThresholdChange('late_stages', newStages);
+                    }}
+                  >
+                    {stage}
+                  </Button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              選取的階段將被視為「後期階段」，套用後期最低進度門檻
             </p>
           </div>
         </CardContent>

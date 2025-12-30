@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
+import { useProgressSettings } from '@/hooks/useProgressManagement';
 import { 
   Building2, 
   Zap, 
@@ -62,6 +63,17 @@ const PROJECT_STATUS_ORDER = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  
+  // Fetch progress settings for alert thresholds
+  const { data: progressSettings = [] } = useProgressSettings();
+  const alertSetting = progressSettings.find(s => s.setting_key === 'alert_thresholds');
+  const alertThresholds = useMemo(() => ({
+    months_threshold: (alertSetting?.setting_value?.months_threshold ?? 6) as number,
+    min_progress_old_project: (alertSetting?.setting_value?.min_progress_old_project ?? 25) as number,
+    min_progress_late_stage: (alertSetting?.setting_value?.min_progress_late_stage ?? 50) as number,
+    late_stages: (alertSetting?.setting_value?.late_stages ?? ['台電審查', '能源局送件', '同意備案', '工程施工', '報竣掛表']) as string[],
+    max_display_count: (alertSetting?.setting_value?.max_display_count ?? 5) as number,
+  }), [alertSetting]);
   
   // Filter states
   const [selectedInvestor, setSelectedInvestor] = useState<string>('all');
@@ -290,32 +302,31 @@ export default function Dashboard() {
       .filter(item => item.count > 0);
   }, [filteredProjects]);
 
-  // Progress behind alert - projects with low progress compared to expected
+  // Progress behind alert - projects with low progress compared to expected (using configurable thresholds)
   const behindProjects = useMemo(() => {
     const now = new Date();
-    const sixMonthsAgo = new Date(now);
-    sixMonthsAgo.setMonth(now.getMonth() - 6);
+    const thresholdDate = new Date(now);
+    thresholdDate.setMonth(now.getMonth() - alertThresholds.months_threshold);
     
     return filteredProjects
       .filter(p => {
         // Exclude suspended/cancelled projects
         if (['暫停', '取消'].includes(p.status)) return false;
         
-        // Projects created more than 6 months ago with less than 25% progress
+        // Projects created more than threshold months ago with less than min progress
         const createdDate = new Date(p.created_at);
         const progress = Number(p.overall_progress) || 0;
         
-        if (createdDate < sixMonthsAgo && progress < 25) return true;
+        if (createdDate < thresholdDate && progress < alertThresholds.min_progress_old_project) return true;
         
-        // Projects in later stages but with low progress
-        const lateStages = ['台電審查', '能源局送件', '同意備案', '工程施工', '報竣掛表'];
-        if (lateStages.includes(p.status) && progress < 50) return true;
+        // Projects in late stages but with low progress
+        if (alertThresholds.late_stages.includes(p.status) && progress < alertThresholds.min_progress_late_stage) return true;
         
         return false;
       })
       .sort((a, b) => (Number(a.overall_progress) || 0) - (Number(b.overall_progress) || 0))
-      .slice(0, 5); // Show top 5 most behind
-  }, [filteredProjects]);
+      .slice(0, alertThresholds.max_display_count);
+  }, [filteredProjects, alertThresholds]);
 
   // Reset filters
   const resetFilters = () => {
