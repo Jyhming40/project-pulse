@@ -100,13 +100,6 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
   
-  // 展開狀態
-  const [projectsOpen, setProjectsOpen] = useState(false);
-  const [investorOpen, setInvestorOpen] = useState(false);
-  const [documentsOpen, setDocumentsOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [governanceOpen, setGovernanceOpen] = useState(false);
-
   // Auto-expand section if current route is within it
   const isInProjects = projectManagementItems.some(item => 
     location.pathname === item.to || location.pathname.startsWith(item.to + '/')
@@ -123,6 +116,13 @@ export default function Layout({ children }: LayoutProps) {
   const isInGovernance = systemGovernanceItems.some(item => 
     location.pathname === item.to || location.pathname.startsWith(item.to + '/')
   );
+
+  // 展開狀態 - 預設展開當前所在分類
+  const [projectsOpen, setProjectsOpen] = useState(isInProjects);
+  const [investorOpen, setInvestorOpen] = useState(isInInvestor);
+  const [documentsOpen, setDocumentsOpen] = useState(isInDocuments);
+  const [settingsOpen, setSettingsOpen] = useState(isInSettings);
+  const [governanceOpen, setGovernanceOpen] = useState(isInGovernance);
 
   const handleSignOut = async () => {
     await signOut();
