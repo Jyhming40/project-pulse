@@ -322,6 +322,21 @@ async function recalculateProjectProgress(projectId: string, token: string) {
   const completedMilestones = await projectMilestonesResponse.json() as ProjectMilestone[];
   const completedCodes = new Set(completedMilestones.map(m => m.milestone_code));
 
+  // Fetch weight settings
+  const settingsResponse = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/progress_settings?setting_key=eq.weights`,
+    {
+      headers: {
+        'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        'Authorization': `Bearer ${token}`,
+      },
+    }
+  );
+  const settingsData = await settingsResponse.json();
+  const weightSettings = settingsData?.[0]?.setting_value || { admin_weight: 50, engineering_weight: 50 };
+  const adminWeight = weightSettings.admin_weight ?? 50;
+  const engineeringWeight = weightSettings.engineering_weight ?? 50;
+
   // Calculate admin progress
   const adminMilestones = allMilestones.filter(m => m.milestone_type === 'admin');
   const adminTotalWeight = adminMilestones.reduce((sum, m) => sum + m.weight, 0);
@@ -338,8 +353,10 @@ async function recalculateProjectProgress(projectId: string, token: string) {
     .reduce((sum, m) => sum + m.weight, 0);
   const engineeringProgress = engTotalWeight > 0 ? (engCompletedWeight / engTotalWeight) * 100 : 0;
 
-  // Calculate overall progress (weighted average, default 50/50)
-  const overallProgress = (adminProgress + engineeringProgress) / 2;
+  // Calculate overall progress using configured weights
+  const overallProgress = 
+    (adminProgress * adminWeight / 100) + 
+    (engineeringProgress * engineeringWeight / 100);
 
   // Find current stage for admin and engineering
   const sortedAdminMilestones = adminMilestones.sort((a, b) => a.sort_order - b.sort_order);
