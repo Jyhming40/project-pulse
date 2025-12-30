@@ -1352,6 +1352,36 @@ export type Database = {
           },
         ]
       }
+      user_security: {
+        Row: {
+          created_at: string | null
+          id: string
+          must_change_password: boolean | null
+          password_changed_at: string | null
+          password_expires_at: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          must_change_password?: boolean | null
+          password_changed_at?: string | null
+          password_expires_at?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          must_change_password?: boolean | null
+          password_changed_at?: string | null
+          password_expires_at?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
