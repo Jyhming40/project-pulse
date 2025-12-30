@@ -13,7 +13,9 @@ import {
   Shield,
   Search,
   X,
-  AlertTriangle
+  AlertTriangle,
+  KeyRound,
+  RefreshCw
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -60,6 +62,7 @@ export default function UserManagement() {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserWithRole | null>(null);
   
   // Form states
@@ -69,6 +72,11 @@ export default function UserManagement() {
   const [newUserRole, setNewUserRole] = useState<AppRole>('viewer');
   const [editUserName, setEditUserName] = useState('');
   const [editUserRole, setEditUserRole] = useState<AppRole>('viewer');
+  
+  // Password reset states
+  const [resetMode, setResetMode] = useState<'force_change' | 'set_password'>('force_change');
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetReason, setResetReason] = useState('');
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['all-users'],
@@ -89,20 +97,62 @@ export default function UserManagement() {
     u.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Update role mutation
+  // Update role mutation using Edge Function
   const updateRoleMutation = useMutation({
     mutationFn: async ({ userId, role }: { userId: string; role: AppRole }) => {
-      const { error: deleteError } = await supabase.from('user_roles').delete().eq('user_id', userId);
-      if (deleteError) throw deleteError;
-      const { error } = await supabase.from('user_roles').insert({ user_id: userId, role });
+      const { data, error } = await supabase.functions.invoke('admin-update-role', {
+        body: { userId, role }
+      });
       if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['all-users'] });
-      toast.success('角色已更新');
+      if (data?.old_role !== data?.new_role) {
+        toast.success('角色已更新', {
+          description: data?.message || '被更改的使用者需重新登入才會完全生效'
+        });
+      } else {
+        toast.info('角色未變更');
+      }
     },
     onError: (error) => {
       toast.error('更新角色失敗: ' + error.message);
+    }
+  });
+  
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ 
+      targetUserId, 
+      resetMode, 
+      reason, 
+      newPassword 
+    }: { 
+      targetUserId: string; 
+      resetMode: 'force_change' | 'set_password'; 
+      reason?: string; 
+      newPassword?: string 
+    }) => {
+      const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+        body: { targetUserId, resetMode, reason, newPassword }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data;
+    },
+    onSuccess: (data) => {
+      toast.success('密碼重設成功', {
+        description: data?.message
+      });
+      setIsResetPasswordDialogOpen(false);
+      setResetPassword('');
+      setResetReason('');
+      setResetMode('force_change');
+    },
+    onError: (error) => {
+      toast.error('密碼重設失敗: ' + error.message);
     }
   });
 
@@ -242,6 +292,30 @@ export default function UserManagement() {
     deleteUserMutation.mutate(selectedUser.id);
   };
 
+  const handleResetPasswordClick = (u: UserWithRole) => {
+    setSelectedUser(u);
+    setResetMode('force_change');
+    setResetPassword('');
+    setResetReason('');
+    setIsResetPasswordDialogOpen(true);
+  };
+
+  const handleConfirmResetPassword = () => {
+    if (!selectedUser) return;
+    
+    if (resetMode === 'set_password' && (!resetPassword || !resetReason)) {
+      toast.error('直接設定密碼需要提供新密碼和原因');
+      return;
+    }
+
+    resetPasswordMutation.mutate({
+      targetUserId: selectedUser.id,
+      resetMode,
+      reason: resetReason || undefined,
+      newPassword: resetPassword || undefined
+    });
+  };
+
   const getRoleBadge = (role: AppRole) => {
     switch (role) {
       case 'admin':
@@ -366,6 +440,16 @@ export default function UserManagement() {
                             title="編輯"
                           >
                             <Edit2 className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => handleResetPasswordClick(u)}
+                            disabled={isCurrentUser}
+                            title={isCurrentUser ? '請使用個人設定更改自己的密碼' : '重設密碼'}
+                          >
+                            <KeyRound className="w-4 h-4" />
                           </Button>
                           <Button
                             variant="ghost"
@@ -567,6 +651,92 @@ export default function UserManagement() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Reset Password Dialog */}
+      <Dialog open={isResetPasswordDialogOpen} onOpenChange={setIsResetPasswordDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <KeyRound className="w-5 h-5" />
+              重設使用者密碼
+            </DialogTitle>
+            <DialogDescription>
+              {selectedUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>重設模式</Label>
+              <Select 
+                value={resetMode} 
+                onValueChange={(v) => setResetMode(v as 'force_change' | 'set_password')}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="force_change">
+                    <div className="flex items-center gap-2">
+                      <RefreshCw className="w-4 h-4" />
+                      強制下次登入時變更密碼
+                    </div>
+                  </SelectItem>
+                  <SelectItem value="set_password">
+                    <div className="flex items-center gap-2">
+                      <KeyRound className="w-4 h-4" />
+                      直接設定新密碼
+                    </div>
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {resetMode === 'set_password' && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="reset-password">新密碼 *</Label>
+                  <Input
+                    id="reset-password"
+                    type="password"
+                    placeholder="至少 6 個字元"
+                    value={resetPassword}
+                    onChange={(e) => setResetPassword(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="reset-reason">原因 *（將記錄於稽核日誌）</Label>
+                  <Input
+                    id="reset-reason"
+                    placeholder="請說明重設密碼的原因"
+                    value={resetReason}
+                    onChange={(e) => setResetReason(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
+            
+            <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+              {resetMode === 'force_change' ? (
+                <p>使用者下次登入時將被強制導向變更密碼頁面，完成後才能使用系統。</p>
+              ) : (
+                <p>直接設定新密碼後，使用者仍需在下次登入時再次變更密碼（安全考量）。此操作將記錄於稽核日誌。</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsResetPasswordDialogOpen(false)}>
+              取消
+            </Button>
+            <Button 
+              onClick={handleConfirmResetPassword}
+              disabled={resetPasswordMutation.isPending || (resetMode === 'set_password' && (!resetPassword || !resetReason))}
+            >
+              {resetPasswordMutation.isPending && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              確認重設
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
