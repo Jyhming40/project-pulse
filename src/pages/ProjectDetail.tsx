@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { CodebookSelect } from '@/components/CodebookSelect';
+import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import {
@@ -101,15 +102,7 @@ const getStatusColor = (status: string) => {
   return statusColorMap[status] || 'bg-muted text-muted-foreground';
 };
 
-const getDocStatusColor = (status: string) => {
-  const docStatusColorMap: Record<string, string> = {
-    '未開始': 'bg-muted text-muted-foreground',
-    '進行中': 'bg-info/15 text-info',
-    '已完成': 'bg-success/15 text-success',
-    '退件補正': 'bg-warning/15 text-warning',
-  };
-  return docStatusColorMap[status] || 'bg-muted text-muted-foreground';
-};
+// Document status is now derived from dates - use getDerivedDocStatus from lib
 
 const getConstructionStatusColor = (status: string) => {
   const colorMap: Record<string, string> = {
@@ -987,12 +980,14 @@ export default function ProjectDetail() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {documents.map(doc => (
+                    {documents.map(doc => {
+                      const derivedStatus = getDerivedDocStatus(doc);
+                      return (
                       <TableRow key={doc.id}>
                         <TableCell className="font-medium">{doc.doc_type}</TableCell>
                         <TableCell>
-                          <Badge className={getDocStatusColor(doc.doc_status)} variant="secondary">
-                            {doc.doc_status}
+                          <Badge className={getDerivedDocStatusColor(derivedStatus)} variant="secondary">
+                            {derivedStatus}
                           </Badge>
                         </TableCell>
                         <TableCell>
@@ -1008,7 +1003,8 @@ export default function ProjectDetail() {
                           {(doc.owner as any)?.full_name || '-'}
                         </TableCell>
                       </TableRow>
-                    ))}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               )}

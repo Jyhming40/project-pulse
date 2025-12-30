@@ -11,6 +11,7 @@ import { TablePagination } from '@/components/ui/table-pagination';
 import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
 import { BatchUpdateDialog, BatchUpdateField } from '@/components/BatchUpdateDialog';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
+import { getDerivedDocStatus, getDerivedDocStatusColor, DerivedDocStatus } from '@/lib/documentStatus';
 import { 
   Search, 
   FileText, 
@@ -18,7 +19,8 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  FileDown
+  FileDown,
+  Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,20 +47,21 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 type DocType = Database['public']['Enums']['doc_type'];
-type DocStatus = Database['public']['Enums']['doc_status'];
 
-// Dynamic status color mapping
-const getDocStatusColor = (status: string) => {
-  const docStatusColorMap: Record<string, string> = {
-    '未開始': 'bg-muted text-muted-foreground',
-    '進行中': 'bg-info/15 text-info',
-    '已完成': 'bg-success/15 text-success',
-    '退件補正': 'bg-warning/15 text-warning',
-  };
-  return docStatusColorMap[status] || 'bg-muted text-muted-foreground';
-};
+// Filter options for derived status
+const derivedStatusOptions: { value: DerivedDocStatus; label: string }[] = [
+  { value: '未開始', label: '未開始' },
+  { value: '已開始', label: '已開始' },
+  { value: '已取得', label: '已取得' },
+];
 
 export default function Documents() {
   const navigate = useNavigate();
@@ -67,7 +70,6 @@ export default function Documents() {
   
   // Fetch dynamic options
   const { options: docTypeOptions } = useOptionsForCategory('doc_type');
-  const { options: docStatusOptions } = useOptionsForCategory('doc_status');
   
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -113,7 +115,7 @@ export default function Documents() {
     },
   });
 
-  // Filter documents
+  // Filter documents with derived status
   const filteredDocuments = documents.filter(doc => {
     const project = doc.projects as any;
     const matchesSearch = 
@@ -122,7 +124,9 @@ export default function Documents() {
       doc.doc_type.toLowerCase().includes(search.toLowerCase());
     
     const matchesType = typeFilter === 'all' || doc.doc_type === typeFilter;
-    const matchesStatus = statusFilter === 'all' || doc.doc_status === statusFilter;
+    // Use derived status for filtering
+    const derivedStatus = getDerivedDocStatus(doc);
+    const matchesStatus = statusFilter === 'all' || derivedStatus === statusFilter;
     
     return matchesSearch && matchesType && matchesStatus;
   });
@@ -223,15 +227,9 @@ export default function Documents() {
     },
   });
 
-  // Batch update fields
+  // Batch update fields - note: status is derived from dates, cannot be manually updated
+  // To change status, update the date fields directly in the document detail page
   const batchUpdateFields: BatchUpdateField[] = [
-    {
-      key: 'doc_status',
-      label: '文件狀態',
-      type: 'select',
-      options: docStatusOptions,
-      placeholder: '選擇狀態',
-    },
     {
       key: 'doc_type',
       label: '文件類型',
@@ -241,10 +239,10 @@ export default function Documents() {
     },
   ];
 
-  // Stats
-  const pendingCount = documents.filter(d => d.doc_status === '退件補正').length;
-  const inProgressCount = documents.filter(d => d.doc_status === '進行中').length;
-  const completedCount = documents.filter(d => d.doc_status === '已完成').length;
+  // Stats - using derived status
+  const notStartedCount = documents.filter(d => getDerivedDocStatus(d) === '未開始').length;
+  const inProgressCount = documents.filter(d => getDerivedDocStatus(d) === '已開始').length;
+  const completedCount = documents.filter(d => getDerivedDocStatus(d) === '已取得').length;
   
   const upcomingDueCount = documents.filter(d => {
     if (!d.due_at) return false;
@@ -276,34 +274,23 @@ export default function Documents() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
+              <XCircle className="w-5 h-5 text-muted-foreground" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{notStartedCount}</p>
+              <p className="text-xs text-muted-foreground">未開始</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-info/10 flex items-center justify-center">
               <Clock className="w-5 h-5 text-info" />
             </div>
             <div>
               <p className="text-2xl font-bold">{inProgressCount}</p>
-              <p className="text-xs text-muted-foreground">進行中</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-warning/10 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5 text-warning" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{pendingCount}</p>
-              <p className="text-xs text-muted-foreground">待補正</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
-              <XCircle className="w-5 h-5 text-destructive" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{upcomingDueCount}</p>
-              <p className="text-xs text-muted-foreground">即將到期</p>
+              <p className="text-xs text-muted-foreground">已開始</p>
             </div>
           </CardContent>
         </Card>
@@ -314,7 +301,18 @@ export default function Documents() {
             </div>
             <div>
               <p className="text-2xl font-bold">{completedCount}</p>
-              <p className="text-xs text-muted-foreground">已完成</p>
+              <p className="text-xs text-muted-foreground">已取得</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{upcomingDueCount}</p>
+              <p className="text-xs text-muted-foreground">即將到期</p>
             </div>
           </CardContent>
         </Card>
@@ -348,7 +346,7 @@ export default function Documents() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">全部狀態</SelectItem>
-            {docStatusOptions.map(opt => (
+            {derivedStatusOptions.map(opt => (
               <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
             ))}
           </SelectContent>
@@ -371,7 +369,21 @@ export default function Documents() {
               )}
               <SortableTableHead sortKey="projects.project_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('projects.project_name').direction} sortIndex={getSortInfo('projects.project_name').index} onSort={handleSort}>案場</SortableTableHead>
               <SortableTableHead sortKey="doc_type" currentSortKey={sortConfig.key} currentDirection={getSortInfo('doc_type').direction} sortIndex={getSortInfo('doc_type').index} onSort={handleSort}>文件類型</SortableTableHead>
-              <SortableTableHead sortKey="doc_status" currentSortKey={sortConfig.key} currentDirection={getSortInfo('doc_status').direction} sortIndex={getSortInfo('doc_status').index} onSort={handleSort}>狀態</SortableTableHead>
+              <TableHead>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="flex items-center gap-1 cursor-help">
+                        狀態
+                        <Info className="w-3 h-3 text-muted-foreground" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>狀態由送件日 / 核發日自動判斷</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </TableHead>
               <SortableTableHead sortKey="submitted_at" currentSortKey={sortConfig.key} currentDirection={getSortInfo('submitted_at').direction} sortIndex={getSortInfo('submitted_at').index} onSort={handleSort}>送件日</SortableTableHead>
               <SortableTableHead sortKey="issued_at" currentSortKey={sortConfig.key} currentDirection={getSortInfo('issued_at').direction} sortIndex={getSortInfo('issued_at').index} onSort={handleSort}>核發日</SortableTableHead>
               <SortableTableHead sortKey="due_at" currentSortKey={sortConfig.key} currentDirection={getSortInfo('due_at').direction} sortIndex={getSortInfo('due_at').index} onSort={handleSort}>到期日</SortableTableHead>
@@ -422,9 +434,23 @@ export default function Documents() {
                       </div>
                     </TableCell>
                     <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
-                      <Badge className={getDocStatusColor(doc.doc_status)} variant="secondary">
-                        {doc.doc_status}
-                      </Badge>
+                      {(() => {
+                        const derivedStatus = getDerivedDocStatus(doc);
+                        return (
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Badge className={getDerivedDocStatusColor(derivedStatus)} variant="secondary">
+                                  {derivedStatus}
+                                </Badge>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>狀態由送件日 / 核發日自動判斷</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
                       {doc.submitted_at ? format(new Date(doc.submitted_at), 'yyyy/MM/dd') : '-'}
