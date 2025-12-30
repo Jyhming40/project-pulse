@@ -501,11 +501,13 @@ export default function Documents() {
         onOpenChange={setIsBatchUpdateOpen}
         title="批次更新文件"
         selectedCount={batchSelect.selectedCount}
+        selectedItems={batchSelect.selectedItems}
         fields={batchUpdateFields}
         onSubmit={async (values) => {
           await batchUpdateMutation.mutateAsync(values);
         }}
         isLoading={batchUpdateMutation.isPending}
+        getItemLabel={(item) => `${item.doc_type} - ${(item as unknown as { projects?: { project_name?: string } }).projects?.project_name || ''}`}
       />
 
       {/* Batch Delete Dialog */}
