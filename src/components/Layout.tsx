@@ -2,7 +2,6 @@ import { ReactNode, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppSettingsRead } from '@/hooks/useAppSettings';
-import { useTheme } from '@/hooks/useTheme';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
   LayoutDashboard, 
@@ -14,28 +13,56 @@ import {
   LogOut,
   Zap,
   ChevronLeft,
+  ChevronDown,
   BookOpen,
   HardHat,
   Trash2,
   Shield,
   ClipboardList,
-  TrendingUp
+  TrendingUp,
+  AlertTriangle,
+  Database,
+  Activity,
+  FileCheck,
+  Palette,
+  UserCog
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 interface LayoutProps {
   children: ReactNode;
 }
 
-const navItems = [
+// 日常工作模組
+const dailyWorkItems = [
   { to: '/', icon: LayoutDashboard, label: '儀表板' },
   { to: '/projects', icon: Building2, label: '案場管理' },
-  { to: '/investors', icon: Users, label: '投資方' },
-  { to: '/partners', icon: HardHat, label: '外包夥伴' },
-  { to: '/investor-codes', icon: BookOpen, label: '代碼對照表' },
   { to: '/documents', icon: FileText, label: '文件管理' },
+  { to: '/investors', icon: Users, label: '投資方 / 業主' },
+  { to: '/partners', icon: HardHat, label: '外包夥伴 / 工班' },
+];
+
+// 管理與設定模組（Admin only）
+const managementItems = [
+  { to: '/progress-settings', icon: TrendingUp, label: '進度設定' },
+  { to: '/system-options', icon: Settings2, label: 'Codebook 選項' },
+  { to: '/investor-codes', icon: BookOpen, label: '代碼對照表' },
+  { to: '/settings', icon: UserCog, label: '使用者管理' },
+  { to: '/deletion-policies', icon: Shield, label: '刪除政策' },
   { to: '/recycle-bin', icon: Trash2, label: '回收區' },
+  { to: '/branding', icon: Palette, label: '公司設定' },
+];
+
+// 系統治理中心（Admin only, high-risk）
+const systemGovernanceItems = [
+  { to: '/engineering', icon: Activity, label: '系統狀態' },
+  { to: '/audit-logs', icon: ClipboardList, label: '稽核日誌' },
 ];
 
 export default function Layout({ children }: LayoutProps) {
@@ -43,6 +70,16 @@ export default function Layout({ children }: LayoutProps) {
   const { settings } = useAppSettingsRead();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(false);
+  const [managementOpen, setManagementOpen] = useState(false);
+  const [governanceOpen, setGovernanceOpen] = useState(false);
+
+  // Auto-expand section if current route is within it
+  const isInManagement = managementItems.some(item => 
+    location.pathname === item.to || location.pathname.startsWith(item.to + '/')
+  );
+  const isInGovernance = systemGovernanceItems.some(item => 
+    location.pathname === item.to || location.pathname.startsWith(item.to + '/')
+  );
 
   const handleSignOut = async () => {
     await signOut();
@@ -58,9 +95,26 @@ export default function Layout({ children }: LayoutProps) {
     }
   };
 
-  // Get system name from settings or use defaults
   const systemNameMain = settings?.company_name_zh || '明群環能';
   const systemNameSub = settings?.system_name_zh?.replace(systemNameMain, '').trim() || '管理系統';
+
+  const renderNavItem = (item: { to: string; icon: React.ElementType; label: string }) => {
+    const isActive = location.pathname === item.to || 
+      (item.to !== '/' && location.pathname.startsWith(item.to));
+    return (
+      <NavLink
+        key={item.to}
+        to={item.to}
+        className={cn(
+          "sidebar-link",
+          isActive && "sidebar-link-active"
+        )}
+      >
+        <item.icon className="w-5 h-5 flex-shrink-0" />
+        {!collapsed && <span className="animate-fade-in">{item.label}</span>}
+      </NavLink>
+    );
+  };
 
   return (
     <div className="min-h-screen flex w-full bg-background">
@@ -92,76 +146,113 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.to || 
-              (item.to !== '/' && location.pathname.startsWith(item.to));
-            return (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                className={cn(
-                  "sidebar-link",
-                  isActive && "sidebar-link-active"
-                )}
-              >
-                <item.icon className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && <span className="animate-fade-in">{item.label}</span>}
-              </NavLink>
-            );
-          })}
+          {/* Section: 日常工作 */}
+          {!collapsed && (
+            <div className="px-3 py-2">
+              <span className="text-xs font-medium text-sidebar-muted uppercase tracking-wider">日常工作</span>
+            </div>
+          )}
+          {dailyWorkItems.map(renderNavItem)}
 
+          {/* Section: 管理與設定 (Admin only) */}
           {isAdmin && (
             <>
-              <NavLink
-                to="/progress-settings"
-                className={cn(
-                  "sidebar-link",
-                  location.pathname === '/progress-settings' && "sidebar-link-active"
-                )}
-              >
-                <TrendingUp className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && <span className="animate-fade-in">進度設定</span>}
-              </NavLink>
-              <NavLink
-                to="/system-options"
-                className={cn(
-                  "sidebar-link",
-                  location.pathname === '/system-options' && "sidebar-link-active"
-                )}
-              >
-                <Settings2 className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && <span className="animate-fade-in">選項設定</span>}
-              </NavLink>
-              <NavLink
-                to="/deletion-policies"
-                className={cn(
-                  "sidebar-link",
-                  location.pathname === '/deletion-policies' && "sidebar-link-active"
-                )}
-              >
-                <Shield className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && <span className="animate-fade-in">刪除政策</span>}
-              </NavLink>
-              <NavLink
-                to="/audit-logs"
-                className={cn(
-                  "sidebar-link",
-                  location.pathname === '/audit-logs' && "sidebar-link-active"
-                )}
-              >
-                <ClipboardList className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && <span className="animate-fade-in">稽核日誌</span>}
-              </NavLink>
-              <NavLink
-                to="/settings"
-                className={cn(
-                  "sidebar-link",
-                  location.pathname === '/settings' && "sidebar-link-active"
-                )}
-              >
-                <Settings className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && <span className="animate-fade-in">系統設定</span>}
-              </NavLink>
+              {collapsed ? (
+                // Collapsed mode: show items directly
+                <>
+                  <div className="my-3 border-t border-sidebar-border" />
+                  {managementItems.map(renderNavItem)}
+                </>
+              ) : (
+                // Expanded mode: show as collapsible group
+                <Collapsible
+                  open={managementOpen || isInManagement}
+                  onOpenChange={setManagementOpen}
+                  className="mt-4"
+                >
+                  <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 text-xs font-medium text-sidebar-muted uppercase tracking-wider hover:text-sidebar-foreground transition-colors">
+                    <span>管理與設定</span>
+                    <ChevronDown className={cn(
+                      "w-4 h-4 transition-transform",
+                      (managementOpen || isInManagement) && "rotate-180"
+                    )} />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-1">
+                    {managementItems.map(renderNavItem)}
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+            </>
+          )}
+
+          {/* Section: 系統治理中心 (Admin only, high-risk) */}
+          {isAdmin && (
+            <>
+              {collapsed ? (
+                // Collapsed mode: show items with warning color
+                <>
+                  <div className="my-3 border-t border-sidebar-border" />
+                  {systemGovernanceItems.map((item) => {
+                    const isActive = location.pathname === item.to || 
+                      location.pathname.startsWith(item.to);
+                    return (
+                      <NavLink
+                        key={item.to}
+                        to={item.to}
+                        className={cn(
+                          "sidebar-link text-amber-600 dark:text-amber-500",
+                          isActive && "sidebar-link-active"
+                        )}
+                        title={item.label}
+                      >
+                        <item.icon className="w-5 h-5 flex-shrink-0" />
+                      </NavLink>
+                    );
+                  })}
+                </>
+              ) : (
+                // Expanded mode: show as collapsible group with warning
+                <Collapsible
+                  open={governanceOpen || isInGovernance}
+                  onOpenChange={setGovernanceOpen}
+                  className="mt-4"
+                >
+                  <CollapsibleTrigger className="flex items-center justify-between w-full px-3 py-2 text-xs font-medium text-amber-600 dark:text-amber-500 uppercase tracking-wider hover:text-amber-700 dark:hover:text-amber-400 transition-colors">
+                    <span className="flex items-center gap-1.5">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      系統治理中心
+                    </span>
+                    <ChevronDown className={cn(
+                      "w-4 h-4 transition-transform",
+                      (governanceOpen || isInGovernance) && "rotate-180"
+                    )} />
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="space-y-1">
+                    <div className="px-3 py-1.5 mb-1">
+                      <p className="text-[10px] text-amber-600/80 dark:text-amber-500/80 leading-tight">
+                        ⚠️ 此區域包含高風險系統操作，請謹慎使用
+                      </p>
+                    </div>
+                    {systemGovernanceItems.map((item) => {
+                      const isActive = location.pathname === item.to || 
+                        location.pathname.startsWith(item.to);
+                      return (
+                        <NavLink
+                          key={item.to}
+                          to={item.to}
+                          className={cn(
+                            "sidebar-link",
+                            isActive && "sidebar-link-active"
+                          )}
+                        >
+                          <item.icon className="w-5 h-5 flex-shrink-0" />
+                          <span className="animate-fade-in">{item.label}</span>
+                        </NavLink>
+                      );
+                    })}
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
             </>
           )}
         </nav>

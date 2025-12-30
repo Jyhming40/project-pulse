@@ -23,6 +23,7 @@ import AuditLogs from "./pages/AuditLogs";
 import Engineering from "./pages/Engineering";
 import ProgressSettings from "./pages/ProgressSettings";
 import ChangePassword from "./pages/ChangePassword";
+import Branding from "./pages/Branding";
 
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
@@ -37,21 +38,28 @@ const App = () => (
           <Routes>
             <Route path="/auth" element={<Auth />} />
             <Route path="/change-password" element={<ChangePassword />} />
+            
+            {/* 日常工作 */}
             <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
             <Route path="/projects" element={<ProtectedRoute><Layout><Projects /></Layout></ProtectedRoute>} />
             <Route path="/projects/:id" element={<ProtectedRoute><Layout><ProjectDetail /></Layout></ProtectedRoute>} />
-            <Route path="/investors" element={<ProtectedRoute><Layout><Investors /></Layout></ProtectedRoute>} />
-            <Route path="/investor-codes" element={<ProtectedRoute><Layout><InvestorCodeReference /></Layout></ProtectedRoute>} />
-            <Route path="/investor-data" element={<ProtectedRoute><Layout><InvestorDataManagement /></Layout></ProtectedRoute>} />
             <Route path="/documents" element={<ProtectedRoute><Layout><Documents /></Layout></ProtectedRoute>} />
+            <Route path="/investors" element={<ProtectedRoute><Layout><Investors /></Layout></ProtectedRoute>} />
+            <Route path="/investor-data" element={<ProtectedRoute><Layout><InvestorDataManagement /></Layout></ProtectedRoute>} />
             <Route path="/partners" element={<ProtectedRoute><Layout><Partners /></Layout></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute adminOnly><Layout><Settings /></Layout></ProtectedRoute>} />
-            <Route path="/system-options" element={<ProtectedRoute adminOnly><Layout><SystemOptions /></Layout></ProtectedRoute>} />
+            
+            {/* 管理與設定 (Admin) */}
             <Route path="/progress-settings" element={<ProtectedRoute adminOnly><Layout><ProgressSettings /></Layout></ProtectedRoute>} />
-            <Route path="/recycle-bin" element={<ProtectedRoute><RecycleBin /></ProtectedRoute>} />
-            <Route path="/deletion-policies" element={<ProtectedRoute adminOnly><DeletionPolicies /></ProtectedRoute>} />
-            <Route path="/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
-            <Route path="/engineering" element={<ProtectedRoute adminOnly><Engineering /></ProtectedRoute>} />
+            <Route path="/system-options" element={<ProtectedRoute adminOnly><Layout><SystemOptions /></Layout></ProtectedRoute>} />
+            <Route path="/investor-codes" element={<ProtectedRoute adminOnly><Layout><InvestorCodeReference /></Layout></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute adminOnly><Layout><Settings /></Layout></ProtectedRoute>} />
+            <Route path="/deletion-policies" element={<ProtectedRoute adminOnly><Layout><DeletionPolicies /></Layout></ProtectedRoute>} />
+            <Route path="/recycle-bin" element={<ProtectedRoute adminOnly><Layout><RecycleBin /></Layout></ProtectedRoute>} />
+            <Route path="/branding" element={<ProtectedRoute adminOnly><Layout><Branding /></Layout></ProtectedRoute>} />
+            
+            {/* 系統治理中心 (Admin) */}
+            <Route path="/engineering" element={<ProtectedRoute adminOnly><Layout><Engineering /></Layout></ProtectedRoute>} />
+            <Route path="/audit-logs" element={<ProtectedRoute adminOnly><Layout><AuditLogs /></Layout></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
