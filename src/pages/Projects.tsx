@@ -704,8 +704,12 @@ export default function Projects() {
                         {duplicateWarnings.get(project.id)?.hasPotentialDuplicates && (
                           <Badge 
                             variant="outline" 
-                            className="bg-warning/15 text-warning border-warning/30 text-xs px-1.5 py-0 flex items-center gap-1 cursor-help"
-                            title={`疑似重複：${duplicateWarnings.get(project.id)?.reason}`}
+                            className="bg-warning/15 text-warning border-warning/30 text-xs px-1.5 py-0 flex items-center gap-1 cursor-pointer hover:bg-warning/25 transition-colors"
+                            title={`疑似重複：${duplicateWarnings.get(project.id)?.reason}（點擊前往掃描頁面）`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate('/duplicate-scanner');
+                            }}
                           >
                             <AlertTriangle className="w-3 h-3" />
                             疑似重複
