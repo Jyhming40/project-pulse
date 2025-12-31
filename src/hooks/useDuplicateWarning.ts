@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import type { Database } from '@/integrations/supabase/types';
+import { getStoredSettings } from './useDuplicateScannerSettings';
 
 type Project = Database['public']['Tables']['projects']['Row'] & {
   investors?: { company_name: string } | null;
@@ -47,6 +48,9 @@ function stringSimilarity(str1: string | null, str2: string | null): number {
 
 // Check if two projects are potential duplicates (high/medium confidence only)
 function isPotentialDuplicate(project1: Project, project2: Project): { isDuplicate: boolean; reason: string } {
+  // Get configurable settings
+  const settings = getStoredSettings();
+  
   // Skip if same project
   if (project1.id === project2.id) {
     return { isDuplicate: false, reason: '' };
@@ -74,11 +78,11 @@ function isPotentialDuplicate(project1: Project, project2: Project): { isDuplica
   }
   
   // Calculate similarity scores for medium confidence
-  const addressSimilarity = stringSimilarity(project1.address, project2.address);
-  const nameSimilarity = stringSimilarity(project1.project_name, project2.project_name);
+  const addressSimilarity = stringSimilarity(project1.address, project2.address) * 100;
+  const nameSimilarity = stringSimilarity(project1.project_name, project2.project_name) * 100;
   
   // Hard exclusion: both address and name similarity too low
-  if (addressSimilarity < 0.4 && nameSimilarity < 0.4) {
+  if (addressSimilarity < settings.minAddressSimilarity && nameSimilarity < settings.minNameSimilarity) {
     return { isDuplicate: false, reason: '' };
   }
   
@@ -89,23 +93,23 @@ function isPotentialDuplicate(project1: Project, project2: Project): { isDuplica
     return { isDuplicate: false, reason: '' };
   }
   
-  // Hard exclusion: capacity difference > 50%
+  // Hard exclusion: capacity difference > threshold
   const capacity1 = (project1 as any).capacity_kwp;
   const capacity2 = (project2 as any).capacity_kwp;
   if (capacity1 && capacity2) {
     const maxCap = Math.max(capacity1, capacity2);
     const minCap = Math.min(capacity1, capacity2);
-    if (maxCap > 0 && (maxCap - minCap) / maxCap > 0.5) {
+    if (maxCap > 0 && ((maxCap - minCap) / maxCap) * 100 > settings.maxCapacityDifference) {
       return { isDuplicate: false, reason: '' };
     }
   }
   
-  // Medium confidence: address >= 80% OR name >= 75%
-  if (addressSimilarity >= 0.8) {
-    return { isDuplicate: true, reason: `地址相似度 ${Math.round(addressSimilarity * 100)}%` };
+  // Medium confidence: address >= threshold OR name >= threshold
+  if (addressSimilarity >= settings.mediumAddressThreshold) {
+    return { isDuplicate: true, reason: `地址相似度 ${Math.round(addressSimilarity)}%` };
   }
-  if (nameSimilarity >= 0.75) {
-    return { isDuplicate: true, reason: `名稱相似度 ${Math.round(nameSimilarity * 100)}%` };
+  if (nameSimilarity >= settings.mediumNameThreshold) {
+    return { isDuplicate: true, reason: `名稱相似度 ${Math.round(nameSimilarity)}%` };
   }
   
   return { isDuplicate: false, reason: '' };
