@@ -124,9 +124,26 @@ export default function Documents() {
       doc.doc_type.toLowerCase().includes(search.toLowerCase());
     
     const matchesType = typeFilter === 'all' || doc.doc_type === typeFilter;
-    // Use derived status for filtering
-    const derivedStatus = getDerivedDocStatus(doc);
-    const matchesStatus = statusFilter === 'all' || derivedStatus === statusFilter;
+    
+    // Handle status filter including 'upcoming' for expiring soon
+    let matchesStatus = true;
+    if (statusFilter === 'all') {
+      matchesStatus = true;
+    } else if (statusFilter === 'upcoming') {
+      // Filter for documents due within 14 days
+      if (!doc.due_at) {
+        matchesStatus = false;
+      } else {
+        const dueDate = new Date(doc.due_at);
+        const today = new Date();
+        const in14Days = subDays(new Date(), -14);
+        matchesStatus = isWithinInterval(dueDate, { start: today, end: in14Days });
+      }
+    } else {
+      // Use derived status for filtering
+      const derivedStatus = getDerivedDocStatus(doc);
+      matchesStatus = derivedStatus === statusFilter;
+    }
     
     return matchesSearch && matchesType && matchesStatus;
   });
@@ -270,9 +287,12 @@ export default function Documents() {
         )}
       </div>
 
-      {/* Stats */}
+      {/* Stats - clickable cards for filtering */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === '未開始' ? 'ring-2 ring-primary' : ''}`}
+          onClick={() => setStatusFilter(statusFilter === '未開始' ? 'all' : '未開始')}
+        >
           <CardContent className="p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center">
               <XCircle className="w-5 h-5 text-muted-foreground" />
@@ -283,7 +303,10 @@ export default function Documents() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === '已開始' ? 'ring-2 ring-primary' : ''}`}
+          onClick={() => setStatusFilter(statusFilter === '已開始' ? 'all' : '已開始')}
+        >
           <CardContent className="p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-info/10 flex items-center justify-center">
               <Clock className="w-5 h-5 text-info" />
@@ -294,7 +317,10 @@ export default function Documents() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === '已取得' ? 'ring-2 ring-primary' : ''}`}
+          onClick={() => setStatusFilter(statusFilter === '已取得' ? 'all' : '已取得')}
+        >
           <CardContent className="p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-success/10 flex items-center justify-center">
               <CheckCircle2 className="w-5 h-5 text-success" />
@@ -305,7 +331,10 @@ export default function Documents() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className={`cursor-pointer transition-all hover:shadow-md ${statusFilter === 'upcoming' ? 'ring-2 ring-primary' : ''}`}
+          onClick={() => setStatusFilter(statusFilter === 'upcoming' ? 'all' : 'upcoming')}
+        >
           <CardContent className="p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-destructive/10 flex items-center justify-center">
               <AlertTriangle className="w-5 h-5 text-destructive" />
