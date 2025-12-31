@@ -183,6 +183,7 @@ export function DataEnrichmentPanel({
     construction_status: false,
     installation_type: false,
     grid_connection_type: false,
+    city: false,
     milestones: false,
   });
 
@@ -190,6 +191,7 @@ export function DataEnrichmentPanel({
   const [constructionStatus, setConstructionStatus] = useState<string>('');
   const [installationType, setInstallationType] = useState<string>('');
   const [gridConnectionType, setGridConnectionType] = useState<string>('');
+  const [city, setCity] = useState<string>('');
   const [selectedMilestones, setSelectedMilestones] = useState<Set<string>>(new Set());
   
   const [showConfirm, setShowConfirm] = useState(false);
@@ -225,6 +227,10 @@ export function DataEnrichmentPanel({
   );
   const gridConnectionTypeOptions = useMemo(() => 
     systemOptions.filter(opt => opt.category === 'grid_connection_type').map(opt => opt.value), 
+    [systemOptions]
+  );
+  const cityOptions = useMemo(() => 
+    systemOptions.filter(opt => opt.category === 'city').map(opt => opt.value), 
     [systemOptions]
   );
 
@@ -273,6 +279,7 @@ export function DataEnrichmentPanel({
     if (enabledFields.construction_status && constructionStatus) fields.push('施工狀態');
     if (enabledFields.installation_type && installationType) fields.push('裝置類型');
     if (enabledFields.grid_connection_type && gridConnectionType) fields.push('併網類型');
+    if (enabledFields.city && city) fields.push('縣市');
     if (enabledFields.milestones && selectedMilestones.size > 0) fields.push('里程碑完成度');
     return fields;
   };
@@ -298,6 +305,10 @@ export function DataEnrichmentPanel({
       
       if (enabledFields.grid_connection_type && gridConnectionType) {
         updates.grid_connection_type = gridConnectionType;
+      }
+
+      if (enabledFields.city && city) {
+        updates.city = city;
       }
 
       // Fetch old progress data BEFORE any updates
@@ -733,7 +744,36 @@ export function DataEnrichmentPanel({
               )}
             </div>
 
-            {/* Note about progress percentage */}
+            <Separator />
+
+            {/* City (縣市) */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="enable-city"
+                  checked={enabledFields.city}
+                  onCheckedChange={() => toggleField('city')}
+                />
+                <Label htmlFor="enable-city" className="font-medium cursor-pointer">
+                  縣市
+                </Label>
+              </div>
+              {enabledFields.city && (
+                <Select value={city} onValueChange={setCity}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇縣市" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cityOptions.map(c => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
             <div className="pt-2 text-xs text-muted-foreground bg-muted/50 p-3 rounded-md">
               <p className="font-medium mb-1">📊 關於進度百分比</p>
               <p>整體進度、行政進度、工程進度百分比由系統根據里程碑完成狀態自動計算，無法手動設定。</p>
