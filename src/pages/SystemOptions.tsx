@@ -228,15 +228,23 @@ export default function SystemOptions() {
   const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
 
-    if (over && active.id !== over.id) {
-      const oldIndex = filteredOptions.findIndex((opt) => opt.id === active.id);
-      const newIndex = filteredOptions.findIndex((opt) => opt.id === over.id);
-
-      const newOrder = arrayMove(filteredOptions, oldIndex, newIndex);
-      const orderedIds = newOrder.map((opt) => opt.id);
-      
-      await reorderOptions.mutateAsync(orderedIds);
+    // Only process if we have a valid drop target and the position actually changed
+    if (!over || active.id === over.id) {
+      return;
     }
+
+    const oldIndex = filteredOptions.findIndex((opt) => opt.id === active.id);
+    const newIndex = filteredOptions.findIndex((opt) => opt.id === over.id);
+
+    // Double-check that indices are valid and different
+    if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) {
+      return;
+    }
+
+    const newOrder = arrayMove(filteredOptions, oldIndex, newIndex);
+    const orderedIds = newOrder.map((opt) => opt.id);
+    
+    await reorderOptions.mutateAsync(orderedIds);
   };
 
   const handleOpenCreate = () => {
