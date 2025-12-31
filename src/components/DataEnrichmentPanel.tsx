@@ -1,7 +1,6 @@
 import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { Constants } from '@/integrations/supabase/types';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -168,17 +167,7 @@ interface DataEnrichmentPanelProps {
   onSuccess: () => void;
 }
 
-// Project status options from database enum (案場狀態)
-const PROJECT_STATUS_OPTIONS = Constants.public.Enums.project_status;
-
-// Construction status options from database enum (施工狀態)
-const CONSTRUCTION_STATUS_OPTIONS = Constants.public.Enums.construction_status;
-
-// Installation type options from database enum (裝置類型)
-const INSTALLATION_TYPE_OPTIONS = Constants.public.Enums.installation_type;
-
-// Grid connection type options from database enum (併網類型)
-const GRID_CONNECTION_TYPE_OPTIONS = Constants.public.Enums.grid_connection_type;
+// We'll fetch dynamic options from system_options table instead of using static Constants
 
 export function DataEnrichmentPanel({
   selectedIds,
@@ -206,6 +195,38 @@ export function DataEnrichmentPanel({
   const [showConfirm, setShowConfirm] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [updateResults, setUpdateResults] = useState<ProgressUpdateResult[]>([]);
+
+  // Fetch dynamic options from system_options table
+  const { data: systemOptions = [] } = useQuery({
+    queryKey: ['system-options-for-enrichment'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('system_options')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Filter options by category
+  const projectStatusOptions = useMemo(() => 
+    systemOptions.filter(opt => opt.category === 'project_status').map(opt => opt.value), 
+    [systemOptions]
+  );
+  const constructionStatusOptions = useMemo(() => 
+    systemOptions.filter(opt => opt.category === 'construction_status').map(opt => opt.value), 
+    [systemOptions]
+  );
+  const installationTypeOptions = useMemo(() => 
+    systemOptions.filter(opt => opt.category === 'installation_type').map(opt => opt.value), 
+    [systemOptions]
+  );
+  const gridConnectionTypeOptions = useMemo(() => 
+    systemOptions.filter(opt => opt.category === 'grid_connection_type').map(opt => opt.value), 
+    [systemOptions]
+  );
 
   // Fetch available milestones
   const { data: milestones = [] } = useQuery({
@@ -449,7 +470,7 @@ export function DataEnrichmentPanel({
                     <SelectValue placeholder="選擇案場狀態" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PROJECT_STATUS_OPTIONS.map(status => (
+                    {projectStatusOptions.map(status => (
                       <SelectItem key={status} value={status}>
                         {status}
                       </SelectItem>
@@ -479,7 +500,7 @@ export function DataEnrichmentPanel({
                     <SelectValue placeholder="選擇施工狀態" />
                   </SelectTrigger>
                   <SelectContent>
-                    {CONSTRUCTION_STATUS_OPTIONS.map(status => (
+                    {constructionStatusOptions.map(status => (
                       <SelectItem key={status} value={status}>
                         {status}
                       </SelectItem>
@@ -571,7 +592,7 @@ export function DataEnrichmentPanel({
                     <SelectValue placeholder="選擇裝置類型" />
                   </SelectTrigger>
                   <SelectContent>
-                    {INSTALLATION_TYPE_OPTIONS.map(type => (
+                    {installationTypeOptions.map(type => (
                       <SelectItem key={type} value={type}>
                         {type}
                       </SelectItem>
@@ -601,7 +622,7 @@ export function DataEnrichmentPanel({
                     <SelectValue placeholder="選擇併網類型" />
                   </SelectTrigger>
                   <SelectContent>
-                    {GRID_CONNECTION_TYPE_OPTIONS.map(type => (
+                    {gridConnectionTypeOptions.map(type => (
                       <SelectItem key={type} value={type}>
                         {type}
                       </SelectItem>
