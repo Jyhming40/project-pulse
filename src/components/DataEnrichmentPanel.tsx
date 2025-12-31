@@ -544,17 +544,15 @@ export function DataEnrichmentPanel({
               </div>
               {enabledFields.milestones && (
                 <div className="space-y-4 pl-6">
-                  {/* Select All / Deselect All */}
+                  {/* Global Select All / Deselect All */}
                   <div className="flex items-center gap-2 pb-2 border-b border-border">
                     <Checkbox
                       id="milestone-select-all"
                       checked={milestones.length > 0 && selectedMilestones.size === milestones.length}
                       onCheckedChange={(checked) => {
                         if (checked) {
-                          // Select all
                           setSelectedMilestones(new Set(milestones.map(m => m.milestone_code)));
                         } else {
-                          // Deselect all
                           setSelectedMilestones(new Set());
                         }
                       }}
@@ -563,7 +561,7 @@ export function DataEnrichmentPanel({
                       htmlFor="milestone-select-all" 
                       className="text-sm cursor-pointer font-medium"
                     >
-                      {selectedMilestones.size === milestones.length ? '全取消' : '全選'}
+                      {selectedMilestones.size === milestones.length ? '全部取消' : '全部選取'}
                       {selectedMilestones.size > 0 && selectedMilestones.size < milestones.length && 
                         ` (已選 ${selectedMilestones.size}/${milestones.length})`
                       }
@@ -571,7 +569,37 @@ export function DataEnrichmentPanel({
                   </div>
                   {/* Admin Milestones */}
                   <div>
-                    <p className="text-xs text-muted-foreground mb-2">行政里程碑</p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-muted-foreground">行政里程碑</p>
+                      <button
+                        type="button"
+                        className="text-xs text-primary hover:underline"
+                        onClick={() => {
+                          const adminCodes = adminMilestones.map(m => m.milestone_code);
+                          const allAdminSelected = adminCodes.every(code => selectedMilestones.has(code));
+                          if (allAdminSelected) {
+                            // Deselect all admin
+                            setSelectedMilestones(prev => {
+                              const next = new Set(prev);
+                              adminCodes.forEach(code => next.delete(code));
+                              return next;
+                            });
+                          } else {
+                            // Select all admin
+                            setSelectedMilestones(prev => {
+                              const next = new Set(prev);
+                              adminCodes.forEach(code => next.add(code));
+                              return next;
+                            });
+                          }
+                        }}
+                      >
+                        {adminMilestones.length > 0 && adminMilestones.every(m => selectedMilestones.has(m.milestone_code)) 
+                          ? '取消全選' 
+                          : '全選'
+                        }
+                      </button>
+                    </div>
                     <div className="space-y-2">
                       {adminMilestones.map(m => (
                         <div key={m.id} className="flex items-center gap-2">
@@ -592,7 +620,37 @@ export function DataEnrichmentPanel({
                   </div>
                   {/* Engineering Milestones */}
                   <div>
-                    <p className="text-xs text-muted-foreground mb-2">工程里程碑</p>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-muted-foreground">工程里程碑</p>
+                      <button
+                        type="button"
+                        className="text-xs text-primary hover:underline"
+                        onClick={() => {
+                          const engCodes = engineeringMilestones.map(m => m.milestone_code);
+                          const allEngSelected = engCodes.every(code => selectedMilestones.has(code));
+                          if (allEngSelected) {
+                            // Deselect all engineering
+                            setSelectedMilestones(prev => {
+                              const next = new Set(prev);
+                              engCodes.forEach(code => next.delete(code));
+                              return next;
+                            });
+                          } else {
+                            // Select all engineering
+                            setSelectedMilestones(prev => {
+                              const next = new Set(prev);
+                              engCodes.forEach(code => next.add(code));
+                              return next;
+                            });
+                          }
+                        }}
+                      >
+                        {engineeringMilestones.length > 0 && engineeringMilestones.every(m => selectedMilestones.has(m.milestone_code)) 
+                          ? '取消全選' 
+                          : '全選'
+                        }
+                      </button>
+                    </div>
                     <div className="space-y-2">
                       {engineeringMilestones.map(m => (
                         <div key={m.id} className="flex items-center gap-2">
