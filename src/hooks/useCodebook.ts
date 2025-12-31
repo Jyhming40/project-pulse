@@ -211,21 +211,44 @@ export function useCodebook(category?: CodebookCategory) {
     },
   });
 
-  // Reorder options
+  // Reorder options - only update items that actually changed
   const reorderOptions = useMutation({
     mutationFn: async (orderedIds: string[]) => {
-      const updates = orderedIds.map((id, index) => 
-        supabase
-          .from('system_options')
-          .update({ sort_order: index + 1 })
-          .eq('id', id)
-      );
+      // Get current options to check what actually needs updating
+      const currentOptions = options.filter(opt => orderedIds.includes(opt.id));
       
-      await Promise.all(updates);
+      // Build a map of id -> current sort_order
+      const currentSortMap = new Map(currentOptions.map(opt => [opt.id, opt.sort_order]));
+      
+      // Collect items that need updating
+      const itemsToUpdate: { id: string; newSortOrder: number }[] = [];
+      orderedIds.forEach((id, index) => {
+        const newSortOrder = index + 1;
+        const currentSortOrder = currentSortMap.get(id);
+        
+        // Only update if sort_order actually changed
+        if (currentSortOrder !== newSortOrder) {
+          itemsToUpdate.push({ id, newSortOrder });
+        }
+      });
+      
+      // Execute updates
+      if (itemsToUpdate.length > 0) {
+        for (const item of itemsToUpdate) {
+          await supabase
+            .from('system_options')
+            .update({ sort_order: item.newSortOrder })
+            .eq('id', item.id);
+        }
+      }
+      
+      return itemsToUpdate.length; // Return count of updated items
     },
-    onSuccess: () => {
+    onSuccess: (updatedCount) => {
       queryClient.invalidateQueries({ queryKey: ['codebook-options'] });
-      toast.success('順序已更新');
+      if (updatedCount > 0) {
+        toast.success('順序已更新');
+      }
     },
     onError: (error: Error) => {
       toast.error('更新順序失敗: ' + error.message);
