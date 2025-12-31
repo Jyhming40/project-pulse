@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { getStoredSettings, DuplicateScannerSettings } from './useDuplicateScannerSettings';
 
 export type ConfidenceLevel = 'high' | 'medium' | 'low';
 export type ReviewDecision = 'dismiss' | 'confirm' | 'merged';
@@ -316,19 +317,27 @@ export function useDuplicateScanner() {
           }
         }
 
+        // Get configurable settings
+        const settings = getStoredSettings();
+
         // ======= HARD EXCLUSIONS (A, B rules) =======
-        // Rule 1: If BOTH address_similarity < 40 AND name_similarity < 40 → EXCLUDE
-        if (addressSimilarity < 40 && nameSimilarity < 40) {
+        // Rule 1: If BOTH address_similarity < threshold AND name_similarity < threshold → EXCLUDE
+        if (addressSimilarity < settings.minAddressSimilarity && nameSimilarity < settings.minNameSimilarity) {
           continue;
         }
 
-        // Rule 2: Capacity difference > 50% → EXCLUDE
-        if (capacityDiff > 50) {
+        // Rule 2: Capacity difference > threshold → EXCLUDE
+        if (capacityDiff > settings.maxCapacityDifference) {
           continue;
         }
 
         // Rule 3: Different township → EXCLUDE
         if (!sameTownship) {
+          continue;
+        }
+
+        // Rule 4: Address token overlap too low → EXCLUDE (unless high confidence match)
+        if (addressTokenOverlap * 100 < settings.minAddressTokenOverlap && !sameSiteCode && !sameInvestorYearSeq) {
           continue;
         }
 
@@ -372,10 +381,10 @@ export function useDuplicateScanner() {
         }
 
         // --- MEDIUM CONFIDENCE CHECKS (D rules) ---
-        // Must satisfy at least one PRIMARY condition: address_similarity >= 80 OR name_similarity >= 75
+        // Must satisfy at least one PRIMARY condition: address_similarity >= threshold OR name_similarity >= threshold
         if (!confidenceLevel) {
-          const hasAddressPrimary = addressSimilarity >= 80;
-          const hasNamePrimary = nameSimilarity >= 75;
+          const hasAddressPrimary = addressSimilarity >= settings.mediumAddressThreshold;
+          const hasNamePrimary = nameSimilarity >= settings.mediumNameThreshold;
           const hasPrimaryCondition = hasAddressPrimary || hasNamePrimary;
           
           if (hasPrimaryCondition) {
@@ -431,12 +440,12 @@ export function useDuplicateScanner() {
             unmatchedCriteria.push({ 
               name: '地址相似度', 
               matched: false, 
-              value: `${Math.round(addressSimilarity)}% (需≥80%)`
+              value: `${Math.round(addressSimilarity)}% (需≥${settings.mediumAddressThreshold}%)`
             });
             unmatchedCriteria.push({ 
               name: '名稱相似度', 
               matched: false, 
-              value: `${Math.round(nameSimilarity)}% (需≥75%)`
+              value: `${Math.round(nameSimilarity)}% (需≥${settings.mediumNameThreshold}%)`
             });
             
             confidenceLevel = 'low';
@@ -451,14 +460,14 @@ export function useDuplicateScanner() {
           if (capacityDiff > 15 && !matchedCriteria.some(c => c.name === '容量接近')) {
             unmatchedCriteria.push({ name: '容量接近', matched: false, value: `差距 ${capacityDiff.toFixed(1)}%` });
           }
-          if (addressSimilarity < 80 && !matchedCriteria.some(c => c.name === '地址高度相似') && !unmatchedCriteria.some(c => c.name === '地址相似度')) {
+          if (addressSimilarity < settings.mediumAddressThreshold && !matchedCriteria.some(c => c.name === '地址高度相似') && !unmatchedCriteria.some(c => c.name === '地址相似度')) {
             unmatchedCriteria.push({ 
               name: '地址相似度', 
               matched: false, 
               value: `${Math.round(addressSimilarity)}%`
             });
           }
-          if (nameSimilarity < 75 && !matchedCriteria.some(c => c.name === '名稱高度相似') && !unmatchedCriteria.some(c => c.name === '名稱相似度')) {
+          if (nameSimilarity < settings.mediumNameThreshold && !matchedCriteria.some(c => c.name === '名稱高度相似') && !unmatchedCriteria.some(c => c.name === '名稱相似度')) {
             unmatchedCriteria.push({ 
               name: '名稱相似度', 
               matched: false, 

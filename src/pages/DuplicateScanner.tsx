@@ -1,5 +1,7 @@
 import { useState, useMemo } from 'react';
 import { useDuplicateScanner, DuplicateGroup, ConfidenceLevel, ProjectForComparison } from '@/hooks/useDuplicateScanner';
+import { useDuplicateScannerSettings } from '@/hooks/useDuplicateScannerSettings';
+import { DuplicateScannerSettingsPanel } from '@/components/DuplicateScannerSettings';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -65,6 +67,8 @@ export default function DuplicateScanner() {
     isConfirming,
     isMerging
   } = useDuplicateScanner();
+  
+  const { settings } = useDuplicateScannerSettings();
 
   const [hasScanned, setHasScanned] = useState(false);
   const [duplicateGroups, setDuplicateGroups] = useState<DuplicateGroup[]>([]);
@@ -186,19 +190,28 @@ export default function DuplicateScanner() {
             掃描並比對可能重複的案場資料，協助資料治理
           </p>
         </div>
-        <Button onClick={handleScan} disabled={isLoading}>
-          {hasScanned ? (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2" />
-              重新掃描
-            </>
-          ) : (
-            <>
-              <Search className="w-4 h-4 mr-2" />
-              開始掃描
-            </>
-          )}
-        </Button>
+        <div className="flex items-center gap-2">
+          <DuplicateScannerSettingsPanel onSettingsChange={() => {
+            // Clear current results when settings change
+            if (hasScanned) {
+              setDuplicateGroups([]);
+              setHasScanned(false);
+            }
+          }} />
+          <Button onClick={handleScan} disabled={isLoading}>
+            {hasScanned ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2" />
+                重新掃描
+              </>
+            ) : (
+              <>
+                <Search className="w-4 h-4 mr-2" />
+                開始掃描
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
       {/* Info Alert */}
