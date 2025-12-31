@@ -436,7 +436,7 @@ export function DataEnrichmentPanel({
       <div className="h-full flex flex-col bg-warning/5 border-l border-warning/20">
         {/* Header */}
         <div className="p-4 border-b border-warning/20 bg-warning/10">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="font-semibold text-foreground">資料補齊面板</h3>
               <p className="text-sm text-muted-foreground mt-1">
@@ -447,6 +447,24 @@ export function DataEnrichmentPanel({
               <X className="w-4 h-4" />
             </Button>
           </div>
+          {/* Apply button moved to header for better accessibility */}
+          <Button
+            onClick={handleApply}
+            disabled={selectedCount === 0 || updateMutation.isPending}
+            className="w-full"
+          >
+            {updateMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                更新中...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                套用到選取案場
+              </>
+            )}
+          </Button>
         </div>
 
         {/* Content */}
@@ -526,6 +544,31 @@ export function DataEnrichmentPanel({
               </div>
               {enabledFields.milestones && (
                 <div className="space-y-4 pl-6">
+                  {/* Select All / Deselect All */}
+                  <div className="flex items-center gap-2 pb-2 border-b border-border">
+                    <Checkbox
+                      id="milestone-select-all"
+                      checked={milestones.length > 0 && selectedMilestones.size === milestones.length}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          // Select all
+                          setSelectedMilestones(new Set(milestones.map(m => m.milestone_code)));
+                        } else {
+                          // Deselect all
+                          setSelectedMilestones(new Set());
+                        }
+                      }}
+                    />
+                    <Label 
+                      htmlFor="milestone-select-all" 
+                      className="text-sm cursor-pointer font-medium"
+                    >
+                      {selectedMilestones.size === milestones.length ? '全取消' : '全選'}
+                      {selectedMilestones.size > 0 && selectedMilestones.size < milestones.length && 
+                        ` (已選 ${selectedMilestones.size}/${milestones.length})`
+                      }
+                    </Label>
+                  </div>
                   {/* Admin Milestones */}
                   <div>
                     <p className="text-xs text-muted-foreground mb-2">行政里程碑</p>
@@ -639,27 +682,6 @@ export function DataEnrichmentPanel({
             </div>
           </div>
         </ScrollArea>
-
-        {/* Footer */}
-        <div className="p-4 border-t border-warning/20 bg-card">
-          <Button
-            onClick={handleApply}
-            disabled={selectedCount === 0 || updateMutation.isPending}
-            className="w-full"
-          >
-            {updateMutation.isPending ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                更新中...
-              </>
-            ) : (
-              <>
-                <CheckCircle2 className="w-4 h-4 mr-2" />
-                套用到選取案場
-              </>
-            )}
-          </Button>
-        </div>
       </div>
 
       {/* Confirmation Dialog */}
