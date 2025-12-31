@@ -9,7 +9,7 @@ import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
 import { useBatchSelect } from '@/hooks/useBatchSelect';
-import { useDuplicateWarnings } from '@/hooks/useDuplicateWarning';
+
 import { CodebookSelect } from '@/components/CodebookSelect';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
@@ -34,8 +34,7 @@ import {
   FileUp,
   ClipboardEdit,
   Database as DatabaseIcon,
-  ExternalLink,
-  AlertTriangle
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -339,8 +338,6 @@ export default function Projects() {
   // Batch selection
   const batchSelect = useBatchSelect(pagination.paginatedData);
   
-  // Duplicate warnings detection
-  const duplicateWarnings = useDuplicateWarnings(projects);
 
   // Batch update mutation with audit logging
   const batchUpdateMutation = useMutation({
@@ -698,25 +695,7 @@ export default function Projects() {
                       </TableCell>
                     )}
                     <TableCell className="font-mono text-sm">{(project as any).site_code_display || project.project_code}</TableCell>
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <span>{project.project_name}</span>
-                        {duplicateWarnings.get(project.id)?.hasPotentialDuplicates && (
-                          <Badge 
-                            variant="outline" 
-                            className="bg-warning/15 text-warning border-warning/30 text-xs px-1.5 py-0 flex items-center gap-1 cursor-pointer hover:bg-warning/25 transition-colors"
-                            title={`疑似重複：${duplicateWarnings.get(project.id)?.reason}（點擊前往掃描頁面）`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate('/duplicate-scanner');
-                            }}
-                          >
-                            <AlertTriangle className="w-3 h-3" />
-                            疑似重複
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
+                    <TableCell className="font-medium">{project.project_name}</TableCell>
                     <TableCell>{(project.investors as any)?.company_name || '-'}</TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(project.status)} variant="secondary">
