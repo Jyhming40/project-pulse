@@ -20,6 +20,7 @@ import {
   DangerZonePanel,
   AuditLogsPanel,
   DeletionPolicyPanel,
+  SchemaExportPanel,
 } from '@/components/engineering';
 
 export default function Engineering() {
@@ -115,8 +116,9 @@ export default function Engineering() {
           </TabsList>
 
           {/* Tab Contents */}
-          <TabsContent value="health" className="mt-6">
+          <TabsContent value="health" className="mt-6 space-y-6">
             <SystemHealthPanel />
+            <SchemaExportPanel />
           </TabsContent>
 
 
