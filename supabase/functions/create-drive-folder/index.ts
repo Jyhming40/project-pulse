@@ -6,15 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Sub-folder template
-const SUBFOLDER_TEMPLATE = [
-  '01_合約與往來文件',
-  '02_圖說與簽證',
-  '03_送審與函文',
-  '04_施工與照片',
-  '05_竣工與掛表',
-  '06_維運保養',
-  '99_其他',
+// Default sub-folder template matching user's existing structure
+const DEFAULT_SUBFOLDER_TEMPLATE = [
+  { code: 'RELATED', folder: '00-相關資料' },
+  { code: 'SYSTEM_DIAGRAM', folder: '01-系統圖' },
+  { code: 'TPC', folder: '02-台電' },
+  { code: 'ENERGY_BUREAU', folder: '03-能源局' },
+  { code: 'BUILDING_AUTH', folder: '04-建管單位' },
+  { code: 'COMPLETION_MANUAL', folder: '05-完工手冊' },
+  { code: 'SITE_PHOTO', folder: '06-現勘照片' },
+  { code: 'CONSTRUCTION_PHOTO', folder: '07-施工照片' },
+  { code: 'GREEN_PERMISSION', folder: '08-綠能容許' },
+  { code: 'OFFICIAL_DOC', folder: '09-公文回函' },
+  { code: 'HANDOVER', folder: '業務部轉交工程部資料' },
 ];
 
 // Sanitize folder name - remove illegal characters for Google Drive
@@ -60,6 +64,11 @@ interface DriveToken {
   google_email: string | null;
 }
 
+interface SubfolderConfig {
+  code: string;
+  folder: string;
+}
+
 // Fetch user's Google email using userinfo API
 async function fetchGoogleEmail(accessToken: string): Promise<string | null> {
   try {
@@ -92,7 +101,7 @@ async function getValidAccessToken(
     .single();
 
   if (tokenError || !data) {
-    throw new Error('NEED_AUTH'); // Special error to indicate user needs to authorize
+    throw new Error('NEED_AUTH');
   }
 
   const tokenData = data as unknown as DriveToken;
@@ -105,12 +114,10 @@ async function getValidAccessToken(
   let accessToken = tokenData.access_token;
 
   if (expiresAt.getTime() - now.getTime() <= bufferMs) {
-    // Token expired, refresh it
     console.log('Token expired, refreshing...');
     const { accessToken: newToken, expiresIn } = await refreshAccessToken(tokenData.refresh_token);
     accessToken = newToken;
     
-    // Update token in database
     const newExpiresAt = new Date(Date.now() + expiresIn * 1000);
     await supabase
       .from('user_drive_tokens')
@@ -122,7 +129,6 @@ async function getValidAccessToken(
       .eq('user_id', userId);
   }
 
-  // Fetch email if not stored
   let googleEmail = tokenData.google_email;
   if (!googleEmail) {
     googleEmail = await fetchGoogleEmail(accessToken);
@@ -135,6 +141,59 @@ async function getValidAccessToken(
   }
 
   return { accessToken, googleEmail };
+}
+
+// Get Drive settings from system_options or use defaults
+async function getDriveSettings(supabaseUrl: string, supabaseServiceKey: string): Promise<{
+  namingPattern: string;
+  subfolders: SubfolderConfig[];
+}> {
+  try {
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    
+    const { data: settings } = await supabase
+      .from('system_options')
+      .select('value, label')
+      .eq('category', 'drive_settings')
+      .eq('is_active', true);
+
+    if (settings && settings.length > 0) {
+      const settingsMap: Record<string, string> = {};
+      for (const s of settings) {
+        settingsMap[s.value] = s.label;
+      }
+
+      // Check for custom naming pattern
+      const namingPattern = settingsMap['naming_pattern'] || '{project_code}_{project_name}';
+      
+      // Check for custom subfolders (stored as JSON in label)
+      let subfolders = DEFAULT_SUBFOLDER_TEMPLATE;
+      if (settingsMap['subfolders']) {
+        try {
+          subfolders = JSON.parse(settingsMap['subfolders']);
+        } catch {
+          console.log('Failed to parse subfolders, using defaults');
+        }
+      }
+
+      return { namingPattern, subfolders };
+    }
+  } catch (err) {
+    console.log('Failed to fetch drive settings, using defaults:', err);
+  }
+  
+  return {
+    namingPattern: '{project_code}_{project_name}',
+    subfolders: DEFAULT_SUBFOLDER_TEMPLATE,
+  };
+}
+
+// Generate folder name from pattern
+function generateFolderName(pattern: string, project: { project_code: string; project_name: string }): string {
+  let name = pattern
+    .replace('{project_code}', project.project_code || '')
+    .replace('{project_name}', project.project_name || '');
+  return sanitizeFolderName(name);
 }
 
 // Create a folder in Google Drive with full Shared Drive support
@@ -152,7 +211,6 @@ async function createFolder(
     metadata.parents = [parentId];
   }
 
-  // Full Shared Drive support parameters
   const params = new URLSearchParams({
     fields: 'id,webViewLink',
     supportsAllDrives: 'true',
@@ -208,13 +266,11 @@ async function verifyRootFolderAccess(accessToken: string, folderId: string): Pr
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Extract userId from JWT token instead of request body
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
@@ -227,7 +283,6 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Verify the JWT and get the user
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
@@ -241,7 +296,6 @@ serve(async (req) => {
 
     const userId = user.id;
 
-    // Authorization check: Only admin and staff can create drive folders
     const { data: userRole } = await supabase
       .from('user_roles')
       .select('role')
@@ -255,7 +309,6 @@ serve(async (req) => {
       );
     }
 
-    // Get projectId from request body (safe - we've verified the user)
     const { projectId } = await req.json();
 
     if (!projectId) {
@@ -276,7 +329,6 @@ serve(async (req) => {
 
     console.log('Creating Drive folder for project:', projectId, 'by user:', userId);
 
-    // Fetch project info
     const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('id, project_code, project_name, drive_folder_id')
@@ -291,19 +343,19 @@ serve(async (req) => {
       );
     }
 
-    // If folder already exists, return it
+    // Idempotent: If folder already exists, return it
     if (project.drive_folder_id) {
       console.log('Folder already exists:', project.drive_folder_id);
       return new Response(
         JSON.stringify({ 
           message: '資料夾已存在',
-          folderId: project.drive_folder_id 
+          folderId: project.drive_folder_id,
+          skipped: true,
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Get access token for user
     let accessToken: string;
     let googleEmail: string | null;
     try {
@@ -323,13 +375,11 @@ serve(async (req) => {
 
     console.log('Using Google account:', googleEmail);
 
-    // Verify root folder access first
     const rootAccess = await verifyRootFolderAccess(accessToken, rootFolderId);
     if (!rootAccess.success) {
       const errorMsg = `無法存取根資料夾。請確認授權帳號 (${googleEmail || 'Unknown'}) 對 Shared Drive 具有 Content Manager 或以上權限。錯誤: ${rootAccess.error}`;
       console.error(errorMsg);
       
-      // Update project with error
       await supabase
         .from('projects')
         .update({
@@ -348,17 +398,25 @@ serve(async (req) => {
       );
     }
 
+    // Get drive settings
+    const driveSettings = await getDriveSettings(supabaseUrl, supabaseServiceKey);
+    console.log('Drive settings:', JSON.stringify(driveSettings));
+
     // Create main project folder
-    const folderName = sanitizeFolderName(`${project.project_code}_${project.project_name}`);
+    const folderName = generateFolderName(driveSettings.namingPattern, project);
     console.log('Creating main folder:', folderName);
     
     const mainFolder = await createFolder(accessToken, folderName, rootFolderId);
     console.log('Main folder created:', mainFolder.id);
 
     // Create subfolders
-    for (const subfolderName of SUBFOLDER_TEMPLATE) {
-      await createFolder(accessToken, subfolderName, mainFolder.id);
+    const createdSubfolders: Record<string, string> = {};
+    for (const subfolder of driveSettings.subfolders) {
+      const result = await createFolder(accessToken, subfolder.folder, mainFolder.id);
+      createdSubfolders[subfolder.code] = result.id;
     }
+
+    const now = new Date().toISOString();
 
     // Update project with folder info
     const { error: updateError } = await supabase
@@ -376,6 +434,24 @@ serve(async (req) => {
       throw new Error('資料夾建立成功，但更新資料庫失敗');
     }
 
+    // Log audit action
+    try {
+      await supabase.from('audit_logs').insert({
+        action: 'CREATE' as const,
+        record_id: projectId,
+        table_name: 'projects',
+        actor_user_id: userId,
+        new_data: {
+          action_type: 'CREATE_DRIVE_FOLDER',
+          drive_folder_id: mainFolder.id,
+          drive_folder_url: mainFolder.webViewLink,
+          subfolders: createdSubfolders,
+        },
+      });
+    } catch (auditErr) {
+      console.error('Failed to log audit:', auditErr);
+    }
+
     console.log('Project folder created successfully');
 
     return new Response(
@@ -384,6 +460,7 @@ serve(async (req) => {
         folderId: mainFolder.id,
         folderUrl: mainFolder.webViewLink,
         googleEmail,
+        subfolders: createdSubfolders,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
