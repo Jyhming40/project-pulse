@@ -9,6 +9,7 @@ import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
 import { useBatchSelect } from '@/hooks/useBatchSelect';
+import { useDriveAuth } from '@/hooks/useDriveAuth';
 
 import { CodebookSelect } from '@/components/CodebookSelect';
 import { TablePagination } from '@/components/ui/table-pagination';
@@ -19,6 +20,7 @@ import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ProjectDetailDrawer } from '@/components/ProjectDetailDrawer';
 import { DataEnrichmentPanel } from '@/components/DataEnrichmentPanel';
+import { BatchDriveFolderPanel } from '@/components/BatchDriveFolderPanel';
 import { 
   Plus, 
   Search, 
@@ -34,7 +36,8 @@ import {
   FileUp,
   ClipboardEdit,
   Database as DatabaseIcon,
-  ExternalLink
+  ExternalLink,
+  FolderPlus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -182,6 +185,12 @@ export default function Projects() {
   
   // Data Enrichment Mode (Admin only)
   const [isEnrichmentMode, setIsEnrichmentMode] = useState(false);
+  
+  // Batch Drive Folder Dialog
+  const [isBatchDriveFolderOpen, setIsBatchDriveFolderOpen] = useState(false);
+  
+  // Drive auth check
+  const { isAuthorized: isDriveConnected } = useDriveAuth();
   
   // Soft delete hook
   const { softDelete, isDeleting } = useSoftDelete({
@@ -1196,6 +1205,12 @@ export default function Projects() {
               icon: BatchActionIcons.edit,
               onClick: () => setIsBatchUpdateOpen(true),
             },
+            ...(isDriveConnected ? [{
+              key: 'drive',
+              label: '建立 Drive 資料夾',
+              icon: <FolderPlus className="w-4 h-4" />,
+              onClick: () => setIsBatchDriveFolderOpen(true),
+            }] : []),
             ...(isAdmin ? [{
               key: 'delete',
               label: '批次刪除',
@@ -1234,6 +1249,26 @@ export default function Projects() {
         }}
         isLoading={batchDeleteMutation.isPending}
       />
+
+      {/* Batch Drive Folder Dialog */}
+      <Dialog open={isBatchDriveFolderOpen} onOpenChange={setIsBatchDriveFolderOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>批次建立 Google Drive 資料夾</DialogTitle>
+            <DialogDescription>
+              為選取的案場建立 Google Drive 資料夾與子資料夾結構
+            </DialogDescription>
+          </DialogHeader>
+          <BatchDriveFolderPanel
+            selectedProjectIds={Array.from(batchSelect.selectedIds)}
+            onComplete={() => {
+              queryClient.invalidateQueries({ queryKey: ['projects'] });
+              batchSelect.deselectAll();
+              setIsBatchDriveFolderOpen(false);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Project Detail Drawer */}
       <ProjectDetailDrawer
