@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,6 +9,7 @@ import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
 import { useBatchSelect } from '@/hooks/useBatchSelect';
+import { useProjectFieldConfig, useProjectCustomFields } from '@/hooks/useProjectFieldConfig';
 
 import { CodebookSelect } from '@/components/CodebookSelect';
 import { TablePagination } from '@/components/ui/table-pagination';
@@ -19,6 +20,7 @@ import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ProjectDetailDrawer } from '@/components/ProjectDetailDrawer';
 import { DataEnrichmentPanel } from '@/components/DataEnrichmentPanel';
+import { ProjectDynamicTable } from '@/components/ProjectDynamicTable';
 import { 
   Plus, 
   Search, 
@@ -138,6 +140,9 @@ export default function Projects() {
   const { options: powerVoltageOptions } = useOptionsForCategory('power_voltage');
   const { options: poleStatusOptions } = useOptionsForCategory('pole_status');
   
+  // Dynamic field configuration
+  const { visibleFields, isLoading: isFieldConfigLoading } = useProjectFieldConfig();
+  const { activeCustomFields } = useProjectCustomFields();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [cityFilter, setCityFilter] = useState<string>('all');
@@ -628,164 +633,50 @@ export default function Projects() {
         </Select>
       </div>
 
-      {/* Table */}
-      <div className="border rounded-lg bg-card overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              {(canEditProjects || isEnrichmentMode) && (
-                <TableHead className="w-12">
-                  <Checkbox
-                    checked={batchSelect.isAllSelected}
-                    onCheckedChange={() => batchSelect.toggleAll()}
-                    aria-label="全選"
-                  />
-                </TableHead>
-              )}
-              <SortableTableHead sortKey="site_code_display" currentSortKey={sortConfig.key} currentDirection={getSortInfo('site_code_display').direction} sortIndex={getSortInfo('site_code_display').index} onSort={handleSort}>案場編號</SortableTableHead>
-              <SortableTableHead sortKey="project_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('project_name').direction} sortIndex={getSortInfo('project_name').index} onSort={handleSort}>案場名稱</SortableTableHead>
-              <SortableTableHead sortKey="investors.company_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investors.company_name').direction} sortIndex={getSortInfo('investors.company_name').index} onSort={handleSort}>投資方</SortableTableHead>
-              <SortableTableHead sortKey="status" currentSortKey={sortConfig.key} currentDirection={getSortInfo('status').direction} sortIndex={getSortInfo('status').index} onSort={handleSort}>狀態</SortableTableHead>
-              <SortableTableHead sortKey="overall_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('overall_progress').direction} sortIndex={getSortInfo('overall_progress').index} onSort={handleSort}>總進度</SortableTableHead>
-              <SortableTableHead sortKey="admin_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('admin_progress').direction} sortIndex={getSortInfo('admin_progress').index} onSort={handleSort}>行政</SortableTableHead>
-              <SortableTableHead sortKey="engineering_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('engineering_progress').direction} sortIndex={getSortInfo('engineering_progress').index} onSort={handleSort}>工程</SortableTableHead>
-              <SortableTableHead sortKey="construction_status" currentSortKey={sortConfig.key} currentDirection={getSortInfo('construction_status').direction} sortIndex={getSortInfo('construction_status').index} onSort={handleSort}>施工狀態</SortableTableHead>
-              <SortableTableHead sortKey="capacity_kwp" currentSortKey={sortConfig.key} currentDirection={getSortInfo('capacity_kwp').direction} sortIndex={getSortInfo('capacity_kwp').index} onSort={handleSort}>容量 (kWp)</SortableTableHead>
-              <SortableTableHead sortKey="city" currentSortKey={sortConfig.key} currentDirection={getSortInfo('city').direction} sortIndex={getSortInfo('city').index} onSort={handleSort}>縣市</SortableTableHead>
-              <TableHead className="w-[50px]"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sortedProjects.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={(canEditProjects || isEnrichmentMode) ? 12 : 11} className="text-center py-12 text-muted-foreground">
-                  {isLoading ? '載入中...' : '暫無資料'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              pagination.paginatedData.map(project => {
-                // In enrichment mode: clicking row toggles selection
-                // In normal mode: clicking row opens drawer
-                const handleRowClick = () => {
-                  if (isEnrichmentMode) {
-                    batchSelect.toggle(project.id);
-                  } else {
-                    setDrawerProjectId(project.id);
-                    setIsDrawerOpen(true);
-                  }
-                };
-                
-                return (
-                  <TableRow 
-                    key={project.id} 
-                    className={`cursor-pointer hover:bg-muted/50 ${
-                      isEnrichmentMode && batchSelect.isSelected(project.id) 
-                        ? 'bg-warning/10 hover:bg-warning/15' 
-                        : ''
-                    }`}
-                    onClick={handleRowClick}
-                  >
-                    {(canEditProjects || isEnrichmentMode) && (
-                      <TableCell onClick={(e) => e.stopPropagation()}>
-                        <Checkbox
-                          checked={batchSelect.isSelected(project.id)}
-                          onCheckedChange={() => batchSelect.toggle(project.id)}
-                          aria-label={`選取 ${project.project_name}`}
-                        />
-                      </TableCell>
-                    )}
-                    <TableCell className="font-mono text-sm">{(project as any).site_code_display || project.project_code}</TableCell>
-                    <TableCell className="font-medium">{project.project_name}</TableCell>
-                    <TableCell>{(project.investors as any)?.company_name || '-'}</TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(project.status)} variant="secondary">
-                        {project.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                          <div 
-                            className="h-full bg-primary rounded-full transition-all"
-                            style={{ width: `${(project as any).overall_progress || 0}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-muted-foreground w-8">{Math.round((project as any).overall_progress || 0)}%</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs">{Math.round((project as any).admin_progress || 0)}%</span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-xs">{Math.round((project as any).engineering_progress || 0)}%</span>
-                    </TableCell>
-                    <TableCell>
-                      {(project as any).construction_status ? (
-                        <Badge className={getConstructionStatusColor((project as any).construction_status)} variant="secondary">
-                          {(project as any).construction_status}
-                        </Badge>
-                      ) : '-'}
-                    </TableCell>
-                    <TableCell>{project.capacity_kwp || '-'}</TableCell>
-                    <TableCell>{project.city || '-'}</TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => {
-                            setDrawerProjectId(project.id);
-                            setIsDrawerOpen(true);
-                          }}>
-                            <Eye className="w-4 h-4 mr-2" />
-                            快速檢視
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}`)}>
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            完整頁面
-                          </DropdownMenuItem>
-                          {canEdit && (
-                            <DropdownMenuItem onClick={() => openEditDialog(project)}>
-                              <Edit className="w-4 h-4 mr-2" />
-                              編輯
-                            </DropdownMenuItem>
-                          )}
-                          {isAdmin && (
-                            <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={() => setDeletingProject(project)}
-                            >
-                              <Trash2 className="w-4 h-4 mr-2" />
-                              刪除
-                            </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                );
-              })
-            )}
-          </TableBody>
-        </Table>
-        <TablePagination
-          currentPage={pagination.currentPage}
-          totalPages={pagination.totalPages}
-          totalItems={pagination.totalItems}
-          pageSize={pagination.pageSize}
-          pageSizeOptions={pagination.pageSizeOptions}
-          startIndex={pagination.startIndex}
-          endIndex={pagination.endIndex}
-          hasNextPage={pagination.hasNextPage}
-          hasPreviousPage={pagination.hasPreviousPage}
-          onPageChange={pagination.goToPage}
-          onPageSizeChange={pagination.changePageSize}
-          getPageNumbers={pagination.getPageNumbers}
-        />
-      </div>
+      {/* Dynamic Table */}
+      <ProjectDynamicTable
+        projects={pagination.paginatedData}
+        visibleFields={visibleFields}
+        activeCustomFields={activeCustomFields}
+        sortConfig={sortConfig}
+        getSortInfo={getSortInfo}
+        handleSort={handleSort}
+        batchSelect={batchSelect}
+        canEditProjects={canEditProjects}
+        isEnrichmentMode={isEnrichmentMode}
+        isLoading={isLoading || isFieldConfigLoading}
+        onRowClick={(project) => {
+          if (isEnrichmentMode) {
+            batchSelect.toggle(project.id);
+          } else {
+            setDrawerProjectId(project.id);
+            setIsDrawerOpen(true);
+          }
+        }}
+        onViewProject={(project) => {
+          setDrawerProjectId(project.id);
+          setIsDrawerOpen(true);
+        }}
+        onEditProject={(project) => openEditDialog(project)}
+        onDeleteProject={(project) => setDeletingProject(project)}
+        onNavigateToProject={(projectId) => navigate(`/projects/${projectId}`)}
+        canEdit={canEdit}
+        isAdmin={isAdmin}
+      />
+      <TablePagination
+        currentPage={pagination.currentPage}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.totalItems}
+        pageSize={pagination.pageSize}
+        pageSizeOptions={pagination.pageSizeOptions}
+        startIndex={pagination.startIndex}
+        endIndex={pagination.endIndex}
+        hasNextPage={pagination.hasNextPage}
+        hasPreviousPage={pagination.hasPreviousPage}
+        onPageChange={pagination.goToPage}
+        onPageSizeChange={pagination.changePageSize}
+        getPageNumbers={pagination.getPageNumbers}
+      />
 
       {/* Create/Edit Dialog */}
       <Dialog 
