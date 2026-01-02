@@ -24,6 +24,7 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DriveConnectionPanel } from '@/components/engineering';
+import { DriveSettingsPanel } from '@/components/DriveSettingsPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -167,7 +168,10 @@ export default function Integrations() {
             <FolderOpen className="w-5 h-5" />
             雲端儲存整合
           </h2>
-          <DriveConnectionPanel />
+          <div className="grid gap-4 lg:grid-cols-2">
+            <DriveConnectionPanel />
+            <DriveSettingsPanel />
+          </div>
         </section>
 
         <Separator />
