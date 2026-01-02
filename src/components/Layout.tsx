@@ -27,8 +27,7 @@ import {
   Link2,
   FolderOpen,
   Copy,
-  Briefcase,
-  TableProperties
+  Briefcase
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -82,7 +81,6 @@ const systemSettingsItems = [
   // 系統設定
   { to: '/progress-settings', icon: TrendingUp, label: '進度設定', adminOnly: true },
   { to: '/system-options', icon: Settings2, label: 'Codebook', adminOnly: true },
-  { to: '/project-field-settings', icon: TableProperties, label: '案場欄位設定', adminOnly: true },
   { to: '/branding', icon: Palette, label: '公司設定', adminOnly: true },
   // 外部整合
   { to: '/integrations', icon: Link2, label: '外部整合', adminOnly: true },
