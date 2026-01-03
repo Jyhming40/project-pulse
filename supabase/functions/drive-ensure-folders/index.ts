@@ -398,11 +398,10 @@ serve(async (req) => {
       );
     }
 
-    // Get root folder ID from system_options first, fallback to env
-    let rootFolderId = Deno.env.get('GOOGLE_DRIVE_ROOT_FOLDER_ID');
+    // Get root folder ID from system_options (REQUIRED - no fallback)
+    console.log('Fetching root folder ID from system_options...');
     
-    // Try to get from system_options
-    const { data: rootSetting } = await supabase
+    const { data: rootSetting, error: rootError } = await supabase
       .from('system_options')
       .select('label')
       .eq('category', 'drive_settings')
@@ -410,13 +409,17 @@ serve(async (req) => {
       .eq('is_active', true)
       .single();
     
-    if (rootSetting?.label) {
-      rootFolderId = rootSetting.label;
-    }
+    console.log('Root setting query result:', { rootSetting, rootError });
+    
+    const rootFolderId = rootSetting?.label;
     
     if (!rootFolderId) {
+      console.error('Root folder ID not configured in system_options');
       return new Response(
-        JSON.stringify({ error: '未設定 Google Drive 根資料夾 ID (MQ-Documents)，請先在整合設定中設定根資料夾' }),
+        JSON.stringify({ 
+          error: '未設定 Google Drive 根資料夾 (MQ-Documents)。請先到「整合設定」→「Drive 資料夾設定」中設定根資料夾 ID。',
+          code: 'ROOT_FOLDER_NOT_CONFIGURED'
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
