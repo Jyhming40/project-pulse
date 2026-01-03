@@ -37,7 +37,11 @@ import {
   ClipboardEdit,
   Database as DatabaseIcon,
   ExternalLink,
-  FolderPlus
+  FolderPlus,
+  FolderCheck,
+  FolderX,
+  FolderClock,
+  HardDrive
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -659,6 +663,7 @@ export default function Projects() {
               <SortableTableHead sortKey="admin_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('admin_progress').direction} sortIndex={getSortInfo('admin_progress').index} onSort={handleSort}>行政</SortableTableHead>
               <SortableTableHead sortKey="engineering_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('engineering_progress').direction} sortIndex={getSortInfo('engineering_progress').index} onSort={handleSort}>工程</SortableTableHead>
               <SortableTableHead sortKey="construction_status" currentSortKey={sortConfig.key} currentDirection={getSortInfo('construction_status').direction} sortIndex={getSortInfo('construction_status').index} onSort={handleSort}>施工狀態</SortableTableHead>
+              <SortableTableHead sortKey="folder_status" currentSortKey={sortConfig.key} currentDirection={getSortInfo('folder_status').direction} sortIndex={getSortInfo('folder_status').index} onSort={handleSort}>Drive</SortableTableHead>
               <SortableTableHead sortKey="capacity_kwp" currentSortKey={sortConfig.key} currentDirection={getSortInfo('capacity_kwp').direction} sortIndex={getSortInfo('capacity_kwp').index} onSort={handleSort}>容量 (kWp)</SortableTableHead>
               <SortableTableHead sortKey="city" currentSortKey={sortConfig.key} currentDirection={getSortInfo('city').direction} sortIndex={getSortInfo('city').index} onSort={handleSort}>縣市</SortableTableHead>
               <TableHead className="w-[50px]"></TableHead>
@@ -667,7 +672,7 @@ export default function Projects() {
           <TableBody>
             {sortedProjects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={(canEditProjects || isEnrichmentMode) ? 12 : 11} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={(canEditProjects || isEnrichmentMode) ? 13 : 12} className="text-center py-12 text-muted-foreground">
                   {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
@@ -734,6 +739,35 @@ export default function Projects() {
                           {(project as any).construction_status}
                         </Badge>
                       ) : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {(() => {
+                        const folderStatus = (project as any).folder_status;
+                        const hasFolderId = !!(project as any).drive_folder_id;
+                        
+                        if (folderStatus === 'created' && hasFolderId) {
+                          return (
+                            <Badge variant="outline" className="text-green-600 border-green-300 bg-green-50 dark:bg-green-950/30">
+                              <FolderCheck className="w-3 h-3 mr-1" />
+                              已建立
+                            </Badge>
+                          );
+                        } else if (folderStatus === 'failed') {
+                          return (
+                            <Badge variant="outline" className="text-destructive border-destructive/30 bg-destructive/10">
+                              <FolderX className="w-3 h-3 mr-1" />
+                              錯誤
+                            </Badge>
+                          );
+                        } else {
+                          return (
+                            <Badge variant="outline" className="text-muted-foreground">
+                              <FolderClock className="w-3 h-3 mr-1" />
+                              待建立
+                            </Badge>
+                          );
+                        }
+                      })()}
                     </TableCell>
                     <TableCell>{project.capacity_kwp || '-'}</TableCell>
                     <TableCell>{project.city || '-'}</TableCell>
@@ -1207,8 +1241,8 @@ export default function Projects() {
             },
             ...(isDriveConnected ? [{
               key: 'drive',
-              label: '建立 Drive 資料夾',
-              icon: <FolderPlus className="w-4 h-4" />,
+              label: '管理 Drive 資料夾',
+              icon: <HardDrive className="w-4 h-4" />,
               onClick: () => setIsBatchDriveFolderOpen(true),
             }] : []),
             ...(isAdmin ? [{
@@ -1252,19 +1286,11 @@ export default function Projects() {
 
       {/* Batch Drive Folder Dialog */}
       <Dialog open={isBatchDriveFolderOpen} onOpenChange={setIsBatchDriveFolderOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>批次建立 Google Drive 資料夾</DialogTitle>
-            <DialogDescription>
-              為選取的案場建立 Google Drive 資料夾與子資料夾結構
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-xl">
           <BatchDriveFolderPanel
             selectedProjectIds={Array.from(batchSelect.selectedIds)}
             onComplete={() => {
               queryClient.invalidateQueries({ queryKey: ['projects'] });
-              batchSelect.deselectAll();
-              setIsBatchDriveFolderOpen(false);
             }}
           />
         </DialogContent>
