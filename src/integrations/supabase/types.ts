@@ -263,16 +263,23 @@ export type Database = {
           deleted_by: string | null
           doc_status: string
           doc_type: string
+          drive_file_id: string | null
+          drive_parent_folder_id: string | null
+          drive_path: string | null
+          drive_web_view_link: string | null
           due_at: string | null
           id: string
           is_archived: boolean | null
+          is_current: boolean | null
           is_deleted: boolean | null
           issued_at: string | null
           note: string | null
           owner_user_id: string | null
           project_id: string
           submitted_at: string | null
+          title: string | null
           updated_at: string
+          version: number | null
         }
         Insert: {
           archive_reason?: string | null
@@ -285,16 +292,23 @@ export type Database = {
           deleted_by?: string | null
           doc_status?: string
           doc_type: string
+          drive_file_id?: string | null
+          drive_parent_folder_id?: string | null
+          drive_path?: string | null
+          drive_web_view_link?: string | null
           due_at?: string | null
           id?: string
           is_archived?: boolean | null
+          is_current?: boolean | null
           is_deleted?: boolean | null
           issued_at?: string | null
           note?: string | null
           owner_user_id?: string | null
           project_id: string
           submitted_at?: string | null
+          title?: string | null
           updated_at?: string
+          version?: number | null
         }
         Update: {
           archive_reason?: string | null
@@ -307,16 +321,23 @@ export type Database = {
           deleted_by?: string | null
           doc_status?: string
           doc_type?: string
+          drive_file_id?: string | null
+          drive_parent_folder_id?: string | null
+          drive_path?: string | null
+          drive_web_view_link?: string | null
           due_at?: string | null
           id?: string
           is_archived?: boolean | null
+          is_current?: boolean | null
           is_deleted?: boolean | null
           issued_at?: string | null
           note?: string | null
           owner_user_id?: string | null
           project_id?: string
           submitted_at?: string | null
+          title?: string | null
           updated_at?: string
+          version?: number | null
         }
         Relationships: [
           {
@@ -1407,6 +1428,7 @@ export type Database = {
           id: string
           installation_type: string | null
           intake_year: number | null
+          investor_drive_folder_id: string | null
           investor_id: string | null
           is_archived: boolean | null
           is_deleted: boolean | null
@@ -1458,6 +1480,7 @@ export type Database = {
           id?: string
           installation_type?: string | null
           intake_year?: number | null
+          investor_drive_folder_id?: string | null
           investor_id?: string | null
           is_archived?: boolean | null
           is_deleted?: boolean | null
@@ -1509,6 +1532,7 @@ export type Database = {
           id?: string
           installation_type?: string | null
           intake_year?: number | null
+          investor_drive_folder_id?: string | null
           investor_id?: string | null
           is_archived?: boolean | null
           is_deleted?: boolean | null

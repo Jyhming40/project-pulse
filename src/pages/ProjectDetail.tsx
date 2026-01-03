@@ -341,7 +341,7 @@ export default function ProjectDetail() {
     },
   });
 
-  // Create Drive folder handler
+  // Create Drive folder handler - unified to use drive-ensure-folders with investor classification
   const handleCreateDriveFolder = async () => {
     if (!id || !user) return;
     
@@ -357,7 +357,8 @@ export default function ProjectDetail() {
     
     setIsCreatingFolder(true);
     try {
-      const { data, error } = await supabase.functions.invoke('create-drive-folder', {
+      // Use drive-ensure-folders for proper investor classification structure
+      const { data, error } = await supabase.functions.invoke('drive-ensure-folders', {
         body: { projectId: id },
       });
       
@@ -372,9 +373,13 @@ export default function ProjectDetail() {
         }
         return;
       }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
       
       queryClient.invalidateQueries({ queryKey: ['project', id] });
-      toast.success('Google Drive 資料夾已建立');
+      toast.success('Google Drive 資料夾結構已建立');
     } catch (err) {
       const error = err as Error;
       toast.error('建立資料夾失敗', { description: error.message });
