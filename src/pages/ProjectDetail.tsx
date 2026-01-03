@@ -77,6 +77,7 @@ import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 import ProjectConstructionAssignments from '@/components/ProjectConstructionAssignments';
 import { ProjectMilestones } from '@/components/ProjectMilestones';
+import { ProjectDocumentsTab } from '@/components/ProjectDocumentsTab';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 type DocType = Database['public']['Enums']['doc_type'];
@@ -948,68 +949,22 @@ export default function ProjectDetail() {
         </TabsContent>
 
         {/* ========================================== */}
-        {/* 關聯文件 Tab - 文件列表 */}
+        {/* 關聯文件 Tab - 文件列表 (with Drive integration) */}
         {/* ========================================== */}
         <TabsContent value="documents" className="mt-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="w-5 h-5 text-primary" />
-                關聯文件列表
-              </CardTitle>
-              {canEdit && (
-                <Button size="sm" onClick={() => setIsAddDocOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  新增文件
-                </Button>
-              )}
-            </CardHeader>
-            <CardContent>
-              {documents.length === 0 ? (
-                <p className="text-center py-8 text-muted-foreground">暫無文件</p>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>文件類型</TableHead>
-                      <TableHead>狀態</TableHead>
-                      <TableHead>送件日</TableHead>
-                      <TableHead>核發日</TableHead>
-                      <TableHead>到期日</TableHead>
-                      <TableHead>負責人</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {documents.map(doc => {
-                      const derivedStatus = getDerivedDocStatus(doc);
-                      return (
-                      <TableRow key={doc.id}>
-                        <TableCell className="font-medium">{doc.doc_type}</TableCell>
-                        <TableCell>
-                          <Badge className={getDerivedDocStatusColor(derivedStatus)} variant="secondary">
-                            {derivedStatus}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          {doc.submitted_at ? format(new Date(doc.submitted_at), 'yyyy/MM/dd') : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {doc.issued_at ? format(new Date(doc.issued_at), 'yyyy/MM/dd') : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {doc.due_at ? format(new Date(doc.due_at), 'yyyy/MM/dd') : '-'}
-                        </TableCell>
-                        <TableCell>
-                          {(doc.owner as any)?.full_name || '-'}
-                        </TableCell>
-                      </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
+          <ProjectDocumentsTab 
+            projectId={id!} 
+            project={{
+              id: project.id,
+              project_code: project.project_code,
+              project_name: project.project_name,
+              drive_folder_id: (project as any).drive_folder_id,
+              drive_folder_url: (project as any).drive_folder_url,
+              folder_status: (project as any).folder_status,
+              folder_error: (project as any).folder_error,
+              investor_id: project.investor_id,
+            }}
+          />
         </TabsContent>
       </Tabs>
 

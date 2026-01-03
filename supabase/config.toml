@@ -12,6 +12,12 @@ verify_jwt = true
 [functions.drive-test-connection]
 verify_jwt = true
 
+[functions.drive-ensure-folders]
+verify_jwt = true
+
+[functions.drive-upload-file]
+verify_jwt = true
+
 [functions.create-project-with-seq]
 verify_jwt = true
 

@@ -24,7 +24,7 @@ export const DEFAULT_SUBFOLDERS: SubfolderConfig[] = [
   { code: 'CONSTRUCTION_PHOTO', folder: '07-施工照片' },
   { code: 'GREEN_PERMISSION', folder: '08-綠能容許' },
   { code: 'OFFICIAL_DOC', folder: '09-公文回函' },
-  { code: 'HANDOVER', folder: '業務部轉交工程部資料' },
+  { code: 'HANDOVER', folder: '10-業務轉工程' },
 ];
 
 export function useDriveSettings() {
