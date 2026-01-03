@@ -1,5 +1,8 @@
 project_id = "mcvgtsoheayabjpdplcr"
 
+[functions.drive-find-root-folder]
+verify_jwt = false
+
 [functions.create-drive-folder]
 verify_jwt = true
 
