@@ -180,6 +180,69 @@ async function findFolderByName(
   return null;
 }
 
+// Get folder info including parents
+async function getFolderInfo(
+  accessToken: string,
+  folderId: string
+): Promise<{ id: string; name: string; parents: string[]; webViewLink: string } | null> {
+  const params = new URLSearchParams({
+    fields: 'id,name,parents,webViewLink',
+    supportsAllDrives: 'true',
+  });
+
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${folderId}?${params.toString()}`,
+    {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    }
+  );
+
+  if (!response.ok) {
+    console.error('Get folder info failed:', await response.text());
+    return null;
+  }
+
+  return response.json();
+}
+
+// Move folder to new parent
+async function moveFolder(
+  accessToken: string,
+  folderId: string,
+  newParentId: string,
+  oldParentId: string
+): Promise<{ id: string; webViewLink: string }> {
+  const params = new URLSearchParams({
+    addParents: newParentId,
+    removeParents: oldParentId,
+    fields: 'id,webViewLink',
+    supportsAllDrives: 'true',
+  });
+
+  console.log(`Moving folder ${folderId} from ${oldParentId} to ${newParentId}`);
+
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${folderId}?${params.toString()}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('Move folder failed:', errorText);
+    throw new Error(`移動資料夾失敗: ${errorText}`);
+  }
+
+  const result = await response.json();
+  console.log('Folder moved successfully');
+  return { id: result.id, webViewLink: result.webViewLink };
+}
+
 // Create a folder in Google Drive (idempotent - checks if exists first)
 async function ensureFolder(
   accessToken: string,
@@ -228,6 +291,58 @@ async function ensureFolder(
   const result = await response.json();
   console.log('Folder created:', result.id);
   return { id: result.id, webViewLink: result.webViewLink, created: true };
+}
+
+// Ensure project folder is in correct parent (investor folder), move if necessary
+async function ensureProjectFolderInCorrectParent(
+  accessToken: string,
+  existingFolderId: string,
+  expectedParentId: string
+): Promise<{ id: string; webViewLink: string; moved: boolean }> {
+  const folderInfo = await getFolderInfo(accessToken, existingFolderId);
+  
+  if (!folderInfo) {
+    throw new Error('無法取得現有資料夾資訊');
+  }
+
+  const currentParents = folderInfo.parents || [];
+  
+  // Check if folder is already in correct parent
+  if (currentParents.includes(expectedParentId)) {
+    console.log('Folder already in correct parent');
+    return { id: folderInfo.id, webViewLink: folderInfo.webViewLink, moved: false };
+  }
+
+  // Move folder to correct parent
+  if (currentParents.length > 0) {
+    const result = await moveFolder(accessToken, existingFolderId, expectedParentId, currentParents[0]);
+    return { ...result, moved: true };
+  }
+
+  // No parent found, add new parent
+  const params = new URLSearchParams({
+    addParents: expectedParentId,
+    fields: 'id,webViewLink',
+    supportsAllDrives: 'true',
+  });
+
+  const response = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${existingFolderId}?${params.toString()}`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('無法設定資料夾父層');
+  }
+
+  const result = await response.json();
+  return { id: result.id, webViewLink: result.webViewLink, moved: true };
 }
 
 serve(async (req) => {
@@ -343,9 +458,36 @@ serve(async (req) => {
     const investorFolder = await ensureFolder(accessToken, investorFolderName, rootFolderId);
     console.log('Investor folder:', investorFolder.id);
 
-    // Step 2: Ensure Project folder under Investor folder
+    // Step 2: Handle Project folder - check if existing folder needs to be moved
     const projectFolderName = sanitizeFolderName(`${project.project_code} ${project.project_name}`);
-    const projectFolder = await ensureFolder(accessToken, projectFolderName, investorFolder.id);
+    let projectFolder: { id: string; webViewLink: string };
+    let folderMoved = false;
+
+    if (project.drive_folder_id) {
+      // Existing folder - check if it's in the correct parent (investor folder)
+      console.log('Existing project folder found, checking parent...');
+      try {
+        const result = await ensureProjectFolderInCorrectParent(
+          accessToken,
+          project.drive_folder_id,
+          investorFolder.id
+        );
+        projectFolder = { id: result.id, webViewLink: result.webViewLink };
+        folderMoved = result.moved;
+        if (folderMoved) {
+          console.log('Project folder moved to correct investor parent');
+        }
+      } catch (moveErr) {
+        console.error('Failed to move existing folder, creating new one:', moveErr);
+        // If move fails, create new folder under investor
+        const newFolder = await ensureFolder(accessToken, projectFolderName, investorFolder.id);
+        projectFolder = { id: newFolder.id, webViewLink: newFolder.webViewLink };
+      }
+    } else {
+      // No existing folder - create new one under investor folder
+      const newFolder = await ensureFolder(accessToken, projectFolderName, investorFolder.id);
+      projectFolder = { id: newFolder.id, webViewLink: newFolder.webViewLink };
+    }
     console.log('Project folder:', projectFolder.id);
 
     // Step 3: Get subfolder config and ensure all subfolders exist
@@ -383,7 +525,10 @@ serve(async (req) => {
       new_data: {
         action_type: 'FOLDER_ENSURE',
         investor_folder_id: investorFolder.id,
+        investor_folder_name: investorFolderName,
         project_folder_id: projectFolder.id,
+        project_folder_name: projectFolderName,
+        folder_moved: folderMoved,
         child_folders: childFolders,
       },
     });
