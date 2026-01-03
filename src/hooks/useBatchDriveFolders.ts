@@ -76,7 +76,8 @@ export function useBatchDriveFolders() {
       }));
 
       try {
-        const { data, error } = await supabase.functions.invoke('create-drive-folder', {
+        // Use drive-ensure-folders for proper investor classification structure
+        const { data, error } = await supabase.functions.invoke('drive-ensure-folders', {
           body: { projectId },
         });
 
