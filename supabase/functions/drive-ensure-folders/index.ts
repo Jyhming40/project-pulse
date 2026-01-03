@@ -205,6 +205,42 @@ async function getFolderInfo(
   return response.json();
 }
 
+// Check if a folder exists in Google Drive
+async function checkFolderExists(
+  accessToken: string,
+  folderId: string
+): Promise<{ exists: boolean; trashed: boolean }> {
+  const params = new URLSearchParams({
+    fields: 'id,trashed',
+    supportsAllDrives: 'true',
+  });
+
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${folderId}?${params.toString()}`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (response.status === 404) {
+      console.log(`Folder ${folderId} not found (404)`);
+      return { exists: false, trashed: false };
+    }
+
+    if (!response.ok) {
+      console.error('Check folder exists failed:', await response.text());
+      return { exists: false, trashed: false };
+    }
+
+    const data = await response.json();
+    return { exists: true, trashed: data.trashed === true };
+  } catch (err) {
+    console.error('Check folder exists error:', err);
+    return { exists: false, trashed: false };
+  }
+}
+
 // Move folder to new parent
 async function moveFolder(
   accessToken: string,
@@ -482,26 +518,57 @@ serve(async (req) => {
     const projectFolderName = sanitizeFolderName(`${project.project_code} ${project.project_name}`);
     let projectFolder: { id: string; webViewLink: string };
     let folderMoved = false;
+    let folderRecreated = false;
 
     if (project.drive_folder_id) {
-      // Existing folder - check if it's in the correct parent (investor folder)
-      console.log('Existing project folder found, checking parent...');
-      try {
-        const result = await ensureProjectFolderInCorrectParent(
-          accessToken,
-          project.drive_folder_id,
-          investorFolder.id
-        );
-        projectFolder = { id: result.id, webViewLink: result.webViewLink };
-        folderMoved = result.moved;
-        if (folderMoved) {
-          console.log('Project folder moved to correct investor parent');
-        }
-      } catch (moveErr) {
-        console.error('Failed to move existing folder, creating new one:', moveErr);
-        // If move fails, create new folder under investor
+      // Check if the folder still exists in Google Drive
+      console.log('Checking if existing folder still exists:', project.drive_folder_id);
+      const folderCheck = await checkFolderExists(accessToken, project.drive_folder_id);
+      
+      if (!folderCheck.exists || folderCheck.trashed) {
+        // Folder was deleted externally - clear database records and recreate
+        console.log('Folder was deleted externally or trashed, clearing records and recreating...');
+        
+        // Log audit for external deletion
+        await supabase.from('audit_logs').insert({
+          action: 'UPDATE' as const,
+          record_id: projectId,
+          table_name: 'projects',
+          actor_user_id: userId,
+          old_data: {
+            drive_folder_id: project.drive_folder_id,
+            investor_drive_folder_id: project.investor_drive_folder_id,
+          },
+          new_data: {
+            action_type: 'FOLDER_DELETED_EXTERNALLY',
+            reason: folderCheck.trashed ? 'Folder was trashed in Google Drive' : 'Folder was deleted from Google Drive',
+          },
+        });
+
+        // Clear the old folder ID and create new folder
+        folderRecreated = true;
         const newFolder = await ensureFolder(accessToken, projectFolderName, investorFolder.id);
         projectFolder = { id: newFolder.id, webViewLink: newFolder.webViewLink };
+      } else {
+        // Existing folder - check if it's in the correct parent (investor folder)
+        console.log('Existing project folder found, checking parent...');
+        try {
+          const result = await ensureProjectFolderInCorrectParent(
+            accessToken,
+            project.drive_folder_id,
+            investorFolder.id
+          );
+          projectFolder = { id: result.id, webViewLink: result.webViewLink };
+          folderMoved = result.moved;
+          if (folderMoved) {
+            console.log('Project folder moved to correct investor parent');
+          }
+        } catch (moveErr) {
+          console.error('Failed to move existing folder, creating new one:', moveErr);
+          // If move fails, create new folder under investor
+          const newFolder = await ensureFolder(accessToken, projectFolderName, investorFolder.id);
+          projectFolder = { id: newFolder.id, webViewLink: newFolder.webViewLink };
+        }
       }
     } else {
       // No existing folder - create new one under investor folder
@@ -549,6 +616,7 @@ serve(async (req) => {
         project_folder_id: projectFolder.id,
         project_folder_name: projectFolderName,
         folder_moved: folderMoved,
+        folder_recreated: folderRecreated,
         child_folders: childFolders,
       },
     });

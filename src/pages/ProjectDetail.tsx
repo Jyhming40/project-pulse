@@ -150,6 +150,8 @@ export default function ProjectDetail() {
   }>({});
   const [constructionForm, setConstructionForm] = useState<string>('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [isVerifyingFolder, setIsVerifyingFolder] = useState(false);
+  const [isResettingFolder, setIsResettingFolder] = useState(false);
 
   // Fetch project
   const { data: project, isLoading } = useQuery({
@@ -397,6 +399,74 @@ export default function ProjectDetail() {
     }
   };
 
+  // Handle verify Drive folder existence
+  const handleVerifyDriveFolder = async () => {
+    if (!id || !user) return;
+    
+    setIsVerifyingFolder(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('drive-verify-folder', {
+        body: { projectId: id },
+      });
+      
+      if (error) throw new Error(error.message);
+      
+      if (data?.error === 'NEED_AUTH') {
+        try {
+          await authorizeDrive();
+        } catch (err) {
+          toast.error('Google Drive 授權失敗');
+        }
+        return;
+      }
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      
+      if (data?.exists) {
+        toast.success('Drive 資料夾存在且正常');
+      } else if (data?.cleared) {
+        toast.info(data.message || 'Drive 資料夾已被刪除，記錄已清除');
+      } else {
+        toast.info('此案場尚未建立 Drive 資料夾');
+      }
+    } catch (err) {
+      const error = err as Error;
+      toast.error('驗證失敗', { description: error.message });
+    } finally {
+      setIsVerifyingFolder(false);
+    }
+  };
+
+  // Handle reset Drive folder link
+  const handleResetDriveFolder = async () => {
+    if (!id || !user) return;
+    
+    setIsResettingFolder(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('drive-verify-folder', {
+        body: { projectId: id, action: 'reset' },
+      });
+      
+      if (error) throw new Error(error.message);
+
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      toast.success('Drive 資料夾連結已重置');
+    } catch (err) {
+      const error = err as Error;
+      toast.error('重置失敗', { description: error.message });
+    } finally {
+      setIsResettingFolder(false);
+    }
+  };
+
   if (isLoading || !project) {
     return (
       <div className="flex items-center justify-center h-96">
@@ -630,21 +700,46 @@ export default function ProjectDetail() {
 
                 {/* Folder Status */}
                 {(project as any).folder_status === 'created' && (project as any).drive_folder_url ? (
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 text-success">
-                      <CheckCircle2 className="w-5 h-5" />
-                      <span>資料夾已建立</span>
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2 text-success">
+                        <CheckCircle2 className="w-5 h-5" />
+                        <span>資料夾已建立</span>
+                      </div>
+                      <Button variant="outline" size="sm" asChild>
+                        <a 
+                          href={(project as any).drive_folder_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                        >
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          開啟 Drive 資料夾
+                        </a>
+                      </Button>
                     </div>
-                    <Button variant="outline" size="sm" asChild>
-                      <a 
-                        href={(project as any).drive_folder_url} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                      >
-                        <ExternalLink className="w-4 h-4 mr-2" />
-                        開啟 Drive 資料夾
-                      </a>
-                    </Button>
+                    {canEdit && isDriveAuthorized && (
+                      <div className="flex items-center gap-2">
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={handleVerifyDriveFolder}
+                          disabled={isVerifyingFolder}
+                        >
+                          <RefreshCw className={`w-4 h-4 mr-2 ${isVerifyingFolder ? 'animate-spin' : ''}`} />
+                          {isVerifyingFolder ? '驗證中...' : '驗證資料夾'}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
+                          onClick={handleResetDriveFolder}
+                          disabled={isResettingFolder}
+                          className="text-muted-foreground hover:text-destructive"
+                        >
+                          <X className="w-4 h-4 mr-2" />
+                          {isResettingFolder ? '重置中...' : '重置連結'}
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 ) : (project as any).folder_status === 'failed' ? (
                   <div className="flex items-center gap-4">
