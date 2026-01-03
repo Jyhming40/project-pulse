@@ -398,13 +398,30 @@ serve(async (req) => {
       );
     }
 
-    const rootFolderId = Deno.env.get('GOOGLE_DRIVE_ROOT_FOLDER_ID');
+    // Get root folder ID from system_options first, fallback to env
+    let rootFolderId = Deno.env.get('GOOGLE_DRIVE_ROOT_FOLDER_ID');
+    
+    // Try to get from system_options
+    const { data: rootSetting } = await supabase
+      .from('system_options')
+      .select('label')
+      .eq('category', 'drive_settings')
+      .eq('value', 'root_folder_id')
+      .eq('is_active', true)
+      .single();
+    
+    if (rootSetting?.label) {
+      rootFolderId = rootSetting.label;
+    }
+    
     if (!rootFolderId) {
       return new Response(
-        JSON.stringify({ error: '未設定 Google Drive 根資料夾 ID (MQ-Documents)' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ error: '未設定 Google Drive 根資料夾 ID (MQ-Documents)，請先在整合設定中設定根資料夾' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+    
+    console.log('Using root folder ID:', rootFolderId);
 
     // Get project with investor info
     const { data: project, error: projectError } = await supabase
