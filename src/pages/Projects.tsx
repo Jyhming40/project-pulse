@@ -149,6 +149,7 @@ export default function Projects() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [cityFilter, setCityFilter] = useState<string>('all');
   const [constructionFilter, setConstructionFilter] = useState<string>('all');
+  const [driveStatusFilter, setDriveStatusFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
 
@@ -336,7 +337,19 @@ export default function Projects() {
     const matchesCity = cityFilter === 'all' || project.city === cityFilter;
     const matchesConstruction = constructionFilter === 'all' || (project as any).construction_status === constructionFilter;
     
-    return matchesSearch && matchesStatus && matchesCity && matchesConstruction;
+    // Drive status filter
+    const folderStatus = (project as any).folder_status;
+    const hasFolderId = !!(project as any).drive_folder_id;
+    let matchesDriveStatus = true;
+    if (driveStatusFilter === 'created') {
+      matchesDriveStatus = folderStatus === 'created' && hasFolderId;
+    } else if (driveStatusFilter === 'pending') {
+      matchesDriveStatus = folderStatus !== 'created' && folderStatus !== 'failed';
+    } else if (driveStatusFilter === 'failed') {
+      matchesDriveStatus = folderStatus === 'failed';
+    }
+    
+    return matchesSearch && matchesStatus && matchesCity && matchesConstruction && matchesDriveStatus;
   });
 
   // Sorting (multi-column support)
@@ -637,6 +650,17 @@ export default function Projects() {
             {constructionStatusOptions.map(opt => (
               <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={driveStatusFilter} onValueChange={setDriveStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[150px]">
+            <SelectValue placeholder="Drive 狀態" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部 Drive 狀態</SelectItem>
+            <SelectItem value="created">已建立</SelectItem>
+            <SelectItem value="pending">待建立</SelectItem>
+            <SelectItem value="failed">錯誤</SelectItem>
           </SelectContent>
         </Select>
       </div>
