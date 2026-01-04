@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAppSettingsRead } from '@/hooks/useAppSettings';
+import { useTheme } from '@/hooks/useTheme';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,8 +28,15 @@ const signupSchema = loginSchema.extend({
 export default function AuthPage() {
   const navigate = useNavigate();
   const { signIn, signUp, user } = useAuth();
+  const { settings } = useAppSettingsRead();
+  const { mode } = useTheme();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('login');
+
+  // Determine which logo to use based on theme
+  const logoUrl = mode === 'dark' ? settings?.logo_dark_url : settings?.logo_light_url;
+  const systemName = settings?.system_name_zh || '明群環能';
+  const companyName = settings?.company_name_zh || '案場與投資方管理系統';
 
   // Form states
   const [email, setEmail] = useState('');
@@ -112,12 +121,20 @@ export default function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-accent/20 p-4">
       <div className="w-full max-w-md animate-fade-in">
         <div className="flex items-center justify-center gap-3 mb-8">
-          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-            <Zap className="w-7 h-7 text-primary-foreground" />
-          </div>
+          {logoUrl ? (
+            <img 
+              src={logoUrl} 
+              alt={systemName} 
+              className="h-12 w-auto object-contain"
+            />
+          ) : (
+            <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
+              <Zap className="w-7 h-7 text-primary-foreground" />
+            </div>
+          )}
           <div>
-            <h1 className="text-2xl font-display font-bold text-foreground">明群環能</h1>
-            <p className="text-sm text-muted-foreground">案場與投資方管理系統</p>
+            <h1 className="text-2xl font-display font-bold text-foreground">{systemName}</h1>
+            <p className="text-sm text-muted-foreground">{companyName}</p>
           </div>
         </div>
 
@@ -227,7 +244,7 @@ export default function AuthPage() {
         </Card>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
-          © 2024 明群環能 / 永沛新能源
+          © {new Date().getFullYear()} {systemName} {settings?.company_name_en ? `/ ${settings.company_name_en}` : ''}
         </p>
       </div>
     </div>
