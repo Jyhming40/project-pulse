@@ -260,90 +260,94 @@ export function ImportExportDialog({
           </TabsContent>
 
           {/* Import Tab */}
-          <TabsContent value="import" className="space-y-4 mt-4 flex-1 overflow-hidden flex flex-col">
-            {/* Constraints Info */}
-            <ImportConstraintsInfo type={constraintType} />
+          <TabsContent value="import" className="mt-4 flex-1 overflow-hidden flex flex-col min-h-0">
+            {/* Constraints Info - Fixed at top */}
+            <div className="flex-shrink-0 mb-4">
+              <ImportConstraintsInfo type={constraintType} />
+            </div>
 
             {importResult ? (
               // Import Result View
-              <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-                {/* Result Summary */}
-                <div className="grid grid-cols-4 gap-3">
-                  <div className="border rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-success">{importResult.inserted}</p>
-                    <p className="text-xs text-muted-foreground">新增成功</p>
+              <ScrollArea className="flex-1">
+                <div className="space-y-4 pr-4">
+                  {/* Result Summary */}
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="border rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-success">{importResult.inserted}</p>
+                      <p className="text-xs text-muted-foreground">新增成功</p>
+                    </div>
+                    <div className="border rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-info">{importResult.updated}</p>
+                      <p className="text-xs text-muted-foreground">更新成功</p>
+                    </div>
+                    <div className="border rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-warning">{importResult.skipped}</p>
+                      <p className="text-xs text-muted-foreground">略過</p>
+                    </div>
+                    <div className="border rounded-lg p-3 text-center">
+                      <p className="text-2xl font-bold text-destructive">{importResult.errors}</p>
+                      <p className="text-xs text-muted-foreground">失敗</p>
+                    </div>
                   </div>
-                  <div className="border rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-info">{importResult.updated}</p>
-                    <p className="text-xs text-muted-foreground">更新成功</p>
-                  </div>
-                  <div className="border rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-warning">{importResult.skipped}</p>
-                    <p className="text-xs text-muted-foreground">略過</p>
-                  </div>
-                  <div className="border rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-destructive">{importResult.errors}</p>
-                    <p className="text-xs text-muted-foreground">失敗</p>
-                  </div>
-                </div>
 
-                {/* Detailed Results */}
-                {importResult.rowResults.length > 0 && (
-                  <div className="flex-1 overflow-hidden">
-                    <Label className="mb-2 block">匯入結果明細</Label>
-                    <ScrollArea className="h-[200px] border rounded-lg">
-                      <div className="p-2 space-y-1">
-                        {importResult.rowResults.map((row, i) => (
-                          <div 
-                            key={i} 
-                            className={`flex items-center gap-3 p-2 rounded text-sm ${
-                              row.status === 'error' ? 'bg-destructive/10' : 
-                              row.status === 'skipped' ? 'bg-warning/10' : 
-                              'bg-success/10'
-                            }`}
-                          >
-                            {getStatusIcon(row.status)}
-                            <span className="font-mono text-xs text-muted-foreground w-16">
-                              第 {row.row} 行
-                            </span>
-                            <span className="font-medium truncate max-w-[120px]" title={row.code}>
-                              {row.code}
-                            </span>
-                            {row.field && (
-                              <Badge variant="outline" className="text-xs font-mono">
-                                {row.field}
-                              </Badge>
-                            )}
-                            {getErrorTypeBadge(row.errorType)}
-                            <span className="text-muted-foreground flex-1 truncate" title={row.message}>
-                              {row.message}
-                            </span>
-                          </div>
-                        ))}
+                  {/* Detailed Results */}
+                  {importResult.rowResults.length > 0 && (
+                    <div>
+                      <Label className="mb-2 block">匯入結果明細</Label>
+                      <div className="border rounded-lg max-h-[200px] overflow-auto">
+                        <div className="p-2 space-y-1">
+                          {importResult.rowResults.map((row, i) => (
+                            <div 
+                              key={i} 
+                              className={`flex items-center gap-3 p-2 rounded text-sm ${
+                                row.status === 'error' ? 'bg-destructive/10' : 
+                                row.status === 'skipped' ? 'bg-warning/10' : 
+                                'bg-success/10'
+                              }`}
+                            >
+                              {getStatusIcon(row.status)}
+                              <span className="font-mono text-xs text-muted-foreground w-16">
+                                第 {row.row} 行
+                              </span>
+                              <span className="font-medium truncate max-w-[120px]" title={row.code}>
+                                {row.code}
+                              </span>
+                              {row.field && (
+                                <Badge variant="outline" className="text-xs font-mono">
+                                  {row.field}
+                                </Badge>
+                              )}
+                              {getErrorTypeBadge(row.errorType)}
+                              <span className="text-muted-foreground flex-1 truncate" title={row.message}>
+                                {row.message}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </ScrollArea>
-                  </div>
-                )}
+                    </div>
+                  )}
 
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={handleClose}>
-                    關閉
-                  </Button>
-                  <Button 
-                    variant="secondary"
-                    onClick={() => {
-                      setSelectedFile(null);
-                      setImportResult(null);
-                      clearPreview();
-                    }}
-                  >
-                    重新匯入
-                  </Button>
+                  <div className="flex justify-end gap-2 pt-4">
+                    <Button variant="outline" onClick={handleClose}>
+                      關閉
+                    </Button>
+                    <Button 
+                      variant="secondary"
+                      onClick={() => {
+                        setSelectedFile(null);
+                        setImportResult(null);
+                        clearPreview();
+                      }}
+                    >
+                      重新匯入
+                    </Button>
+                  </div>
                 </div>
-              </div>
+              </ScrollArea>
             ) : !preview ? (
               // File Upload View
-              <>
+              <div className="space-y-4">
                 <div className="border-2 border-dashed rounded-lg p-8 text-center">
                   <input
                     ref={fileInputRef}
@@ -378,12 +382,12 @@ export function ImportExportDialog({
                     下載匯入範本
                   </Button>
                 </div>
-              </>
+              </div>
             ) : (
-              // Preview View
-              <div className="flex-1 overflow-hidden flex flex-col">
-                <ScrollArea className="flex-1 pr-4">
-                  <div className="space-y-4">
+              // Preview View - with scrollable content
+              <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                <ScrollArea className="flex-1">
+                  <div className="space-y-4 pr-4">
                     {/* Preview Summary */}
                     <div className="flex items-center gap-4">
                       <Badge variant="outline" className="gap-1">
@@ -425,7 +429,7 @@ export function ImportExportDialog({
                           <Calendar className="w-4 h-4 text-info" />
                           <Label>日期欄位預覽（前 5 筆）</Label>
                         </div>
-                        <ScrollArea className="h-24 border rounded-lg">
+                        <div className="border rounded-lg max-h-24 overflow-auto">
                           <div className="p-2">
                             <table className="w-full text-xs">
                               <thead>
@@ -464,7 +468,7 @@ export function ImportExportDialog({
                               </tbody>
                             </table>
                           </div>
-                        </ScrollArea>
+                        </div>
                       </div>
                     )}
 
@@ -474,13 +478,13 @@ export function ImportExportDialog({
                         <XCircle className="h-4 w-4" />
                         <AlertDescription>
                           <p className="font-medium mb-2">以下資料有驗證錯誤，將不會匯入：</p>
-                          <ScrollArea className="h-20">
+                          <div className="max-h-20 overflow-auto">
                             <ul className="text-xs space-y-1">
                               {preview.errors.map((err, i) => (
                                 <li key={i}>{err.message}</li>
                               ))}
                             </ul>
-                          </ScrollArea>
+                          </div>
                         </AlertDescription>
                       </Alert>
                     )}
@@ -539,7 +543,7 @@ export function ImportExportDialog({
                           <AlertTriangle className="w-4 h-4 text-warning" />
                           <Label>偵測到 {preview.duplicates.length} 筆重複資料</Label>
                         </div>
-                        <ScrollArea className="h-20 border rounded-lg p-2">
+                        <div className="border rounded-lg p-2 max-h-20 overflow-auto">
                           <div className="space-y-1">
                             {preview.duplicates.map((dup, i) => (
                               <div key={i} className="flex items-center gap-2 text-xs">
@@ -550,7 +554,7 @@ export function ImportExportDialog({
                               </div>
                             ))}
                           </div>
-                        </ScrollArea>
+                        </div>
                       </div>
                     )}
 
@@ -577,7 +581,7 @@ export function ImportExportDialog({
                 </ScrollArea>
 
                 {/* Import button - fixed at bottom */}
-                <div className="flex justify-end gap-2 pt-4 border-t mt-4">
+                <div className="flex-shrink-0 flex justify-end gap-2 pt-4 border-t mt-4">
                   <Button variant="outline" onClick={handleClose} disabled={isProcessing}>
                     取消
                   </Button>
