@@ -248,131 +248,134 @@ export function ProjectBackupDialog({
           </TabsContent>
 
           {/* Import Tab */}
-          <TabsContent value="import" className="space-y-4 mt-4 flex-1 overflow-hidden flex flex-col">
+          <TabsContent value="import" className="mt-4 flex-1 overflow-hidden flex flex-col min-h-0">
             {importSummary ? (
               // Import Result View
-              <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-                {/* Result Summary by Category */}
-                <div className="grid grid-cols-4 gap-3">
-                  <div className="border rounded-lg p-3 text-center">
-                    <p className="text-lg font-bold text-success">
-                      {importSummary.investors.inserted + importSummary.investorContacts.inserted + importSummary.investorPaymentMethods.inserted + importSummary.partners.inserted + importSummary.projects.inserted + importSummary.statusHistory.inserted + importSummary.constructionHistory.inserted + importSummary.constructionAssignments.inserted + importSummary.documents.inserted + importSummary.systemOptions.inserted}
-                    </p>
-                    <p className="text-xs text-muted-foreground">新增成功</p>
-                  </div>
-                  <div className="border rounded-lg p-3 text-center">
-                    <p className="text-lg font-bold text-info">
-                      {importSummary.investors.updated + importSummary.investorContacts.updated + importSummary.investorPaymentMethods.updated + importSummary.partners.updated + importSummary.projects.updated + importSummary.statusHistory.updated + importSummary.constructionHistory.updated + importSummary.constructionAssignments.updated + importSummary.documents.updated + importSummary.systemOptions.updated}
-                    </p>
-                    <p className="text-xs text-muted-foreground">更新成功</p>
-                  </div>
-                  <div className="border rounded-lg p-3 text-center">
-                    <p className="text-lg font-bold text-warning">
-                      {importSummary.investors.skipped + importSummary.investorContacts.skipped + importSummary.investorPaymentMethods.skipped + importSummary.partners.skipped + importSummary.projects.skipped + importSummary.statusHistory.skipped + importSummary.constructionHistory.skipped + importSummary.constructionAssignments.skipped + importSummary.documents.skipped + importSummary.documentFiles.skipped + importSummary.systemOptions.skipped}
-                    </p>
-                    <p className="text-xs text-muted-foreground">略過</p>
-                  </div>
-                  <div className="border rounded-lg p-3 text-center">
-                    <p className="text-lg font-bold text-destructive">
-                      {importSummary.investors.errors + importSummary.investorContacts.errors + importSummary.investorPaymentMethods.errors + importSummary.partners.errors + importSummary.projects.errors + importSummary.statusHistory.errors + importSummary.constructionHistory.errors + importSummary.constructionAssignments.errors + importSummary.documents.errors + importSummary.systemOptions.errors}
-                    </p>
-                    <p className="text-xs text-muted-foreground">失敗</p>
-                  </div>
-                </div>
+              <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                <ScrollArea className="flex-1">
+                  <div className="space-y-4 pr-4">
+                    {/* Result Summary by Category */}
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="border rounded-lg p-3 text-center">
+                        <p className="text-lg font-bold text-success">
+                          {importSummary.investors.inserted + importSummary.investorContacts.inserted + importSummary.investorPaymentMethods.inserted + importSummary.partners.inserted + importSummary.projects.inserted + importSummary.statusHistory.inserted + importSummary.constructionHistory.inserted + importSummary.constructionAssignments.inserted + importSummary.documents.inserted + importSummary.systemOptions.inserted}
+                        </p>
+                        <p className="text-xs text-muted-foreground">新增成功</p>
+                      </div>
+                      <div className="border rounded-lg p-3 text-center">
+                        <p className="text-lg font-bold text-info">
+                          {importSummary.investors.updated + importSummary.investorContacts.updated + importSummary.investorPaymentMethods.updated + importSummary.partners.updated + importSummary.projects.updated + importSummary.statusHistory.updated + importSummary.constructionHistory.updated + importSummary.constructionAssignments.updated + importSummary.documents.updated + importSummary.systemOptions.updated}
+                        </p>
+                        <p className="text-xs text-muted-foreground">更新成功</p>
+                      </div>
+                      <div className="border rounded-lg p-3 text-center">
+                        <p className="text-lg font-bold text-warning">
+                          {importSummary.investors.skipped + importSummary.investorContacts.skipped + importSummary.investorPaymentMethods.skipped + importSummary.partners.skipped + importSummary.projects.skipped + importSummary.statusHistory.skipped + importSummary.constructionHistory.skipped + importSummary.constructionAssignments.skipped + importSummary.documents.skipped + importSummary.documentFiles.skipped + importSummary.systemOptions.skipped}
+                        </p>
+                        <p className="text-xs text-muted-foreground">略過</p>
+                      </div>
+                      <div className="border rounded-lg p-3 text-center">
+                        <p className="text-lg font-bold text-destructive">
+                          {importSummary.investors.errors + importSummary.investorContacts.errors + importSummary.investorPaymentMethods.errors + importSummary.partners.errors + importSummary.projects.errors + importSummary.statusHistory.errors + importSummary.constructionHistory.errors + importSummary.constructionAssignments.errors + importSummary.documents.errors + importSummary.systemOptions.errors}
+                        </p>
+                        <p className="text-xs text-muted-foreground">失敗</p>
+                      </div>
+                    </div>
 
-                {/* Breakdown by Sheet */}
-                <ScrollArea className="max-h-32">
-                  <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 text-xs">
-                    <div className="border rounded p-2">
-                      <p className="font-medium mb-1">投資方</p>
-                      <p className="text-success">+{importSummary.investors.inserted}</p>
-                      <p className="text-info">↻{importSummary.investors.updated}</p>
-                      <p className="text-destructive">✗{importSummary.investors.errors}</p>
+                    {/* Breakdown by Sheet */}
+                    <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 text-xs">
+                      <div className="border rounded p-2">
+                        <p className="font-medium mb-1">投資方</p>
+                        <p className="text-success">+{importSummary.investors.inserted}</p>
+                        <p className="text-info">↻{importSummary.investors.updated}</p>
+                        <p className="text-destructive">✗{importSummary.investors.errors}</p>
+                      </div>
+                      <div className="border rounded p-2">
+                        <p className="font-medium mb-1">廠商</p>
+                        <p className="text-success">+{importSummary.partners.inserted}</p>
+                        <p className="text-info">↻{importSummary.partners.updated}</p>
+                        <p className="text-destructive">✗{importSummary.partners.errors}</p>
+                      </div>
+                      <div className="border rounded p-2">
+                        <p className="font-medium mb-1">案場</p>
+                        <p className="text-success">+{importSummary.projects.inserted}</p>
+                        <p className="text-info">↻{importSummary.projects.updated}</p>
+                        <p className="text-destructive">✗{importSummary.projects.errors}</p>
+                      </div>
+                      <div className="border rounded p-2">
+                        <p className="font-medium mb-1">狀態歷程</p>
+                        <p className="text-success">+{importSummary.statusHistory.inserted}</p>
+                        <p className="text-info">↻{importSummary.statusHistory.updated}</p>
+                        <p className="text-destructive">✗{importSummary.statusHistory.errors}</p>
+                      </div>
+                      <div className="border rounded p-2">
+                        <p className="font-medium mb-1">施工派工</p>
+                        <p className="text-success">+{importSummary.constructionAssignments.inserted}</p>
+                        <p className="text-info">↻{importSummary.constructionAssignments.updated}</p>
+                        <p className="text-destructive">✗{importSummary.constructionAssignments.errors}</p>
+                      </div>
+                      <div className="border rounded p-2">
+                        <p className="font-medium mb-1">文件</p>
+                        <p className="text-success">+{importSummary.documents.inserted}</p>
+                        <p className="text-info">↻{importSummary.documents.updated}</p>
+                        <p className="text-destructive">✗{importSummary.documents.errors}</p>
+                      </div>
                     </div>
-                    <div className="border rounded p-2">
-                      <p className="font-medium mb-1">廠商</p>
-                      <p className="text-success">+{importSummary.partners.inserted}</p>
-                      <p className="text-info">↻{importSummary.partners.updated}</p>
-                      <p className="text-destructive">✗{importSummary.partners.errors}</p>
-                    </div>
-                    <div className="border rounded p-2">
-                      <p className="font-medium mb-1">案場</p>
-                      <p className="text-success">+{importSummary.projects.inserted}</p>
-                      <p className="text-info">↻{importSummary.projects.updated}</p>
-                      <p className="text-destructive">✗{importSummary.projects.errors}</p>
-                    </div>
-                    <div className="border rounded p-2">
-                      <p className="font-medium mb-1">狀態歷程</p>
-                      <p className="text-success">+{importSummary.statusHistory.inserted}</p>
-                      <p className="text-info">↻{importSummary.statusHistory.updated}</p>
-                      <p className="text-destructive">✗{importSummary.statusHistory.errors}</p>
-                    </div>
-                    <div className="border rounded p-2">
-                      <p className="font-medium mb-1">施工派工</p>
-                      <p className="text-success">+{importSummary.constructionAssignments.inserted}</p>
-                      <p className="text-info">↻{importSummary.constructionAssignments.updated}</p>
-                      <p className="text-destructive">✗{importSummary.constructionAssignments.errors}</p>
-                    </div>
-                    <div className="border rounded p-2">
-                      <p className="font-medium mb-1">文件</p>
-                      <p className="text-success">+{importSummary.documents.inserted}</p>
-                      <p className="text-info">↻{importSummary.documents.updated}</p>
-                      <p className="text-destructive">✗{importSummary.documents.errors}</p>
-                    </div>
+
+                    {/* Error List */}
+                    {importSummary.errorList.length > 0 && (
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <Label>錯誤明細（共 {importSummary.errorList.length} 筆）</Label>
+                          <Button variant="outline" size="sm" onClick={downloadErrorReport}>
+                            <FileDown className="w-4 h-4 mr-1" />
+                            下載錯誤報告
+                          </Button>
+                        </div>
+                        <div className="border rounded-lg max-h-[200px] overflow-auto">
+                          <div className="p-2 space-y-1">
+                            {importSummary.errorList.slice(0, 100).map((err, i) => (
+                              <div 
+                                key={i} 
+                                className="flex items-center gap-2 p-2 rounded text-sm bg-destructive/10"
+                              >
+                                <XCircle className="w-4 h-4 text-destructive flex-shrink-0" />
+                                <Badge variant="outline" className="text-xs">
+                                  {err.sheet}
+                                </Badge>
+                                <span className="font-mono text-xs text-muted-foreground w-14 flex-shrink-0">
+                                  第{err.row}行
+                                </span>
+                                {err.code && (
+                                  <span className="font-medium truncate max-w-[100px]" title={err.code}>
+                                    {err.code}
+                                  </span>
+                                )}
+                                {err.field && (
+                                  <Badge variant="secondary" className="text-xs font-mono">
+                                    {err.field}
+                                  </Badge>
+                                )}
+                                {getErrorTypeBadge(err.errorType)}
+                                <span className="text-muted-foreground flex-1 truncate" title={err.message}>
+                                  {err.message}
+                                </span>
+                              </div>
+                            ))}
+                            {importSummary.errorList.length > 100 && (
+                              <p className="text-center text-sm text-muted-foreground py-2">
+                                顯示前 100 筆，共 {importSummary.errorList.length} 筆錯誤
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </ScrollArea>
 
-                {/* Error List */}
-                {importSummary.errorList.length > 0 && (
-                  <div className="flex-1 overflow-hidden flex flex-col">
-                    <div className="flex items-center justify-between mb-2">
-                      <Label>錯誤明細（共 {importSummary.errorList.length} 筆）</Label>
-                      <Button variant="outline" size="sm" onClick={downloadErrorReport}>
-                        <FileDown className="w-4 h-4 mr-1" />
-                        下載錯誤報告
-                      </Button>
-                    </div>
-                    <ScrollArea className="flex-1 border rounded-lg">
-                      <div className="p-2 space-y-1">
-                        {importSummary.errorList.slice(0, 100).map((err, i) => (
-                          <div 
-                            key={i} 
-                            className="flex items-center gap-2 p-2 rounded text-sm bg-destructive/10"
-                          >
-                            <XCircle className="w-4 h-4 text-destructive flex-shrink-0" />
-                            <Badge variant="outline" className="text-xs">
-                              {err.sheet}
-                            </Badge>
-                            <span className="font-mono text-xs text-muted-foreground w-14 flex-shrink-0">
-                              第{err.row}行
-                            </span>
-                            {err.code && (
-                              <span className="font-medium truncate max-w-[100px]" title={err.code}>
-                                {err.code}
-                              </span>
-                            )}
-                            {err.field && (
-                              <Badge variant="secondary" className="text-xs font-mono">
-                                {err.field}
-                              </Badge>
-                            )}
-                            {getErrorTypeBadge(err.errorType)}
-                            <span className="text-muted-foreground flex-1 truncate" title={err.message}>
-                              {err.message}
-                            </span>
-                          </div>
-                        ))}
-                        {importSummary.errorList.length > 100 && (
-                          <p className="text-center text-sm text-muted-foreground py-2">
-                            顯示前 100 筆，共 {importSummary.errorList.length} 筆錯誤
-                          </p>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </div>
-                )}
-
-                <div className="flex justify-end gap-2">
+                {/* Buttons - fixed at bottom */}
+                <div className="flex-shrink-0 flex justify-end gap-2 pt-4 border-t mt-4">
                   <Button variant="outline" onClick={handleClose}>
                     關閉
                   </Button>
@@ -382,118 +385,130 @@ export function ProjectBackupDialog({
                 </div>
               </div>
             ) : !selectedFile ? (
-              // File Selection View
-              <>
-                <Alert>
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    <strong>匯入模式說明：</strong>
-                    <ul className="list-disc list-inside mt-2 text-sm space-y-1">
-                      <li><strong>Upsert（推薦）</strong>：有則更新、無則新增</li>
-                      <li><strong>Insert</strong>：僅新增，重複資料會報錯</li>
-                      <li><strong>Skip</strong>：重複資料自動跳過</li>
-                    </ul>
-                  </AlertDescription>
-                </Alert>
+              // File Selection View - with scrollable content
+              <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                <ScrollArea className="flex-1">
+                  <div className="space-y-4 pr-4">
+                    <Alert>
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        <strong>匯入模式說明：</strong>
+                        <ul className="list-disc list-inside mt-2 text-sm space-y-1">
+                          <li><strong>Upsert（推薦）</strong>：有則更新、無則新增</li>
+                          <li><strong>Insert</strong>：僅新增，重複資料會報錯</li>
+                          <li><strong>Skip</strong>：重複資料自動跳過</li>
+                        </ul>
+                      </AlertDescription>
+                    </Alert>
 
-                <div className="space-y-3">
-                  <Label>選擇匯入模式</Label>
-                  <RadioGroup 
-                    value={importMode} 
-                    onValueChange={(v) => setImportMode(v as ImportMode)}
-                    className="flex gap-6"
-                  >
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="upsert" id="upsert" />
-                      <Label htmlFor="upsert" className="cursor-pointer">
-                        Upsert（有則更新）
-                      </Label>
+                    <div className="space-y-3">
+                      <Label>選擇匯入模式</Label>
+                      <RadioGroup 
+                        value={importMode} 
+                        onValueChange={(v) => setImportMode(v as ImportMode)}
+                        className="space-y-2"
+                      >
+                        <div className="flex items-center space-x-2 border rounded-lg p-3">
+                          <RadioGroupItem value="upsert" id="upsert" />
+                          <Label htmlFor="upsert" className="flex-1 cursor-pointer">
+                            <p className="font-medium">Upsert（有則更新）</p>
+                            <p className="text-xs text-muted-foreground">有則更新、無則新增，推薦使用</p>
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2 border rounded-lg p-3">
+                          <RadioGroupItem value="insert" id="insert" />
+                          <Label htmlFor="insert" className="flex-1 cursor-pointer">
+                            <p className="font-medium">Insert（僅新增）</p>
+                            <p className="text-xs text-muted-foreground">重複資料將會報錯，不會覆蓋現有資料</p>
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2 border rounded-lg p-3">
+                          <RadioGroupItem value="skip" id="skip_mode" />
+                          <Label htmlFor="skip_mode" className="flex-1 cursor-pointer">
+                            <p className="font-medium">Skip（跳過重複）</p>
+                            <p className="text-xs text-muted-foreground">重複資料自動跳過，僅新增不存在的資料</p>
+                          </Label>
+                        </div>
+                      </RadioGroup>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="insert" id="insert" />
-                      <Label htmlFor="insert" className="cursor-pointer">
-                        Insert（僅新增）
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <RadioGroupItem value="skip" id="skip" />
-                      <Label htmlFor="skip" className="cursor-pointer">
-                        Skip（跳過重複）
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
 
-                <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".xlsx,.xls"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
-                  <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-4" />
-                  <p className="text-sm text-muted-foreground mb-4">
-                    選擇備份 Excel 檔案（.xlsx）
-                  </p>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    選擇檔案
-                  </Button>
-                </div>
+                    <div className="border-2 border-dashed rounded-lg p-8 text-center">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept=".xlsx,.xls"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                      <Upload className="w-10 h-10 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-sm text-muted-foreground mb-4">
+                        選擇備份 Excel 檔案（.xlsx）
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        選擇檔案
+                      </Button>
+                    </div>
 
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>需要範本？</span>
-                  <Button variant="link" className="h-auto p-0" onClick={downloadTemplate}>
-                    下載匯入範本
-                  </Button>
-                </div>
-              </>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>需要範本？</span>
+                      <Button variant="link" className="h-auto p-0" onClick={downloadTemplate}>
+                        下載匯入範本
+                      </Button>
+                    </div>
+                  </div>
+                </ScrollArea>
+              </div>
             ) : (
               // File Selected - Confirmation View
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <Badge variant="outline" className="gap-1">
-                    <FileSpreadsheet className="w-3 h-3" />
-                    {selectedFile.name}
-                  </Badge>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={handleReset}
-                    disabled={isProcessing}
-                  >
-                    重新選擇
-                  </Button>
-                </div>
-
-                <Alert variant="default" className="bg-warning/10 border-warning/30">
-                  <AlertTriangle className="h-4 w-4 text-warning" />
-                  <AlertDescription>
-                    <strong>即將以「{importMode === 'upsert' ? 'Upsert' : importMode === 'insert' ? 'Insert' : 'Skip'}」模式匯入。</strong>
-                    <br />
-                    {importMode === 'upsert' && '現有資料若ID或編號相符將會被更新。'}
-                    {importMode === 'insert' && '重複資料將會報錯，不會覆蓋現有資料。'}
-                    {importMode === 'skip' && '重複資料將自動跳過，僅新增不存在的資料。'}
-                  </AlertDescription>
-                </Alert>
-
-                {isProcessing && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        正在匯入：{progress.currentSheet}
-                      </span>
-                      <span>{progress.current}/{progress.total}</span>
+              <div className="flex-1 overflow-hidden flex flex-col min-h-0">
+                <ScrollArea className="flex-1">
+                  <div className="space-y-4 pr-4">
+                    <div className="flex items-center gap-4">
+                      <Badge variant="outline" className="gap-1">
+                        <FileSpreadsheet className="w-3 h-3" />
+                        {selectedFile.name}
+                      </Badge>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={handleReset}
+                        disabled={isProcessing}
+                      >
+                        重新選擇
+                      </Button>
                     </div>
-                    <Progress value={progressPercent} className="h-2" />
-                  </div>
-                )}
 
-                <div className="flex justify-end gap-2">
+                    <Alert variant="default" className="bg-warning/10 border-warning/30">
+                      <AlertTriangle className="h-4 w-4 text-warning" />
+                      <AlertDescription>
+                        <strong>即將以「{importMode === 'upsert' ? 'Upsert' : importMode === 'insert' ? 'Insert' : 'Skip'}」模式匯入。</strong>
+                        <br />
+                        {importMode === 'upsert' && '現有資料若ID或編號相符將會被更新。'}
+                        {importMode === 'insert' && '重複資料將會報錯，不會覆蓋現有資料。'}
+                        {importMode === 'skip' && '重複資料將自動跳過，僅新增不存在的資料。'}
+                      </AlertDescription>
+                    </Alert>
+
+                    {isProcessing && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            正在匯入：{progress.currentSheet}
+                          </span>
+                          <span>{progress.current}/{progress.total}</span>
+                        </div>
+                        <Progress value={progressPercent} className="h-2" />
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+
+                {/* Buttons - fixed at bottom */}
+                <div className="flex-shrink-0 flex justify-end gap-2 pt-4 border-t mt-4">
                   <Button variant="outline" onClick={handleClose} disabled={isProcessing}>
                     取消
                   </Button>
