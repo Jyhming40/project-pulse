@@ -381,199 +381,203 @@ export function ImportExportDialog({
               </>
             ) : (
               // Preview View
-              <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
-                {/* Preview Summary */}
-                <div className="flex items-center gap-4">
-                  <Badge variant="outline" className="gap-1">
-                    <FileSpreadsheet className="w-3 h-3" />
-                    {selectedFile?.name}
-                  </Badge>
-                  <Button 
-                    variant="ghost" 
-                    size="sm"
-                    onClick={() => {
-                      setSelectedFile(null);
-                      clearPreview();
-                    }}
-                  >
-                    重新選擇
-                  </Button>
-                </div>
-
-                {/* Statistics */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="border rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-success">{preview.data.length}</p>
-                    <p className="text-xs text-muted-foreground">有效資料</p>
-                  </div>
-                  <div className="border rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-warning">{preview.duplicates.length}</p>
-                    <p className="text-xs text-muted-foreground">重複資料</p>
-                  </div>
-                  <div className="border rounded-lg p-3 text-center">
-                    <p className="text-2xl font-bold text-destructive">{preview.errors.length}</p>
-                    <p className="text-xs text-muted-foreground">驗證錯誤</p>
-                  </div>
-                </div>
-
-                {/* Date Preview for Documents */}
-                {type === 'documents' && documentPreview && documentPreview.data.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-info" />
-                      <Label>日期欄位預覽（前 5 筆）</Label>
+              <div className="flex-1 overflow-hidden flex flex-col">
+                <ScrollArea className="flex-1 pr-4">
+                  <div className="space-y-4">
+                    {/* Preview Summary */}
+                    <div className="flex items-center gap-4">
+                      <Badge variant="outline" className="gap-1">
+                        <FileSpreadsheet className="w-3 h-3" />
+                        {selectedFile?.name}
+                      </Badge>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedFile(null);
+                          clearPreview();
+                        }}
+                      >
+                        重新選擇
+                      </Button>
                     </div>
-                    <ScrollArea className="h-24 border rounded-lg">
-                      <div className="p-2">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="text-muted-foreground">
-                              <th className="text-left p-1">行號</th>
-                              <th className="text-left p-1">案場</th>
-                              <th className="text-left p-1">送件日</th>
-                              <th className="text-left p-1">核發日</th>
-                              <th className="text-left p-1">到期日</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {documentPreview.data.slice(0, 5).map((doc, i) => (
-                              <tr key={i} className="border-t border-border/50">
-                                <td className="p-1 font-mono">{doc._rowIndex}</td>
-                                <td className="p-1 truncate max-w-[100px]" title={doc.project_code}>
-                                  {doc.project_code}
-                                </td>
-                                <td className="p-1">
-                                  <span className={doc.submitted_at ? 'text-success' : 'text-muted-foreground'}>
-                                    {doc.submitted_at || '-'}
-                                  </span>
-                                </td>
-                                <td className="p-1">
-                                  <span className={doc.issued_at ? 'text-success' : 'text-muted-foreground'}>
-                                    {doc.issued_at || '-'}
-                                  </span>
-                                </td>
-                                <td className="p-1">
-                                  <span className={doc.due_at ? 'text-success' : 'text-muted-foreground'}>
-                                    {doc.due_at || '-'}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
+
+                    {/* Statistics */}
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="border rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-success">{preview.data.length}</p>
+                        <p className="text-xs text-muted-foreground">有效資料</p>
                       </div>
-                    </ScrollArea>
-                  </div>
-                )}
+                      <div className="border rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-warning">{preview.duplicates.length}</p>
+                        <p className="text-xs text-muted-foreground">重複資料</p>
+                      </div>
+                      <div className="border rounded-lg p-3 text-center">
+                        <p className="text-2xl font-bold text-destructive">{preview.errors.length}</p>
+                        <p className="text-xs text-muted-foreground">驗證錯誤</p>
+                      </div>
+                    </div>
 
-                {/* Errors */}
-                {preview.errors.length > 0 && (
-                  <Alert variant="destructive">
-                    <XCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      <p className="font-medium mb-2">以下資料有驗證錯誤，將不會匯入：</p>
-                      <ScrollArea className="h-20">
-                        <ul className="text-xs space-y-1">
-                          {preview.errors.map((err, i) => (
-                            <li key={i}>{err.message}</li>
-                          ))}
-                        </ul>
-                      </ScrollArea>
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {/* Import Strategy Selection */}
-                <div className="space-y-3">
-                  <Label>匯入模式</Label>
-                  <RadioGroup 
-                    value={importStrategy} 
-                    onValueChange={(v) => setImportStrategy(v as ImportStrategy)}
-                    className="space-y-2"
-                  >
-                    <div className="flex items-center space-x-2 border rounded-lg p-3">
-                      <RadioGroupItem value="insert_only" id="insert_only" />
-                      <Label htmlFor="insert_only" className="flex-1 cursor-pointer">
+                    {/* Date Preview for Documents */}
+                    {type === 'documents' && documentPreview && documentPreview.data.length > 0 && (
+                      <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium">僅新增 (Insert Only)</p>
-                          <Badge variant="outline" className="text-xs">嚴格模式</Badge>
+                          <Calendar className="w-4 h-4 text-info" />
+                          <Label>日期欄位預覽（前 5 筆）</Label>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          遇到重複資料視為錯誤，不進行任何寫入
-                        </p>
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2 border rounded-lg p-3">
-                      <RadioGroupItem value="skip" id="skip" />
-                      <Label htmlFor="skip" className="flex-1 cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">略過重複 (Skip Duplicates)</p>
-                          <Badge variant="secondary" className="text-xs">安全模式</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          保留現有資料，只新增不重複的項目
-                        </p>
-                      </Label>
-                    </div>
-                    <div className="flex items-center space-x-2 border rounded-lg p-3">
-                      <RadioGroupItem value="update" id="update" />
-                      <Label htmlFor="update" className="flex-1 cursor-pointer">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium">更新現有 (Upsert)</p>
-                          <Badge variant="outline" className="text-xs text-warning border-warning">覆寫模式</Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          以匯入資料覆蓋現有的重複項目
-                        </p>
-                      </Label>
-                    </div>
-                  </RadioGroup>
-                </div>
-                
-                {/* Duplicates Preview */}
-                {preview.duplicates.length > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <AlertTriangle className="w-4 h-4 text-warning" />
-                      <Label>偵測到 {preview.duplicates.length} 筆重複資料</Label>
-                    </div>
-                    <ScrollArea className="h-20 border rounded-lg p-2">
-                      <div className="space-y-1">
-                        {preview.duplicates.map((dup, i) => (
-                          <div key={i} className="flex items-center gap-2 text-xs">
-                            <AlertCircle className="w-3 h-3 text-warning" />
-                            <span className="font-mono">第 {dup.row} 行</span>
-                            <span className="font-medium">{dup.code}</span>
-                            <span className="text-muted-foreground">已存在於系統中</span>
+                        <ScrollArea className="h-24 border rounded-lg">
+                          <div className="p-2">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="text-muted-foreground">
+                                  <th className="text-left p-1">行號</th>
+                                  <th className="text-left p-1">案場</th>
+                                  <th className="text-left p-1">送件日</th>
+                                  <th className="text-left p-1">核發日</th>
+                                  <th className="text-left p-1">到期日</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {documentPreview.data.slice(0, 5).map((doc, i) => (
+                                  <tr key={i} className="border-t border-border/50">
+                                    <td className="p-1 font-mono">{doc._rowIndex}</td>
+                                    <td className="p-1 truncate max-w-[100px]" title={doc.project_code}>
+                                      {doc.project_code}
+                                    </td>
+                                    <td className="p-1">
+                                      <span className={doc.submitted_at ? 'text-success' : 'text-muted-foreground'}>
+                                        {doc.submitted_at || '-'}
+                                      </span>
+                                    </td>
+                                    <td className="p-1">
+                                      <span className={doc.issued_at ? 'text-success' : 'text-muted-foreground'}>
+                                        {doc.issued_at || '-'}
+                                      </span>
+                                    </td>
+                                    <td className="p-1">
+                                      <span className={doc.due_at ? 'text-success' : 'text-muted-foreground'}>
+                                        {doc.due_at || '-'}
+                                      </span>
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
                           </div>
-                        ))}
+                        </ScrollArea>
                       </div>
-                    </ScrollArea>
-                  </div>
-                )}
+                    )}
 
-                {/* Progress bar when importing */}
-                {isProcessing && importProgress.total > 0 && (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">
-                        {importProgress.phase === 'preparing' && '準備中...'}
-                        {importProgress.phase === 'importing' && '匯入中...'}
-                        {importProgress.phase === 'done' && '完成!'}
-                      </span>
-                      <span className="font-mono">
-                        {importProgress.current} / {importProgress.total}
-                      </span>
+                    {/* Errors */}
+                    {preview.errors.length > 0 && (
+                      <Alert variant="destructive">
+                        <XCircle className="h-4 w-4" />
+                        <AlertDescription>
+                          <p className="font-medium mb-2">以下資料有驗證錯誤，將不會匯入：</p>
+                          <ScrollArea className="h-20">
+                            <ul className="text-xs space-y-1">
+                              {preview.errors.map((err, i) => (
+                                <li key={i}>{err.message}</li>
+                              ))}
+                            </ul>
+                          </ScrollArea>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {/* Import Strategy Selection */}
+                    <div className="space-y-3">
+                      <Label>匯入模式</Label>
+                      <RadioGroup 
+                        value={importStrategy} 
+                        onValueChange={(v) => setImportStrategy(v as ImportStrategy)}
+                        className="space-y-2"
+                      >
+                        <div className="flex items-center space-x-2 border rounded-lg p-3">
+                          <RadioGroupItem value="insert_only" id="insert_only" />
+                          <Label htmlFor="insert_only" className="flex-1 cursor-pointer">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">僅新增 (Insert Only)</p>
+                              <Badge variant="outline" className="text-xs">嚴格模式</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              遇到重複資料視為錯誤，不進行任何寫入
+                            </p>
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2 border rounded-lg p-3">
+                          <RadioGroupItem value="skip" id="skip" />
+                          <Label htmlFor="skip" className="flex-1 cursor-pointer">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">略過重複 (Skip Duplicates)</p>
+                              <Badge variant="secondary" className="text-xs">安全模式</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              保留現有資料，只新增不重複的項目
+                            </p>
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2 border rounded-lg p-3">
+                          <RadioGroupItem value="update" id="update" />
+                          <Label htmlFor="update" className="flex-1 cursor-pointer">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium">更新現有 (Upsert)</p>
+                              <Badge variant="outline" className="text-xs text-warning border-warning">覆寫模式</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              以匯入資料覆蓋現有的重複項目
+                            </p>
+                          </Label>
+                        </div>
+                      </RadioGroup>
                     </div>
-                    <Progress 
-                      value={(importProgress.current / importProgress.total) * 100} 
-                      className="h-2"
-                    />
-                  </div>
-                )}
+                    
+                    {/* Duplicates Preview */}
+                    {preview.duplicates.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="w-4 h-4 text-warning" />
+                          <Label>偵測到 {preview.duplicates.length} 筆重複資料</Label>
+                        </div>
+                        <ScrollArea className="h-20 border rounded-lg p-2">
+                          <div className="space-y-1">
+                            {preview.duplicates.map((dup, i) => (
+                              <div key={i} className="flex items-center gap-2 text-xs">
+                                <AlertCircle className="w-3 h-3 text-warning" />
+                                <span className="font-mono">第 {dup.row} 行</span>
+                                <span className="font-medium">{dup.code}</span>
+                                <span className="text-muted-foreground">已存在於系統中</span>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    )}
 
-                {/* Import button */}
-                <div className="flex justify-end gap-2">
+                    {/* Progress bar when importing */}
+                    {isProcessing && importProgress.total > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            {importProgress.phase === 'preparing' && '準備中...'}
+                            {importProgress.phase === 'importing' && '匯入中...'}
+                            {importProgress.phase === 'done' && '完成!'}
+                          </span>
+                          <span className="font-mono">
+                            {importProgress.current} / {importProgress.total}
+                          </span>
+                        </div>
+                        <Progress 
+                          value={(importProgress.current / importProgress.total) * 100} 
+                          className="h-2"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+
+                {/* Import button - fixed at bottom */}
+                <div className="flex justify-end gap-2 pt-4 border-t mt-4">
                   <Button variant="outline" onClick={handleClose} disabled={isProcessing}>
                     取消
                   </Button>
