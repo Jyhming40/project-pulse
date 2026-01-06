@@ -12,6 +12,7 @@ import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
 import { BatchUpdateDialog, BatchUpdateField } from '@/components/BatchUpdateDialog';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { CreateDocumentDialog } from '@/components/CreateDocumentDialog';
+import { DocumentDetailDialog } from '@/components/DocumentDetailDialog';
 import { getDerivedDocStatus, getDerivedDocStatusColor, DerivedDocStatus } from '@/lib/documentStatus';
 import { 
   Search, 
@@ -82,7 +83,8 @@ export default function Documents() {
   const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false);
   const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   // Fetch documents with project info
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['all-documents'],
@@ -477,6 +479,10 @@ export default function Documents() {
                     key={doc.id}
                     className="cursor-pointer hover:bg-muted/50"
                     data-selected={batchSelect.isSelected(doc.id)}
+                    onClick={() => {
+                      setSelectedDocumentId(doc.id);
+                      setIsDetailOpen(true);
+                    }}
                   >
                     {canEdit && (
                       <TableCell onClick={(e) => e.stopPropagation()}>
@@ -487,19 +493,19 @@ export default function Documents() {
                         />
                       </TableCell>
                     )}
-                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
+                    <TableCell>
                       <div>
                         <p className="font-medium">{project?.project_name}</p>
                         <p className="text-xs text-muted-foreground font-mono">{project?.project_code}</p>
                       </div>
                     </TableCell>
-                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
+                    <TableCell>
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-muted-foreground" />
                         {doc.doc_type}
                       </div>
                     </TableCell>
-                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
+                    <TableCell>
                       {(() => {
                         const derivedStatus = getDerivedDocStatus(doc);
                         return (
@@ -518,13 +524,13 @@ export default function Documents() {
                         );
                       })()}
                     </TableCell>
-                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
+                    <TableCell>
                       {doc.submitted_at ? format(new Date(doc.submitted_at), 'yyyy/MM/dd') : '-'}
                     </TableCell>
-                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
+                    <TableCell>
                       {doc.issued_at ? format(new Date(doc.issued_at), 'yyyy/MM/dd') : '-'}
                     </TableCell>
-                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>
+                    <TableCell>
                       {doc.due_at ? (
                         <span className={isDueSoon ? 'text-destructive font-medium' : ''}>
                           {format(new Date(doc.due_at), 'yyyy/MM/dd')}
@@ -532,7 +538,7 @@ export default function Documents() {
                         </span>
                       ) : '-'}
                     </TableCell>
-                    <TableCell onClick={() => navigate(`/projects/${doc.project_id}`)}>{owner?.full_name || '-'}</TableCell>
+                    <TableCell>{owner?.full_name || '-'}</TableCell>
                   </TableRow>
                 );
               })
@@ -623,6 +629,13 @@ export default function Documents() {
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['all-documents'] });
         }}
+      />
+
+      {/* Document Detail Dialog */}
+      <DocumentDetailDialog
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+        documentId={selectedDocumentId}
       />
     </div>
   );
