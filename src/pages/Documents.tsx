@@ -13,6 +13,7 @@ import { BatchUpdateDialog, BatchUpdateField } from '@/components/BatchUpdateDia
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { CreateDocumentDialog } from '@/components/CreateDocumentDialog';
 import { DocumentDetailDialog } from '@/components/DocumentDetailDialog';
+import { BatchUploadVersionDialog } from '@/components/BatchUploadVersionDialog';
 import { getDerivedDocStatus, getDerivedDocStatusColor, DerivedDocStatus } from '@/lib/documentStatus';
 import { 
   Search, 
@@ -25,6 +26,9 @@ import {
   Info,
   Plus,
   Building2,
+  Upload,
+  Bell,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -85,6 +89,9 @@ export default function Documents() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isBatchUploadOpen, setIsBatchUploadOpen] = useState(false);
+  const [isSendingReminders, setIsSendingReminders] = useState(false);
+  
   // Fetch documents with project info
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['all-documents'],
@@ -273,6 +280,46 @@ export default function Documents() {
     },
   ];
 
+  // Send expiry reminders
+  const handleSendReminders = async () => {
+    try {
+      setIsSendingReminders(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error('請先登入');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-document-expiry`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ daysAhead: 14, sendEmails: true }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || '發送失敗');
+      }
+
+      if (result.count === 0) {
+        toast.info('目前沒有即將到期的文件');
+      } else {
+        toast.success(`已發送 ${result.emailsSent || 0} 封到期提醒通知`);
+      }
+    } catch (error: any) {
+      toast.error('發送提醒失敗', { description: error.message });
+    } finally {
+      setIsSendingReminders(false);
+    }
+  };
+
   // Stats - using derived status
   const notStartedCount = documents.filter(d => getDerivedDocStatus(d) === '未開始').length;
   const inProgressCount = documents.filter(d => getDerivedDocStatus(d) === '已開始').length;
@@ -308,6 +355,20 @@ export default function Documents() {
                 匯入/匯出
               </Button>
             </>
+          )}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              onClick={handleSendReminders}
+              disabled={isSendingReminders}
+            >
+              {isSendingReminders ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Bell className="w-4 h-4 mr-2" />
+              )}
+              發送到期提醒
+            </Button>
           )}
         </div>
       </div>
@@ -577,6 +638,12 @@ export default function Documents() {
           onClear={batchSelect.deselectAll}
           actions={[
             {
+              key: 'upload',
+              label: '批次上傳新版本',
+              icon: <Upload className="w-4 h-4" />,
+              onClick: () => setIsBatchUploadOpen(true),
+            },
+            {
               key: 'edit',
               label: '批次修改',
               icon: BatchActionIcons.edit,
@@ -636,6 +703,23 @@ export default function Documents() {
         open={isDetailOpen}
         onOpenChange={setIsDetailOpen}
         documentId={selectedDocumentId}
+      />
+
+      {/* Batch Upload Version Dialog */}
+      <BatchUploadVersionDialog
+        open={isBatchUploadOpen}
+        onOpenChange={setIsBatchUploadOpen}
+        selectedDocuments={batchSelect.selectedItems.map(doc => ({
+          id: doc.id,
+          doc_type: doc.doc_type,
+          title: doc.title,
+          version: doc.version,
+          projects: doc.projects as any,
+        }))}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+          batchSelect.deselectAll();
+        }}
       />
     </div>
   );
