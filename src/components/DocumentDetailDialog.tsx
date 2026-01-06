@@ -39,9 +39,11 @@ import {
   Edit2,
   Save,
   X,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
 import { toast } from 'sonner';
+import { DocumentVersionCompare } from './DocumentVersionCompare';
 
 interface DocumentDetailDialogProps {
   open: boolean;
@@ -57,6 +59,7 @@ export function DocumentDetailDialog({
   const { canEdit } = useAuth();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [editData, setEditData] = useState({
     submitted_at: '',
     issued_at: '',
@@ -413,10 +416,20 @@ export function DocumentDetailDialog({
               {/* Version History */}
               {versions.length > 1 && (
                 <div className="space-y-3">
-                  <h4 className="font-medium flex items-center gap-2">
-                    <Clock className="w-4 h-4" />
-                    版本歷史 ({versions.length} 個版本)
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-medium flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      版本歷史 ({versions.length} 個版本)
+                    </h4>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setIsCompareOpen(true)}
+                    >
+                      <ArrowLeftRight className="w-4 h-4 mr-2" />
+                      版本比較
+                    </Button>
+                  </div>
                   <div className="border rounded-lg overflow-hidden">
                     <Table>
                       <TableHeader>
@@ -524,6 +537,13 @@ export function DocumentDetailDialog({
             </div>
           )}
         </ScrollArea>
+
+        {/* Version Compare Dialog */}
+        <DocumentVersionCompare
+          open={isCompareOpen}
+          onOpenChange={setIsCompareOpen}
+          versions={versions}
+        />
       </DialogContent>
     </Dialog>
   );
