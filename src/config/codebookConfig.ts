@@ -22,6 +22,7 @@ export type CodebookCategory =
   | 'project_status'
   | 'doc_type'
   | 'doc_status'
+  | 'agency'
   | 'installation_type'
   | 'grid_connection_type'
   | 'power_phase_type'
@@ -70,6 +71,14 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
     description: '文件處理的狀態選項',
     usageMapping: [
       { table: 'documents', column: 'doc_status' },
+    ],
+  },
+  agency: {
+    label: '發證機關',
+    icon: Building2,
+    description: '文件發證機關選項',
+    usageMapping: [
+      { table: 'documents', column: 'agency' },
     ],
   },
   installation_type: {
@@ -206,6 +215,14 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
     { value: '進行中', label: '進行中' },
     { value: '已完成', label: '已完成' },
     { value: '退件補正', label: '退件補正' },
+  ],
+  agency: [
+    { value: '台灣電力公司', label: '台灣電力公司' },
+    { value: '經濟部能源署', label: '經濟部能源署' },
+    { value: '地方政府', label: '地方政府' },
+    { value: '結構技師', label: '結構技師' },
+    { value: '電機技師', label: '電機技師' },
+    { value: '其他', label: '其他' },
   ],
   installation_type: [
     { value: '畜牧舍', label: '畜牧舍' },

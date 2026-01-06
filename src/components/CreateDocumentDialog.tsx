@@ -4,7 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
-import { getAgencyByDocType, canAutoInferAgency, DEFAULT_AGENCY_OPTIONS, generateDocumentDisplayName } from '@/lib/documentAgency';
+import { getAgencyByDocType, canAutoInferAgency, generateDocumentDisplayName } from '@/lib/documentAgency';
 import {
   Dialog,
   DialogContent,
@@ -58,6 +58,7 @@ export function CreateDocumentDialog({
   const { user } = useAuth();
   const { isAuthorized: isDriveAuthorized, authorize: authorizeDrive, isAuthorizing } = useDriveAuth();
   const { options: docTypeOptions } = useOptionsForCategory('doc_type');
+  const { options: agencyOptions } = useOptionsForCategory('agency');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -120,8 +121,16 @@ export function CreateDocumentDialog({
   // Get selected project info
   const selectedProject = projects.find(p => p.id === projectId);
   
-  // Use default agency options (agency is not a system_options category)
-  const mergedAgencyOptions = DEFAULT_AGENCY_OPTIONS;
+  // Use system options for agency, fallback to defaults if not configured
+  const defaultAgencyFallback = [
+    { value: '台灣電力公司', label: '台灣電力公司' },
+    { value: '經濟部能源署', label: '經濟部能源署' },
+    { value: '地方政府', label: '地方政府' },
+    { value: '結構技師', label: '結構技師' },
+    { value: '電機技師', label: '電機技師' },
+    { value: '其他', label: '其他' },
+  ];
+  const mergedAgencyOptions = agencyOptions.length > 0 ? agencyOptions : defaultAgencyFallback;
   
   // Handle file selection
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

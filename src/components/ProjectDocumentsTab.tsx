@@ -6,6 +6,8 @@ import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
+import { CreateDocumentDialog } from '@/components/CreateDocumentDialog';
+import { DocumentDetailDialog } from '@/components/DocumentDetailDialog';
 import {
   FolderOpen,
   Upload,
@@ -18,6 +20,7 @@ import {
   ChevronRight,
   Clock,
   File,
+  Plus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -77,6 +80,9 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [uploadForm, setUploadForm] = useState<{
     documentType: string;
     title: string;
@@ -372,11 +378,17 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
               顯示目前版本，可展開查看歷史版本
             </CardDescription>
           </div>
-          {canEdit && hasDriveFolder && isDriveAuthorized && (
-            <Button size="sm" onClick={() => setIsUploadOpen(true)}>
-              <Upload className="w-4 h-4 mr-2" />
-              上傳文件
-            </Button>
+          {canEdit && (
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setIsUploadOpen(true)} disabled={!hasDriveFolder || !isDriveAuthorized}>
+                <Upload className="w-4 h-4 mr-2" />
+                上傳新版本
+              </Button>
+              <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                新增文件
+              </Button>
+            </div>
           )}
         </CardHeader>
         <CardContent>
@@ -411,7 +423,13 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                   
                   return (
                     <Collapsible key={key} open={isExpanded}>
-                      <TableRow className="hover:bg-muted/50">
+                      <TableRow 
+                        className="hover:bg-muted/50 cursor-pointer"
+                        onClick={() => {
+                          setSelectedDocumentId(current.id);
+                          setIsDetailOpen(true);
+                        }}
+                      >
                         <TableCell className="w-8">
                           {hasVersions && (
                             <CollapsibleTrigger asChild>
@@ -591,6 +609,23 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Create Document Dialog */}
+      <CreateDocumentDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        defaultProjectId={projectId}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['project-documents-versioned', projectId] });
+        }}
+      />
+
+      {/* Document Detail Dialog */}
+      <DocumentDetailDialog
+        open={isDetailOpen}
+        onOpenChange={setIsDetailOpen}
+        documentId={selectedDocumentId}
+      />
     </div>
   );
 }
