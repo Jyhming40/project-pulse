@@ -40,10 +40,12 @@ import {
   Save,
   X,
   ArrowLeftRight,
+  Tag,
 } from 'lucide-react';
 import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
 import { toast } from 'sonner';
 import { DocumentVersionCompare } from './DocumentVersionCompare';
+import { DocumentTagSelector } from './DocumentTagSelector';
 
 interface DocumentDetailDialogProps {
   open: boolean;
@@ -258,10 +260,17 @@ export function DocumentDetailDialog({
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline">{document.doc_type}</Badge>
                     <Badge className={statusColor}>{derivedStatus}</Badge>
                   </div>
+                </div>
+
+                {/* Tags Section */}
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="text-sm text-muted-foreground shrink-0">標籤：</span>
+                  <DocumentTagSelector documentId={documentId!} canEdit={canEdit} />
                 </div>
 
                 {isEditing ? (
