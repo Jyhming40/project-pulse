@@ -6,6 +6,7 @@ import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
 import { useBatchSelect } from '@/hooks/useBatchSelect';
+import { useDocumentTags, useAllDocumentTagAssignments } from '@/hooks/useDocumentTags';
 import { format, isWithinInterval, subDays } from 'date-fns';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
@@ -14,6 +15,7 @@ import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { CreateDocumentDialog } from '@/components/CreateDocumentDialog';
 import { DocumentDetailDialog } from '@/components/DocumentDetailDialog';
 import { BatchUploadVersionDialog } from '@/components/BatchUploadVersionDialog';
+import { DocumentTagBadge } from '@/components/DocumentTagBadge';
 import { getDerivedDocStatus, getDerivedDocStatusColor, DerivedDocStatus } from '@/lib/documentStatus';
 import { 
   Search, 
@@ -29,6 +31,7 @@ import {
   Upload,
   Bell,
   Loader2,
+  Tag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,6 +86,7 @@ export default function Documents() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [tagFilter, setTagFilter] = useState<string>('all');
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false);
   const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
@@ -91,6 +95,10 @@ export default function Documents() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isBatchUploadOpen, setIsBatchUploadOpen] = useState(false);
   const [isSendingReminders, setIsSendingReminders] = useState(false);
+
+  // Fetch document tags and assignments
+  const { tags } = useDocumentTags();
+  const { data: tagAssignments } = useAllDocumentTagAssignments();
   
   // Fetch documents with project info
   const { data: documents = [], isLoading } = useQuery({
@@ -138,16 +146,28 @@ export default function Documents() {
     return acc;
   }, [] as { id: string; code: string; name: string }[]).sort((a, b) => a.code.localeCompare(b.code));
 
-  // Filter documents with derived status and project filter
+  // Filter documents with derived status, project filter, tag filter, and enhanced search
   const filteredDocuments = documents.filter(doc => {
     const project = doc.projects as any;
-    const matchesSearch = 
-      project?.project_name?.toLowerCase().includes(search.toLowerCase()) ||
-      project?.project_code?.toLowerCase().includes(search.toLowerCase()) ||
-      doc.doc_type.toLowerCase().includes(search.toLowerCase());
+    const searchLower = search.toLowerCase();
+    
+    // Enhanced search across multiple fields
+    const matchesSearch = !search || 
+      project?.project_name?.toLowerCase().includes(searchLower) ||
+      project?.project_code?.toLowerCase().includes(searchLower) ||
+      doc.doc_type.toLowerCase().includes(searchLower) ||
+      doc.title?.toLowerCase().includes(searchLower) ||
+      doc.note?.toLowerCase().includes(searchLower);
     
     const matchesType = typeFilter === 'all' || doc.doc_type === typeFilter;
     const matchesProject = projectFilter === 'all' || doc.project_id === projectFilter;
+    
+    // Tag filter
+    let matchesTag = true;
+    if (tagFilter !== 'all' && tagAssignments) {
+      const docTags = tagAssignments.get(doc.id) || [];
+      matchesTag = docTags.some(t => t.id === tagFilter);
+    }
     
     // Handle status filter including 'upcoming' for expiring soon
     let matchesStatus = true;
@@ -169,7 +189,7 @@ export default function Documents() {
       matchesStatus = derivedStatus === statusFilter;
     }
     
-    return matchesSearch && matchesType && matchesStatus && matchesProject;
+    return matchesSearch && matchesType && matchesStatus && matchesProject && matchesTag;
   });
 
   // Sorting
@@ -438,7 +458,7 @@ export default function Documents() {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
-            placeholder="搜尋案場名稱、編號、文件類型..."
+            placeholder="搜尋案場、標題、備註..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"
@@ -480,6 +500,25 @@ export default function Documents() {
             ))}
           </SelectContent>
         </Select>
+        <Select value={tagFilter} onValueChange={setTagFilter}>
+          <SelectTrigger className="w-full sm:w-[150px]">
+            <div className="flex items-center gap-2">
+              <Tag className="w-4 h-4" />
+              <SelectValue placeholder="標籤篩選" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部標籤</SelectItem>
+            {tags.map(tag => (
+              <SelectItem key={tag.id} value={tag.id}>
+                <div className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full bg-${tag.color}-500`} />
+                  {tag.name}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}
@@ -516,19 +555,21 @@ export default function Documents() {
               <SortableTableHead sortKey="submitted_at" currentSortKey={sortConfig.key} currentDirection={getSortInfo('submitted_at').direction} sortIndex={getSortInfo('submitted_at').index} onSort={handleSort}>送件日</SortableTableHead>
               <SortableTableHead sortKey="issued_at" currentSortKey={sortConfig.key} currentDirection={getSortInfo('issued_at').direction} sortIndex={getSortInfo('issued_at').index} onSort={handleSort}>核發日</SortableTableHead>
               <SortableTableHead sortKey="due_at" currentSortKey={sortConfig.key} currentDirection={getSortInfo('due_at').direction} sortIndex={getSortInfo('due_at').index} onSort={handleSort}>到期日</SortableTableHead>
+              <TableHead>標籤</TableHead>
               <SortableTableHead sortKey="owner.full_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('owner.full_name').direction} sortIndex={getSortInfo('owner.full_name').index} onSort={handleSort}>負責人</SortableTableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sortedDocuments.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={canEdit ? 8 : 7} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={canEdit ? 9 : 8} className="text-center py-12 text-muted-foreground">
                   {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
             ) : (
               pagination.paginatedData.map(doc => {
                 const project = doc.projects as any;
+                const docTags = tagAssignments?.get(doc.id) || [];
                 const owner = doc.owner as any;
                 const isDueSoon = doc.due_at && isWithinInterval(new Date(doc.due_at), {
                   start: new Date(),
@@ -598,6 +639,18 @@ export default function Documents() {
                           {isDueSoon && <AlertTriangle className="w-3 h-3 inline ml-1" />}
                         </span>
                       ) : '-'}
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <div className="flex flex-wrap gap-1 max-w-[150px]">
+                        {docTags.map(tag => (
+                          <DocumentTagBadge
+                            key={tag.id}
+                            name={tag.name}
+                            color={tag.color}
+                            size="sm"
+                          />
+                        ))}
+                      </div>
                     </TableCell>
                     <TableCell>{owner?.full_name || '-'}</TableCell>
                   </TableRow>
