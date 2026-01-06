@@ -1,5 +1,7 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import {
@@ -13,6 +15,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import {
   Table,
   TableBody,
@@ -31,8 +36,12 @@ import {
   AlertCircle,
   CheckCircle2,
   File,
+  Edit2,
+  Save,
+  X,
 } from 'lucide-react';
 import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
+import { toast } from 'sonner';
 
 interface DocumentDetailDialogProps {
   open: boolean;
@@ -45,6 +54,16 @@ export function DocumentDetailDialog({
   onOpenChange,
   documentId,
 }: DocumentDetailDialogProps) {
+  const { canEdit } = useAuth();
+  const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({
+    submitted_at: '',
+    issued_at: '',
+    due_at: '',
+    note: '',
+  });
+
   // Fetch document with all versions
   const { data: document, isLoading } = useQuery({
     queryKey: ['document-detail', documentId],
@@ -118,6 +137,71 @@ export function DocumentDetailDialog({
     enabled: open && (versions.length > 0 || !!documentId),
   });
 
+  // Update mutation
+  const updateMutation = useMutation({
+    mutationFn: async (data: typeof editData) => {
+      if (!documentId) throw new Error('No document ID');
+
+      const updatePayload: Record<string, string | null> = {
+        submitted_at: data.submitted_at || null,
+        issued_at: data.issued_at || null,
+        due_at: data.due_at || null,
+        note: data.note || null,
+        updated_at: new Date().toISOString(),
+      };
+
+      const { error } = await supabase
+        .from('documents')
+        .update(updatePayload)
+        .eq('id', documentId);
+
+      if (error) throw error;
+
+      // Log audit
+      await supabase.rpc('log_audit_action', {
+        p_table_name: 'documents',
+        p_record_id: documentId,
+        p_action: 'UPDATE',
+        p_old_data: {
+          submitted_at: document?.submitted_at,
+          issued_at: document?.issued_at,
+          due_at: document?.due_at,
+          note: document?.note,
+        },
+        p_new_data: updatePayload,
+        p_reason: '編輯文件資訊',
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['document-detail', documentId] });
+      queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['project-documents'] });
+      toast.success('文件資訊已更新');
+      setIsEditing(false);
+    },
+    onError: (error: Error) => {
+      toast.error('更新失敗', { description: error.message });
+    },
+  });
+
+  const handleEdit = () => {
+    setEditData({
+      submitted_at: document?.submitted_at?.split('T')[0] || '',
+      issued_at: document?.issued_at?.split('T')[0] || '',
+      due_at: document?.due_at?.split('T')[0] || '',
+      note: document?.note || '',
+    });
+    setIsEditing(true);
+  };
+
+  const handleSave = () => {
+    updateMutation.mutate(editData);
+  };
+
+  const handleCancel = () => {
+    setIsEditing(false);
+  };
+
   if (!open) return null;
 
   const project = document?.projects as { project_code: string; project_name: string } | null;
@@ -129,10 +213,18 @@ export function DocumentDetailDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" />
-            文件詳情
-          </DialogTitle>
+          <div className="flex items-center justify-between">
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              文件詳情
+            </DialogTitle>
+            {canEdit && !isEditing && document && (
+              <Button variant="outline" size="sm" onClick={handleEdit}>
+                <Edit2 className="w-4 h-4 mr-2" />
+                編輯
+              </Button>
+            )}
+          </div>
           <DialogDescription>
             查看文件完整資訊與歷史版本
           </DialogDescription>
@@ -169,62 +261,130 @@ export function DocumentDetailDialog({
                   </div>
                 </div>
 
-                {document.note && (
-                  <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-                    {document.note}
-                  </p>
+                {isEditing ? (
+                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="submitted_at">送件日</Label>
+                        <Input
+                          id="submitted_at"
+                          type="date"
+                          value={editData.submitted_at}
+                          onChange={e =>
+                            setEditData(prev => ({ ...prev, submitted_at: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="issued_at">核發日</Label>
+                        <Input
+                          id="issued_at"
+                          type="date"
+                          value={editData.issued_at}
+                          onChange={e =>
+                            setEditData(prev => ({ ...prev, issued_at: e.target.value }))
+                          }
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="due_at">到期日</Label>
+                        <Input
+                          id="due_at"
+                          type="date"
+                          value={editData.due_at}
+                          onChange={e =>
+                            setEditData(prev => ({ ...prev, due_at: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="note">備註</Label>
+                      <Textarea
+                        id="note"
+                        value={editData.note}
+                        onChange={e =>
+                          setEditData(prev => ({ ...prev, note: e.target.value }))
+                        }
+                        rows={3}
+                        placeholder="輸入備註..."
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={handleCancel}>
+                        <X className="w-4 h-4 mr-1" />
+                        取消
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleSave}
+                        disabled={updateMutation.isPending}
+                      >
+                        <Save className="w-4 h-4 mr-1" />
+                        儲存
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  document.note && (
+                    <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
+                      {document.note}
+                    </p>
+                  )
                 )}
               </div>
 
               <Separator />
 
               {/* Key Dates */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    送件日
-                  </p>
-                  <p className="text-sm font-medium">
-                    {document.submitted_at
-                      ? format(new Date(document.submitted_at), 'yyyy/MM/dd')
-                      : '-'}
-                  </p>
+              {!isEditing && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      送件日
+                    </p>
+                    <p className="text-sm font-medium">
+                      {document.submitted_at
+                        ? format(new Date(document.submitted_at), 'yyyy/MM/dd')
+                        : '-'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      核發日
+                    </p>
+                    <p className="text-sm font-medium">
+                      {document.issued_at
+                        ? format(new Date(document.issued_at), 'yyyy/MM/dd')
+                        : '-'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <AlertCircle className="w-3 h-3" />
+                      到期日
+                    </p>
+                    <p className="text-sm font-medium">
+                      {document.due_at
+                        ? format(new Date(document.due_at), 'yyyy/MM/dd')
+                        : '-'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <User className="w-3 h-3" />
+                      負責人
+                    </p>
+                    <p className="text-sm font-medium">
+                      {owner?.full_name || '-'}
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" />
-                    核發日
-                  </p>
-                  <p className="text-sm font-medium">
-                    {document.issued_at
-                      ? format(new Date(document.issued_at), 'yyyy/MM/dd')
-                      : '-'}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <AlertCircle className="w-3 h-3" />
-                    到期日
-                  </p>
-                  <p className="text-sm font-medium">
-                    {document.due_at
-                      ? format(new Date(document.due_at), 'yyyy/MM/dd')
-                      : '-'}
-                  </p>
-                </div>
-                <div className="space-y-1">
-                  <p className="text-xs text-muted-foreground flex items-center gap-1">
-                    <User className="w-3 h-3" />
-                    負責人
-                  </p>
-                  <p className="text-sm font-medium">
-                    {owner?.full_name || '-'}
-                  </p>
-                </div>
-              </div>
+              )}
 
-              <Separator />
+              {!isEditing && <Separator />}
 
               {/* Current Version & Drive Link */}
               <div className="flex items-center justify-between">
