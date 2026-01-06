@@ -11,6 +11,7 @@ import { TablePagination } from '@/components/ui/table-pagination';
 import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
 import { BatchUpdateDialog, BatchUpdateField } from '@/components/BatchUpdateDialog';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
+import { CreateDocumentDialog } from '@/components/CreateDocumentDialog';
 import { getDerivedDocStatus, getDerivedDocStatusColor, DerivedDocStatus } from '@/lib/documentStatus';
 import { 
   Search, 
@@ -20,7 +21,9 @@ import {
   CheckCircle2,
   XCircle,
   FileDown,
-  Info
+  Info,
+  Plus,
+  Building2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,9 +77,11 @@ export default function Documents() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [projectFilter, setProjectFilter] = useState<string>('all');
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false);
   const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
   // Fetch documents with project info
   const { data: documents = [], isLoading } = useQuery({
@@ -115,7 +120,16 @@ export default function Documents() {
     },
   });
 
-  // Filter documents with derived status
+  // Fetch unique projects for filter dropdown
+  const uniqueProjects = documents.reduce((acc, doc) => {
+    const project = doc.projects as any;
+    if (project && !acc.find(p => p.id === doc.project_id)) {
+      acc.push({ id: doc.project_id, code: project.project_code, name: project.project_name });
+    }
+    return acc;
+  }, [] as { id: string; code: string; name: string }[]).sort((a, b) => a.code.localeCompare(b.code));
+
+  // Filter documents with derived status and project filter
   const filteredDocuments = documents.filter(doc => {
     const project = doc.projects as any;
     const matchesSearch = 
@@ -124,6 +138,7 @@ export default function Documents() {
       doc.doc_type.toLowerCase().includes(search.toLowerCase());
     
     const matchesType = typeFilter === 'all' || doc.doc_type === typeFilter;
+    const matchesProject = projectFilter === 'all' || doc.project_id === projectFilter;
     
     // Handle status filter including 'upcoming' for expiring soon
     let matchesStatus = true;
@@ -145,7 +160,7 @@ export default function Documents() {
       matchesStatus = derivedStatus === statusFilter;
     }
     
-    return matchesSearch && matchesType && matchesStatus;
+    return matchesSearch && matchesType && matchesStatus && matchesProject;
   });
 
   // Sorting
@@ -279,12 +294,20 @@ export default function Documents() {
             所有案場文件總覽 {documents.length > 0 && `(共 ${documents.length} 筆)`}
           </p>
         </div>
-        {canEdit && (
-          <Button variant="outline" onClick={() => setIsImportExportOpen(true)}>
-            <FileDown className="w-4 h-4 mr-2" />
-            匯入/匯出
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {canEdit && (
+            <>
+              <Button onClick={() => setIsCreateDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                新增文件
+              </Button>
+              <Button variant="outline" onClick={() => setIsImportExportOpen(true)}>
+                <FileDown className="w-4 h-4 mr-2" />
+                匯入/匯出
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Stats - clickable cards for filtering */}
@@ -358,6 +381,20 @@ export default function Documents() {
             className="pl-10"
           />
         </div>
+        <Select value={projectFilter} onValueChange={setProjectFilter}>
+          <SelectTrigger className="w-full sm:w-[200px]">
+            <SelectValue placeholder="選擇案場" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部案場</SelectItem>
+            {uniqueProjects.map(p => (
+              <SelectItem key={p.id} value={p.id}>
+                <span className="font-mono text-xs text-muted-foreground mr-1">{p.code}</span>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={typeFilter} onValueChange={setTypeFilter}>
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="文件類型" />
@@ -576,6 +613,16 @@ export default function Documents() {
           await batchDeleteMutation.mutateAsync(reason);
         }}
         isLoading={batchDeleteMutation.isPending}
+      />
+
+      {/* Create Document Dialog */}
+      <CreateDocumentDialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+        defaultProjectId={projectFilter !== 'all' ? projectFilter : null}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+        }}
       />
     </div>
   );
