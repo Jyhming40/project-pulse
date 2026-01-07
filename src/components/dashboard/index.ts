@@ -1,7 +1,10 @@
 export { QuickAccessSection } from './QuickAccessSection';
+export { QuickAccessCompact } from './QuickAccessCompact';
 export { AdministrativeSection } from './AdministrativeSection';
 export { EngineeringSection } from './EngineeringSection';
 export { RiskSection } from './RiskSection';
 export { ProgressOverviewCards } from './ProgressOverviewCards';
 export { StatusDistributionChart } from './StatusDistributionChart';
 export { RiskProjectsList } from './RiskProjectsList';
+export { ActionRequiredSection } from './ActionRequiredSection';
+export { HealthKPICards } from './HealthKPICards';

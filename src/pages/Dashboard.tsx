@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   Filter,
+  BarChart3,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
@@ -17,13 +18,13 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  QuickAccessSection,
+  QuickAccessCompact,
   AdministrativeSection,
   EngineeringSection,
   RiskSection,
-  ProgressOverviewCards,
   StatusDistributionChart,
-  RiskProjectsList,
+  ActionRequiredSection,
+  HealthKPICards,
 } from '@/components/dashboard';
 import { useAnalyticsSummary, useRiskProjects } from '@/hooks/useProjectAnalytics';
 
@@ -92,6 +93,11 @@ export default function Dashboard() {
     });
   }, [projects, selectedInvestor, selectedStatus, selectedConstructionStatus]);
 
+  // Pending fix count
+  const pendingFixCount = useMemo(() => {
+    return projects.filter(p => p.status === '台電審查').length;
+  }, [projects]);
+
   // Reset filters
   const resetFilters = () => {
     setSelectedInvestor('all');
@@ -103,51 +109,39 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-display font-bold text-foreground">儀表板</h1>
-        <p className="text-muted-foreground mt-1">每日作戰圖 — 行政推進、工程進度、風險追蹤</p>
+      {/* Header with Quick Access */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-display font-bold text-foreground">儀表板</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">一眼掌握今日待處理事項</p>
+        </div>
+        <QuickAccessCompact />
       </div>
 
-      {/* Progress Overview Cards */}
-      <ProgressOverviewCards
+      {/* Section 1: Health KPIs - 精簡版關鍵指標 */}
+      <HealthKPICards
         totalProjects={summary?.total_projects ?? 0}
         atRiskCount={summary?.at_risk_count ?? 0}
         averageProgress={summary?.average_progress ?? 0}
-        averageAdminProgress={summary?.average_admin_progress ?? 0}
-        averageEngineeringProgress={summary?.average_engineering_progress ?? 0}
+        pendingFixCount={pendingFixCount}
         isLoading={summaryLoading}
       />
 
-      {/* Charts and Risk List */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <StatusDistributionChart
-          title="案場狀態分佈"
-          distribution={summary?.status_distribution ?? {}}
-          isLoading={summaryLoading}
-        />
-        <StatusDistributionChart
-          title="施工狀態分佈"
-          distribution={summary?.construction_status_distribution ?? {}}
-          isLoading={summaryLoading}
-        />
-        <RiskProjectsList
-          projects={riskProjects}
-          isLoading={riskLoading}
-          limit={5}
-        />
-      </div>
+      {/* Section 2: Action Required - 需要立即處理的事項 */}
+      <ActionRequiredSection
+        riskProjects={riskProjects}
+        allProjects={projects as any}
+        isLoading={riskLoading}
+        maxDisplayCount={5}
+      />
 
-      {/* Quick Access */}
-      <QuickAccessSection />
-
-      {/* Filters */}
+      {/* Section 3: Filters + Detailed Tabs */}
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-medium flex items-center gap-2">
               <Filter className="w-4 h-4" />
-              篩選條件
+              進階分析
             </CardTitle>
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={resetFilters}>
@@ -156,12 +150,13 @@ export default function Dashboard() {
             )}
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1.5">
+        <CardContent className="space-y-4">
+          {/* Filters */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">投資方</Label>
               <Select value={selectedInvestor} onValueChange={setSelectedInvestor}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="全部" />
                 </SelectTrigger>
                 <SelectContent>
@@ -175,10 +170,10 @@ export default function Dashboard() {
               </Select>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">案場狀態</Label>
               <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="全部" />
                 </SelectTrigger>
                 <SelectContent>
@@ -190,10 +185,10 @@ export default function Dashboard() {
               </Select>
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-1">
               <Label className="text-xs text-muted-foreground">施工狀態</Label>
               <Select value={selectedConstructionStatus} onValueChange={setSelectedConstructionStatus}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9">
                   <SelectValue placeholder="全部" />
                 </SelectTrigger>
                 <SelectContent>
@@ -205,29 +200,49 @@ export default function Dashboard() {
               </Select>
             </div>
           </div>
+
+          {/* Tabs */}
+          <Tabs defaultValue="admin" className="space-y-4">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="admin">行政</TabsTrigger>
+              <TabsTrigger value="engineering">工程</TabsTrigger>
+              <TabsTrigger value="risk">風險</TabsTrigger>
+              <TabsTrigger value="charts" className="flex items-center gap-1">
+                <BarChart3 className="w-3 h-3" />
+                分佈圖
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="admin">
+              <AdministrativeSection projects={filteredProjects as any} />
+            </TabsContent>
+
+            <TabsContent value="engineering">
+              <EngineeringSection projects={filteredProjects as any} />
+            </TabsContent>
+
+            <TabsContent value="risk">
+              <RiskSection projects={filteredProjects as any} />
+            </TabsContent>
+
+            {/* Charts moved to a separate tab */}
+            <TabsContent value="charts">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <StatusDistributionChart
+                  title="案場狀態分佈"
+                  distribution={summary?.status_distribution ?? {}}
+                  isLoading={summaryLoading}
+                />
+                <StatusDistributionChart
+                  title="施工狀態分佈"
+                  distribution={summary?.construction_status_distribution ?? {}}
+                  isLoading={summaryLoading}
+                />
+              </div>
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
-
-      {/* Main Tabs: 行政 / 工程 / 風險 */}
-      <Tabs defaultValue="admin" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="admin">行政區</TabsTrigger>
-          <TabsTrigger value="engineering">工程區</TabsTrigger>
-          <TabsTrigger value="risk">風險區</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="admin">
-          <AdministrativeSection projects={filteredProjects as any} />
-        </TabsContent>
-
-        <TabsContent value="engineering">
-          <EngineeringSection projects={filteredProjects as any} />
-        </TabsContent>
-
-        <TabsContent value="risk">
-          <RiskSection projects={filteredProjects as any} />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 }
