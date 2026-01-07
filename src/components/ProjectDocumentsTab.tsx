@@ -403,16 +403,17 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
           ) : currentDocuments.length === 0 ? (
             <p className="text-center py-8 text-muted-foreground">暫無文件</p>
           ) : (
-            <Table>
+            <div className="overflow-x-auto">
+            <Table className="min-w-[800px]">
               <TableHeader>
                 <TableRow>
-                  <TableHead className="w-8"></TableHead>
-                  <TableHead>文件類型</TableHead>
-                  <TableHead>標題</TableHead>
-                  <TableHead>版本</TableHead>
-                  <TableHead>上傳時間</TableHead>
-                  <TableHead>上傳者</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
+                  <TableHead className="w-10"></TableHead>
+                  <TableHead className="min-w-[120px]">文件類型</TableHead>
+                  <TableHead className="min-w-[150px]">標題</TableHead>
+                  <TableHead className="min-w-[100px]">版本</TableHead>
+                  <TableHead className="min-w-[130px]">上傳時間</TableHead>
+                  <TableHead className="min-w-[100px]">上傳者</TableHead>
+                  <TableHead className="text-right min-w-[80px]">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -529,6 +530,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                 })}
               </TableBody>
             </Table>
+            </div>
           )}
         </CardContent>
       </Card>
