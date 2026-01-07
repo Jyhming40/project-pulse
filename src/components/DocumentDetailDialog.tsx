@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import {
@@ -41,32 +42,47 @@ import {
   X,
   ArrowLeftRight,
   Tag,
+  Trash2,
 } from 'lucide-react';
 import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
 import { toast } from 'sonner';
 import { DocumentVersionCompare } from './DocumentVersionCompare';
 import { DocumentTagSelector } from './DocumentTagSelector';
+import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 
 interface DocumentDetailDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   documentId: string | null;
+  onDeleted?: () => void;
 }
 
 export function DocumentDetailDialog({
   open,
   onOpenChange,
   documentId,
+  onDeleted,
 }: DocumentDetailDialogProps) {
   const { canEdit } = useAuth();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editData, setEditData] = useState({
     submitted_at: '',
     issued_at: '',
     due_at: '',
     note: '',
+  });
+
+  // Soft delete hook for documents
+  const { softDelete, isDeleting } = useSoftDelete({
+    tableName: 'documents',
+    queryKey: ['project-documents-versioned', 'all-documents', 'project-documents', 'document-detail'],
+    onSuccess: () => {
+      onOpenChange(false);
+      onDeleted?.();
+    },
   });
 
   // Fetch document with all versions
@@ -215,25 +231,37 @@ export function DocumentDetailDialog({
   const statusColor = getDerivedDocStatusColor(derivedStatus);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary" />
-              文件詳情
-            </DialogTitle>
-            {canEdit && !isEditing && document && (
-              <Button variant="outline" size="sm" onClick={handleEdit}>
-                <Edit2 className="w-4 h-4 mr-2" />
-                編輯
-              </Button>
-            )}
-          </div>
-          <DialogDescription>
-            查看文件完整資訊與歷史版本
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5 text-primary" />
+                文件詳情
+              </DialogTitle>
+              {canEdit && !isEditing && document && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={handleEdit}>
+                    <Edit2 className="w-4 h-4 mr-2" />
+                    編輯
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    刪除
+                  </Button>
+                </div>
+              )}
+            </div>
+            <DialogDescription>
+              查看文件完整資訊與歷史版本
+            </DialogDescription>
+          </DialogHeader>
 
         <ScrollArea className="flex-1 pr-4">
           {isLoading ? (
@@ -555,5 +583,21 @@ export function DocumentDetailDialog({
         />
       </DialogContent>
     </Dialog>
+
+    {/* Delete Confirmation Dialog */}
+    <DeleteConfirmDialog
+      open={isDeleteDialogOpen}
+      onOpenChange={setIsDeleteDialogOpen}
+      onConfirm={async (reason) => {
+        if (documentId) {
+          await softDelete({ id: documentId, reason });
+        }
+      }}
+      title="刪除文件"
+      itemName={document?.title || document?.doc_type}
+      tableName="documents"
+      isPending={isDeleting}
+    />
+  </>
   );
 }
