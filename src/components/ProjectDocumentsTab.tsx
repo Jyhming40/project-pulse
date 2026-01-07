@@ -449,13 +449,13 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                             </CollapsibleTrigger>
                           )}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <Badge variant="outline">{current.doc_type}</Badge>
                         </TableCell>
-                        <TableCell className="font-medium">
+                        <TableCell className="font-medium whitespace-nowrap">
                           {current.title || current.doc_type}
                         </TableCell>
-                        <TableCell>
+                        <TableCell className="whitespace-nowrap">
                           <Badge variant="secondary">v{current.version || 1}</Badge>
                           {hasVersions && (
                             <span className="text-xs text-muted-foreground ml-2">
@@ -463,12 +463,12 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                             </span>
                           )}
                         </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
+                        <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                           {current.created_at
                             ? format(new Date(current.created_at), 'yyyy/MM/dd HH:mm', { locale: zhTW })
                             : '-'}
                         </TableCell>
-                        <TableCell className="text-sm">
+                        <TableCell className="text-sm whitespace-nowrap">
                           {(current.owner as { full_name?: string })?.full_name || '-'}
                         </TableCell>
                         <TableCell className="text-right">
@@ -490,23 +490,23 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                             {versions.filter(v => v.id !== current.id).map(doc => (
                               <TableRow key={doc.id} className="bg-muted/30">
                                 <TableCell></TableCell>
-                                <TableCell>
+                                <TableCell className="whitespace-nowrap">
                                   <Clock className="w-4 h-4 text-muted-foreground" />
                                 </TableCell>
-                                <TableCell className="text-muted-foreground">
+                                <TableCell className="text-muted-foreground whitespace-nowrap">
                                   {doc.title || doc.doc_type}
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="whitespace-nowrap">
                                   <Badge variant="outline" className="text-muted-foreground">
                                     v{doc.version || 1}
                                   </Badge>
                                 </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
+                                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                                   {doc.created_at
                                     ? format(new Date(doc.created_at), 'yyyy/MM/dd HH:mm', { locale: zhTW })
                                     : '-'}
                                 </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">
+                                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                                   {(doc.owner as { full_name?: string })?.full_name || '-'}
                                 </TableCell>
                                 <TableCell className="text-right">
