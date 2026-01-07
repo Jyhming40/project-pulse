@@ -8,6 +8,9 @@ import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { CreateDocumentDialog } from '@/components/CreateDocumentDialog';
 import { DocumentDetailDialog } from '@/components/DocumentDetailDialog';
+import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
+import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
+import { useBatchSelect } from '@/hooks/useBatchSelect';
 import {
   FolderOpen,
   Upload,
@@ -21,12 +24,14 @@ import {
   Clock,
   File,
   Plus,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Select,
   SelectContent,
@@ -53,6 +58,7 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 
 interface ProjectDocumentsTabProps {
   projectId: string;
@@ -87,6 +93,9 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [expandedDocs, setExpandedDocs] = useState<Set<string>>(new Set());
+  const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
+  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
+  const [singleDeleteDoc, setSingleDeleteDoc] = useState<{ id: string; title: string } | null>(null);
 
   const { options: docTypeOptions } = useOptionsForCategory('doc_type');
 
@@ -124,6 +133,9 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
     },
     enabled: !!projectId,
   });
+
+  // Batch selection for documents
+  const docBatchSelect = useBatchSelect(documents);
 
   // Group documents by type and title
   const groupedDocuments = documents.reduce((acc, doc) => {
@@ -255,6 +267,73 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
       }
       return next;
     });
+  };
+
+  // Soft delete document(s)
+  const softDeleteMutation = useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { error } = await supabase
+        .from('documents')
+        .update({ 
+          is_deleted: true, 
+          deleted_at: new Date().toISOString(),
+          deleted_by: user?.id 
+        })
+        .in('id', ids);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project-documents-versioned', projectId] });
+    },
+  });
+
+  const handleBatchDelete = async (reason?: string) => {
+    const selectedIds = Array.from(docBatchSelect.selectedIds);
+    if (selectedIds.length === 0) return;
+    
+    setIsBatchDeleting(true);
+    try {
+      // If reason is provided, update with reason
+      if (reason) {
+        await supabase
+          .from('documents')
+          .update({ 
+            is_deleted: true, 
+            deleted_at: new Date().toISOString(),
+            deleted_by: user?.id,
+            delete_reason: reason 
+          })
+          .in('id', selectedIds);
+      } else {
+        await softDeleteMutation.mutateAsync(selectedIds);
+      }
+      toast.success(`已刪除 ${selectedIds.length} 筆文件`);
+      docBatchSelect.deselectAll();
+    } catch (err) {
+      toast.error('刪除失敗', { description: (err as Error).message });
+    } finally {
+      setIsBatchDeleting(false);
+    }
+  };
+
+  const handleSingleDelete = async (reason?: string) => {
+    if (!singleDeleteDoc) return;
+    try {
+      await supabase
+        .from('documents')
+        .update({ 
+          is_deleted: true, 
+          deleted_at: new Date().toISOString(),
+          deleted_by: user?.id,
+          delete_reason: reason || null
+        })
+        .eq('id', singleDeleteDoc.id);
+      queryClient.invalidateQueries({ queryKey: ['project-documents-versioned', projectId] });
+      toast.success('已刪除文件');
+      setSingleDeleteDoc(null);
+    } catch (err) {
+      toast.error('刪除失敗', { description: (err as Error).message });
+    }
   };
 
   const hasDriveFolder = !!project.drive_folder_id;
@@ -399,16 +478,25 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
             <p className="text-center py-8 text-muted-foreground">暫無文件</p>
           ) : (
             <div className="overflow-x-auto">
-            <Table className="min-w-[800px]">
+            <Table className="min-w-[900px]">
               <TableHeader>
                 <TableRow>
+                  {canEdit && (
+                    <TableHead className="w-10">
+                      <Checkbox 
+                        checked={docBatchSelect.isAllSelected}
+                        onCheckedChange={() => docBatchSelect.toggleAll()}
+                        aria-label="全選"
+                      />
+                    </TableHead>
+                  )}
                   <TableHead className="w-10"></TableHead>
                   <TableHead className="min-w-[120px]">文件類型</TableHead>
                   <TableHead className="min-w-[150px]">標題</TableHead>
                   <TableHead className="min-w-[100px]">版本</TableHead>
                   <TableHead className="min-w-[130px]">上傳時間</TableHead>
                   <TableHead className="min-w-[100px]">上傳者</TableHead>
-                  <TableHead className="text-right min-w-[80px]">操作</TableHead>
+                  <TableHead className="text-right min-w-[100px]">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -426,6 +514,16 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                           setIsDetailOpen(true);
                         }}
                       >
+                        {canEdit && (
+                          <TableCell className="w-10">
+                            <Checkbox 
+                              checked={docBatchSelect.isSelected(current.id)}
+                              onCheckedChange={() => docBatchSelect.toggle(current.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              aria-label="選取"
+                            />
+                          </TableCell>
+                        )}
                         <TableCell className="w-10">
                           {hasVersions && (
                             <Button
@@ -468,23 +566,47 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                           {(current.owner as { full_name?: string })?.full_name || '-'}
                         </TableCell>
                         <TableCell className="text-right">
-                          {current.drive_web_view_link && (
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                window.open(current.drive_web_view_link!, '_blank');
-                              }}
-                            >
-                              <ExternalLink className="w-4 h-4" />
-                            </Button>
-                          )}
+                          <div className="flex items-center justify-end gap-1">
+                            {current.drive_web_view_link && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.open(current.drive_web_view_link!, '_blank');
+                                }}
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </Button>
+                            )}
+                            {canEdit && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSingleDeleteDoc({ id: current.id, title: current.title || current.doc_type });
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </div>
                         </TableCell>
                       </TableRow>
                       
                       {hasVersions && isExpanded && versions.filter(v => v.id !== current.id).map(doc => (
                         <TableRow key={doc.id} className="bg-muted/30">
+                          {canEdit && (
+                            <TableCell className="w-10">
+                              <Checkbox 
+                                checked={docBatchSelect.isSelected(doc.id)}
+                                onCheckedChange={() => docBatchSelect.toggle(doc.id)}
+                                aria-label="選取舊版本"
+                              />
+                            </TableCell>
+                          )}
                           <TableCell className="w-10"></TableCell>
                           <TableCell className="whitespace-nowrap">
                             <Clock className="w-4 h-4 text-muted-foreground" />
@@ -506,15 +628,27 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                             {(doc.owner as { full_name?: string })?.full_name || '-'}
                           </TableCell>
                           <TableCell className="text-right">
-                            {doc.drive_web_view_link && (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => window.open(doc.drive_web_view_link!, '_blank')}
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                              </Button>
-                            )}
+                            <div className="flex items-center justify-end gap-1">
+                              {doc.drive_web_view_link && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => window.open(doc.drive_web_view_link!, '_blank')}
+                                >
+                                  <ExternalLink className="w-4 h-4" />
+                                </Button>
+                              )}
+                              {canEdit && (
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => setSingleDeleteDoc({ id: doc.id, title: `${doc.title || doc.doc_type} v${doc.version || 1}` })}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -621,6 +755,44 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
         onOpenChange={setIsDetailOpen}
         documentId={selectedDocumentId}
       />
+
+      {/* Batch Delete Dialog */}
+      <BatchDeleteDialog
+        open={isBatchDeleteOpen}
+        onOpenChange={setIsBatchDeleteOpen}
+        selectedCount={docBatchSelect.selectedCount}
+        itemLabel="份文件"
+        onConfirm={handleBatchDelete}
+        isLoading={isBatchDeleting}
+      />
+
+      {/* Single Delete Dialog */}
+      <DeleteConfirmDialog
+        open={!!singleDeleteDoc}
+        onOpenChange={(open) => !open && setSingleDeleteDoc(null)}
+        onConfirm={handleSingleDelete}
+        title="刪除文件"
+        description="確定要刪除此文件嗎？"
+        itemName={singleDeleteDoc?.title || ''}
+        tableName="documents"
+      />
+
+      {/* Batch Action Bar */}
+      {canEdit && (
+        <BatchActionBar
+          selectedCount={docBatchSelect.selectedCount}
+          actions={[
+            {
+              key: 'delete',
+              label: '批次刪除',
+              icon: BatchActionIcons.delete,
+              variant: 'destructive',
+              onClick: () => setIsBatchDeleteOpen(true),
+            },
+          ]}
+          onClear={docBatchSelect.deselectAll}
+        />
+      )}
     </div>
   );
 }
