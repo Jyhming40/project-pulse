@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -50,11 +50,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -423,7 +418,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                   const isExpanded = expandedDocs.has(key);
                   
                   return (
-                    <Collapsible key={key} open={isExpanded}>
+                    <React.Fragment key={key}>
                       <TableRow 
                         className="hover:bg-muted/50 cursor-pointer"
                         onClick={() => {
@@ -431,29 +426,30 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                           setIsDetailOpen(true);
                         }}
                       >
-                        <TableCell className="w-8">
+                        <TableCell className="w-10">
                           {hasVersions && (
-                            <CollapsibleTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                                onClick={() => toggleExpand(key)}
-                              >
-                                {isExpanded ? (
-                                  <ChevronDown className="h-4 w-4" />
-                                ) : (
-                                  <ChevronRight className="h-4 w-4" />
-                                )}
-                              </Button>
-                            </CollapsibleTrigger>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpand(key);
+                              }}
+                            >
+                              {isExpanded ? (
+                                <ChevronDown className="h-4 w-4" />
+                              ) : (
+                                <ChevronRight className="h-4 w-4" />
+                              )}
+                            </Button>
                           )}
                         </TableCell>
                         <TableCell className="whitespace-nowrap">
                           <Badge variant="outline">{current.doc_type}</Badge>
                         </TableCell>
                         <TableCell className="font-medium whitespace-nowrap">
-                          {current.title || current.doc_type}
+                          {current.title || '-'}
                         </TableCell>
                         <TableCell className="whitespace-nowrap">
                           <Badge variant="secondary">v{current.version || 1}</Badge>
@@ -476,7 +472,10 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => window.open(current.drive_web_view_link!, '_blank')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(current.drive_web_view_link!, '_blank');
+                              }}
                             >
                               <ExternalLink className="w-4 h-4" />
                             </Button>
@@ -484,48 +483,42 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                         </TableCell>
                       </TableRow>
                       
-                      {hasVersions && (
-                        <CollapsibleContent asChild>
-                          <>
-                            {versions.filter(v => v.id !== current.id).map(doc => (
-                              <TableRow key={doc.id} className="bg-muted/30">
-                                <TableCell></TableCell>
-                                <TableCell className="whitespace-nowrap">
-                                  <Clock className="w-4 h-4 text-muted-foreground" />
-                                </TableCell>
-                                <TableCell className="text-muted-foreground whitespace-nowrap">
-                                  {doc.title || doc.doc_type}
-                                </TableCell>
-                                <TableCell className="whitespace-nowrap">
-                                  <Badge variant="outline" className="text-muted-foreground">
-                                    v{doc.version || 1}
-                                  </Badge>
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                                  {doc.created_at
-                                    ? format(new Date(doc.created_at), 'yyyy/MM/dd HH:mm', { locale: zhTW })
-                                    : '-'}
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                                  {(doc.owner as { full_name?: string })?.full_name || '-'}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                  {doc.drive_web_view_link && (
-                                    <Button
-                                      size="sm"
-                                      variant="ghost"
-                                      onClick={() => window.open(doc.drive_web_view_link!, '_blank')}
-                                    >
-                                      <ExternalLink className="w-4 h-4" />
-                                    </Button>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </>
-                        </CollapsibleContent>
-                      )}
-                    </Collapsible>
+                      {hasVersions && isExpanded && versions.filter(v => v.id !== current.id).map(doc => (
+                        <TableRow key={doc.id} className="bg-muted/30">
+                          <TableCell className="w-10"></TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <Clock className="w-4 h-4 text-muted-foreground" />
+                          </TableCell>
+                          <TableCell className="text-muted-foreground whitespace-nowrap">
+                            {doc.title || '-'}
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <Badge variant="outline" className="text-muted-foreground">
+                              v{doc.version || 1}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {doc.created_at
+                              ? format(new Date(doc.created_at), 'yyyy/MM/dd HH:mm', { locale: zhTW })
+                              : '-'}
+                          </TableCell>
+                          <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                            {(doc.owner as { full_name?: string })?.full_name || '-'}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {doc.drive_web_view_link && (
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => window.open(doc.drive_web_view_link!, '_blank')}
+                              >
+                                <ExternalLink className="w-4 h-4" />
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
                   );
                 })}
               </TableBody>
