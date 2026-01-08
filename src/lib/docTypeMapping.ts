@@ -6,14 +6,15 @@
  * 此 mapping 為唯一權威來源，避免詞彙散落在各處
  * 
  * ⚠️ IMPORTANT: documents.doc_type enum 合法值只有 8 種：
- *   台電審查意見書、能源局同意備案、結構簽證、躉售合約、報竣掛表、設備登記、土地契約、其他
+ *   台電審查意見書、能源署同意備案、結構簽證、躉售合約、報竣掛表、設備登記、土地契約、其他
  *   所有 mapping 必須嚴格輸出這 8 種之一，無對應一律輸出「其他」
  */
 
 // documents.doc_type enum 合法值（Phase 1 唯一權威來源）
+// ⚠️ 已統一使用「能源署」，不再使用「能源局」
 export const DOC_TYPE_ENUM_VALUES = [
   '台電審查意見書',
-  '能源局同意備案', // DB enum 使用「能源局」，不能改
+  '能源署同意備案',
   '結構簽證',
   '躉售合約',
   '報竣掛表',
@@ -32,8 +33,8 @@ export const DOC_TYPE_CODE_TO_ENUM: Record<string, DocTypeEnum> = {
   TPC_CONTRACT: '躉售合約',
   TPC_METER: '報竣掛表',
   
-  // 能源署相關（DB enum 仍為「能源局同意備案」，不能變）
-  MOEA_CONSENT: '能源局同意備案',
+  // 能源署相關（已統一使用「能源署」）
+  MOEA_CONSENT: '能源署同意備案',
   MOEA_REGISTER: '設備登記',
   
   // 技師簽證

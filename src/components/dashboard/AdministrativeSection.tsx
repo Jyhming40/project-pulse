@@ -30,7 +30,7 @@ interface AdministrativeSectionProps {
 
 // 行政相關狀態
 const ADMIN_STATUSES = {
-  SUBMITTING: ['台電送件', '能源局送件'],
+  SUBMITTING: ['台電送件', '能源署送件'],
   PENDING_FIX: ['台電審查'], // 需要補件的狀態
   APPROVED: ['同意備案'],
   PENDING_METER: ['報竣掛表'],
@@ -90,7 +90,7 @@ export function AdministrativeSection({
     <div className="space-y-4">
       {/* 行政 KPI 卡片 */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => navigate('/projects?status=台電送件,能源局送件')}>
+        <Card className="cursor-pointer hover:bg-accent/50 transition-colors" onClick={() => navigate('/projects?status=台電送件,能源署送件')}>
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>

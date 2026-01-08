@@ -17,7 +17,7 @@ export const DEFAULT_SUBFOLDERS: SubfolderConfig[] = [
   { code: 'RELATED', folder: '00-相關資料' },
   { code: 'SYSTEM_DIAGRAM', folder: '01-系統圖' },
   { code: 'TPC', folder: '02-台電' },
-  { code: 'ENERGY_BUREAU', folder: '03-能源局' },
+  { code: 'ENERGY_BUREAU', folder: '03-能源署' },
   { code: 'BUILDING_AUTH', folder: '04-建管單位' },
   { code: 'COMPLETION_MANUAL', folder: '05-完工手冊' },
   { code: 'SITE_PHOTO', folder: '06-現勘照片' },
