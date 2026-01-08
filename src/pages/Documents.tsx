@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,7 +8,6 @@ import { usePagination } from '@/hooks/usePagination';
 import { useBatchSelect } from '@/hooks/useBatchSelect';
 import { useDocumentTags, useAllDocumentTagAssignments } from '@/hooks/useDocumentTags';
 import { format, isWithinInterval, subDays } from 'date-fns';
-import { normalizeDocTypeString, DOC_TYPE_ENUM_VALUES } from '@/lib/docTypeMapping';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
 import { BatchUpdateDialog, BatchUpdateField } from '@/components/BatchUpdateDialog';
@@ -138,46 +137,6 @@ export default function Documents() {
     },
   });
 
-  // 🔍 黑箱驗收 2.0: 輸出 doc_type 統計到 console
-  useEffect(() => {
-    if (documents.length > 0) {
-      // 統計各 doc_type 出現次數
-      const docTypeStats: Record<string, number> = {};
-      documents.forEach(doc => {
-        const key = doc.doc_type || '(null)';
-        docTypeStats[key] = (docTypeStats[key] || 0) + 1;
-      });
-      
-      // 檢查哪些是合法 enum，哪些是舊值
-      const validEnums = new Set(DOC_TYPE_ENUM_VALUES);
-      const legacyValues: string[] = [];
-      const validValues: string[] = [];
-      
-      Object.keys(docTypeStats).forEach(key => {
-        if (validEnums.has(key as any)) {
-          validValues.push(key);
-        } else {
-          legacyValues.push(key);
-        }
-      });
-      
-      console.group('📊 [黑箱驗收 2.0] documents.doc_type 統計');
-      console.log('總筆數:', documents.length);
-      console.table(
-        Object.entries(docTypeStats)
-          .sort((a, b) => b[1] - a[1])
-          .map(([type, count]) => ({
-            doc_type: type,
-            count,
-            isValid: validEnums.has(type as any) ? '✅ 合法' : '⚠️ 舊值',
-            normalized: normalizeDocTypeString(type),
-          }))
-      );
-      console.log('✅ 合法 enum 值:', validValues);
-      console.log('⚠️ 舊值（需 normalize）:', legacyValues);
-      console.groupEnd();
-    }
-  }, [documents]);
   const uniqueProjects = documents.reduce((acc, doc) => {
     const project = doc.projects as any;
     if (project && !acc.find(p => p.id === doc.project_id)) {
