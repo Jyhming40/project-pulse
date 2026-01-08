@@ -80,7 +80,7 @@ export default function ProgressSettings() {
     months_threshold: (alertSetting?.setting_value?.months_threshold ?? 6) as number,
     min_progress_old_project: (alertSetting?.setting_value?.min_progress_old_project ?? 25) as number,
     min_progress_late_stage: (alertSetting?.setting_value?.min_progress_late_stage ?? 50) as number,
-    late_stages: (alertSetting?.setting_value?.late_stages ?? ['台電審查', '能源局送件', '同意備案', '工程施工', '報竣掛表']) as string[],
+    late_stages: (alertSetting?.setting_value?.late_stages ?? ['台電審查', '能源署送件', '同意備案', '工程施工', '報竣掛表']) as string[],
     max_display_count: (alertSetting?.setting_value?.max_display_count ?? 5) as number,
   };
 
@@ -313,7 +313,7 @@ export default function ProgressSettings() {
           <div className="space-y-2">
             <Label>後期階段定義</Label>
             <div className="flex flex-wrap gap-2">
-              {['台電審查', '能源局送件', '同意備案', '工程施工', '報竣掛表', '設備登記'].map((stage) => {
+              {['台電審查', '能源署送件', '同意備案', '工程施工', '報竣掛表', '設備登記'].map((stage) => {
                 const isSelected = alertThresholds.late_stages.includes(stage);
                 return (
                   <Button

@@ -200,7 +200,7 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
     { value: '結構簽證', label: '結構簽證' },
     { value: '台電送件', label: '台電送件' },
     { value: '台電審查', label: '台電審查' },
-    { value: '能源局送件', label: '能源局送件' },
+    { value: '能源署送件', label: '能源署送件' },
     { value: '同意備案', label: '同意備案' },
     { value: '工程施工', label: '工程施工' },
     { value: '報竣掛表', label: '報竣掛表' },

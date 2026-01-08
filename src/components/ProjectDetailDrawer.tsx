@@ -54,7 +54,7 @@ const getStatusColor = (status: string) => {
     '結構簽證': 'bg-primary/15 text-primary',
     '台電送件': 'bg-info/15 text-info',
     '台電審查': 'bg-warning/15 text-warning',
-    '能源局送件': 'bg-info/15 text-info',
+    '能源署送件': 'bg-info/15 text-info',
     '同意備案': 'bg-success/15 text-success',
     '工程施工': 'bg-primary/15 text-primary',
     '報竣掛表': 'bg-info/15 text-info',
