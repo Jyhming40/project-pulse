@@ -4,35 +4,43 @@
  * doc_type_code (英文代碼) → documents.doc_type (中文 enum 值)
  * 
  * 此 mapping 為唯一權威來源，避免詞彙散落在各處
+ * 
+ * ⚠️ IMPORTANT: documents.doc_type enum 合法值只有 8 種：
+ *   台電審查意見書、能源局同意備案、結構簽證、躉售合約、報竣掛表、設備登記、土地契約、其他
+ *   所有 mapping 必須嚴格輸出這 8 種之一，無對應一律輸出「其他」
  */
 
-// doc_type_code → documents.doc_type enum 中文值
-export const DOC_TYPE_CODE_TO_ENUM: Record<string, string> = {
+// documents.doc_type enum 合法值（Phase 1 唯一權威來源）
+export const DOC_TYPE_ENUM_VALUES = [
+  '台電審查意見書',
+  '能源局同意備案', // DB enum 使用「能源局」，不能改
+  '結構簽證',
+  '躉售合約',
+  '報竣掛表',
+  '設備登記',
+  '土地契約',
+  '其他',
+] as const;
+
+export type DocTypeEnum = typeof DOC_TYPE_ENUM_VALUES[number];
+
+// Phase 1 doc_type_code → documents.doc_type enum 中文值
+// ⚠️ value 必須嚴格等於 DOC_TYPE_ENUM_VALUES 之一
+export const DOC_TYPE_CODE_TO_ENUM: Record<string, DocTypeEnum> = {
   // 台電相關
   TPC_REVIEW: '台電審查意見書',
-  TPC_DRAWING: '台電審訖圖',
-  TPC_CONSULT: '台電細部協商文件',
-  TPC_CONTRACT: '台電躉售合約',
-  TPC_FORMAL_CONTRACT: '台電正式躉售',
-  TPC_VISIT: '台電派員訪查併聯函',
-  TPC_METER: '台電報竣掛表',
-  TPC_DEADLINE: '最終掛表期限',
+  TPC_CONTRACT: '躉售合約',
+  TPC_METER: '報竣掛表',
   
-  // 能源署相關（統一使用「能源署」，不再使用「能源局」）
-  MOEA_CONSENT: '能源署同意備案',
-  MOEA_REGISTER: '能源署設備登記',
-  MOEA_TRANSFER: '電廠轉移申請',
+  // 能源署相關（DB enum 仍為「能源局同意備案」，不能變）
+  MOEA_CONSENT: '能源局同意備案',
+  MOEA_REGISTER: '設備登記',
   
   // 技師簽證
-  STRUCT_CERT: '結構技師簽證',
-  ELECTRIC_CERT: '電機技師簽證',
+  STRUCT_CERT: '結構簽證',
   
-  // 免雜執照（地方政府）
-  LICENSE_CONSENT: '免雜執照同意備案',
-  LICENSE_COMPLETE: '免雜執照完竣',
-  
-  // 附屬設施
-  FACILITY_CONSENT: '附屬綠能設施同意函',
+  // 土地
+  LAND_CONTRACT: '土地契約',
   
   // 其他
   OTHER: '其他',
@@ -45,9 +53,9 @@ export const ENUM_TO_DOC_TYPE_CODE: Record<string, string> = Object.fromEntries(
 
 /**
  * 將 doc_type_code 轉換為 documents.doc_type enum 值
- * 若無對應則返回 '其他'
+ * ⚠️ 若無對應則返回 '其他'（確保永遠輸出合法 enum 值）
  */
-export function docTypeCodeToEnum(code: string): string {
+export function docTypeCodeToEnum(code: string): DocTypeEnum {
   return DOC_TYPE_CODE_TO_ENUM[code] || '其他';
 }
 
@@ -57,6 +65,13 @@ export function docTypeCodeToEnum(code: string): string {
  */
 export function enumToDocTypeCode(enumVal: string): string {
   return ENUM_TO_DOC_TYPE_CODE[enumVal] || 'OTHER';
+}
+
+/**
+ * 驗證是否為合法的 doc_type enum 值
+ */
+export function isValidDocTypeEnum(value: string): value is DocTypeEnum {
+  return DOC_TYPE_ENUM_VALUES.includes(value as DocTypeEnum);
 }
 
 // agency 代碼對應中文顯示名
@@ -78,15 +93,13 @@ export const LABEL_TO_AGENCY_CODE: Record<string, string> = Object.fromEntries(
 );
 
 /**
- * 根據 doc_type_code 推斷 agency 代碼
+ * 根據 doc_type_code 推斷 agency 代碼（Phase 1 最小集合）
  */
 export function inferAgencyCodeFromDocTypeCode(docTypeCode: string): string | null {
   if (docTypeCode.startsWith('TPC_')) return 'TPC';
   if (docTypeCode.startsWith('MOEA_')) return 'MOEA';
   if (docTypeCode.startsWith('STRUCT_')) return 'STR';
-  if (docTypeCode.startsWith('ELECTRIC_')) return 'ELEC';
-  if (docTypeCode.startsWith('LICENSE_')) return 'GOV';
-  if (docTypeCode.startsWith('FACILITY_')) return 'GOV';
+  if (docTypeCode.startsWith('LAND_')) return 'OTHER'; // 土地契約無固定機關
   return null;
 }
 

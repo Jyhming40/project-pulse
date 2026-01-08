@@ -165,6 +165,7 @@ export function CreateDocumentDialog({
       
       try {
         // 1. Create document record (using enum value for legacy compatibility)
+        // ⚠️ Phase 1: 不再寫入 version/is_current，避免加深版本依賴
         const { data: docData, error: docError } = await supabase
           .from('documents')
           .insert({
@@ -177,8 +178,7 @@ export function CreateDocumentDialog({
             due_at: dueAt || null,
             owner_user_id: user.id,
             created_by: user.id,
-            version: 1,
-            is_current: true,
+            // version/is_current 由 DB default 處理，不在此指定
           })
           .select()
           .single();
