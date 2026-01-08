@@ -21,6 +21,7 @@ import {
 export type CodebookCategory = 
   | 'project_status'
   | 'doc_type'
+  | 'doc_type_code'
   | 'doc_status'
   | 'agency'
   | 'installation_type'
@@ -58,11 +59,19 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
     ],
   },
   doc_type: {
-    label: '文件類型',
+    label: '文件類型 (Legacy)',
     icon: FileText,
-    description: '文件分類的類型選項',
+    description: '文件分類的類型選項（中文 enum，相容舊資料）',
     usageMapping: [
       { table: 'documents', column: 'doc_type' },
+    ],
+  },
+  doc_type_code: {
+    label: '文件類型代碼',
+    icon: FileText,
+    description: '文件分類代碼（英文代碼，權威治理用）',
+    usageMapping: [
+      { table: 'document_files', column: 'doc_type_code' },
     ],
   },
   doc_status: {
@@ -202,13 +211,40 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
   ],
   doc_type: [
     { value: '台電審查意見書', label: '台電審查意見書' },
-    { value: '能源局同意備案', label: '能源局同意備案' },
-    { value: '結構簽證', label: '結構簽證' },
-    { value: '躉售合約', label: '躉售合約' },
-    { value: '報竣掛表', label: '報竣掛表' },
-    { value: '設備登記', label: '設備登記' },
-    { value: '土地契約', label: '土地契約' },
+    { value: '台電審訖圖', label: '台電審訖圖' },
+    { value: '能源署同意備案', label: '能源署同意備案' },
+    { value: '結構技師簽證', label: '結構技師簽證' },
+    { value: '電機技師簽證', label: '電機技師簽證' },
+    { value: '台電躉售合約', label: '台電躉售合約' },
+    { value: '台電報竣掛表', label: '台電報竣掛表' },
+    { value: '能源署設備登記', label: '能源署設備登記' },
+    { value: '台電派員訪查併聯函', label: '台電派員訪查併聯函' },
+    { value: '台電正式躉售', label: '台電正式躉售' },
+    { value: '免雜執照同意備案', label: '免雜執照同意備案' },
+    { value: '免雜執照完竣', label: '免雜執照完竣' },
+    { value: '附屬綠能設施同意函', label: '附屬綠能設施同意函' },
+    { value: '最終掛表期限', label: '最終掛表期限' },
+    { value: '電廠轉移申請', label: '電廠轉移申請' },
     { value: '其他', label: '其他' },
+  ],
+  doc_type_code: [
+    { value: 'TPC_REVIEW', label: '台電審查意見書' },
+    { value: 'TPC_DRAWING', label: '台電審訖圖' },
+    { value: 'TPC_CONSULT', label: '台電細部協商文件' },
+    { value: 'TPC_CONTRACT', label: '台電躉售合約' },
+    { value: 'TPC_FORMAL_CONTRACT', label: '台電正式躉售' },
+    { value: 'TPC_VISIT', label: '台電派員訪查併聯函' },
+    { value: 'TPC_METER', label: '台電報竣掛表' },
+    { value: 'TPC_DEADLINE', label: '最終掛表期限' },
+    { value: 'MOEA_CONSENT', label: '能源署同意備案' },
+    { value: 'MOEA_REGISTER', label: '能源署設備登記' },
+    { value: 'MOEA_TRANSFER', label: '電廠轉移申請' },
+    { value: 'STRUCT_CERT', label: '結構技師簽證' },
+    { value: 'ELECTRIC_CERT', label: '電機技師簽證' },
+    { value: 'LICENSE_CONSENT', label: '免雜執照同意備案' },
+    { value: 'LICENSE_COMPLETE', label: '免雜執照完竣' },
+    { value: 'FACILITY_CONSENT', label: '附屬綠能設施同意函' },
+    { value: 'OTHER', label: '其他' },
   ],
   doc_status: [
     { value: '未開始', label: '未開始' },
@@ -217,12 +253,15 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
     { value: '退件補正', label: '退件補正' },
   ],
   agency: [
-    { value: '台灣電力公司', label: '台灣電力公司' },
-    { value: '經濟部能源署', label: '經濟部能源署' },
-    { value: '地方政府', label: '地方政府' },
-    { value: '結構技師', label: '結構技師' },
-    { value: '電機技師', label: '電機技師' },
-    { value: '其他', label: '其他' },
+    { value: 'TPC', label: '台灣電力公司' },
+    { value: 'MOEA', label: '經濟部能源署' },
+    { value: 'GOV', label: '地方政府' },
+    { value: 'CONST', label: '建管單位' },
+    { value: 'FIRE', label: '消防單位' },
+    { value: 'STR', label: '結構技師' },
+    { value: 'ELEC', label: '電機技師' },
+    { value: 'ENV', label: '環保單位' },
+    { value: 'OTHER', label: '其他' },
   ],
   installation_type: [
     { value: '畜牧舍', label: '畜牧舍' },

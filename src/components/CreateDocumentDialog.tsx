@@ -4,7 +4,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
-import { getAgencyByDocType, canAutoInferAgency, generateDocumentDisplayName } from '@/lib/documentAgency';
+import { generateDocumentDisplayName } from '@/lib/documentAgency';
+import { 
+  docTypeCodeToEnum, 
+  inferAgencyCodeFromDocTypeCode, 
+  canAutoInferAgencyFromCode,
+  AGENCY_CODE_TO_LABEL,
+} from '@/lib/docTypeMapping';
 import {
   Dialog,
   DialogContent,
@@ -57,15 +63,16 @@ export function CreateDocumentDialog({
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { isAuthorized: isDriveAuthorized, authorize: authorizeDrive, isAuthorizing } = useDriveAuth();
-  const { options: docTypeOptions } = useOptionsForCategory('doc_type');
-  const { options: agencyOptions } = useOptionsForCategory('agency');
+  // Use doc_type_code as primary selection for governance
+  const { options: docTypeCodeOptions } = useOptionsForCategory('doc_type_code');
+  const { options: agencyCodeOptions } = useOptionsForCategory('agency');
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Form state
+  // Form state - use codes as primary selection value
   const [projectId, setProjectId] = useState(defaultProjectId || '');
-  const [docType, setDocType] = useState('');
-  const [agency, setAgency] = useState('');
+  const [docTypeCode, setDocTypeCode] = useState(''); // doc_type_code (e.g., 'TPC_REVIEW')
+  const [agencyCode, setAgencyCode] = useState(''); // agency code (e.g., 'TPC')
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
   const [submittedAt, setSubmittedAt] = useState('');
@@ -77,22 +84,22 @@ export function CreateDocumentDialog({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   
-  // Auto-infer agency when doc_type changes
+  // Auto-infer agency when doc_type_code changes
   useEffect(() => {
-    if (docType) {
-      const inferredAgency = getAgencyByDocType(docType);
-      if (inferredAgency) {
-        setAgency(inferredAgency);
+    if (docTypeCode) {
+      const inferredAgencyCode = inferAgencyCodeFromDocTypeCode(docTypeCode);
+      if (inferredAgencyCode) {
+        setAgencyCode(inferredAgencyCode);
       }
     }
-  }, [docType]);
+  }, [docTypeCode]);
   
   // Reset form when dialog opens
   useEffect(() => {
     if (open) {
       setProjectId(defaultProjectId || '');
-      setDocType('');
-      setAgency('');
+      setDocTypeCode('');
+      setAgencyCode('');
       setTitle('');
       setNote('');
       setSubmittedAt('');
@@ -121,16 +128,17 @@ export function CreateDocumentDialog({
   // Get selected project info
   const selectedProject = projects.find(p => p.id === projectId);
   
-  // Use system options for agency, fallback to defaults if not configured
-  const defaultAgencyFallback = [
-    { value: '台灣電力公司', label: '台灣電力公司' },
-    { value: '經濟部能源署', label: '經濟部能源署' },
-    { value: '地方政府', label: '地方政府' },
-    { value: '結構技師', label: '結構技師' },
-    { value: '電機技師', label: '電機技師' },
-    { value: '其他', label: '其他' },
-  ];
-  const mergedAgencyOptions = agencyOptions.length > 0 ? agencyOptions : defaultAgencyFallback;
+  // Get agency label from code for display
+  const getAgencyLabel = (code: string) => {
+    const opt = agencyCodeOptions.find(o => o.value === code);
+    return opt?.label || AGENCY_CODE_TO_LABEL[code] || code;
+  };
+  
+  // Get doc_type label from code for display
+  const getDocTypeLabel = (code: string) => {
+    const opt = docTypeCodeOptions.find(o => o.value === code);
+    return opt?.label || docTypeCodeToEnum(code);
+  };
   
   // Handle file selection
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -144,21 +152,25 @@ export function CreateDocumentDialog({
   // Create document mutation
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (!user || !projectId || !docType) {
+      if (!user || !projectId || !docTypeCode) {
         throw new Error('請填寫必要欄位');
       }
+      
+      // Convert doc_type_code to documents.doc_type enum value
+      const docTypeEnum = docTypeCodeToEnum(docTypeCode);
+      const docTypeLabel = getDocTypeLabel(docTypeCode);
       
       setIsUploading(true);
       setUploadProgress(10);
       
       try {
-        // 1. Create document record
+        // 1. Create document record (using enum value for legacy compatibility)
         const { data: docData, error: docError } = await supabase
           .from('documents')
           .insert({
             project_id: projectId,
-            doc_type: docType,
-            title: title || docType,
+            doc_type: docTypeEnum, // Store enum value for legacy compatibility
+            title: title || docTypeLabel,
             note,
             submitted_at: submittedAt || null,
             issued_at: issuedAt || null,
@@ -182,11 +194,12 @@ export function CreateDocumentDialog({
           // Get file extension
           const ext = selectedFile.name.split('.').pop() || 'pdf';
           
-          // Generate display name
+          // Generate display name with agency label
+          const agencyLabel = getAgencyLabel(agencyCode);
           const displayName = generateDocumentDisplayName({
             projectCode: selectedProject.project_code,
-            agency: agency || '未指定',
-            docType,
+            agency: agencyLabel || '未指定',
+            docType: docTypeLabel,
             date: new Date(),
             version: 1,
             status: issuedAt ? '已取得' : (submittedAt ? '已開始' : '未開始'),
@@ -256,8 +269,8 @@ export function CreateDocumentDialog({
           p_record_id: docData.id,
           p_action: 'CREATE',
           p_old_data: null,
-          p_new_data: docData,
-          p_reason: `新增文件：${docType}`,
+          p_new_data: { ...docData, doc_type_code: docTypeCode, agency_code: agencyCode },
+          p_reason: `新增文件：${docTypeLabel}`,
         });
         
         return docData;
@@ -277,8 +290,8 @@ export function CreateDocumentDialog({
     },
   });
   
-  const canSubmit = projectId && docType && !isUploading && !createMutation.isPending;
-  const showAgencySelect = !canAutoInferAgency(docType);
+  const canSubmit = projectId && docTypeCode && !isUploading && !createMutation.isPending;
+  const showAgencySelect = !canAutoInferAgencyFromCode(docTypeCode);
   
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -317,17 +330,17 @@ export function CreateDocumentDialog({
               </Select>
             </div>
             
-            {/* Document Type */}
+            {/* Document Type Code */}
             <div className="space-y-2">
-              <Label htmlFor="docType">
+              <Label htmlFor="docTypeCode">
                 文件類型 <span className="text-destructive">*</span>
               </Label>
-              <Select value={docType} onValueChange={setDocType}>
+              <Select value={docTypeCode} onValueChange={setDocTypeCode}>
                 <SelectTrigger>
                   <SelectValue placeholder="選擇類型..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {docTypeOptions.map(opt => (
+                  {docTypeCodeOptions.map(opt => (
                     <SelectItem key={opt.value} value={opt.value}>
                       {opt.label}
                     </SelectItem>
@@ -337,7 +350,7 @@ export function CreateDocumentDialog({
             </div>
             
             {/* Agency - only show if cannot auto-infer */}
-            {docType && (
+            {docTypeCode && (
               <div className="space-y-2">
                 <Label htmlFor="agency">
                   發證機關
@@ -348,12 +361,12 @@ export function CreateDocumentDialog({
                   )}
                 </Label>
                 {showAgencySelect ? (
-                  <Select value={agency} onValueChange={setAgency}>
+                  <Select value={agencyCode} onValueChange={setAgencyCode}>
                     <SelectTrigger>
                       <SelectValue placeholder="選擇機關..." />
                     </SelectTrigger>
                     <SelectContent>
-                      {mergedAgencyOptions.map(opt => (
+                      {agencyCodeOptions.map(opt => (
                         <SelectItem key={opt.value} value={opt.value}>
                           {opt.label}
                         </SelectItem>
@@ -363,7 +376,7 @@ export function CreateDocumentDialog({
                 ) : (
                   <div className="flex items-center gap-2 p-2 bg-muted rounded-md">
                     <Building2 className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm">{agency}</span>
+                    <span className="text-sm">{getAgencyLabel(agencyCode)}</span>
                   </div>
                 )}
               </div>
@@ -376,7 +389,7 @@ export function CreateDocumentDialog({
                 id="title"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder={docType || '輸入文件標題...'}
+                placeholder={docTypeCode ? getDocTypeLabel(docTypeCode) : '輸入文件標題...'}
               />
               <p className="text-xs text-muted-foreground">
                 留空將使用文件類型作為標題
