@@ -53,44 +53,76 @@ export const ENUM_TO_DOC_TYPE_CODE: Record<string, string> = Object.fromEntries(
 );
 
 /**
- * ⚠️ 兼容性 normalize：將舊字串（能源局→能源署）或非標準寫法統一
- * 用於處理讀入資料時的舊值轉換
+ * ⚠️ 兼容性 normalize：將舊長值字串轉為標準短 enum 值
+ * 
+ * 【策略】documents.doc_type 採「短值」策略：
+ *   - enum 只存 8 種短值（不帶機關前綴）
+ *   - 機關資訊由 agency_code / doc_type_code 表達
+ *   - 顯示名稱可在 UI 層組合
+ * 
+ * 用於：
+ *   1. 讀入舊資料時轉換顯示
+ *   2. 匯入時正規化
  */
-export function normalizeDocTypeString(input: string): string {
-  if (!input) return input;
+export function normalizeDocTypeString(input: string): DocTypeEnum {
+  if (!input) return '其他';
   
-  // 能源局 → 能源署
+  // 先處理「能源局」→「能源署」
   let normalized = input.replace(/能源局/g, '能源署');
   
-  // 常見非標準寫法 → 標準 enum 值
-  const LEGACY_MAPPING: Record<string, DocTypeEnum> = {
-    // 舊的長描述 → 標準短 enum
+  // 若已經是合法短值，直接返回
+  if (isValidDocTypeEnum(normalized)) {
+    return normalized;
+  }
+  
+  // 舊長值 → 標準短 enum（按優先順序匹配）
+  const LEGACY_TO_SHORT: Record<string, DocTypeEnum> = {
+    // 台電相關 → 短值
+    '台電審查意見書': '台電審查意見書',  // 保持（已是 enum）
     '台電躉售合約': '躉售合約',
     '台電正式躉售': '躉售合約',
     '台電報竣掛表': '報竣掛表',
-    '結構技師簽證': '結構簽證',
-    '能源署設備登記': '設備登記',
-    '能源局設備登記': '設備登記',
-    // 其他可能的舊值
     '台電審訖圖': '其他',
     '台電派員訪查併聯函': '其他',
     '最終掛表期限': '其他',
+    
+    // 能源署相關 → 短值
+    '能源署同意備案': '能源署同意備案',  // 保持（已是 enum）
+    '能源署設備登記': '設備登記',
+    
+    // 技師簽證 → 短值
+    '結構技師簽證': '結構簽證',
     '電機技師簽證': '其他',
+    
+    // 其他舊值 → 其他
     '免雜執照同意備案': '其他',
     '免雜執照完竣': '其他',
     '附屬綠能設施同意函': '其他',
   };
   
-  if (LEGACY_MAPPING[normalized]) {
-    return LEGACY_MAPPING[normalized];
+  // 完全匹配
+  if (LEGACY_TO_SHORT[normalized]) {
+    return LEGACY_TO_SHORT[normalized];
   }
   
-  return normalized;
+  // 模糊匹配（包含關鍵字）
+  if (normalized.includes('躉售')) return '躉售合約';
+  if (normalized.includes('報竣') || normalized.includes('掛表') || normalized.includes('掛錶')) return '報竣掛表';
+  if (normalized.includes('同意備案')) return '能源署同意備案';
+  if (normalized.includes('設備登記')) return '設備登記';
+  if (normalized.includes('結構') && normalized.includes('簽證')) return '結構簽證';
+  if (normalized.includes('土地') && normalized.includes('契約')) return '土地契約';
+  if (normalized.includes('審查意見')) return '台電審查意見書';
+  
+  // 無法識別，返回「其他」
+  return '其他';
 }
 
 /**
  * 驗證並正規化 doc_type enum 值
- * 若輸入為合法 enum 值則返回，否則嘗試 normalize 後再驗證
+ * 若輸入為合法 enum 值則返回，否則 normalize 轉換
+ * 
+ * ⚠️ 此函數保證輸出一定是合法的 DocTypeEnum
  */
 export function ensureValidDocTypeEnum(input: string): DocTypeEnum {
   // 先檢查是否為合法值
@@ -98,14 +130,8 @@ export function ensureValidDocTypeEnum(input: string): DocTypeEnum {
     return input;
   }
   
-  // 嘗試 normalize
-  const normalized = normalizeDocTypeString(input);
-  if (isValidDocTypeEnum(normalized)) {
-    return normalized;
-  }
-  
-  // 無法識別，返回「其他」
-  return '其他';
+  // normalize 已保證返回 DocTypeEnum
+  return normalizeDocTypeString(input);
 }
 
 /**
