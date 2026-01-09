@@ -366,26 +366,31 @@ serve(async (req) => {
     const drivePath = `${project.project_code}/${subfolderConfig.folder}/${file.name}`;
 
     // Create or version the document record
-    // First check for existing current document
+    // First check for existing current document with same project_id + doc_type
+    // The unique constraint is on (project_id, doc_type) for is_current = true
     const { data: existingDocs } = await supabase
       .from('documents')
-      .select('id, version')
+      .select('id, version, title')
       .eq('project_id', projectId)
       .eq('doc_type', documentType)
-      .eq('title', title)
       .eq('is_current', true)
       .eq('is_deleted', false);
 
     let newVersion = 1;
     if (existingDocs && existingDocs.length > 0) {
-      // Mark old versions as not current
-      const oldDoc = existingDocs[0];
+      // Find existing doc with same title or use the first one
+      const sameTitle = existingDocs.find(d => d.title === title);
+      const oldDoc = sameTitle || existingDocs[0];
       newVersion = (oldDoc.version || 1) + 1;
       
+      // Mark ALL current documents with this project_id + doc_type as not current
+      // to satisfy the unique constraint
       await supabase
         .from('documents')
         .update({ is_current: false })
-        .eq('id', oldDoc.id);
+        .eq('project_id', projectId)
+        .eq('doc_type', documentType)
+        .eq('is_current', true);
     }
 
     // Insert new document record
