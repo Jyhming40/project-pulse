@@ -46,6 +46,8 @@ export interface CategoryConfig {
     table: string;
     column: string;
   }[];
+  // If true, cannot add or delete options, only edit labels and toggle active
+  isSystemControlled?: boolean;
 }
 
 // Complete category configuration with usage mappings
@@ -59,12 +61,14 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
     ],
   },
   doc_type: {
-    label: '文件類型 (Legacy)',
+    label: '文件類型',
     icon: FileText,
-    description: '文件分類的類型選項（中文 enum，相容舊資料）',
+    description: '文件分類的類型選項（系統受控，僅可調整標籤）',
     usageMapping: [
       { table: 'documents', column: 'doc_type' },
     ],
+    // Mark as system-controlled: cannot add or delete, only edit labels
+    isSystemControlled: true,
   },
   doc_type_code: {
     label: '文件類型代碼',
@@ -209,22 +213,15 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
     { value: '暫停', label: '暫停' },
     { value: '取消', label: '取消' },
   ],
+  // ⚠️ 系統受控：僅限 docTypeMapping.ts 定義的 8 種短值
   doc_type: [
     { value: '台電審查意見書', label: '台電審查意見書' },
-    { value: '台電審訖圖', label: '台電審訖圖' },
-    { value: '能源署同意備案', label: '能源署同意備案' },
-    { value: '結構技師簽證', label: '結構技師簽證' },
-    { value: '電機技師簽證', label: '電機技師簽證' },
-    { value: '台電躉售合約', label: '台電躉售合約' },
-    { value: '台電報竣掛表', label: '台電報竣掛表' },
-    { value: '能源署設備登記', label: '能源署設備登記' },
-    { value: '台電派員訪查併聯函', label: '台電派員訪查併聯函' },
-    { value: '台電正式躉售', label: '台電正式躉售' },
-    { value: '免雜執照同意備案', label: '免雜執照同意備案' },
-    { value: '免雜執照完竣', label: '免雜執照完竣' },
-    { value: '附屬綠能設施同意函', label: '附屬綠能設施同意函' },
-    { value: '最終掛表期限', label: '最終掛表期限' },
-    { value: '電廠轉移申請', label: '電廠轉移申請' },
+    { value: '同意備案', label: '同意備案' },
+    { value: '結構簽證', label: '結構簽證' },
+    { value: '躉售合約', label: '躉售合約' },
+    { value: '報竣掛表', label: '報竣掛表' },
+    { value: '設備登記', label: '設備登記' },
+    { value: '線補費通知單', label: '線補費通知單' },
     { value: '其他', label: '其他' },
   ],
   doc_type_code: [
