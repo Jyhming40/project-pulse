@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
+import { deleteDriveFile } from '@/hooks/useDriveSync';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import {
@@ -43,6 +44,7 @@ import {
   ArrowLeftRight,
   Tag,
   Trash2,
+  Cloud,
 } from 'lucide-react';
 import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
 import { toast } from 'sonner';
@@ -588,8 +590,18 @@ export function DocumentDetailDialog({
     <DeleteConfirmDialog
       open={isDeleteDialogOpen}
       onOpenChange={setIsDeleteDialogOpen}
-      onConfirm={async (reason) => {
+      onConfirm={async (reason, shouldDeleteDrive) => {
         if (documentId) {
+          // Delete from Drive first if requested
+          if (shouldDeleteDrive && document?.drive_file_id) {
+            const driveResult = await deleteDriveFile(documentId);
+            if (driveResult.driveDeleted) {
+              toast.success('雲端檔案已刪除');
+            } else if (driveResult.message) {
+              toast.warning('雲端檔案刪除失敗', { description: driveResult.message });
+            }
+          }
+          // Then soft delete the document record
           await softDelete({ id: documentId, reason });
         }
       }}
@@ -597,6 +609,7 @@ export function DocumentDetailDialog({
       itemName={document?.title || document?.doc_type}
       tableName="documents"
       isPending={isDeleting}
+      hasDriveFile={!!document?.drive_file_id}
     />
   </>
   );

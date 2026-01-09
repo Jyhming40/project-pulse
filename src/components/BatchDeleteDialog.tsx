@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, AlertTriangle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, AlertTriangle, Cloud } from 'lucide-react';
 
 interface BatchDeleteDialogProps {
   open: boolean;
@@ -19,8 +20,10 @@ interface BatchDeleteDialogProps {
   selectedCount: number;
   itemLabel?: string;
   requireReason?: boolean;
-  onConfirm: (reason?: string) => Promise<void>;
+  onConfirm: (reason?: string, deleteDriveFiles?: boolean) => Promise<void>;
   isLoading?: boolean;
+  /** Number of items that have associated Drive files */
+  driveFileCount?: number;
 }
 
 export function BatchDeleteDialog({
@@ -31,17 +34,27 @@ export function BatchDeleteDialog({
   requireReason = false,
   onConfirm,
   isLoading = false,
+  driveFileCount = 0,
 }: BatchDeleteDialogProps) {
   const [reason, setReason] = useState('');
+  const [deleteDriveFiles, setDeleteDriveFiles] = useState(true);
+
+  // Reset state when dialog opens
+  useEffect(() => {
+    if (open) {
+      setDeleteDriveFiles(true);
+    }
+  }, [open]);
 
   const handleConfirm = async () => {
-    await onConfirm(reason || undefined);
+    await onConfirm(reason || undefined, driveFileCount > 0 ? deleteDriveFiles : undefined);
     setReason('');
     onOpenChange(false);
   };
 
   const handleClose = () => {
     setReason('');
+    setDeleteDriveFiles(true);
     onOpenChange(false);
   };
 
@@ -70,6 +83,30 @@ export function BatchDeleteDialog({
               placeholder="請輸入刪除原因..."
               rows={3}
             />
+          </div>
+        )}
+
+        {driveFileCount > 0 && (
+          <div className="flex items-start space-x-3 bg-muted/50 rounded-lg p-3">
+            <Checkbox
+              id="delete-drive-files"
+              checked={deleteDriveFiles}
+              onCheckedChange={(checked) => setDeleteDriveFiles(checked === true)}
+            />
+            <div className="space-y-1">
+              <Label 
+                htmlFor="delete-drive-files" 
+                className="flex items-center gap-2 cursor-pointer font-medium"
+              >
+                <Cloud className="h-4 w-4 text-blue-500" />
+                同時刪除 Google Drive 檔案
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {deleteDriveFiles 
+                  ? `將刪除 ${driveFileCount} 個雲端檔案`
+                  : '雲端檔案將被保留，僅刪除系統紀錄'}
+              </p>
+            </div>
           </div>
         )}
 
