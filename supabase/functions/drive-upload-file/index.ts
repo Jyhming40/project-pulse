@@ -45,6 +45,39 @@ const DOC_TYPE_TO_SUBFOLDER: Record<string, string> = {
   '其他': 'RELATED',
 };
 
+// Document type code to milestone code mapping
+const DOC_TYPE_CODE_TO_MILESTONE: Record<string, string> = {
+  // 台電相關
+  'TPC_REVIEW': 'ADMIN_03_TAIPOWER_OPINION',      // 審查意見書 -> 取得台電審查意見書
+  'TPC_NEGOTIATION': 'ADMIN_06_TAIPOWER_DETAIL',  // 細部協商 -> 台電細部協商完成
+  'TPC_CONTRACT': 'ADMIN_07_PPA_SIGNED',          // 躉售合約 -> 躉售合約完成
+  'TPC_METER': 'ADMIN_08_METER_INSTALLED',        // 報竣掛表 -> 報竣掛表完成
+  // 能源署相關
+  'MOEA_CONSENT': 'ADMIN_04_ENERGY_APPROVAL',     // 同意備案 -> 能源署同意備案
+  'MOEA_REGISTER': 'ADMIN_09_EQUIPMENT_REG',      // 設備登記 -> 能源署設備登記完成
+  // 建管相關
+  'BUILD_EXEMPT_COMP': 'ADMIN_05_MISC_EXEMPT',    // 免雜項竣工 -> 免雜項執照完成/回函
+};
+
+// Also map by doc_type label for legacy support
+const DOC_TYPE_LABEL_TO_MILESTONE: Record<string, string> = {
+  '審查意見書': 'ADMIN_03_TAIPOWER_OPINION',
+  '台電審查意見書': 'ADMIN_03_TAIPOWER_OPINION',
+  '細部協商': 'ADMIN_06_TAIPOWER_DETAIL',
+  '台電細部協商': 'ADMIN_06_TAIPOWER_DETAIL',
+  '躉售合約': 'ADMIN_07_PPA_SIGNED',
+  '台電躉售合約': 'ADMIN_07_PPA_SIGNED',
+  '報竣掛表': 'ADMIN_08_METER_INSTALLED',
+  '台電報竣掛表': 'ADMIN_08_METER_INSTALLED',
+  '同意備案': 'ADMIN_04_ENERGY_APPROVAL',
+  '能源署同意備案': 'ADMIN_04_ENERGY_APPROVAL',
+  '能源局同意備案': 'ADMIN_04_ENERGY_APPROVAL',
+  '設備登記': 'ADMIN_09_EQUIPMENT_REG',
+  '能源署設備登記': 'ADMIN_09_EQUIPMENT_REG',
+  '免雜項竣工': 'ADMIN_05_MISC_EXEMPT',
+  '免雜執照完竣': 'ADMIN_05_MISC_EXEMPT',
+};
+
 // Refresh access token
 async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; expiresIn: number }> {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
@@ -441,6 +474,86 @@ serve(async (req) => {
         document_type: documentType,
       },
     });
+
+    // Auto-sync milestone completion based on document type
+    // First try to get doc_type_code from document_type_config
+    let milestoneCode: string | null = null;
+    
+    const { data: docTypeConfig } = await supabase
+      .from('document_type_config')
+      .select('code')
+      .eq('label', documentType)
+      .eq('is_active', true)
+      .maybeSingle();
+    
+    if (docTypeConfig?.code && DOC_TYPE_CODE_TO_MILESTONE[docTypeConfig.code]) {
+      milestoneCode = DOC_TYPE_CODE_TO_MILESTONE[docTypeConfig.code];
+    } else if (DOC_TYPE_LABEL_TO_MILESTONE[documentType]) {
+      // Fallback to label-based mapping
+      milestoneCode = DOC_TYPE_LABEL_TO_MILESTONE[documentType];
+    }
+
+    if (milestoneCode) {
+      console.log(`Auto-completing milestone: ${milestoneCode} for project ${projectId}`);
+      
+      // Check if milestone already exists
+      const { data: existingMilestone } = await supabase
+        .from('project_milestones')
+        .select('id, is_completed')
+        .eq('project_id', projectId)
+        .eq('milestone_code', milestoneCode)
+        .maybeSingle();
+
+      if (existingMilestone) {
+        // Update if not already completed
+        if (!existingMilestone.is_completed) {
+          await supabase
+            .from('project_milestones')
+            .update({
+              is_completed: true,
+              completed_at: new Date().toISOString(),
+              completed_by: user.id,
+              note: `透過文件上傳自動完成 (${title})`,
+            })
+            .eq('id', existingMilestone.id);
+        }
+      } else {
+        // Insert new milestone record
+        await supabase
+          .from('project_milestones')
+          .insert({
+            project_id: projectId,
+            milestone_code: milestoneCode,
+            is_completed: true,
+            completed_at: new Date().toISOString(),
+            completed_by: user.id,
+            note: `透過文件上傳自動完成 (${title})`,
+          });
+      }
+
+      // Trigger progress recalculation
+      try {
+        const progressResponse = await fetch(
+          `${supabaseUrl}/functions/v1/recalculate-project-progress`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+            },
+            body: JSON.stringify({ project_id: projectId }),
+          }
+        );
+        
+        if (progressResponse.ok) {
+          const progressResult = await progressResponse.json();
+          console.log('Progress recalculated:', progressResult);
+        }
+      } catch (progressErr) {
+        console.error('Failed to recalculate progress:', progressErr);
+        // Don't fail the upload just because progress recalculation failed
+      }
+    }
 
     return new Response(
       JSON.stringify({
