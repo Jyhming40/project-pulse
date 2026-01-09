@@ -6,10 +6,9 @@
  * 
  * === Constraint/Index Mapping 維護指南 ===
  * 
- * 當 DB 新增 unique constraint 或 index 時，請在 UNIQUE_CONSTRAINT_MAP 中新增對應規則：
- * 1. 從 pg_indexes 或 migration 取得實際名稱
- * 2. 在 match 欄位使用 RegExp，支援部分匹配或多種寫法
- * 3. 撰寫使用者友善的中文訊息
+ * 當 DB 新增 unique constraint 或 index 時，請在對應的 MAP 中新增規則：
+ * - DOCUMENTS_UNIQUE_MAP: documents 表專用（Import Batch 使用）
+ * - GLOBAL_UNIQUE_MAP: 其他表（investors, projects 等）
  * 
  * 目前已知的 documents 表 unique indexes：
  * - documents_one_current_per_key: (project_id, doc_type) WHERE is_current=true
@@ -20,32 +19,75 @@
 
 /**
  * 從 Supabase/Postgres 錯誤物件中擷取 constraint/index 名稱
- * 優先順序：constraint > constraint_name > details regex > message regex
+ * 
+ * 支援格式：
+ * - unique constraint "documents_one_current_per_key"
+ * - unique constraint "public.documents_one_current_per_key"
+ * - index "documents_unique_version_per_key"
+ * - constraint "xxx" / index "xxx"
+ * 
+ * 若名稱帶 schema 前綴（如 public.xxx），只保留最後一段
  */
 function extractConstraintName(err: Record<string, any>): string | null {
-  // 1. 直接欄位
+  // 1. 直接欄位（最可靠）
   if (err?.constraint && typeof err.constraint === 'string') {
-    return err.constraint.toLowerCase();
+    return normalizeConstraintName(err.constraint);
   }
   if (err?.constraint_name && typeof err.constraint_name === 'string') {
-    return err.constraint_name.toLowerCase();
+    return normalizeConstraintName(err.constraint_name);
   }
   
-  // 2. 從 details 擷取 (常見格式: Key ... violates unique constraint "xxx")
-  const details = err?.details || '';
-  const detailsMatch = details.match(/(?:constraint|index)\s*["']?([a-z0-9_]+)["']?/i);
-  if (detailsMatch?.[1]) {
-    return detailsMatch[1].toLowerCase();
-  }
+  // 2. 從 details 擷取
+  const detailsName = extractFromText(err?.details);
+  if (detailsName) return detailsName;
   
-  // 3. 從 message 擷取 (常見格式: duplicate key value violates unique constraint "xxx")
-  const message = err?.message || '';
-  const messageMatch = message.match(/(?:constraint|index)\s*["']?([a-z0-9_]+)["']?/i);
-  if (messageMatch?.[1]) {
-    return messageMatch[1].toLowerCase();
+  // 3. 從 message 擷取（最後手段）
+  const messageName = extractFromText(err?.message);
+  if (messageName) return messageName;
+  
+  return null;
+}
+
+/**
+ * 從文字中擷取 constraint/index 名稱
+ * 支援多種 Postgres 錯誤格式
+ */
+function extractFromText(text: unknown): string | null {
+  if (!text || typeof text !== 'string') return null;
+  
+  // 匹配常見格式：
+  // - unique constraint "xxx"
+  // - violates unique constraint "xxx"
+  // - index "xxx"
+  // - constraint "xxx"
+  // 名稱可能帶 schema: "public.xxx" 或不帶: "xxx"
+  const patterns = [
+    /unique\s+constraint\s+["']([^"']+)["']/i,
+    /violates\s+.*?constraint\s+["']([^"']+)["']/i,
+    /index\s+["']([^"']+)["']/i,
+    /constraint\s+["']([^"']+)["']/i,
+  ];
+  
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) {
+      return normalizeConstraintName(match[1]);
+    }
   }
   
   return null;
+}
+
+/**
+ * 標準化 constraint 名稱
+ * - 移除 schema 前綴（public.xxx -> xxx）
+ * - 轉小寫
+ */
+function normalizeConstraintName(name: string): string {
+  const lower = name.toLowerCase().trim();
+  // 若有 schema 前綴，取最後一段
+  const parts = lower.split('.');
+  return parts[parts.length - 1];
 }
 
 /**
@@ -58,38 +100,59 @@ function buildSearchText(err: Record<string, any>): string {
   return `${msg} ${hint} ${details}`;
 }
 
-// === Constraint Mapping Table ===
+// === Constraint Mapping Tables ===
+
+interface ConstraintRule {
+  match: RegExp;
+  message: string;
+}
 
 /**
- * 23505 (unique_violation) constraint 名稱對應表
- * match: RegExp 用於匹配 constraint/index 名稱（已 toLowerCase）
- * message: 使用者友善的中文訊息
+ * Documents 表專用 unique constraint mapping
+ * Import Batch 優先使用此 map，避免誤判其他表的錯誤
  */
-const UNIQUE_CONSTRAINT_MAP: Array<{ match: RegExp; message: string }> = [
-  // documents 表：同 project+doc_type 只能一筆 is_current=true
+const DOCUMENTS_UNIQUE_MAP: ConstraintRule[] = [
+  // 同 project+doc_type 只能一筆 is_current=true
   {
-    match: /documents_one_current_per_key|one_current|is_current.*unique/i,
+    match: /^documents_one_current_per_key$/,
     message: '同類文件的最新版本狀態衝突，請稍後重新上傳。',
   },
-  // documents 表：同 project+doc_type+version 不可重複
+  // 同 project+doc_type+version 不可重複
   {
-    match: /documents_unique_version_per_key|unique_version|version.*unique/i,
+    match: /^documents_unique_version_per_key$/,
     message: '版本編號衝突，可能已存在相同版本。請重新整理頁面後再試。',
   },
+  // 寬鬆匹配（若 constraint 名稱略有變化）
+  {
+    match: /documents.*one.*current|one_current.*documents/i,
+    message: '同類文件的最新版本狀態衝突，請稍後重新上傳。',
+  },
+  {
+    match: /documents.*unique.*version|version.*unique.*documents/i,
+    message: '版本編號衝突，可能已存在相同版本。請重新整理頁面後再試。',
+  },
+];
+
+/**
+ * 其他表的 unique constraint mapping
+ * 用於非 Import Batch 情境
+ */
+const GLOBAL_UNIQUE_MAP: ConstraintRule[] = [
   // investors 表：investor_code 唯一
   {
-    match: /investors_investor_code_key|investor_code/i,
+    match: /investors.*code|investor_code/i,
     message: '投資人代碼已存在，請使用不同的代碼。',
   },
   // projects 表：project_code 唯一
   {
-    match: /projects_project_code_key|project_code/i,
+    match: /projects.*code|project_code/i,
     message: '案場代碼已存在，請使用不同的代碼。',
   },
 ];
 
 /**
  * 23505 fallback 關鍵字對應（當無法取得 constraint 名稱時使用）
+ * 僅用於 documents 相關情境
  */
 const UNIQUE_FALLBACK_KEYWORDS: Array<{ keywords: string[]; message: string }> = [
   {
@@ -107,8 +170,11 @@ const UNIQUE_FALLBACK_KEYWORDS: Array<{ keywords: string[]; message: string }> =
 /**
  * 將技術性錯誤轉換為使用者友善的中文訊息
  * 絕對不會回傳 error.message 原文或技術錯誤碼
+ * 
+ * @param error - 原始錯誤物件
+ * @param context - 可選，指定情境（如 'documents'）以使用專屬 mapping
  */
-export function formatUploadError(error: unknown): string {
+export function formatUploadError(error: unknown, context?: 'documents' | 'global'): string {
   if (!error) {
     return '上傳時發生未知錯誤，請稍後重試。';
   }
@@ -124,17 +190,31 @@ export function formatUploadError(error: unknown): string {
   if (code === '23505') {
     // 1. 優先使用 constraint 名稱匹配
     if (constraintName) {
-      for (const rule of UNIQUE_CONSTRAINT_MAP) {
+      // 優先使用 documents map（Import Batch 專用）
+      const docContext = context === 'global' ? false : true;
+      
+      if (docContext) {
+        for (const rule of DOCUMENTS_UNIQUE_MAP) {
+          if (rule.match.test(constraintName)) {
+            return rule.message;
+          }
+        }
+      }
+      
+      // 再嘗試 global map
+      for (const rule of GLOBAL_UNIQUE_MAP) {
         if (rule.match.test(constraintName)) {
           return rule.message;
         }
       }
     }
     
-    // 2. Fallback: 使用 searchText 關鍵字匹配
-    for (const rule of UNIQUE_FALLBACK_KEYWORDS) {
-      if (rule.keywords.some(kw => searchText.includes(kw))) {
-        return rule.message;
+    // 2. Fallback: 使用 searchText 關鍵字匹配（僅限 documents 情境）
+    if (context !== 'global') {
+      for (const rule of UNIQUE_FALLBACK_KEYWORDS) {
+        if (rule.keywords.some(kw => searchText.includes(kw))) {
+          return rule.message;
+        }
       }
     }
     
@@ -185,7 +265,7 @@ export function formatUploadError(error: unknown): string {
   }
 
   // === Google Drive / Storage 錯誤 ===
-  // 注意：必須明確包含 'drive' 或 'storage'，避免單獨 'upload' 誤判
+  // 必須明確包含 'drive' 或 'storage'，避免單獨 'upload' 誤判
 
   const hasDriveOrStorage = searchText.includes('drive') || searchText.includes('storage');
   
