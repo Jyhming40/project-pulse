@@ -282,6 +282,34 @@ export function useToggleProjectMilestone() {
 
       // Recalculate progress after milestone change
       await recalculateProjectProgress(projectId, token);
+
+      // Send notification if completing milestone
+      if (isCompleted) {
+        try {
+          const notificationResponse = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-milestone-notification`,
+            {
+              method: 'POST',
+              headers: {
+                'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                projectId,
+                milestoneCode,
+                milestoneName: '', // Will be looked up in edge function
+                completedBy: session.data.session?.user?.id,
+              }),
+            }
+          );
+          if (!notificationResponse.ok) {
+            console.warn('Failed to send milestone notification');
+          }
+        } catch (err) {
+          console.warn('Error sending milestone notification:', err);
+        }
+      }
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['project-milestones', variables.projectId] });

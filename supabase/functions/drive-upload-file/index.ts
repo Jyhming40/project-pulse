@@ -76,12 +76,36 @@ const DOC_TYPE_LABEL_TO_MILESTONE: Record<string, string> = {
   '能源署設備登記': 'ADMIN_09_EQUIPMENT_REG',
   '免雜項竣工': 'ADMIN_05_MISC_EXEMPT',
   '免雜執照完竣': 'ADMIN_05_MISC_EXEMPT',
+  // Engineering milestones triggered by document upload
+  '現勘報告': 'ENG_01_SITE_SURVEY',
+  '現場勘查': 'ENG_01_SITE_SURVEY',
+  '設計圖說': 'ENG_02_DESIGN_FINAL',
+  '系統圖': 'ENG_02_DESIGN_FINAL',
+  '施工照片': 'ENG_04_STRUCTURE',
+  '鋼構照片': 'ENG_04_STRUCTURE',
+  '模組安裝': 'ENG_05_MODULE',
+  '模組施工照片': 'ENG_05_MODULE',
+  '機電配線': 'ENG_06_ELECTRICAL',
+  '配線照片': 'ENG_06_ELECTRICAL',
+  '逆變器安裝': 'ENG_07_INVERTER',
+  '逆變器照片': 'ENG_07_INVERTER',
+  '併聯測試': 'ENG_08_GRID_TEST',
+  '測試報告': 'ENG_08_GRID_TEST',
+  '缺失改善': 'ENG_09_DEFECT_FIX',
+  '竣工報告': 'ENG_10_HANDOVER',
+  '工程交付': 'ENG_10_HANDOVER',
 };
 
 // Prerequisite milestones: when a milestone is completed, these should also be completed
 const MILESTONE_PREREQUISITES: Record<string, string[]> = {
   'ADMIN_03_TAIPOWER_OPINION': ['ADMIN_02_TAIPOWER_SUBMIT'],  // 取得審查意見書 -> 送件完成
   'ADMIN_04_ENERGY_APPROVAL': ['ADMIN_02_TAIPOWER_SUBMIT', 'ADMIN_03_TAIPOWER_OPINION'],  // 同意備案 -> 台電送件+審查意見書
+  'ENG_05_MODULE': ['ENG_04_STRUCTURE'],  // 模組完成 -> 鋼構完成
+  'ENG_06_ELECTRICAL': ['ENG_05_MODULE'],  // 機電完成 -> 模組完成
+  'ENG_07_INVERTER': ['ENG_06_ELECTRICAL'],  // 逆變器完成 -> 機電完成
+  'ENG_08_GRID_TEST': ['ENG_07_INVERTER'],  // 併聯測試 -> 逆變器完成
+  'ENG_09_DEFECT_FIX': ['ENG_08_GRID_TEST'],  // 缺失改善 -> 併聯測試
+  'ENG_10_HANDOVER': ['ENG_09_DEFECT_FIX'],  // 工程交付 -> 缺失改善
 };
 
 // Refresh access token
@@ -600,6 +624,46 @@ serve(async (req) => {
       } catch (progressErr) {
         console.error('Failed to recalculate progress:', progressErr);
         // Don't fail the upload just because progress recalculation failed
+      }
+
+      // Get milestone name for notification
+      const { data: milestoneInfo } = await supabase
+        .from('progress_milestones')
+        .select('milestone_name, notify_on_complete')
+        .eq('milestone_code', milestoneCode)
+        .single();
+
+      // Trigger milestone notification if enabled
+      if (milestoneInfo?.notify_on_complete) {
+        try {
+          console.log(`Sending notification for milestone: ${milestoneCode}`);
+          const notificationResponse = await fetch(
+            `${supabaseUrl}/functions/v1/send-milestone-notification`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${supabaseServiceKey}`,
+              },
+              body: JSON.stringify({
+                projectId,
+                milestoneCode,
+                milestoneName: milestoneInfo.milestone_name,
+                completedBy: user.id,
+              }),
+            }
+          );
+          
+          if (notificationResponse.ok) {
+            const notificationResult = await notificationResponse.json();
+            console.log('Notification sent:', notificationResult);
+          } else {
+            console.error('Failed to send notification:', await notificationResponse.text());
+          }
+        } catch (notifyErr) {
+          console.error('Failed to send milestone notification:', notifyErr);
+          // Don't fail the upload just because notification failed
+        }
       }
     }
 
