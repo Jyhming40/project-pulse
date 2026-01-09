@@ -8,6 +8,7 @@ import {
   AGENCY_CODE_TO_LABEL,
 } from '@/lib/docTypeMapping';
 import { generateDocumentDisplayName } from '@/lib/documentAgency';
+import { formatUploadError, logUploadError } from '@/lib/formatUploadError';
 import { toast } from 'sonner';
 
 // === Types ===
@@ -116,48 +117,6 @@ export function generateDisplayNamePreview(params: {
   
   // Format: {ProjectCode}_{Agency}_{DocumentType}_{YYYYMMDD}_v{XX}.pdf
   return `${projectCode}_${agencyLabel}_${docTypeLabel}_${dateFormatted}_${versionStr}.${extension}`;
-}
-
-// === Error Message Formatting ===
-
-function formatUploadError(error: any): string {
-  const code = error?.code;
-  const msg = error?.message || '';
-  
-  // DB constraint violations - hide technical codes
-  if (code === '23505') {
-    if (msg.includes('version')) {
-      return '版本編號衝突，系統已自動重試但仍失敗。請稍後重新上傳。';
-    }
-    if (msg.includes('is_current')) {
-      return '同類文件同時上傳導致衝突，請重新上傳此檔案。';
-    }
-    return '資料重複，請確認是否已上傳過此文件。';
-  }
-  
-  if (code === '23514') {
-    return '文件類型無效，請選擇正確的文件類型。';
-  }
-  
-  if (code === '23503') {
-    return '關聯資料不存在，請確認案場設定正確。';
-  }
-  
-  // Network/auth errors
-  if (msg.includes('未登入') || msg.includes('session')) {
-    return '登入狀態已失效，請重新登入後再試。';
-  }
-  
-  if (msg.includes('找不到案場')) {
-    return '找不到指定的案場，請重新選擇。';
-  }
-  
-  if (msg.includes('缺少必要欄位')) {
-    return '請填寫案場與文件類型後再上傳。';
-  }
-  
-  // Generic fallback - still hide raw message
-  return '上傳時發生錯誤，請稍後重試。若問題持續，請聯繫管理員。';
 }
 
 // === Main Hook ===
@@ -578,6 +537,8 @@ export function useImportBatch() {
         ));
       } catch (error: any) {
         errorCount++;
+        // Log original error for debugging (engineers only)
+        logUploadError(error, `ImportBatch:${item.originalName}`);
         // Convert technical errors to user-friendly messages
         const userMessage = formatUploadError(error);
         setItems(prev => prev.map(i => 
