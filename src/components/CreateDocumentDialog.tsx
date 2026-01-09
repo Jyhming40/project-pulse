@@ -164,8 +164,19 @@ export function CreateDocumentDialog({
       setUploadProgress(10);
       
       try {
-        // 1. Create document record (using enum value for legacy compatibility)
-        // ⚠️ Phase 1: 不再寫入 version/is_current，避免加深版本依賴
+        // 1. 先將同 project_id + doc_type 的舊文件 is_current 設為 false
+        // 避免 documents_one_current_per_key unique constraint 衝突
+        await supabase
+          .from('documents')
+          .update({ is_current: false })
+          .eq('project_id', projectId)
+          .eq('doc_type', docTypeEnum)
+          .eq('is_current', true)
+          .eq('is_deleted', false);
+        
+        setUploadProgress(20);
+        
+        // 2. Create document record (using enum value for legacy compatibility)
         const { data: docData, error: docError } = await supabase
           .from('documents')
           .insert({
@@ -178,7 +189,8 @@ export function CreateDocumentDialog({
             due_at: dueAt || null,
             owner_user_id: user.id,
             created_by: user.id,
-            // version/is_current 由 DB default 處理，不在此指定
+            is_current: true,
+            version: 1,
           })
           .select()
           .single();
