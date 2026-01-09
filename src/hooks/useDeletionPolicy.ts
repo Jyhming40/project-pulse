@@ -43,28 +43,47 @@ export interface AuditLog {
 
 // Table display name mapping
 export const tableDisplayNames: Record<string, string> = {
+  // Core business
   projects: '案場',
   documents: '文件',
   document_files: '文件檔案',
-  partners: '外包夥伴',
-  partner_contacts: '夥伴聯絡人',
+  document_tags: '文件標籤',
+  document_tag_assignments: '文件標籤關聯',
+  // Investors
   investors: '投資人',
   investor_contacts: '投資人聯絡人',
   investor_payment_methods: '付款方式',
+  investor_year_counters: '投資方年度計數器',
+  // Partners
+  partners: '外包夥伴',
+  partner_contacts: '夥伴聯絡人',
+  // Project related
   project_construction_assignments: '工程指派',
   project_status_history: '案場狀態歷程',
   construction_status_history: '施工狀態歷程',
   project_milestones: '案場里程碑',
+  project_custom_fields: '專案自訂欄位',
+  project_custom_field_values: '專案自訂欄位值',
+  project_field_config: '專案欄位設定',
+  // Progress & milestones
   progress_milestones: '進度里程碑定義',
   progress_settings: '進度設定',
+  // Duplicate management
+  duplicate_ignore_pairs: '重複忽略配對',
+  duplicate_reviews: '重複審核記錄',
+  // System config
   system_options: '系統選項',
   deletion_policies: '刪除政策',
-  audit_logs: '稽核日誌',
-  module_permissions: '模組權限',
-  user_preferences: '使用者偏好設定',
+  app_settings: '系統設定',
+  // User & permissions
   profiles: '使用者資料',
   user_roles: '使用者角色',
-  investor_year_counters: '投資方年度計數器',
+  user_security: '使用者安全設定',
+  user_preferences: '使用者偏好設定',
+  user_drive_tokens: 'Drive 憑證',
+  module_permissions: '模組權限',
+  // Audit
+  audit_logs: '稽核日誌',
 };
 
 // Tables that support soft delete (only tables with is_deleted column)

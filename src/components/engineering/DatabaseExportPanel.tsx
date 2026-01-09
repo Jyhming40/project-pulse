@@ -28,25 +28,46 @@ interface ExportMeta {
 
 // Tables to export (all public schema business tables)
 const EXPORT_TABLES = [
+  // Core business tables
   'projects',
   'documents',
   'document_files',
+  'document_tags',
+  'document_tag_assignments',
+  // Investor tables
   'investors',
   'investor_contacts',
   'investor_payment_methods',
+  'investor_year_counters',
+  // Partner tables
   'partners',
   'partner_contacts',
+  // Project related
   'project_construction_assignments',
   'project_status_history',
   'construction_status_history',
   'project_milestones',
+  'project_custom_fields',
+  'project_custom_field_values',
+  'project_field_config',
+  // Progress & milestones
   'progress_milestones',
   'progress_settings',
+  // Duplicate management
+  'duplicate_ignore_pairs',
+  'duplicate_reviews',
+  // System config
   'system_options',
   'deletion_policies',
-  'audit_logs',
-  'module_permissions',
+  'app_settings',
+  // User & permissions
+  'user_roles',
+  'user_security',
   'user_preferences',
+  'user_drive_tokens',
+  'module_permissions',
+  // Audit
+  'audit_logs',
 ];
 
 // Excel sheet name max length is 31 characters
