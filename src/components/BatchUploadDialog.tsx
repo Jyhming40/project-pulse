@@ -8,6 +8,7 @@ import {
   getDocTypeLabelByCode,
   type AgencyCode,
 } from '@/lib/docTypeMapping';
+import { generateDocumentDisplayName } from '@/lib/documentAgency';
 import { GroupedDocTypeSelect } from '@/components/GroupedDocTypeSelect';
 import {
   Dialog,
@@ -161,6 +162,21 @@ export function BatchUploadDialog({
   // Generate unique ID
   const generateId = () => Math.random().toString(36).substring(2, 9);
 
+  // Generate standardized title based on encoding format
+  const generateStandardTitle = useCallback((docTypeCode: string, agencyCode: string) => {
+    const docTypeLabel = getDocTypeLabelByCode(docTypeCode) || docTypeCode;
+    const agencyLabel = AGENCY_CODE_TO_LABEL[agencyCode as AgencyCode] || agencyCode;
+    
+    return generateDocumentDisplayName({
+      projectCode,
+      agency: agencyLabel,
+      docType: docTypeLabel,
+      date: new Date(),
+      version: 1,
+      status: '未開始',
+    }).replace(/\.[^/.]+$/, ''); // Remove extension for title
+  }, [projectCode]);
+
   // Add files
   const handleFilesSelected = useCallback((selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
@@ -186,12 +202,15 @@ export function BatchUploadDialog({
       // Infer agency code from doc_type_code
       const agencyCode = getAgencyCodeByDocTypeCode(inferredDocType) || 'OTHER';
 
+      // Generate standardized title
+      const standardTitle = generateStandardTitle(inferredDocType, agencyCode);
+
       return {
         id: generateId(),
         file,
         documentType: inferredDocType,
         agencyCode,
-        title: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
+        title: standardTitle,
         subfolderCode,
         subfolderName: getSubfolderName(subfolderCode),
         status: 'pending' as const,
@@ -199,7 +218,7 @@ export function BatchUploadDialog({
     });
 
     setFiles(prev => [...prev, ...newItems]);
-  }, [docTypeOptions, getSubfolderCodeFromDocType, getSubfolderName]);
+  }, [docTypeOptions, getSubfolderCodeFromDocType, getSubfolderName, generateStandardTitle]);
 
   // Update file item
   const updateFileItem = useCallback((id: string, updates: Partial<FileItem>) => {
@@ -208,7 +227,7 @@ export function BatchUploadDialog({
       
       const updated = { ...item, ...updates };
       
-      // If doc type changed, update subfolder and agency
+      // If doc type changed, update subfolder, agency and regenerate title
       if (updates.documentType && updates.documentType !== item.documentType) {
         const newCode = getSubfolderCodeFromDocType(updates.documentType);
         updated.subfolderCode = newCode;
@@ -218,6 +237,8 @@ export function BatchUploadDialog({
         if (inferredAgency) {
           updated.agencyCode = inferredAgency;
         }
+        // Regenerate standardized title
+        updated.title = generateStandardTitle(updates.documentType, updated.agencyCode);
       }
       
       // If manual subfolder change
@@ -227,7 +248,7 @@ export function BatchUploadDialog({
       
       return updated;
     }));
-  }, [getSubfolderCodeFromDocType, getSubfolderName]);
+  }, [getSubfolderCodeFromDocType, getSubfolderName, generateStandardTitle]);
 
   // Remove file
   const removeFile = useCallback((id: string) => {
