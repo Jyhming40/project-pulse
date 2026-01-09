@@ -85,14 +85,24 @@ export function BatchUploadVersionDialog({
       throw new Error('案場尚未設定 Drive 資料夾');
     }
 
-    // Calculate new version
-    const newVersion = (doc.version || 1) + 1;
+    // Get project_id from the document
+    const { data: docData, error: fetchError } = await supabase
+      .from('documents')
+      .select('project_id')
+      .eq('id', doc.id)
+      .single();
 
-    // Upload to Google Drive
+    if (fetchError || !docData) {
+      throw new Error('找不到文件資料');
+    }
+
+    // Upload to Google Drive with correct parameters
+    // The edge function handles versioning and document record creation
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('folderId', project.drive_folder_id);
-    formData.append('fileName', file.name);
+    formData.append('projectId', docData.project_id);
+    formData.append('documentType', doc.doc_type);
+    formData.append('title', doc.title || doc.doc_type);
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) throw new Error('未登入');
@@ -115,57 +125,14 @@ export function BatchUploadVersionDialog({
 
     const uploadResult = await uploadResponse.json();
 
-    // Create new document record (new version)
-    const { data: newDoc, error: docError } = await supabase
-      .from('documents')
-      .insert({
-        project_id: doc.projects ? (await supabase
-          .from('documents')
-          .select('project_id')
-          .eq('id', doc.id)
-          .single()).data?.project_id : null,
-        doc_type: doc.doc_type,
-        title: doc.title,
-        version: newVersion,
-        is_current: true,
-        drive_file_id: uploadResult.id,
-        drive_web_view_link: uploadResult.webViewLink,
-        drive_path: uploadResult.name,
-        owner_user_id: user?.id,
-        created_by: user?.id,
-      })
-      .select()
-      .single();
-
-    if (docError) throw docError;
-
-    // Update old version to not be current
+    // Mark old document as not current
     await supabase
       .from('documents')
       .update({ is_current: false })
       .eq('id', doc.id);
 
-    // Create document_files record
-    await supabase.from('document_files').insert({
-      document_id: newDoc.id,
-      original_name: file.name,
-      storage_path: uploadResult.id,
-      file_size: file.size,
-      mime_type: file.type,
-      uploaded_by: user?.id,
-    });
-
-    // Log audit
-    await supabase.rpc('log_audit_action', {
-      p_table_name: 'documents',
-      p_record_id: newDoc.id,
-      p_action: 'CREATE',
-      p_old_data: null,
-      p_new_data: { version: newVersion, previous_version_id: doc.id },
-      p_reason: `批次上傳新版本 v${newVersion}`,
-    });
-
-    return newVersion;
+    // Return the new version number from the uploaded document
+    return uploadResult.document?.version || (doc.version || 1) + 1;
   };
 
   const handleBatchUpload = async () => {
