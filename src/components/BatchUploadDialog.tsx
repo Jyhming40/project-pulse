@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { DOC_TYPE_CODE_TO_SHORT } from '@/lib/docTypeMapping';
 import {
   Dialog,
   DialogContent,
@@ -56,8 +57,18 @@ const DEFAULT_SUBFOLDER_TEMPLATE = [
   { code: 'HANDOVER', folder: '10-業務轉工程' },
 ];
 
-// Doc type to subfolder mapping
+// Doc type to subfolder mapping (supports both doc_type_code and short values)
 const DOC_TYPE_TO_SUBFOLDER: Record<string, string> = {
+  // doc_type_code keys
+  'TPC_REVIEW': 'TPC',
+  'TPC_CONTRACT': 'TPC',
+  'TPC_METER': 'TPC',
+  'MOEA_CONSENT': 'ENERGY_BUREAU',
+  'MOEA_REGISTER': 'ENERGY_BUREAU',
+  'STRUCT_CERT': 'RELATED',
+  'LINE_COMP_NOTICE': 'TPC',
+  'OTHER': 'RELATED',
+  // Short value keys (for backwards compatibility)
   '台電審查意見書': 'TPC',
   '台電報竣掛表': 'TPC',
   '台電躉售合約': 'TPC',
@@ -73,6 +84,8 @@ const DOC_TYPE_TO_SUBFOLDER: Record<string, string> = {
   '躉售合約': 'TPC',
   '報竣掛表': 'TPC',
   '設備登記': 'ENERGY_BUREAU',
+  '同意備案': 'ENERGY_BUREAU',
+  '線補費通知單': 'TPC',
   '免雜執照同意備案': 'BUILDING_AUTH',
   '免雜執照完竣': 'BUILDING_AUTH',
   '附屬綠能設施同意函': 'GREEN_PERMISSION',
@@ -201,9 +214,12 @@ export function BatchUploadDialog({
 
   // Upload single file
   const uploadSingleFile = async (item: FileItem, accessToken: string): Promise<boolean> => {
+    // Convert doc_type_code to short value for database storage
+    const docTypeShort = DOC_TYPE_CODE_TO_SHORT[item.documentType] || item.documentType;
+    
     const formData = new FormData();
     formData.append('projectId', projectId);
-    formData.append('documentType', item.documentType);
+    formData.append('documentType', docTypeShort);
     formData.append('title', item.title);
     formData.append('file', item.file);
     // Pass the selected subfolder code to override default

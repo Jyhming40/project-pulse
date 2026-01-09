@@ -7,6 +7,7 @@ import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { CodebookSelect } from '@/components/CodebookSelect';
 import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
+import { DOC_TYPE_CODE_TO_SHORT } from '@/lib/docTypeMapping';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import {
@@ -324,9 +325,14 @@ export default function ProjectDetail() {
   // Add document mutation
   const addDocumentMutation = useMutation({
     mutationFn: async (data: typeof docForm) => {
+      // Convert doc_type_code to short value for database storage
+      const docTypeShort = data.doc_type 
+        ? (DOC_TYPE_CODE_TO_SHORT[data.doc_type] || data.doc_type)
+        : null;
+      
       const { error } = await supabase.from('documents').insert({
         project_id: id,
-        doc_type: data.doc_type!,
+        doc_type: docTypeShort!,
         doc_status: data.doc_status || '未開始',
         submitted_at: data.submitted_at || null,
         issued_at: data.issued_at || null,
