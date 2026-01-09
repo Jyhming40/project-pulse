@@ -555,6 +555,40 @@ serve(async (req) => {
       }
     }
 
+    // Auto-extract approval_date from "同意備案" document title
+    // Title format example: 2024YF003-2024_MOEA_同意備案_20241210_v01_FINAL
+    if (documentType === '同意備案' || documentType === '能源署同意備案' || documentType === '能源局同意備案') {
+      // Try to extract date from title (format: YYYYMMDD)
+      const dateMatch = title.match(/_(\d{8})_/);
+      if (dateMatch) {
+        const dateStr = dateMatch[1]; // e.g., "20241210"
+        const year = dateStr.substring(0, 4);
+        const month = dateStr.substring(4, 6);
+        const day = dateStr.substring(6, 8);
+        const approvalDate = `${year}-${month}-${day}`; // Convert to ISO format
+        
+        console.log(`Auto-setting approval_date: ${approvalDate} for project ${projectId}`);
+        
+        // Only update if approval_date is not already set
+        const { data: projectData } = await supabase
+          .from('projects')
+          .select('approval_date')
+          .eq('id', projectId)
+          .single();
+        
+        if (!projectData?.approval_date) {
+          await supabase
+            .from('projects')
+            .update({ approval_date: approvalDate })
+            .eq('id', projectId);
+          
+          console.log(`Approval date set to ${approvalDate}`);
+        } else {
+          console.log(`Approval date already set: ${projectData.approval_date}, skipping auto-update`);
+        }
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
