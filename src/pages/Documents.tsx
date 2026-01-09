@@ -120,7 +120,7 @@ export default function Documents() {
         promises.push(
           supabase
             .from('documents')
-            .select('*, projects(project_name, project_code), owner:profiles!documents_owner_user_id_fkey(full_name)')
+            .select('*, projects(project_name, project_code, drive_folder_id), owner:profiles!documents_owner_user_id_fkey(full_name)')
             .eq('is_deleted', false)
             .order('updated_at', { ascending: false })
             .range(i * pageSize, (i + 1) * pageSize - 1)
