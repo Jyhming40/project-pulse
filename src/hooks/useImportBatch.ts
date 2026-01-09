@@ -538,9 +538,9 @@ export function useImportBatch() {
       } catch (error: any) {
         errorCount++;
         // Log original error for debugging (engineers only)
-        logUploadError(error, `ImportBatch:${item.originalName}`);
-        // Convert technical errors to user-friendly messages
-        const userMessage = formatUploadError(error);
+        logUploadError(error, 'ImportBatch');
+        // Convert technical errors to user-friendly messages (use 'documents' context)
+        const userMessage = formatUploadError(error, 'documents');
         setItems(prev => prev.map(i => 
           i.id === item.id ? { ...i, status: 'error', error: userMessage } : i
         ));

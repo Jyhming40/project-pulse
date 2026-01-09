@@ -138,14 +138,14 @@ const DOCUMENTS_UNIQUE_MAP: ConstraintRule[] = [
  * 用於非 Import Batch 情境
  */
 const GLOBAL_UNIQUE_MAP: ConstraintRule[] = [
-  // investors 表：investor_code 唯一
+  // investors 表：investor_code 唯一（精準匹配實際 constraint 名稱）
   {
-    match: /investors.*code|investor_code/i,
+    match: /^investors_investor_code_key$/,
     message: '投資人代碼已存在，請使用不同的代碼。',
   },
-  // projects 表：project_code 唯一
+  // projects 表：project_code 唯一（精準匹配實際 constraint 名稱）
   {
-    match: /projects.*code|project_code/i,
+    match: /^projects_project_code_key$/,
     message: '案場代碼已存在，請使用不同的代碼。',
   },
 ];
