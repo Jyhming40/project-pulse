@@ -68,6 +68,12 @@ const DOC_TYPE_TO_SUBFOLDER: Record<string, string> = {
   'STRUCT_CERT': 'RELATED',
   'LINE_COMP_NOTICE': 'TPC',
   'OTHER': 'RELATED',
+  // Generic category codes (直接對應)
+  'TPC': 'TPC',
+  'ENERGY_BUREAU': 'ENERGY_BUREAU',
+  'RELATED': 'RELATED',
+  'BUILDING_AUTH': 'BUILDING_AUTH',
+  'GREEN_PERMISSION': 'GREEN_PERMISSION',
   // Short value keys (for backwards compatibility)
   '台電審查意見書': 'TPC',
   '台電報竣掛表': 'TPC',
@@ -90,6 +96,12 @@ const DOC_TYPE_TO_SUBFOLDER: Record<string, string> = {
   '免雜執照完竣': 'BUILDING_AUTH',
   '附屬綠能設施同意函': 'GREEN_PERMISSION',
   '最終掛表期限': 'TPC',
+  // Generic short values
+  '台電相關': 'TPC',
+  '能源署相關': 'ENERGY_BUREAU',
+  '其他相關文件': 'RELATED',
+  '建管處相關': 'BUILDING_AUTH',
+  '綠能設施': 'GREEN_PERMISSION',
   '其他': 'RELATED',
 };
 

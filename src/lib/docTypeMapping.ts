@@ -20,6 +20,11 @@ export const DOC_TYPE_SHORT_VALUES = [
   '報竣掛表',       // 不帶「台電」
   '設備登記',       // 不帶「能源署」
   '線補費通知單',   // 替換原「土地契約」
+  '台電相關',       // 通用：其他台電文件
+  '能源署相關',     // 通用：其他能源署文件
+  '其他相關文件',   // 通用：雜項文件
+  '建管處相關',     // 通用：建管處文件
+  '綠能設施',       // 通用：綠能設施文件
   '其他',
 ] as const;
 
@@ -46,6 +51,13 @@ export const DOC_TYPE_CODE_TO_SHORT: Record<string, DocTypeShort> = {
   
   // 線補費
   LINE_COMP_NOTICE: '線補費通知單',
+  
+  // 通用分類代碼
+  TPC: '台電相關',
+  ENERGY_BUREAU: '能源署相關',
+  RELATED: '其他相關文件',
+  BUILDING_AUTH: '建管處相關',
+  GREEN_PERMISSION: '綠能設施',
   
   // 其他
   OTHER: '其他',
