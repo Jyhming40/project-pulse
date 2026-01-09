@@ -164,7 +164,20 @@ export function CreateDocumentDialog({
       setUploadProgress(10);
       
       try {
-        // 1. 先將同 project_id + doc_type 的舊文件 is_current 設為 false
+        // 1. 查詢同 project_id + doc_type 的最大版本號
+        const { data: maxVersionData } = await supabase
+          .from('documents')
+          .select('version')
+          .eq('project_id', projectId)
+          .eq('doc_type', docTypeEnum)
+          .eq('is_deleted', false)
+          .order('version', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        
+        const nextVersion = (maxVersionData?.version || 0) + 1;
+        
+        // 2. 將同 project_id + doc_type 的舊文件 is_current 設為 false
         // 避免 documents_one_current_per_key unique constraint 衝突
         await supabase
           .from('documents')
@@ -176,12 +189,12 @@ export function CreateDocumentDialog({
         
         setUploadProgress(20);
         
-        // 2. Create document record (using enum value for legacy compatibility)
+        // 3. Create document record
         const { data: docData, error: docError } = await supabase
           .from('documents')
           .insert({
             project_id: projectId,
-            doc_type: docTypeEnum, // Store enum value for legacy compatibility
+            doc_type: docTypeEnum,
             title: title || docTypeLabel,
             note,
             submitted_at: submittedAt || null,
@@ -190,7 +203,7 @@ export function CreateDocumentDialog({
             owner_user_id: user.id,
             created_by: user.id,
             is_current: true,
-            version: 1,
+            version: nextVersion,
           })
           .select()
           .single();
