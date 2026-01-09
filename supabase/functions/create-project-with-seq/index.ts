@@ -208,6 +208,46 @@ serve(async (req) => {
 
     console.log('Project created successfully:', newProject);
 
+    // Auto-complete "建檔完成" milestone (ADMIN_01_CREATED)
+    const { error: milestoneError } = await serviceClient
+      .from('project_milestones')
+      .insert({
+        project_id: newProject.id,
+        milestone_code: 'ADMIN_01_CREATED',
+        is_completed: true,
+        completed_at: new Date().toISOString(),
+        completed_by: user.id,
+        note: '專案建立時自動完成',
+      });
+
+    if (milestoneError) {
+      console.error('Failed to create milestone:', milestoneError);
+      // Don't fail the project creation, just log the error
+    } else {
+      console.log('Milestone ADMIN_01_CREATED auto-completed');
+    }
+
+    // Recalculate project progress
+    try {
+      const progressResponse = await fetch(
+        `${supabaseUrl}/functions/v1/recalculate-project-progress`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ project_id: newProject.id }),
+        }
+      );
+      
+      if (progressResponse.ok) {
+        console.log('Progress recalculated for new project');
+      }
+    } catch (progressErr) {
+      console.error('Failed to recalculate progress:', progressErr);
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
