@@ -6,8 +6,7 @@ import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { deleteDriveFile } from '@/hooks/useDriveSync';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { useOptionsForCategory } from '@/hooks/useSystemOptions';
-import { docTypeCodeToEnum, DOC_TYPE_ENUM_VALUES } from '@/lib/docTypeMapping';
+import { useCodebookOptions } from '@/hooks/useCodebook';
 import {
   Dialog,
   DialogContent,
@@ -87,8 +86,8 @@ export function DocumentDetailDialog({
     note: '',
   });
   
-  // Get doc_type options from system_options
-  const docTypeOptions = DOC_TYPE_ENUM_VALUES;
+  // Get doc_type options from system_options (codebook)
+  const { options: docTypeOptions } = useCodebookOptions('doc_type');
 
   // Soft delete hook for documents
   const { softDelete, isDeleting } = useSoftDelete({
@@ -332,9 +331,9 @@ export function DocumentDetailDialog({
                           <SelectValue placeholder="選擇文件類型..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {docTypeOptions.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
+                          {docTypeOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
