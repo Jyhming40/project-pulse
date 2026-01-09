@@ -302,9 +302,13 @@ export function CreateDocumentDialog({
         setIsUploading(false);
       }
     },
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['all-documents'] });
       queryClient.invalidateQueries({ queryKey: ['project-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['project-milestones'] });
+      queryClient.invalidateQueries({ queryKey: ['project'] });
+      queryClient.invalidateQueries({ queryKey: ['project-drawer'] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('文件新增成功');
       onOpenChange(false);
       onSuccess?.();

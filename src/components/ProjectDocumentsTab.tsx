@@ -247,7 +247,12 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
       }
 
       setUploadProgress(100);
+      // Invalidate documents and progress-related queries
       queryClient.invalidateQueries({ queryKey: ['project-documents-versioned', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['project-milestones', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['project-drawer', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success(`文件上傳成功 (版本 ${result.document?.version || 1})`);
       setIsUploadOpen(false);
       setUploadForm({ documentType: '', title: '', file: null });
@@ -774,6 +779,10 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
         defaultProjectId={projectId}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['project-documents-versioned', projectId] });
+          queryClient.invalidateQueries({ queryKey: ['project-milestones', projectId] });
+          queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+          queryClient.invalidateQueries({ queryKey: ['project-drawer', projectId] });
+          queryClient.invalidateQueries({ queryKey: ['projects'] });
         }}
       />
 
@@ -785,6 +794,10 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
         projectCode={project.project_code}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['project-documents-versioned', projectId] });
+          queryClient.invalidateQueries({ queryKey: ['project-milestones', projectId] });
+          queryClient.invalidateQueries({ queryKey: ['project', projectId] });
+          queryClient.invalidateQueries({ queryKey: ['project-drawer', projectId] });
+          queryClient.invalidateQueries({ queryKey: ['projects'] });
         }}
       />
 
