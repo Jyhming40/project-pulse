@@ -3,8 +3,111 @@
  * 
  * 將技術性錯誤轉換為使用者友善的中文訊息
  * 永遠不會回傳 error.message 原文或技術錯誤碼
+ * 
+ * === Constraint/Index Mapping 維護指南 ===
+ * 
+ * 當 DB 新增 unique constraint 或 index 時，請在 UNIQUE_CONSTRAINT_MAP 中新增對應規則：
+ * 1. 從 pg_indexes 或 migration 取得實際名稱
+ * 2. 在 match 欄位使用 RegExp，支援部分匹配或多種寫法
+ * 3. 撰寫使用者友善的中文訊息
+ * 
+ * 目前已知的 documents 表 unique indexes：
+ * - documents_one_current_per_key: (project_id, doc_type) WHERE is_current=true
+ * - documents_unique_version_per_key: (project_id, doc_type, version) WHERE is_deleted=false
  */
 
+// === Private Helpers ===
+
+/**
+ * 從 Supabase/Postgres 錯誤物件中擷取 constraint/index 名稱
+ * 優先順序：constraint > constraint_name > details regex > message regex
+ */
+function extractConstraintName(err: Record<string, any>): string | null {
+  // 1. 直接欄位
+  if (err?.constraint && typeof err.constraint === 'string') {
+    return err.constraint.toLowerCase();
+  }
+  if (err?.constraint_name && typeof err.constraint_name === 'string') {
+    return err.constraint_name.toLowerCase();
+  }
+  
+  // 2. 從 details 擷取 (常見格式: Key ... violates unique constraint "xxx")
+  const details = err?.details || '';
+  const detailsMatch = details.match(/(?:constraint|index)\s*["']?([a-z0-9_]+)["']?/i);
+  if (detailsMatch?.[1]) {
+    return detailsMatch[1].toLowerCase();
+  }
+  
+  // 3. 從 message 擷取 (常見格式: duplicate key value violates unique constraint "xxx")
+  const message = err?.message || '';
+  const messageMatch = message.match(/(?:constraint|index)\s*["']?([a-z0-9_]+)["']?/i);
+  if (messageMatch?.[1]) {
+    return messageMatch[1].toLowerCase();
+  }
+  
+  return null;
+}
+
+/**
+ * 合併 message/hint/details 為可搜尋文本（供 fallback 用）
+ */
+function buildSearchText(err: Record<string, any>): string {
+  const msg = (err?.message || '').toLowerCase();
+  const hint = (err?.hint || '').toLowerCase();
+  const details = (err?.details || '').toLowerCase();
+  return `${msg} ${hint} ${details}`;
+}
+
+// === Constraint Mapping Table ===
+
+/**
+ * 23505 (unique_violation) constraint 名稱對應表
+ * match: RegExp 用於匹配 constraint/index 名稱（已 toLowerCase）
+ * message: 使用者友善的中文訊息
+ */
+const UNIQUE_CONSTRAINT_MAP: Array<{ match: RegExp; message: string }> = [
+  // documents 表：同 project+doc_type 只能一筆 is_current=true
+  {
+    match: /documents_one_current_per_key|one_current|is_current.*unique/i,
+    message: '同類文件的最新版本狀態衝突，請稍後重新上傳。',
+  },
+  // documents 表：同 project+doc_type+version 不可重複
+  {
+    match: /documents_unique_version_per_key|unique_version|version.*unique/i,
+    message: '版本編號衝突，可能已存在相同版本。請重新整理頁面後再試。',
+  },
+  // investors 表：investor_code 唯一
+  {
+    match: /investors_investor_code_key|investor_code/i,
+    message: '投資人代碼已存在，請使用不同的代碼。',
+  },
+  // projects 表：project_code 唯一
+  {
+    match: /projects_project_code_key|project_code/i,
+    message: '案場代碼已存在，請使用不同的代碼。',
+  },
+];
+
+/**
+ * 23505 fallback 關鍵字對應（當無法取得 constraint 名稱時使用）
+ */
+const UNIQUE_FALLBACK_KEYWORDS: Array<{ keywords: string[]; message: string }> = [
+  {
+    keywords: ['version'],
+    message: '版本編號衝突，可能已存在相同版本。請重新整理頁面後再試。',
+  },
+  {
+    keywords: ['is_current', 'current'],
+    message: '同類文件的最新版本狀態衝突，請稍後重新上傳。',
+  },
+];
+
+// === Main Export ===
+
+/**
+ * 將技術性錯誤轉換為使用者友善的中文訊息
+ * 絕對不會回傳 error.message 原文或技術錯誤碼
+ */
 export function formatUploadError(error: unknown): string {
   if (!error) {
     return '上傳時發生未知錯誤，請稍後重試。';
@@ -12,27 +115,36 @@ export function formatUploadError(error: unknown): string {
 
   const err = error as Record<string, any>;
   const code = err?.code;
-  const msg = (err?.message || '').toLowerCase();
-  const hint = (err?.hint || '').toLowerCase();
-  const details = (err?.details || '').toLowerCase();
-  const fullText = `${msg} ${hint} ${details}`;
+  const searchText = buildSearchText(err);
+  const constraintName = extractConstraintName(err);
 
   // === Postgres / Supabase DB 錯誤碼 ===
 
   // 23505: unique_violation - 資料重複
   if (code === '23505') {
-    if (fullText.includes('version')) {
-      return '版本編號衝突，可能已存在相同版本。請重新整理頁面後再試。';
+    // 1. 優先使用 constraint 名稱匹配
+    if (constraintName) {
+      for (const rule of UNIQUE_CONSTRAINT_MAP) {
+        if (rule.match.test(constraintName)) {
+          return rule.message;
+        }
+      }
     }
-    if (fullText.includes('is_current') || fullText.includes('current')) {
-      return '同類文件的最新版本狀態衝突，請稍後重新上傳。';
+    
+    // 2. Fallback: 使用 searchText 關鍵字匹配
+    for (const rule of UNIQUE_FALLBACK_KEYWORDS) {
+      if (rule.keywords.some(kw => searchText.includes(kw))) {
+        return rule.message;
+      }
     }
+    
+    // 3. Generic unique violation
     return '資料重複，可能已存在相同版本或文件。請重新整理後再試。';
   }
 
   // 23514: check_violation - 欄位值不符合限制
   if (code === '23514') {
-    if (fullText.includes('doc_type')) {
+    if (searchText.includes('doc_type')) {
       return '文件類型不合法，請重新選擇正確的文件類型。';
     }
     return '資料格式不符合規定，請檢查填寫內容後重試。';
@@ -60,25 +172,28 @@ export function formatUploadError(error: unknown): string {
 
   // === 網路 / 連線 / 認證錯誤 ===
 
-  if (fullText.includes('network') || fullText.includes('fetch') || fullText.includes('timeout')) {
+  if (searchText.includes('network') || searchText.includes('fetch') || searchText.includes('timeout')) {
     return '網路連線失敗，請檢查網路狀態後重試。';
   }
 
-  if (fullText.includes('未登入') || fullText.includes('session') || fullText.includes('unauthorized') || fullText.includes('401')) {
+  if (searchText.includes('未登入') || searchText.includes('session') || searchText.includes('unauthorized') || searchText.includes('401')) {
     return '登入狀態已失效，請重新登入後再試。';
   }
 
-  if (fullText.includes('forbidden') || fullText.includes('403')) {
+  if (searchText.includes('forbidden') || searchText.includes('403')) {
     return '您沒有執行此操作的權限。';
   }
 
   // === Google Drive / Storage 錯誤 ===
+  // 注意：必須明確包含 'drive' 或 'storage'，避免單獨 'upload' 誤判
 
-  if (fullText.includes('drive') || fullText.includes('storage') || fullText.includes('upload')) {
-    if (fullText.includes('quota') || fullText.includes('limit')) {
+  const hasDriveOrStorage = searchText.includes('drive') || searchText.includes('storage');
+  
+  if (hasDriveOrStorage) {
+    if (searchText.includes('quota') || searchText.includes('limit')) {
       return '雲端儲存空間不足，請聯繫管理員。';
     }
-    if (fullText.includes('permission') || fullText.includes('access')) {
+    if (searchText.includes('permission') || searchText.includes('access')) {
       return '雲端資料夾存取權限不足，請確認 Google Drive 設定。';
     }
     return '檔案上傳至雲端失敗，請檢查網路後重試。';
@@ -86,15 +201,15 @@ export function formatUploadError(error: unknown): string {
 
   // === 應用程式層錯誤（中文錯誤訊息）===
 
-  if (msg.includes('找不到案場')) {
+  if (searchText.includes('找不到案場')) {
     return '找不到指定的案場，請重新選擇。';
   }
 
-  if (msg.includes('缺少必要欄位')) {
+  if (searchText.includes('缺少必要欄位')) {
     return '請填寫案場與文件類型後再上傳。';
   }
 
-  if (msg.includes('找不到') || msg.includes('不存在')) {
+  if (searchText.includes('找不到') || searchText.includes('不存在')) {
     return '找不到相關資料，請重新整理頁面後再試。';
   }
 
@@ -110,5 +225,16 @@ export function formatUploadError(error: unknown): string {
  */
 export function logUploadError(error: unknown, context?: string): void {
   const prefix = context ? `[${context}]` : '[UploadError]';
-  console.error(prefix, error);
+  const err = error as Record<string, any>;
+  const constraintName = extractConstraintName(err);
+  
+  // 輸出完整錯誤資訊供除錯
+  console.error(prefix, {
+    code: err?.code,
+    constraint: constraintName,
+    message: err?.message,
+    details: err?.details,
+    hint: err?.hint,
+    raw: error,
+  });
 }
