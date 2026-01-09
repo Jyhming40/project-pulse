@@ -6,6 +6,8 @@ import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { deleteDriveFile } from '@/hooks/useDriveSync';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
+import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { docTypeCodeToEnum, DOC_TYPE_ENUM_VALUES } from '@/lib/docTypeMapping';
 import {
   Dialog,
   DialogContent,
@@ -20,6 +22,13 @@ import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -71,11 +80,15 @@ export function DocumentDetailDialog({
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [editData, setEditData] = useState({
+    doc_type: '',
     submitted_at: '',
     issued_at: '',
     due_at: '',
     note: '',
   });
+  
+  // Get doc_type options from system_options
+  const docTypeOptions = DOC_TYPE_ENUM_VALUES;
 
   // Soft delete hook for documents
   const { softDelete, isDeleting } = useSoftDelete({
@@ -166,6 +179,7 @@ export function DocumentDetailDialog({
       if (!documentId) throw new Error('No document ID');
 
       const updatePayload: Record<string, string | null> = {
+        doc_type: data.doc_type || document?.doc_type || null,
         submitted_at: data.submitted_at || null,
         issued_at: data.issued_at || null,
         due_at: data.due_at || null,
@@ -186,6 +200,7 @@ export function DocumentDetailDialog({
         p_record_id: documentId,
         p_action: 'UPDATE',
         p_old_data: {
+          doc_type: document?.doc_type,
           submitted_at: document?.submitted_at,
           issued_at: document?.issued_at,
           due_at: document?.due_at,
@@ -209,6 +224,7 @@ export function DocumentDetailDialog({
 
   const handleEdit = () => {
     setEditData({
+      doc_type: document?.doc_type || '',
       submitted_at: document?.submitted_at?.split('T')[0] || '',
       issued_at: document?.issued_at?.split('T')[0] || '',
       due_at: document?.due_at?.split('T')[0] || '',
@@ -305,6 +321,27 @@ export function DocumentDetailDialog({
 
                 {isEditing ? (
                   <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                    {/* Document Type */}
+                    <div className="space-y-2">
+                      <Label htmlFor="doc_type">文件類型</Label>
+                      <Select 
+                        value={editData.doc_type} 
+                        onValueChange={(value) => setEditData(prev => ({ ...prev, doc_type: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="選擇文件類型..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {docTypeOptions.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    
+                    {/* Date Fields */}
                     <div className="grid grid-cols-3 gap-4">
                       <div className="space-y-2">
                         <Label htmlFor="submitted_at">送件日</Label>
