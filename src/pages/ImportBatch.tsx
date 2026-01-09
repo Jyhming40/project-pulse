@@ -4,6 +4,7 @@ import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useImportBatch, ImportFileItem } from '@/hooks/useImportBatch';
 import { inferAgencyCodeFromDocTypeCode, DOC_TYPE_CODE_TO_SHORT, AGENCY_CODE_TO_LABEL, getDocTypeLabelByCode, type AgencyCode } from '@/lib/docTypeMapping';
 import { GroupedDocTypeSelect } from '@/components/GroupedDocTypeSelect';
+import { ImportSummaryDialog } from '@/components/ImportSummaryDialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -74,11 +75,25 @@ export default function ImportBatch() {
   const [batchProjectId, setBatchProjectId] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
+  const [showSummary, setShowSummary] = useState(false);
+  const prevIsUploading = useRef(false);
   
   // Load projects on mount
   useEffect(() => {
     loadProjects();
   }, [loadProjects]);
+
+  // Show summary dialog when upload completes
+  useEffect(() => {
+    if (prevIsUploading.current && !isUploading) {
+      // Upload just finished
+      const hasCompleted = items.some(i => i.status === 'success' || i.status === 'error');
+      if (hasCompleted) {
+        setShowSummary(true);
+      }
+    }
+    prevIsUploading.current = isUploading;
+  }, [isUploading, items]);
   
   // Handle file drop
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -595,6 +610,14 @@ export default function ImportBatch() {
           </CardContent>
         </Card>
       )}
+
+      {/* Import Summary Dialog */}
+      <ImportSummaryDialog
+        open={showSummary}
+        onOpenChange={setShowSummary}
+        items={items}
+        onClear={clearItems}
+      />
     </div>
   );
 }
