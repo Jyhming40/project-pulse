@@ -6,34 +6,49 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import * as XLSX from 'xlsx';
 
-// Define known tables with their Chinese labels
+// Define known tables with their Chinese labels (38 tables total)
 const KNOWN_TABLES = [
+  // Core business tables
   { name: 'projects', label: '案場' },
+  { name: 'documents', label: '文件' },
+  { name: 'document_files', label: '文件檔案' },
+  { name: 'document_tags', label: '文件標籤' },
+  { name: 'document_tag_assignments', label: '文件標籤關聯' },
+  // Investor tables
   { name: 'investors', label: '投資人' },
   { name: 'investor_contacts', label: '投資人聯絡人' },
   { name: 'investor_payment_methods', label: '投資人付款方式' },
+  { name: 'investor_year_counters', label: '投資人年度計數器' },
+  // Partner tables
   { name: 'partners', label: '協力廠商' },
   { name: 'partner_contacts', label: '協力廠商聯絡人' },
-  { name: 'documents', label: '文件' },
-  { name: 'document_files', label: '文件檔案' },
-  { name: 'project_milestones', label: '案場里程碑' },
-  { name: 'progress_milestones', label: '進度里程碑定義' },
+  // Project related
   { name: 'project_construction_assignments', label: '施工分派' },
   { name: 'project_status_history', label: '案場狀態歷程' },
   { name: 'construction_status_history', label: '施工狀態歷程' },
-  { name: 'system_options', label: '系統選項' },
-  { name: 'profiles', label: '使用者資料' },
-  { name: 'user_roles', label: '使用者角色' },
-  { name: 'user_preferences', label: '使用者偏好' },
-  { name: 'module_permissions', label: '模組權限' },
-  { name: 'deletion_policies', label: '刪除政策' },
-  { name: 'audit_logs', label: '稽核日誌' },
-  { name: 'app_settings', label: '系統設定' },
+  { name: 'project_milestones', label: '案場里程碑' },
+  { name: 'project_custom_fields', label: '專案自訂欄位' },
+  { name: 'project_custom_field_values', label: '專案自訂欄位值' },
+  { name: 'project_field_config', label: '專案欄位設定' },
+  // Progress & milestones
+  { name: 'progress_milestones', label: '進度里程碑定義' },
+  { name: 'progress_settings', label: '進度設定' },
+  // Duplicate management
   { name: 'duplicate_ignore_pairs', label: '重複忽略配對' },
   { name: 'duplicate_reviews', label: '重複審查' },
-  { name: 'investor_year_counters', label: '投資人年度計數器' },
+  // System config
+  { name: 'system_options', label: '系統選項' },
+  { name: 'deletion_policies', label: '刪除政策' },
+  { name: 'app_settings', label: '系統設定' },
+  // User & permissions
+  { name: 'profiles', label: '使用者資料' },
+  { name: 'user_roles', label: '使用者角色' },
+  { name: 'user_security', label: '使用者安全設定' },
+  { name: 'user_preferences', label: '使用者偏好' },
   { name: 'user_drive_tokens', label: '雲端硬碟權杖' },
-  { name: 'progress_settings', label: '進度設定' },
+  { name: 'module_permissions', label: '模組權限' },
+  // Audit
+  { name: 'audit_logs', label: '稽核日誌' },
 ] as const;
 
 type TableName = typeof KNOWN_TABLES[number]['name'];
