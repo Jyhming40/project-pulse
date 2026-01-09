@@ -366,31 +366,32 @@ serve(async (req) => {
     const drivePath = `${project.project_code}/${subfolderConfig.folder}/${file.name}`;
 
     // Create or version the document record
-    // First check for existing current document with same project_id + doc_type
-    // The unique constraint is on (project_id, doc_type) for is_current = true
-    const { data: existingDocs } = await supabase
+    // First, get the maximum version for this project_id + doc_type combination
+    const { data: allDocs } = await supabase
       .from('documents')
-      .select('id, version, title')
+      .select('id, version, is_current')
       .eq('project_id', projectId)
       .eq('doc_type', documentType)
-      .eq('is_current', true)
-      .eq('is_deleted', false);
+      .eq('is_deleted', false)
+      .order('version', { ascending: false });
 
+    // Calculate new version from MAX existing version
     let newVersion = 1;
-    if (existingDocs && existingDocs.length > 0) {
-      // Find existing doc with same title or use the first one
-      const sameTitle = existingDocs.find(d => d.title === title);
-      const oldDoc = sameTitle || existingDocs[0];
-      newVersion = (oldDoc.version || 1) + 1;
+    if (allDocs && allDocs.length > 0) {
+      const maxVersion = Math.max(...allDocs.map(d => d.version || 0));
+      newVersion = maxVersion + 1;
       
       // Mark ALL current documents with this project_id + doc_type as not current
-      // to satisfy the unique constraint
-      await supabase
-        .from('documents')
-        .update({ is_current: false })
-        .eq('project_id', projectId)
-        .eq('doc_type', documentType)
-        .eq('is_current', true);
+      // to satisfy the unique constraint documents_one_current_per_key
+      const currentDocs = allDocs.filter(d => d.is_current);
+      if (currentDocs.length > 0) {
+        await supabase
+          .from('documents')
+          .update({ is_current: false })
+          .eq('project_id', projectId)
+          .eq('doc_type', documentType)
+          .eq('is_current', true);
+      }
     }
 
     // Insert new document record
