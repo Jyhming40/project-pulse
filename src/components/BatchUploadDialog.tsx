@@ -176,7 +176,7 @@ export function BatchUploadDialog({
     }).replace(/\.[^/.]+$/, ''); // Remove extension for title
   }, [projectCode]);
 
-  // Add files
+  // Add files - always default to OFFICIAL_DOC subfolder
   const handleFilesSelected = useCallback((selectedFiles: FileList | null) => {
     if (!selectedFiles) return;
 
@@ -184,7 +184,7 @@ export function BatchUploadDialog({
       // Try to infer doc type from filename
       let inferredDocType = '';
       const lowerName = file.name.toLowerCase();
-      for (const [docType, code] of Object.entries(DOC_TYPE_TO_SUBFOLDER)) {
+      for (const [docType] of Object.entries(DOC_TYPE_TO_SUBFOLDER)) {
         if (lowerName.includes(docType.toLowerCase()) || 
             lowerName.includes(docType.replace(/[^\u4e00-\u9fff]/g, '').toLowerCase())) {
           inferredDocType = docType;
@@ -197,7 +197,8 @@ export function BatchUploadDialog({
         inferredDocType = docTypeOptions[0].value;
       }
 
-      const subfolderCode = getSubfolderCodeFromDocType(inferredDocType);
+      // Always use OFFICIAL_DOC as default subfolder
+      const subfolderCode = 'OFFICIAL_DOC';
       // Infer agency code from doc_type_code
       const agencyCode = getAgencyCodeByDocTypeCode(inferredDocType) || 'OTHER';
 
@@ -217,20 +218,17 @@ export function BatchUploadDialog({
     });
 
     setFiles(prev => [...prev, ...newItems]);
-  }, [docTypeOptions, getSubfolderCodeFromDocType, getSubfolderName, generateStandardTitle]);
+  }, [docTypeOptions, getSubfolderName, generateStandardTitle]);
 
-  // Update file item
+  // Update file item - do NOT auto-change subfolder when doc type changes
   const updateFileItem = useCallback((id: string, updates: Partial<FileItem>) => {
     setFiles(prev => prev.map(item => {
       if (item.id !== id) return item;
       
       const updated = { ...item, ...updates };
       
-      // If doc type changed, update subfolder, agency and regenerate title
+      // If doc type changed, update agency and regenerate title (but keep subfolder fixed)
       if (updates.documentType && updates.documentType !== item.documentType) {
-        const newCode = getSubfolderCodeFromDocType(updates.documentType);
-        updated.subfolderCode = newCode;
-        updated.subfolderName = getSubfolderName(newCode);
         // Update agency code based on new doc type
         const inferredAgency = getAgencyCodeByDocTypeCode(updates.documentType);
         if (inferredAgency) {
@@ -238,6 +236,7 @@ export function BatchUploadDialog({
         }
         // Regenerate standardized title
         updated.title = generateStandardTitle(updates.documentType, updated.agencyCode);
+        // Do NOT change subfolder - keep it as user set or default (OFFICIAL_DOC)
       }
       
       // If manual subfolder change
@@ -247,7 +246,7 @@ export function BatchUploadDialog({
       
       return updated;
     }));
-  }, [getSubfolderCodeFromDocType, getSubfolderName, generateStandardTitle]);
+  }, [getSubfolderName, generateStandardTitle]);
 
   // Remove file
   const removeFile = useCallback((id: string) => {

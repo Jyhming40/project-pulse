@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
+import { deleteDriveFile } from '@/hooks/useDriveSync';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
@@ -290,26 +291,37 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
     },
   });
 
-  const handleBatchDelete = async (reason?: string) => {
+  const handleBatchDelete = async (reason?: string, deleteDriveFiles?: boolean) => {
     const selectedIds = Array.from(docBatchSelect.selectedIds);
     if (selectedIds.length === 0) return;
     
     setIsBatchDeleting(true);
     try {
-      // If reason is provided, update with reason
-      if (reason) {
-        await supabase
-          .from('documents')
-          .update({ 
-            is_deleted: true, 
-            deleted_at: new Date().toISOString(),
-            deleted_by: user?.id,
-            delete_reason: reason 
-          })
-          .in('id', selectedIds);
-      } else {
-        await softDeleteMutation.mutateAsync(selectedIds);
+      // Delete from Drive first if requested
+      if (deleteDriveFiles) {
+        const docsWithDrive = documents.filter(
+          d => selectedIds.includes(d.id) && d.drive_file_id
+        );
+        const drivePromises = docsWithDrive.map(d => deleteDriveFile(d.id));
+        const driveResults = await Promise.all(drivePromises);
+        const successCount = driveResults.filter(r => r.driveDeleted).length;
+        if (successCount > 0) {
+          toast.success(`已刪除 ${successCount} 個雲端檔案`);
+        }
       }
+
+      // Soft delete in database
+      await supabase
+        .from('documents')
+        .update({ 
+          is_deleted: true, 
+          deleted_at: new Date().toISOString(),
+          deleted_by: user?.id,
+          delete_reason: reason || null
+        })
+        .in('id', selectedIds);
+
+      queryClient.invalidateQueries({ queryKey: ['project-documents-versioned', projectId] });
       toast.success(`已刪除 ${selectedIds.length} 筆文件`);
       docBatchSelect.deselectAll();
     } catch (err) {
@@ -319,9 +331,18 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
     }
   };
 
-  const handleSingleDelete = async (reason?: string) => {
+  const handleSingleDelete = async (reason?: string, deleteDriveFile_?: boolean) => {
     if (!singleDeleteDoc) return;
     try {
+      // Delete from Drive first if requested
+      const doc = documents.find(d => d.id === singleDeleteDoc.id);
+      if (deleteDriveFile_ && doc?.drive_file_id) {
+        const driveResult = await deleteDriveFile(singleDeleteDoc.id);
+        if (driveResult.driveDeleted) {
+          toast.success('已刪除雲端檔案');
+        }
+      }
+
       await supabase
         .from('documents')
         .update({ 
@@ -782,6 +803,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
         itemLabel="份文件"
         onConfirm={handleBatchDelete}
         isLoading={isBatchDeleting}
+        driveFileCount={documents.filter(d => docBatchSelect.selectedIds.has(d.id) && d.drive_file_id).length}
       />
 
       {/* Single Delete Dialog */}
@@ -793,6 +815,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
         description="確定要刪除此文件嗎？"
         itemName={singleDeleteDoc?.title || ''}
         tableName="documents"
+        hasDriveFile={!!documents.find(d => d.id === singleDeleteDoc?.id)?.drive_file_id}
       />
 
       {/* Batch Action Bar */}
