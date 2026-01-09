@@ -80,8 +80,8 @@ export default function Documents() {
   const queryClient = useQueryClient();
   const { canEdit, isAdmin } = useAuth();
   
-  // Fetch dynamic options
-  const { options: docTypeOptions } = useOptionsForCategory('doc_type');
+  // Fetch doc_type_code options (single source of truth)
+  const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
   
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');

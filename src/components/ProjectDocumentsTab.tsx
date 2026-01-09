@@ -100,7 +100,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [singleDeleteDoc, setSingleDeleteDoc] = useState<{ id: string; title: string } | null>(null);
 
-  const { options: docTypeOptions } = useOptionsForCategory('doc_type');
+  const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
 
   // Extended document type with new columns
   type ExtendedDocument = {

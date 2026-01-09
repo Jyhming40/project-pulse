@@ -126,9 +126,9 @@ export default function ProjectDetail() {
   const { isAuthorized: isDriveAuthorized, isLoading: isDriveLoading, authorize: authorizeDrive, isAuthorizing } = useDriveAuth();
   const queryClient = useQueryClient();
 
-  // Fetch dynamic options
+  // Fetch dynamic options (doc_type_code is single source of truth for document types)
   const { options: statusOptions } = useOptionsForCategory('project_status');
-  const { options: docTypeOptions } = useOptionsForCategory('doc_type');
+  const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
   const { options: docStatusOptions } = useOptionsForCategory('doc_status');
 
   const [isAddDocOpen, setIsAddDocOpen] = useState(false);

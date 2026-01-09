@@ -18,9 +18,9 @@ import {
 } from 'lucide-react';
 
 // All categories that can be managed in the Codebook
+// doc_type removed - use doc_type_code as single source of truth
 export type CodebookCategory = 
   | 'project_status'
-  | 'doc_type'
   | 'doc_type_code'
   | 'doc_status'
   | 'agency'
@@ -60,23 +60,16 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
       { table: 'projects', column: 'status' },
     ],
   },
-  doc_type: {
-    label: '文件類型',
+  // doc_type_code is the single source of truth for document types
+  doc_type_code: {
+    label: '文件類型代碼',
     icon: FileText,
-    description: '文件分類的類型選項（系統受控，僅可調整標籤）',
+    description: '文件分類代碼（唯一權威來源，透過程式轉換為中文短值）',
     usageMapping: [
       { table: 'documents', column: 'doc_type' },
     ],
     // Mark as system-controlled: cannot add or delete, only edit labels
     isSystemControlled: true,
-  },
-  doc_type_code: {
-    label: '文件類型代碼',
-    icon: FileText,
-    description: '文件分類代碼（英文代碼，權威治理用）',
-    usageMapping: [
-      { table: 'document_files', column: 'doc_type_code' },
-    ],
   },
   doc_status: {
     label: '文件狀態',
@@ -213,34 +206,15 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
     { value: '暫停', label: '暫停' },
     { value: '取消', label: '取消' },
   ],
-  // ⚠️ 系統受控：僅限 docTypeMapping.ts 定義的 8 種短值
-  doc_type: [
-    { value: '台電審查意見書', label: '台電審查意見書' },
-    { value: '同意備案', label: '同意備案' },
-    { value: '結構簽證', label: '結構簽證' },
-    { value: '躉售合約', label: '躉售合約' },
-    { value: '報竣掛表', label: '報竣掛表' },
-    { value: '設備登記', label: '設備登記' },
-    { value: '線補費通知單', label: '線補費通知單' },
-    { value: '其他', label: '其他' },
-  ],
+  // doc_type_code is the single source of truth (synced with docTypeMapping.ts)
   doc_type_code: [
     { value: 'TPC_REVIEW', label: '台電審查意見書' },
-    { value: 'TPC_DRAWING', label: '台電審訖圖' },
-    { value: 'TPC_CONSULT', label: '台電細部協商文件' },
-    { value: 'TPC_CONTRACT', label: '台電躉售合約' },
-    { value: 'TPC_FORMAL_CONTRACT', label: '台電正式躉售' },
-    { value: 'TPC_VISIT', label: '台電派員訪查併聯函' },
-    { value: 'TPC_METER', label: '台電報竣掛表' },
-    { value: 'TPC_DEADLINE', label: '最終掛表期限' },
-    { value: 'MOEA_CONSENT', label: '能源署同意備案' },
-    { value: 'MOEA_REGISTER', label: '能源署設備登記' },
-    { value: 'MOEA_TRANSFER', label: '電廠轉移申請' },
-    { value: 'STRUCT_CERT', label: '結構技師簽證' },
-    { value: 'ELECTRIC_CERT', label: '電機技師簽證' },
-    { value: 'LICENSE_CONSENT', label: '免雜執照同意備案' },
-    { value: 'LICENSE_COMPLETE', label: '免雜執照完竣' },
-    { value: 'FACILITY_CONSENT', label: '附屬綠能設施同意函' },
+    { value: 'MOEA_CONSENT', label: '同意備案' },
+    { value: 'STRUCT_CERT', label: '結構簽證' },
+    { value: 'TPC_CONTRACT', label: '躉售合約' },
+    { value: 'TPC_METER', label: '報竣掛表' },
+    { value: 'MOEA_REGISTER', label: '設備登記' },
+    { value: 'LINE_COMP_NOTICE', label: '線補費通知單' },
     { value: 'OTHER', label: '其他' },
   ],
   doc_status: [
