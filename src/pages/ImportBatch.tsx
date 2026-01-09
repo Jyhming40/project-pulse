@@ -200,7 +200,11 @@ export default function ImportBatch() {
             <TooltipTrigger>
               <Badge variant="destructive"><X className="w-3 h-3 mr-1" />失敗</Badge>
             </TooltipTrigger>
-            <TooltipContent>{item.error}</TooltipContent>
+            <TooltipContent className="max-w-xs">
+              <p className="font-medium mb-1">上傳失敗</p>
+              <p className="text-sm">{item.error || '發生未知錯誤'}</p>
+              <p className="text-xs text-muted-foreground mt-1">可移除此檔案後重新加入上傳</p>
+            </TooltipContent>
           </Tooltip>
         );
       default:
@@ -428,7 +432,7 @@ export default function ImportBatch() {
               <CardTitle className="text-base">檔案清單</CardTitle>
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Info className="w-4 h-4" />
-                <span>版本提示：若同案場+類型已存在文件，將自動建議新版本號</span>
+                <span>上傳新版本不會覆蓋舊文件，系統會自動建立新版本</span>
               </div>
             </div>
           </CardHeader>
