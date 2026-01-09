@@ -315,7 +315,7 @@ export function CreateDocumentDialog({
     },
   });
   
-  const canSubmit = projectId && docTypeCode && !isUploading && !createMutation.isPending;
+  const canSubmit = projectId && docTypeCode && selectedFile && !isUploading && !createMutation.isPending;
   const showAgencySelect = !canAutoInferAgencyFromCode(docTypeCode);
   
   return (
@@ -483,7 +483,9 @@ export function CreateDocumentDialog({
             
             {/* File Upload */}
             <div className="space-y-2">
-              <Label>檔案上傳（選填）</Label>
+              <Label>
+                檔案上傳 <span className="text-destructive">*</span>
+              </Label>
               <div className="border-2 border-dashed rounded-lg p-4 text-center">
                 <input
                   ref={fileInputRef}
