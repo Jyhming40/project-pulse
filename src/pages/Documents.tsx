@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +7,7 @@ import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
 import { useBatchSelect } from '@/hooks/useBatchSelect';
 import { useDocumentTags, useAllDocumentTagAssignments } from '@/hooks/useDocumentTags';
+import { deleteDriveFile } from '@/hooks/useDriveSync';
 import { format, isWithinInterval, subDays } from 'date-fns';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
@@ -245,16 +246,29 @@ export default function Documents() {
     },
   });
 
-  // Batch delete mutation with audit logging
+  // Batch delete mutation with audit logging and optional Drive sync
   const batchDeleteMutation = useMutation({
-    mutationFn: async (reason?: string) => {
+    mutationFn: async ({ reason, deleteDriveFiles }: { reason?: string; deleteDriveFiles?: boolean }) => {
       const selectedIds = Array.from(batchSelect.selectedIds);
       
-      // Get old data for audit
-      const { data: oldData } = await supabase
+      // Get documents with drive_file_id for Drive deletion
+      const { data: docsToDelete } = await supabase
         .from('documents')
-        .select('id, doc_type, doc_status')
+        .select('id, doc_type, doc_status, drive_file_id')
         .in('id', selectedIds);
+      
+      // Delete from Drive first if requested
+      if (deleteDriveFiles && docsToDelete) {
+        const drivePromises = docsToDelete
+          .filter(d => d.drive_file_id)
+          .map(d => deleteDriveFile(d.id));
+        
+        const driveResults = await Promise.all(drivePromises);
+        const successCount = driveResults.filter(r => r.driveDeleted).length;
+        if (successCount > 0) {
+          toast.success(`已刪除 ${successCount} 個雲端檔案`);
+        }
+      }
       
       const { error } = await supabase
         .from('documents')
@@ -268,7 +282,7 @@ export default function Documents() {
       
       // Log batch delete to audit_logs
       for (const id of selectedIds) {
-        const oldRecord = oldData?.find(r => r.id === id);
+        const oldRecord = docsToDelete?.find(r => r.id === id);
         await supabase.rpc('log_audit_action', {
           p_table_name: 'documents',
           p_record_id: id,
@@ -736,10 +750,11 @@ export default function Documents() {
         selectedCount={batchSelect.selectedCount}
         itemLabel="筆文件"
         requireReason
-        onConfirm={async (reason) => {
-          await batchDeleteMutation.mutateAsync(reason);
+        onConfirm={async (reason, deleteDriveFiles) => {
+          await batchDeleteMutation.mutateAsync({ reason, deleteDriveFiles });
         }}
         isLoading={batchDeleteMutation.isPending}
+        driveFileCount={batchSelect.selectedItems.filter(d => d.drive_file_id).length}
       />
 
       {/* Create Document Dialog */}

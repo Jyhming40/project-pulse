@@ -1,5 +1,8 @@
 project_id = "mcvgtsoheayabjpdplcr"
 
+[functions.drive-delete-file]
+verify_jwt = true
+
 [functions.drive-find-root-folder]
 verify_jwt = false
 

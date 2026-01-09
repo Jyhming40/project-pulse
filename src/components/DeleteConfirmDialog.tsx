@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -11,18 +11,23 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Trash2, AlertTriangle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2, Trash2, AlertTriangle, Cloud } from 'lucide-react';
 import { useEffectivePolicy, type SoftDeleteTable } from '@/hooks/useDeletionPolicy';
 
 interface DeleteConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: (reason?: string) => Promise<void>;
+  onConfirm: (reason?: string, deleteDriveFile?: boolean) => Promise<void>;
   title?: string;
   description?: string;
   itemName?: string;
   tableName: SoftDeleteTable;
   isPending?: boolean;
+  /** If the item has an associated Drive file */
+  hasDriveFile?: boolean;
+  /** Default state for Drive sync checkbox */
+  defaultDeleteDrive?: boolean;
 }
 
 export function DeleteConfirmDialog({
@@ -34,10 +39,20 @@ export function DeleteConfirmDialog({
   itemName,
   tableName,
   isPending = false,
+  hasDriveFile = false,
+  defaultDeleteDrive = true,
 }: DeleteConfirmDialogProps) {
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deleteDriveFile, setDeleteDriveFile] = useState(defaultDeleteDrive);
   const policy = useEffectivePolicy(tableName);
+
+  // Reset state when dialog opens
+  useEffect(() => {
+    if (open) {
+      setDeleteDriveFile(defaultDeleteDrive);
+    }
+  }, [open, defaultDeleteDrive]);
 
   const isSoftDelete = policy.deletionMode === 'soft_delete';
   const requireReason = policy.requireDeleteReason;
@@ -49,7 +64,7 @@ export function DeleteConfirmDialog({
     
     setIsSubmitting(true);
     try {
-      await onConfirm(reason || undefined);
+      await onConfirm(reason || undefined, hasDriveFile ? deleteDriveFile : undefined);
       setReason('');
       onOpenChange(false);
     } finally {
@@ -60,6 +75,7 @@ export function DeleteConfirmDialog({
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
       setReason('');
+      setDeleteDriveFile(defaultDeleteDrive);
     }
     onOpenChange(newOpen);
   };
@@ -104,6 +120,30 @@ export function DeleteConfirmDialog({
                 此資料表的刪除政策要求填寫刪除原因
               </p>
             )}
+          </div>
+        )}
+
+        {hasDriveFile && (
+          <div className="flex items-start space-x-3 bg-muted/50 rounded-lg p-3">
+            <Checkbox
+              id="delete-drive-file"
+              checked={deleteDriveFile}
+              onCheckedChange={(checked) => setDeleteDriveFile(checked === true)}
+            />
+            <div className="space-y-1">
+              <Label 
+                htmlFor="delete-drive-file" 
+                className="flex items-center gap-2 cursor-pointer font-medium"
+              >
+                <Cloud className="h-4 w-4 text-blue-500" />
+                同時刪除 Google Drive 檔案
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                {deleteDriveFile 
+                  ? '雲端檔案將與紀錄一起刪除' 
+                  : '雲端檔案將被保留，僅刪除系統紀錄'}
+              </p>
+            </div>
           </div>
         )}
 
