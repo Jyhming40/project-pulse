@@ -331,7 +331,7 @@ serve(async (req) => {
     // Find the correct subfolder
     // Use manual override if provided, otherwise use doc type mapping
     const driveSettings = await getDriveSettings(supabaseUrl, supabaseServiceKey);
-    const subfolderCode = manualSubfolderCode || DOC_TYPE_TO_SUBFOLDER[documentType] || 'RELATED';
+    const subfolderCode = manualSubfolderCode || DOC_TYPE_TO_SUBFOLDER[documentType] || 'OFFICIAL_DOC';
     const subfolderConfig = driveSettings.subfolders.find((sf: { code: string; folder: string }) => sf.code === subfolderCode);
     
     if (!subfolderConfig) {
@@ -355,18 +355,23 @@ serve(async (req) => {
     const fileBuffer = await file.arrayBuffer();
     const fileContent = new Uint8Array(fileBuffer);
 
-    // Upload to Drive
-    console.log(`Uploading ${file.name} to folder ${subfolder.id}`);
+    // Get file extension from original filename
+    const fileExt = file.name.includes('.') ? '.' + file.name.split('.').pop() : '';
+    // Use encoded title as the filename in Drive
+    const driveFileName = title.endsWith(fileExt) ? title : title + fileExt;
+
+    // Upload to Drive with encoded title as filename
+    console.log(`Uploading ${driveFileName} (original: ${file.name}) to folder ${subfolder.id}`);
     const uploadResult = await uploadFileToDrive(
       accessToken,
-      file.name,
+      driveFileName,
       fileContent,
       file.type || 'application/octet-stream',
       subfolder.id
     );
 
     // Build the path
-    const drivePath = `${project.project_code}/${subfolderConfig.folder}/${file.name}`;
+    const drivePath = `${project.project_code}/${subfolderConfig.folder}/${driveFileName}`;
 
     // Create or version the document record
     // First, get the maximum version for this project_id + doc_type combination

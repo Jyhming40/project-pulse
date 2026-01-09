@@ -154,9 +154,9 @@ export function BatchUploadDialog({
     return folder?.folder || '00-相關資料';
   }, [driveSubfolders]);
 
-  // Get subfolder code from doc type
+  // Get subfolder code from doc type (default to OFFICIAL_DOC)
   const getSubfolderCodeFromDocType = useCallback((docType: string): string => {
-    return DOC_TYPE_TO_SUBFOLDER[docType] || 'RELATED';
+    return DOC_TYPE_TO_SUBFOLDER[docType] || 'OFFICIAL_DOC';
   }, []);
 
   // Generate unique ID
