@@ -12,6 +12,7 @@ import { useBatchSelect } from '@/hooks/useBatchSelect';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
 
 import { CodebookSelect } from '@/components/CodebookSelect';
+import { SearchInputWithHistory } from '@/components/SearchInputWithHistory';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
 import { BatchUpdateDialog, BatchUpdateField } from '@/components/BatchUpdateDialog';
@@ -610,15 +611,13 @@ export default function Projects() {
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="搜尋案場名稱、編號、地址、投資方..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+        <SearchInputWithHistory
+          value={search}
+          onChange={setSearch}
+          placeholder="搜尋案場名稱、編號、地址、投資方..."
+          storageKey="projects-search-history"
+          className="flex-1"
+        />
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue placeholder="狀態篩選" />
