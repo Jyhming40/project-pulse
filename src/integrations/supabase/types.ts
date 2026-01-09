@@ -879,6 +879,92 @@ export type Database = {
         }
         Relationships: []
       }
+      milestone_notification_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          id: string
+          milestone_code: string
+          project_id: string
+          recipients: string[]
+          sent_at: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          milestone_code: string
+          project_id: string
+          recipients?: string[]
+          sent_at?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          milestone_code?: string
+          project_id?: string
+          recipients?: string[]
+          sent_at?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "milestone_notification_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "milestone_notification_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      milestone_notification_settings: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          setting_key: string
+          setting_value: Json
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          setting_key: string
+          setting_value?: Json
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          setting_key?: string
+          setting_value?: Json
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "milestone_notification_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       module_permissions: {
         Row: {
           can_create: boolean
@@ -1111,6 +1197,8 @@ export type Database = {
           milestone_code: string
           milestone_name: string
           milestone_type: Database["public"]["Enums"]["milestone_type"]
+          notify_on_complete: boolean | null
+          notify_recipients: string[] | null
           sort_order: number
           stage_label: string | null
           updated_at: string
@@ -1127,6 +1215,8 @@ export type Database = {
           milestone_code: string
           milestone_name: string
           milestone_type: Database["public"]["Enums"]["milestone_type"]
+          notify_on_complete?: boolean | null
+          notify_recipients?: string[] | null
           sort_order?: number
           stage_label?: string | null
           updated_at?: string
@@ -1143,6 +1233,8 @@ export type Database = {
           milestone_code?: string
           milestone_name?: string
           milestone_type?: Database["public"]["Enums"]["milestone_type"]
+          notify_on_complete?: boolean | null
+          notify_recipients?: string[] | null
           sort_order?: number
           stage_label?: string | null
           updated_at?: string

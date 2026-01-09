@@ -18,8 +18,10 @@ import {
   X,
   AlertCircle,
   Percent,
-  AlertTriangle
+  AlertTriangle,
+  Bell
 } from 'lucide-react';
+import MilestoneNotificationSettings from '@/components/MilestoneNotificationSettings';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -489,6 +491,9 @@ export default function ProgressSettings() {
           </Tabs>
         </CardContent>
       </Card>
+
+      {/* Notification Settings */}
+      <MilestoneNotificationSettings milestones={milestones} />
 
       {/* Add Milestone Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
