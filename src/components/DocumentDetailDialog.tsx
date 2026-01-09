@@ -55,6 +55,7 @@ import {
   Cloud,
 } from 'lucide-react';
 import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
+import { DOC_TYPE_CODE_TO_SHORT, SHORT_TO_DOC_TYPE_CODE } from '@/lib/docTypeMapping';
 import { toast } from 'sonner';
 import { DocumentVersionCompare } from './DocumentVersionCompare';
 import { DocumentTagSelector } from './DocumentTagSelector';
@@ -177,8 +178,13 @@ export function DocumentDetailDialog({
     mutationFn: async (data: typeof editData) => {
       if (!documentId) throw new Error('No document ID');
 
+      // Convert doc_type_code to short value for database storage
+      const docTypeValue = data.doc_type 
+        ? (DOC_TYPE_CODE_TO_SHORT[data.doc_type] || data.doc_type)
+        : document?.doc_type || null;
+
       const updatePayload: Record<string, string | null> = {
-        doc_type: data.doc_type || document?.doc_type || null,
+        doc_type: docTypeValue,
         submitted_at: data.submitted_at || null,
         issued_at: data.issued_at || null,
         due_at: data.due_at || null,
@@ -222,8 +228,13 @@ export function DocumentDetailDialog({
   });
 
   const handleEdit = () => {
+    // Convert doc_type short value back to code for the select
+    const docTypeCode = document?.doc_type 
+      ? (SHORT_TO_DOC_TYPE_CODE[document.doc_type] || document.doc_type)
+      : '';
+    
     setEditData({
-      doc_type: document?.doc_type || '',
+      doc_type: docTypeCode,
       submitted_at: document?.submitted_at?.split('T')[0] || '',
       issued_at: document?.issued_at?.split('T')[0] || '',
       due_at: document?.due_at?.split('T')[0] || '',
