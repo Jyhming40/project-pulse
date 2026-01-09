@@ -10,6 +10,7 @@ import { CreateDocumentDialog } from '@/components/CreateDocumentDialog';
 import { DocumentDetailDialog } from '@/components/DocumentDetailDialog';
 import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
+import { BatchUploadDialog } from '@/components/BatchUploadDialog';
 import { useBatchSelect } from '@/hooks/useBatchSelect';
 import {
   FolderOpen,
@@ -25,6 +26,7 @@ import {
   File,
   Plus,
   Trash2,
+  Files,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -81,6 +83,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isBatchUploadOpen, setIsBatchUploadOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -454,9 +457,13 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
           </div>
           {canEdit && (
             <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => setIsBatchUploadOpen(true)} disabled={!hasDriveFolder || !isDriveAuthorized}>
+                <Files className="w-4 h-4 mr-2" />
+                批次上傳
+              </Button>
               <Button size="sm" variant="outline" onClick={() => setIsUploadOpen(true)} disabled={!hasDriveFolder || !isDriveAuthorized}>
                 <Upload className="w-4 h-4 mr-2" />
-                上傳新版本
+                上傳檔案
               </Button>
               <Button size="sm" onClick={() => setIsCreateDialogOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" />
@@ -744,6 +751,17 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
         defaultProjectId={projectId}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: ['project-documents-versioned', projectId] });
+        }}
+      />
+
+      {/* Batch Upload Dialog */}
+      <BatchUploadDialog
+        open={isBatchUploadOpen}
+        onOpenChange={setIsBatchUploadOpen}
+        projectId={projectId}
+        projectCode={project.project_code}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['project-documents-versioned', projectId] });
         }}

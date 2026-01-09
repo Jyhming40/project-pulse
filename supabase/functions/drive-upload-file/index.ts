@@ -282,6 +282,8 @@ serve(async (req) => {
     const documentType = formData.get('documentType') as string;
     const title = formData.get('title') as string;
     const file = formData.get('file') as File;
+    // Optional: allow manual subfolder override from batch upload
+    const manualSubfolderCode = formData.get('subfolderCode') as string | null;
 
     if (!projectId || !documentType || !title || !file) {
       return new Response(
@@ -327,8 +329,9 @@ serve(async (req) => {
     }
 
     // Find the correct subfolder
+    // Use manual override if provided, otherwise use doc type mapping
     const driveSettings = await getDriveSettings(supabaseUrl, supabaseServiceKey);
-    const subfolderCode = DOC_TYPE_TO_SUBFOLDER[documentType] || 'RELATED';
+    const subfolderCode = manualSubfolderCode || DOC_TYPE_TO_SUBFOLDER[documentType] || 'RELATED';
     const subfolderConfig = driveSettings.subfolders.find((sf: { code: string; folder: string }) => sf.code === subfolderCode);
     
     if (!subfolderConfig) {
