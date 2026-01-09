@@ -335,6 +335,7 @@ export type Database = {
       }
       documents: {
         Row: {
+          agency_code: string | null
           archive_reason: string | null
           archived_at: string | null
           archived_by: string | null
@@ -345,6 +346,7 @@ export type Database = {
           deleted_by: string | null
           doc_status: string
           doc_type: string
+          doc_type_code: string | null
           drive_file_id: string | null
           drive_parent_folder_id: string | null
           drive_path: string | null
@@ -364,6 +366,7 @@ export type Database = {
           version: number | null
         }
         Insert: {
+          agency_code?: string | null
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
@@ -374,6 +377,7 @@ export type Database = {
           deleted_by?: string | null
           doc_status?: string
           doc_type: string
+          doc_type_code?: string | null
           drive_file_id?: string | null
           drive_parent_folder_id?: string | null
           drive_path?: string | null
@@ -393,6 +397,7 @@ export type Database = {
           version?: number | null
         }
         Update: {
+          agency_code?: string | null
           archive_reason?: string | null
           archived_at?: string | null
           archived_by?: string | null
@@ -403,6 +408,7 @@ export type Database = {
           deleted_by?: string | null
           doc_status?: string
           doc_type?: string
+          doc_type_code?: string | null
           drive_file_id?: string | null
           drive_parent_folder_id?: string | null
           drive_path?: string | null
