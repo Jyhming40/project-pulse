@@ -108,6 +108,138 @@ const MILESTONE_PREREQUISITES: Record<string, string[]> = {
   'ENG_10_HANDOVER': ['ENG_09_DEFECT_FIX'],  // 工程交付 -> 缺失改善
 };
 
+// Document type to project status mapping - auto-suggest project status based on uploaded document
+const DOC_TYPE_TO_PROJECT_STATUS: Record<string, string> = {
+  '審查意見書': '台電審查',
+  '台電審查意見書': '台電審查',
+  '同意備案': '同意備案',
+  '能源署同意備案': '同意備案',
+  '能源局同意備案': '同意備案',
+  '報竣掛表': '報竣掛表',
+  '台電報竣掛表': '報竣掛表',
+  '設備登記': '設備登記',
+  '能源署設備登記': '設備登記',
+  '躉售合約': '運維中',
+  '台電躉售合約': '運維中',
+  // Engineering documents -> 工程施工
+  '施工照片': '工程施工',
+  '鋼構照片': '工程施工',
+  '模組安裝': '工程施工',
+  '模組施工照片': '工程施工',
+  '機電配線': '工程施工',
+  '配線照片': '工程施工',
+  '逆變器安裝': '工程施工',
+  '逆變器照片': '工程施工',
+};
+
+// Type definitions for recalculateProgress
+interface MilestoneData {
+  milestone_code: string;
+  milestone_type: string;
+  weight: number;
+  is_active: boolean;
+  milestone_name: string;
+  sort_order: number;
+}
+
+interface ProjectMilestoneData {
+  milestone_code: string;
+  is_completed: boolean;
+}
+
+interface ProgressSettingsData {
+  setting_key: string;
+  setting_value: { admin_weight?: number; engineering_weight?: number };
+}
+
+// Helper function to recalculate project progress inline
+// deno-lint-ignore no-explicit-any
+async function recalculateProgress(
+  supabase: any,
+  projectId: string
+): Promise<{ admin_progress: number; engineering_progress: number; overall_progress: number; admin_stage: string | null; engineering_stage: string | null }> {
+  // Fetch all active progress milestones
+  const { data: milestonesRaw } = await supabase
+    .from('progress_milestones')
+    .select('milestone_code, milestone_type, weight, is_active, milestone_name, sort_order')
+    .eq('is_active', true);
+  
+  const milestones = (milestonesRaw || []) as MilestoneData[];
+
+  // Fetch project's completed milestones
+  const { data: projectMilestonesRaw } = await supabase
+    .from('project_milestones')
+    .select('milestone_code, is_completed')
+    .eq('project_id', projectId)
+    .eq('is_completed', true);
+
+  const projectMilestones = (projectMilestonesRaw || []) as ProjectMilestoneData[];
+  const completedCodes = new Set(projectMilestones.map(m => m.milestone_code));
+
+  // Fetch weight settings
+  const { data: settingsRaw } = await supabase
+    .from('progress_settings')
+    .select('setting_key, setting_value')
+    .eq('setting_key', 'weights')
+    .single();
+
+  const settings = settingsRaw as ProgressSettingsData | null;
+  const weights = {
+    admin_weight: settings?.setting_value?.admin_weight ?? 50,
+    engineering_weight: settings?.setting_value?.engineering_weight ?? 50,
+  };
+
+  // Calculate admin progress
+  const adminMilestones = milestones.filter(m => m.milestone_type === 'admin');
+  const adminTotalWeight = adminMilestones.reduce((sum, m) => sum + m.weight, 0);
+  const adminCompletedWeight = adminMilestones
+    .filter(m => completedCodes.has(m.milestone_code))
+    .reduce((sum, m) => sum + m.weight, 0);
+  const adminProgress = adminTotalWeight > 0 
+    ? (adminCompletedWeight / adminTotalWeight) * 100 
+    : 0;
+
+  // Calculate engineering progress
+  const engMilestones = milestones.filter(m => m.milestone_type === 'engineering');
+  const engTotalWeight = engMilestones.reduce((sum, m) => sum + m.weight, 0);
+  const engCompletedWeight = engMilestones
+    .filter(m => completedCodes.has(m.milestone_code))
+    .reduce((sum, m) => sum + m.weight, 0);
+  const engineeringProgress = engTotalWeight > 0 
+    ? (engCompletedWeight / engTotalWeight) * 100 
+    : 0;
+
+  // Calculate overall progress
+  const overallProgress = 
+    (adminProgress * weights.admin_weight / 100) + 
+    (engineeringProgress * weights.engineering_weight / 100);
+
+  // Find current stage
+  const adminStage = (() => {
+    const sortedAdmin = milestones
+      .filter(m => m.milestone_code.startsWith('ADMIN'))
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    const nextIncomplete = sortedAdmin.find(m => !completedCodes.has(m.milestone_code));
+    return nextIncomplete?.milestone_name || (sortedAdmin.length > 0 ? '已完成' : null);
+  })();
+
+  const engineeringStage = (() => {
+    const sortedEng = milestones
+      .filter(m => m.milestone_code.startsWith('ENG'))
+      .sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0));
+    const nextIncomplete = sortedEng.find(m => !completedCodes.has(m.milestone_code));
+    return nextIncomplete?.milestone_name || (sortedEng.length > 0 ? '已完成' : null);
+  })();
+
+  return {
+    admin_progress: Math.round(adminProgress * 100) / 100,
+    engineering_progress: Math.round(engineeringProgress * 100) / 100,
+    overall_progress: Math.round(overallProgress * 100) / 100,
+    admin_stage: adminStage,
+    engineering_stage: engineeringStage,
+  };
+}
+
 // Refresh access token
 async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; expiresIn: number }> {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
@@ -603,24 +735,24 @@ serve(async (req) => {
         }
       }
 
-      // Trigger progress recalculation
+      // Recalculate progress directly (inline, not via separate edge function)
       try {
-        const progressResponse = await fetch(
-          `${supabaseUrl}/functions/v1/recalculate-project-progress`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabaseServiceKey}`,
-            },
-            body: JSON.stringify({ project_id: projectId }),
-          }
-        );
+        const progressResult = await recalculateProgress(supabase, projectId);
+        console.log('Progress recalculated:', progressResult);
         
-        if (progressResponse.ok) {
-          const progressResult = await progressResponse.json();
-          console.log('Progress recalculated:', progressResult);
-        }
+        // Update project with new progress values
+        await supabase
+          .from('projects')
+          .update({
+            admin_progress: progressResult.admin_progress,
+            engineering_progress: progressResult.engineering_progress,
+            overall_progress: progressResult.overall_progress,
+            admin_stage: progressResult.admin_stage,
+            engineering_stage: progressResult.engineering_stage,
+          })
+          .eq('id', projectId);
+        
+        console.log('Project progress updated successfully');
       } catch (progressErr) {
         console.error('Failed to recalculate progress:', progressErr);
         // Don't fail the upload just because progress recalculation failed
@@ -667,7 +799,44 @@ serve(async (req) => {
       }
     }
 
-    // Auto-extract approval_date from "同意備案" document title
+    // Auto-update project status based on document type (suggest new status if applicable)
+    const suggestedStatus = DOC_TYPE_TO_PROJECT_STATUS[documentType];
+    if (suggestedStatus) {
+      try {
+        // Get current project status
+        const { data: currentProject } = await supabase
+          .from('projects')
+          .select('status')
+          .eq('id', projectId)
+          .single();
+        
+        // Only auto-update if not already at a "later" status 
+        // Define status progression order
+        const statusOrder = [
+          '開發中', '台電送件', '台電審查', '能源署送件', '同意備案', 
+          '結構簽證', '工程施工', '報竣掛表', '設備登記', '運維中'
+        ];
+        
+        const currentIndex = statusOrder.indexOf(currentProject?.status || '');
+        const suggestedIndex = statusOrder.indexOf(suggestedStatus);
+        
+        // Auto-update if suggested status is later in the progression
+        if (suggestedIndex > currentIndex) {
+          await supabase
+            .from('projects')
+            .update({ status: suggestedStatus })
+            .eq('id', projectId);
+          
+          console.log(`Project status auto-updated from "${currentProject?.status}" to "${suggestedStatus}"`);
+        } else {
+          console.log(`Project status "${currentProject?.status}" is already at or beyond suggested "${suggestedStatus}", skipping`);
+        }
+      } catch (statusErr) {
+        console.error('Failed to auto-update project status:', statusErr);
+        // Don't fail the upload just because status update failed
+      }
+    }
+
     // Title format example: 2024YF003-2024_MOEA_同意備案_20241210_v01_FINAL
     if (documentType === '同意備案' || documentType === '能源署同意備案' || documentType === '能源局同意備案') {
       // Try to extract date from title (format: YYYYMMDD)
