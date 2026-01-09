@@ -79,7 +79,7 @@ export function canAutoInferAgency(docType: string): boolean {
 
 /**
  * 生成標準文件顯示名稱
- * 格式：{ProjectCode}_{Agency}_{DocumentType}_{YYYYMMDD}_v{XX}_{Status}.pdf
+ * 格式：{ProjectCode}_{Agency}_{DocumentType}_{YYYYMMDD}_v{XX}
  * 
  * @param params 命名參數
  * @returns 標準化的檔案名稱
@@ -90,7 +90,6 @@ export function generateDocumentDisplayName(params: {
   docType: string;
   date: Date;
   version: number;
-  status?: '未開始' | '已開始' | '已取得';
   extension?: string;
 }): string {
   const {
@@ -99,7 +98,6 @@ export function generateDocumentDisplayName(params: {
     docType,
     date,
     version,
-    status = '未開始',
     extension = 'pdf',
   } = params;
   
@@ -114,7 +112,7 @@ export function generateDocumentDisplayName(params: {
   const cleanAgency = agency.replace(/[^a-zA-Z0-9\-_\u4e00-\u9fff]/g, '');
   const cleanDocType = docType.replace(/[^a-zA-Z0-9\-_\u4e00-\u9fff]/g, '');
   
-  return `${cleanProjectCode}_${cleanAgency}_${cleanDocType}_${dateStr}_${versionStr}_${status}.${extension}`;
+  return `${cleanProjectCode}_${cleanAgency}_${cleanDocType}_${dateStr}_${versionStr}.${extension}`;
 }
 
 // 預設機關選項（當無法自動推斷時使用）
