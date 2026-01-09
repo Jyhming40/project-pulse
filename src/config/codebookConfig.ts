@@ -14,6 +14,7 @@ import {
   ClipboardList,
   HardHat,
   MapPin,
+  FolderOpen,
   LucideIcon
 } from 'lucide-react';
 
@@ -24,6 +25,7 @@ export type CodebookCategory =
   | 'doc_type_code'
   | 'doc_status'
   | 'agency'
+  | 'subfolder_code'
   | 'installation_type'
   | 'grid_connection_type'
   | 'power_phase_type'
@@ -86,6 +88,14 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
     usageMapping: [
       { table: 'documents', column: 'agency' },
     ],
+  },
+  subfolder_code: {
+    label: '資料夾代碼',
+    icon: FolderOpen,
+    description: 'Google Drive 文件分類資料夾代碼',
+    usageMapping: [],
+    // Mark as system-controlled: cannot add or delete, only edit labels
+    isSystemControlled: true,
   },
   installation_type: {
     label: '裝置類型',
@@ -233,6 +243,13 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
     { value: 'ELEC', label: '電機技師' },
     { value: 'ENV', label: '環保單位' },
     { value: 'OTHER', label: '其他' },
+  ],
+  subfolder_code: [
+    { value: 'TPC', label: '台電相關' },
+    { value: 'ENERGY_BUREAU', label: '能源署相關' },
+    { value: 'RELATED', label: '其他相關文件' },
+    { value: 'BUILDING_AUTH', label: '建管處相關' },
+    { value: 'GREEN_PERMISSION', label: '綠能設施' },
   ],
   installation_type: [
     { value: '畜牧舍', label: '畜牧舍' },
