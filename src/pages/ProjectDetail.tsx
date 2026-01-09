@@ -206,6 +206,7 @@ export default function ProjectDetail() {
         .from('documents')
         .select('*, owner:profiles!documents_owner_user_id_fkey(full_name, email)')
         .eq('project_id', id)
+        .eq('is_deleted', false)
         .order('created_at', { ascending: false });
       if (error) throw error;
       return data;
@@ -222,7 +223,8 @@ export default function ProjectDetail() {
       const { data, error } = await supabase
         .from('document_files')
         .select('*')
-        .in('document_id', docIds);
+        .in('document_id', docIds)
+        .eq('is_deleted', false);
       if (error) throw error;
       return data;
     },
