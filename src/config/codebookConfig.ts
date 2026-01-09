@@ -225,6 +225,11 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
     { value: 'TPC_METER', label: '報竣掛表' },
     { value: 'MOEA_REGISTER', label: '設備登記' },
     { value: 'LINE_COMP_NOTICE', label: '線補費通知單' },
+    { value: 'TPC', label: '台電相關' },
+    { value: 'ENERGY_BUREAU', label: '能源署相關' },
+    { value: 'RELATED', label: '其他相關文件' },
+    { value: 'BUILDING_AUTH', label: '建管處相關' },
+    { value: 'GREEN_PERMISSION', label: '綠能設施' },
     { value: 'OTHER', label: '其他' },
   ],
   doc_status: [
