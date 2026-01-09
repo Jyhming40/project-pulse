@@ -206,10 +206,18 @@ export const LABEL_TO_AGENCY_CODE: Record<string, string> = Object.fromEntries(
  * 根據 doc_type_code 推斷 agency 代碼（Phase 1 最小集合）
  */
 export function inferAgencyCodeFromDocTypeCode(docTypeCode: string): string | null {
+  // Specific document types
   if (docTypeCode.startsWith('TPC_')) return 'TPC';
   if (docTypeCode.startsWith('MOEA_')) return 'MOEA';
   if (docTypeCode.startsWith('STRUCT_')) return 'STR';
   if (docTypeCode.startsWith('LINE_')) return 'TPC'; // 線補費屬於台電
+  
+  // Generic category codes
+  if (docTypeCode === 'TPC') return 'TPC';
+  if (docTypeCode === 'ENERGY_BUREAU') return 'MOEA';
+  if (docTypeCode === 'BUILDING_AUTH') return 'CONST';
+  if (docTypeCode === 'GREEN_PERMISSION') return 'GOV';
+  
   return null;
 }
 

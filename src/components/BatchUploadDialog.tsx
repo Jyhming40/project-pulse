@@ -1,7 +1,11 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
-import { DOC_TYPE_CODE_TO_SHORT } from '@/lib/docTypeMapping';
+import { 
+  DOC_TYPE_CODE_TO_SHORT, 
+  inferAgencyCodeFromDocTypeCode,
+  AGENCY_CODE_TO_LABEL,
+} from '@/lib/docTypeMapping';
 import {
   Dialog,
   DialogContent,
@@ -109,6 +113,7 @@ interface FileItem {
   id: string;
   file: File;
   documentType: string;
+  agencyCode: string;  // Added agency code
   title: string;
   subfolderCode: string;
   subfolderName: string;
@@ -138,7 +143,13 @@ export function BatchUploadDialog({
   const [driveSubfolders, setDriveSubfolders] = useState(DEFAULT_SUBFOLDER_TEMPLATE);
 
   const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
+  const { options: agencyOptions } = useOptionsForCategory('agency');
 
+  // Get agency label from code
+  const getAgencyLabel = useCallback((code: string) => {
+    const opt = agencyOptions.find(o => o.value === code);
+    return opt?.label || AGENCY_CODE_TO_LABEL[code] || code;
+  }, [agencyOptions]);
   // Get subfolder name from code
   const getSubfolderName = useCallback((code: string) => {
     const folder = driveSubfolders.find(sf => sf.code === code);
@@ -175,11 +186,14 @@ export function BatchUploadDialog({
       }
 
       const subfolderCode = getSubfolderCodeFromDocType(inferredDocType);
+      // Infer agency code from doc_type_code
+      const agencyCode = inferAgencyCodeFromDocTypeCode(inferredDocType) || 'OTHER';
 
       return {
         id: generateId(),
         file,
         documentType: inferredDocType,
+        agencyCode,
         title: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
         subfolderCode,
         subfolderName: getSubfolderName(subfolderCode),
@@ -197,11 +211,16 @@ export function BatchUploadDialog({
       
       const updated = { ...item, ...updates };
       
-      // If doc type changed, update subfolder
+      // If doc type changed, update subfolder and agency
       if (updates.documentType && updates.documentType !== item.documentType) {
         const newCode = getSubfolderCodeFromDocType(updates.documentType);
         updated.subfolderCode = newCode;
         updated.subfolderName = getSubfolderName(newCode);
+        // Update agency code based on new doc type
+        const inferredAgency = inferAgencyCodeFromDocTypeCode(updates.documentType);
+        if (inferredAgency) {
+          updated.agencyCode = inferredAgency;
+        }
       }
       
       // If manual subfolder change
@@ -432,6 +451,7 @@ export function BatchUploadDialog({
                   <TableRow>
                     <TableHead className="min-w-[180px]">檔案名稱</TableHead>
                     <TableHead className="min-w-[150px]">文件類型</TableHead>
+                    <TableHead className="min-w-[100px]">發證機關</TableHead>
                     <TableHead className="min-w-[150px]">標題</TableHead>
                     <TableHead className="min-w-[150px]">儲存位置</TableHead>
                     <TableHead className="w-[80px]">狀態</TableHead>
@@ -463,6 +483,24 @@ export function BatchUploadDialog({
                           </SelectTrigger>
                           <SelectContent>
                             {docTypeOptions.map(opt => (
+                              <SelectItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={item.agencyCode}
+                          onValueChange={(value) => updateFileItem(item.id, { agencyCode: value })}
+                          disabled={item.status !== 'pending'}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="選擇機關" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {agencyOptions.map(opt => (
                               <SelectItem key={opt.value} value={opt.value}>
                                 {opt.label}
                               </SelectItem>
