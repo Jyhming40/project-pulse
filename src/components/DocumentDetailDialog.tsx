@@ -86,8 +86,8 @@ export function DocumentDetailDialog({
     note: '',
   });
   
-  // Get doc_type options from system_options (codebook)
-  const { options: docTypeOptions } = useCodebookOptions('doc_type');
+  // Get doc_type_code options from system_options (single source of truth)
+  const { options: docTypeOptions } = useCodebookOptions('doc_type_code');
 
   // Soft delete hook for documents
   const { softDelete, isDeleting } = useSoftDelete({

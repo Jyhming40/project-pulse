@@ -112,7 +112,7 @@ export function BatchUploadDialog({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [driveSubfolders, setDriveSubfolders] = useState(DEFAULT_SUBFOLDER_TEMPLATE);
 
-  const { options: docTypeOptions } = useOptionsForCategory('doc_type');
+  const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
 
   // Get subfolder name from code
   const getSubfolderName = useCallback((code: string) => {

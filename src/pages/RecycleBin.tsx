@@ -22,8 +22,8 @@ export default function RecycleBin() {
   const [operatingId, setOperatingId] = useState<string | null>(null);
   const { isAdmin } = useAuth();
 
-  // Fetch doc_type options for document type filter
-  const { options: docTypeOptions } = useOptionsForCategory('doc_type');
+  // Fetch doc_type_code options for document type filter (single source of truth)
+  const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
 
   const tableFilter = selectedTable === 'all' ? undefined : selectedTable;
   const { data: deletedRecords = [], isLoading, refetch } = useRecycleBin(tableFilter);
