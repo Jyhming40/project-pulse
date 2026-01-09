@@ -19,7 +19,7 @@ export const DOC_TYPE_SHORT_VALUES = [
   '躉售合約',       // 不帶「台電」
   '報竣掛表',       // 不帶「台電」
   '設備登記',       // 不帶「能源署」
-  '土地契約',
+  '線補費通知單',   // 替換原「土地契約」
   '其他',
 ] as const;
 
@@ -44,8 +44,8 @@ export const DOC_TYPE_CODE_TO_SHORT: Record<string, DocTypeShort> = {
   // 技師簽證（短值不帶「技師」）
   STRUCT_CERT: '結構簽證',
   
-  // 土地
-  LAND_CONTRACT: '土地契約',
+  // 線補費
+  LINE_COMP_NOTICE: '線補費通知單',
   
   // 其他
   OTHER: '其他',
@@ -122,7 +122,7 @@ export function normalizeDocTypeString(input: string): DocTypeShort {
   if (normalized.includes('同意備案')) return '同意備案';
   if (normalized.includes('設備登記')) return '設備登記';
   if (normalized.includes('結構') && normalized.includes('簽證')) return '結構簽證';
-  if (normalized.includes('土地') && normalized.includes('契約')) return '土地契約';
+  if (normalized.includes('線補費')) return '線補費通知單';
   if (normalized.includes('審查意見')) return '台電審查意見書';
   
   // 無法識別，返回「其他」
@@ -197,7 +197,7 @@ export function inferAgencyCodeFromDocTypeCode(docTypeCode: string): string | nu
   if (docTypeCode.startsWith('TPC_')) return 'TPC';
   if (docTypeCode.startsWith('MOEA_')) return 'MOEA';
   if (docTypeCode.startsWith('STRUCT_')) return 'STR';
-  if (docTypeCode.startsWith('LAND_')) return 'OTHER'; // 土地契約無固定機關
+  if (docTypeCode.startsWith('LINE_')) return 'TPC'; // 線補費屬於台電
   return null;
 }
 

@@ -82,9 +82,10 @@ interface SortableRowProps {
   onEdit: (option: CodebookOption) => void;
   onDelete: (option: CodebookOption, usageCount: number) => void;
   onToggleActive: (option: CodebookOption) => void;
+  isSystemControlled?: boolean;
 }
 
-function SortableRow({ option, usageCount, onEdit, onDelete, onToggleActive }: SortableRowProps) {
+function SortableRow({ option, usageCount, onEdit, onDelete, onToggleActive, isSystemControlled }: SortableRowProps) {
   const {
     attributes,
     listeners,
@@ -156,29 +157,31 @@ function SortableRow({ option, usageCount, onEdit, onDelete, onToggleActive }: S
           >
             <Pencil className="w-4 h-4" />
           </Button>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => onDelete(option, usageCount)}
-                    className={canDelete ? "text-destructive hover:text-destructive" : "text-muted-foreground"}
-                    disabled={!canDelete}
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                </span>
-              </TooltipTrigger>
-              {!canDelete && (
-                <TooltipContent>
-                  <p>已被 {usageCount} 筆資料使用，無法刪除</p>
-                  <p className="text-xs text-muted-foreground">請改為停用此選項</p>
-                </TooltipContent>
-              )}
-            </Tooltip>
-          </TooltipProvider>
+          {!isSystemControlled && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onDelete(option, usageCount)}
+                      className={canDelete ? "text-destructive hover:text-destructive" : "text-muted-foreground"}
+                      disabled={!canDelete}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </span>
+                </TooltipTrigger>
+                {!canDelete && (
+                  <TooltipContent>
+                    <p>已被 {usageCount} 筆資料使用，無法刪除</p>
+                    <p className="text-xs text-muted-foreground">請改為停用此選項</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </TooltipProvider>
+          )}
         </div>
       </TableCell>
     </TableRow>
@@ -212,6 +215,7 @@ export default function SystemOptions() {
 
   const filteredOptions = options.filter(opt => opt.category === activeCategory);
   const categoryConfig = codebookCategoryConfig[activeCategory];
+  const isSystemControlled = categoryConfig.isSystemControlled ?? false;
 
   // Setup dnd-kit sensors
   const sensors = useSensors(
@@ -429,7 +433,14 @@ export default function SystemOptions() {
                 <Icon className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <CardTitle>{categoryConfig.label}</CardTitle>
+                <div className="flex items-center gap-2">
+                  <CardTitle>{categoryConfig.label}</CardTitle>
+                  {isSystemControlled && (
+                    <Badge variant="secondary" className="text-xs">
+                      系統受控
+                    </Badge>
+                  )}
+                </div>
                 <CardDescription>{categoryConfig.description}</CardDescription>
                 <div className="flex flex-wrap gap-1 mt-2">
                   {categoryConfig.usageMapping.map((mapping, idx) => (
@@ -451,10 +462,12 @@ export default function SystemOptions() {
                   載入預設值
                 </Button>
               )}
-              <Button onClick={handleOpenCreate}>
-                <Plus className="w-4 h-4 mr-2" />
-                新增選項
-              </Button>
+              {!isSystemControlled && (
+                <Button onClick={handleOpenCreate}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  新增選項
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent>
@@ -508,6 +521,7 @@ export default function SystemOptions() {
                           onEdit={handleOpenEdit}
                           onDelete={handleDeleteClick}
                           onToggleActive={handleToggleActive}
+                          isSystemControlled={isSystemControlled}
                         />
                       ))}
                     </SortableContext>
