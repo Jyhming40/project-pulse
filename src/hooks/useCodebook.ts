@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { CodebookCategory, codebookCategoryConfig } from '@/config/codebookConfig';
+import { DOC_TYPE_CODE_TO_SHORT } from '@/lib/docTypeMapping';
 
 export interface CodebookOption {
   id: string;
@@ -41,11 +42,17 @@ async function calculateUsageCount(category: CodebookCategory, value: string): P
   for (const mapping of config.usageMapping) {
     const { table, column } = mapping;
     
+    // For doc_type_code, convert code to short value for querying documents.doc_type
+    let queryValue = value;
+    if (category === 'doc_type_code' && table === 'documents' && column === 'doc_type') {
+      queryValue = DOC_TYPE_CODE_TO_SHORT[value] || value;
+    }
+    
     // Query the table to count rows with this value
     const { count, error } = await supabase
       .from(table as any)
       .select('*', { count: 'exact', head: true })
-      .eq(column, value);
+      .eq(column, queryValue);
     
     if (!error && count !== null) {
       totalCount += count;
