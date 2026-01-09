@@ -300,10 +300,11 @@ export function useImportBatch() {
     setItems([]);
   }, []);
   
-  // Upload a single item
+  // Upload a single item with race-condition safety
   const uploadItem = useCallback(async (
     item: ImportFileItem,
-    userId: string
+    userId: string,
+    retryCount: number = 0
   ): Promise<boolean> => {
     if (!item.projectId || !item.docTypeCode) {
       throw new Error('缺少必要欄位');
@@ -314,11 +315,11 @@ export function useImportBatch() {
       throw new Error('找不到案場');
     }
     
-    // Get doc_type enum value
+    // Get doc_type short value (enforced by DB constraint)
     const docType = docTypeCodeToEnum(item.docTypeCode);
     const ext = item.file.name.split('.').pop() || 'pdf';
     
-    // 1. Upload to Google Drive if folder is configured
+    // 1. Upload to Google Drive if folder is configured (Drive failure doesn't block DB)
     let driveFileId: string | null = null;
     let driveWebViewLink: string | null = null;
     let drivePath: string | null = null;
@@ -355,62 +356,96 @@ export function useImportBatch() {
       }
     }
     
-    // 2. Create document record
-    const { data: docData, error: docError } = await supabase
-      .from('documents')
-      .insert({
-        project_id: item.projectId,
-        doc_type: docType,
-        title: item.displayNamePreview.replace(`.${ext}`, ''),
-        version: item.suggestedVersion,
-        is_current: true,
-        drive_file_id: driveFileId,
-        drive_web_view_link: driveWebViewLink,
-        drive_path: drivePath,
-        owner_user_id: userId,
-        created_by: userId,
-      })
-      .select()
-      .single();
-    
-    if (docError) throw docError;
-    
-    // 3. If this is a new version, mark old version as not current
-    if (item.existingDocId) {
+    // 2. DB safe sequence to avoid race conditions
+    try {
+      // Step 2a: Clear ALL existing is_current for this project+doc_type (not just existingDocId)
       await supabase
         .from('documents')
         .update({ is_current: false })
-        .eq('id', item.existingDocId);
+        .eq('project_id', item.projectId)
+        .eq('doc_type', docType)
+        .eq('is_current', true)
+        .eq('is_deleted', false)
+        .eq('is_archived', false);
+      
+      // Step 2b: Get fresh max version (avoid race condition with stale suggestedVersion)
+      const { data: versionData } = await supabase
+        .from('documents')
+        .select('version')
+        .eq('project_id', item.projectId)
+        .eq('doc_type', docType)
+        .eq('is_deleted', false)
+        .order('version', { ascending: false })
+        .limit(1);
+      
+      const freshVersion = (versionData && versionData.length > 0 && versionData[0].version)
+        ? versionData[0].version + 1
+        : 1;
+      
+      // Step 2c: Insert new document with is_current=true
+      const { data: docData, error: docError } = await supabase
+        .from('documents')
+        .insert({
+          project_id: item.projectId,
+          doc_type: docType,
+          title: item.displayNamePreview.replace(`.${ext}`, ''),
+          version: freshVersion,
+          is_current: true,
+          drive_file_id: driveFileId,
+          drive_web_view_link: driveWebViewLink,
+          drive_path: drivePath,
+          owner_user_id: userId,
+          created_by: userId,
+        })
+        .select()
+        .single();
+      
+      if (docError) {
+        // Check for unique constraint violation (Postgres error code 23505)
+        if (docError.code === '23505' && retryCount < 1) {
+          console.log('Unique constraint violation, retrying...');
+          // Retry once: re-run the entire safe sequence
+          return await uploadItem(item, userId, retryCount + 1);
+        }
+        throw docError;
+      }
+      
+      // 3. Create document_files record
+      await supabase.from('document_files').insert({
+        document_id: docData.id,
+        original_name: item.originalName,
+        storage_path: driveFileId || `local://${item.displayNamePreview}`,
+        file_size: item.file.size,
+        mime_type: item.file.type,
+        uploaded_by: userId,
+      });
+      
+      // 4. Log audit
+      await supabase.rpc('log_audit_action', {
+        p_table_name: 'documents',
+        p_record_id: docData.id,
+        p_action: 'CREATE',
+        p_old_data: null,
+        p_new_data: { 
+          doc_type_code: item.docTypeCode, 
+          agency_code: item.agencyCode,
+          version: freshVersion,
+          is_new_version: freshVersion > 1,
+        },
+        p_reason: freshVersion > 1 
+          ? `批次匯入新版本 v${freshVersion}` 
+          : `批次匯入文件`,
+      });
+      
+      return true;
+    } catch (error: any) {
+      // Check for unique constraint violation on retry
+      if (error.code === '23505' && retryCount < 1) {
+        console.log('Unique constraint violation in catch, retrying...');
+        return await uploadItem(item, userId, retryCount + 1);
+      }
+      throw error;
     }
-    
-    // 4. Create document_files record
-    await supabase.from('document_files').insert({
-      document_id: docData.id,
-      original_name: item.originalName,
-      storage_path: driveFileId || `local://${item.displayNamePreview}`,
-      file_size: item.file.size,
-      mime_type: item.file.type,
-      uploaded_by: userId,
-    });
-    
-    // 5. Log audit
-    await supabase.rpc('log_audit_action', {
-      p_table_name: 'documents',
-      p_record_id: docData.id,
-      p_action: 'CREATE',
-      p_old_data: null,
-      p_new_data: { 
-        doc_type_code: item.docTypeCode, 
-        agency_code: item.agencyCode,
-        version: item.suggestedVersion,
-        is_new_version: !!item.existingDocId,
-      },
-      p_reason: item.existingDocId 
-        ? `批次匯入新版本 v${item.suggestedVersion}` 
-        : `批次匯入文件`,
-    });
-    
-    return true;
   }, [projects]);
   
   // Upload all ready items
