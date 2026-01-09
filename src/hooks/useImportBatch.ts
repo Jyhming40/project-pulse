@@ -300,7 +300,7 @@ export function useImportBatch() {
     setItems([]);
   }, []);
   
-  // Upload a single item with race-condition safety
+  // Upload a single item with race-condition safety and three-stage write
   const uploadItem = useCallback(async (
     item: ImportFileItem,
     userId: string,
@@ -356,20 +356,12 @@ export function useImportBatch() {
       }
     }
     
-    // 2. DB safe sequence to avoid race conditions
+    // 2. Three-stage DB safe sequence to avoid current=0 scenario
+    let newDocId: string | null = null;
+    
     try {
-      // Step 2a: Clear ALL existing is_current for this project+doc_type (not just existingDocId)
-      await supabase
-        .from('documents')
-        .update({ is_current: false })
-        .eq('project_id', item.projectId)
-        .eq('doc_type', docType)
-        .eq('is_current', true)
-        .eq('is_deleted', false)
-        .eq('is_archived', false);
-      
-      // Step 2b: Get fresh max version (avoid race condition with stale suggestedVersion)
-      const { data: versionData } = await supabase
+      // Stage 1: Get fresh max version (with error handling)
+      const { data: versionData, error: versionError } = await supabase
         .from('documents')
         .select('version')
         .eq('project_id', item.projectId)
@@ -378,19 +370,21 @@ export function useImportBatch() {
         .order('version', { ascending: false })
         .limit(1);
       
+      if (versionError) throw versionError;
+      
       const freshVersion = (versionData && versionData.length > 0 && versionData[0].version)
         ? versionData[0].version + 1
         : 1;
       
-      // Step 2c: Insert new document with is_current=true
-      const { data: docData, error: docError } = await supabase
+      // Stage 2: Insert new document with is_current=FALSE first (safe insert)
+      const { data: docData, error: insertError } = await supabase
         .from('documents')
         .insert({
           project_id: item.projectId,
           doc_type: docType,
           title: item.displayNamePreview.replace(`.${ext}`, ''),
           version: freshVersion,
-          is_current: true,
+          is_current: false, // Start with false to avoid constraint violation
           drive_file_id: driveFileId,
           drive_web_view_link: driveWebViewLink,
           drive_path: drivePath,
@@ -400,19 +394,54 @@ export function useImportBatch() {
         .select()
         .single();
       
-      if (docError) {
-        // Check for unique constraint violation (Postgres error code 23505)
-        if (docError.code === '23505' && retryCount < 1) {
-          console.log('Unique constraint violation, retrying...');
-          // Retry once: re-run the entire safe sequence
+      if (insertError) {
+        // Check for unique constraint violation (version duplicate)
+        if (insertError.code === '23505' && retryCount < 2) {
+          console.log(`Unique constraint violation (attempt ${retryCount + 1}), retrying...`);
           return await uploadItem(item, userId, retryCount + 1);
         }
-        throw docError;
+        throw insertError;
       }
       
-      // 3. Create document_files record
-      await supabase.from('document_files').insert({
-        document_id: docData.id,
+      newDocId = docData.id;
+      
+      // Stage 3a: Clear ALL existing is_current for this project+doc_type
+      const { error: clearError } = await supabase
+        .from('documents')
+        .update({ is_current: false })
+        .eq('project_id', item.projectId)
+        .eq('doc_type', docType)
+        .eq('is_current', true)
+        .eq('is_deleted', false)
+        .eq('is_archived', false);
+      
+      if (clearError) {
+        // Rollback: mark the new doc as deleted
+        await supabase
+          .from('documents')
+          .update({ is_deleted: true, delete_reason: 'Rollback: failed to clear old current' })
+          .eq('id', newDocId);
+        throw clearError;
+      }
+      
+      // Stage 3b: Set the new document as is_current=true
+      const { error: setCurrentError } = await supabase
+        .from('documents')
+        .update({ is_current: true })
+        .eq('id', newDocId);
+      
+      if (setCurrentError) {
+        // Rollback: mark the new doc as deleted
+        await supabase
+          .from('documents')
+          .update({ is_deleted: true, delete_reason: 'Rollback: failed to set current' })
+          .eq('id', newDocId);
+        throw setCurrentError;
+      }
+      
+      // 3. Create document_files record (with error handling)
+      const { error: fileError } = await supabase.from('document_files').insert({
+        document_id: newDocId,
         original_name: item.originalName,
         storage_path: driveFileId || `local://${item.displayNamePreview}`,
         file_size: item.file.size,
@@ -420,10 +449,19 @@ export function useImportBatch() {
         uploaded_by: userId,
       });
       
-      // 4. Log audit
-      await supabase.rpc('log_audit_action', {
+      if (fileError) {
+        // Rollback: mark the new doc as deleted
+        await supabase
+          .from('documents')
+          .update({ is_deleted: true, delete_reason: 'Rollback: failed to create file record' })
+          .eq('id', newDocId);
+        throw fileError;
+      }
+      
+      // 4. Log audit (with error handling - non-critical, log but don't fail)
+      const { error: auditError } = await supabase.rpc('log_audit_action', {
         p_table_name: 'documents',
-        p_record_id: docData.id,
+        p_record_id: newDocId,
         p_action: 'CREATE',
         p_old_data: null,
         p_new_data: { 
@@ -437,11 +475,28 @@ export function useImportBatch() {
           : `批次匯入文件`,
       });
       
+      if (auditError) {
+        console.warn('Audit log failed (non-critical):', auditError);
+        // Don't throw - audit failure shouldn't fail the upload
+      }
+      
       return true;
     } catch (error: any) {
+      // If we created a doc but failed later, ensure it's marked deleted
+      if (newDocId) {
+        try {
+          await supabase
+            .from('documents')
+            .update({ is_deleted: true, delete_reason: `Rollback: ${error.message}` })
+            .eq('id', newDocId);
+        } catch {
+          // Ignore rollback errors
+        }
+      }
+      
       // Check for unique constraint violation on retry
-      if (error.code === '23505' && retryCount < 1) {
-        console.log('Unique constraint violation in catch, retrying...');
+      if (error.code === '23505' && retryCount < 2) {
+        console.log(`Unique constraint violation in catch (attempt ${retryCount + 1}), retrying...`);
         return await uploadItem(item, userId, retryCount + 1);
       }
       throw error;
