@@ -31,6 +31,7 @@ import Integrations from "./pages/Integrations";
 import PendingApproval from "./pages/PendingApproval";
 import DuplicateScanner from "./pages/DuplicateScanner";
 import NotFound from "./pages/NotFound";
+import DevVerification from "./pages/DevVerification";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -73,6 +74,9 @@ const App = () => (
             <Route path="/recycle-bin" element={<ProtectedRoute adminOnly><Layout><RecycleBin /></Layout></ProtectedRoute>} />
             <Route path="/audit-logs" element={<ProtectedRoute adminOnly><Layout><AuditLogs /></Layout></ProtectedRoute>} />
             <Route path="/duplicate-scanner" element={<ProtectedRoute adminOnly><Layout><DuplicateScanner /></Layout></ProtectedRoute>} />
+            
+            {/* Dev-only verification page */}
+            <Route path="/dev-verification" element={<ProtectedRoute adminOnly><Layout><DevVerification /></Layout></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
