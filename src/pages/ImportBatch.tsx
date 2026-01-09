@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useImportBatch, ImportFileItem } from '@/hooks/useImportBatch';
-import { inferAgencyCodeFromDocTypeCode, DOC_TYPE_CODE_TO_SHORT, AGENCY_CODE_TO_LABEL } from '@/lib/docTypeMapping';
+import { inferAgencyCodeFromDocTypeCode, DOC_TYPE_CODE_TO_SHORT, AGENCY_CODE_TO_LABEL, getDocTypeLabelByCode, type AgencyCode } from '@/lib/docTypeMapping';
+import { GroupedDocTypeSelect } from '@/components/GroupedDocTypeSelect';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -51,7 +52,6 @@ import { cn } from '@/lib/utils';
 
 export default function ImportBatch() {
   const { user } = useAuth();
-  const { options: docTypeCodeOptions } = useOptionsForCategory('doc_type_code');
   const { options: agencyCodeOptions } = useOptionsForCategory('agency');
   
   const {
@@ -130,22 +130,19 @@ export default function ImportBatch() {
     }
   }, [items, selectedIds]);
   
-  // Apply batch updates
+  // Apply batch updates - updateItem already recalculates displayNamePreview
   const applyBatchDocTypeCode = useCallback(() => {
     if (!batchDocTypeCode) return;
     const ids = Array.from(selectedIds);
     const agencyCode = inferAgencyCodeFromDocTypeCode(batchDocTypeCode);
     ids.forEach(id => {
-      const item = items.find(i => i.id === id);
-      if (item) {
-        updateItem(id, { 
-          docTypeCode: batchDocTypeCode,
-          agencyCode: agencyCode || item.agencyCode,
-        });
-      }
+      updateItem(id, { 
+        docTypeCode: batchDocTypeCode,
+        agencyCode: agencyCode || undefined,
+      });
     });
     setBatchDocTypeCode('');
-  }, [batchDocTypeCode, selectedIds, items, updateItem]);
+  }, [batchDocTypeCode, selectedIds, updateItem]);
   
   const applyBatchAgencyCode = useCallback(() => {
     if (!batchAgencyCode) return;
@@ -384,18 +381,15 @@ export default function ImportBatch() {
               
               {/* Batch DocTypeCode */}
               <div className="flex items-center gap-2">
-                <Select value={batchDocTypeCode} onValueChange={setBatchDocTypeCode}>
-                  <SelectTrigger className="w-[180px] h-9">
-                    <SelectValue placeholder="選擇類型..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {docTypeCodeOptions.map(opt => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <GroupedDocTypeSelect
+                  value={batchDocTypeCode}
+                  onValueChange={(code, agencyCode) => {
+                    setBatchDocTypeCode(code);
+                    // agencyCode will be applied when user clicks "套用"
+                  }}
+                  placeholder="選擇類型..."
+                  className="w-[180px] h-9"
+                />
                 <Button size="sm" variant="secondary" onClick={applyBatchDocTypeCode} disabled={!batchDocTypeCode}>
                   套用
                 </Button>
@@ -507,28 +501,18 @@ export default function ImportBatch() {
                         </Select>
                       </TableCell>
                       <TableCell>
-                        <Select 
-                          value={item.docTypeCode || ''} 
-                          onValueChange={(val) => {
-                            const agencyCode = inferAgencyCodeFromDocTypeCode(val);
+                        <GroupedDocTypeSelect
+                          value={item.docTypeCode || ''}
+                          onValueChange={(code, agencyCode) => {
                             updateItem(item.id, { 
-                              docTypeCode: val,
+                              docTypeCode: code,
                               agencyCode: agencyCode || item.agencyCode,
                             });
                           }}
+                          placeholder="選擇..."
                           disabled={item.status === 'uploading' || item.status === 'success'}
-                        >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="選擇..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {docTypeCodeOptions.map(opt => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          className="h-8 text-xs w-[140px]"
+                        />
                       </TableCell>
                       <TableCell>
                         <Select 
