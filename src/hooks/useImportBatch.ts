@@ -383,6 +383,8 @@ export function useImportBatch() {
         .insert({
           project_id: item.projectId,
           doc_type: docType,
+          doc_type_code: item.docTypeCode, // New field
+          agency_code: item.agencyCode, // New field
           title: item.displayNamePreview.replace(`.${ext}`, ''),
           version: freshVersion,
           is_current: false, // Start with false to avoid constraint violation
