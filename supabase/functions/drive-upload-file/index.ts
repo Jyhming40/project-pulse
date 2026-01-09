@@ -78,6 +78,12 @@ const DOC_TYPE_LABEL_TO_MILESTONE: Record<string, string> = {
   '免雜執照完竣': 'ADMIN_05_MISC_EXEMPT',
 };
 
+// Prerequisite milestones: when a milestone is completed, these should also be completed
+const MILESTONE_PREREQUISITES: Record<string, string[]> = {
+  'ADMIN_03_TAIPOWER_OPINION': ['ADMIN_02_TAIPOWER_SUBMIT'],  // 取得審查意見書 -> 送件完成
+  'ADMIN_04_ENERGY_APPROVAL': ['ADMIN_02_TAIPOWER_SUBMIT', 'ADMIN_03_TAIPOWER_OPINION'],  // 同意備案 -> 台電送件+審查意見書
+};
+
 // Refresh access token
 async function refreshAccessToken(refreshToken: string): Promise<{ accessToken: string; expiresIn: number }> {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
@@ -529,6 +535,48 @@ serve(async (req) => {
             completed_by: user.id,
             note: `透過文件上傳自動完成 (${title})`,
           });
+      }
+
+      // Auto-complete prerequisite milestones
+      const prerequisites = MILESTONE_PREREQUISITES[milestoneCode];
+      if (prerequisites && prerequisites.length > 0) {
+        console.log(`Auto-completing prerequisite milestones: ${prerequisites.join(', ')}`);
+        
+        for (const prereqCode of prerequisites) {
+          const { data: existingPrereq } = await supabase
+            .from('project_milestones')
+            .select('id, is_completed')
+            .eq('project_id', projectId)
+            .eq('milestone_code', prereqCode)
+            .maybeSingle();
+
+          if (existingPrereq) {
+            if (!existingPrereq.is_completed) {
+              await supabase
+                .from('project_milestones')
+                .update({
+                  is_completed: true,
+                  completed_at: new Date().toISOString(),
+                  completed_by: user.id,
+                  note: `因 ${milestoneCode} 完成而自動完成`,
+                })
+                .eq('id', existingPrereq.id);
+              console.log(`Prerequisite milestone ${prereqCode} auto-completed`);
+            }
+          } else {
+            await supabase
+              .from('project_milestones')
+              .insert({
+                project_id: projectId,
+                milestone_code: prereqCode,
+                is_completed: true,
+                completed_at: new Date().toISOString(),
+                completed_by: user.id,
+                note: `因 ${milestoneCode} 完成而自動完成`,
+              });
+            console.log(`Prerequisite milestone ${prereqCode} created and completed`);
+          }
+        }
       }
 
       // Trigger progress recalculation
