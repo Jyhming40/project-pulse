@@ -19,6 +19,14 @@ import { BatchUploadVersionDialog } from '@/components/BatchUploadVersionDialog'
 import { DocumentTagBadge } from '@/components/DocumentTagBadge';
 import { getDerivedDocStatus, getDerivedDocStatusColor, DerivedDocStatus } from '@/lib/documentStatus';
 import { 
+  AGENCY_CODE_TO_LABEL, 
+  AGENCY_CODES, 
+  getDocTypeLabelByCode, 
+  getAgencyCodeByDocTypeCode,
+  type AgencyCode 
+} from '@/lib/docTypeMapping';
+import { GroupedDocTypeSelect } from '@/components/GroupedDocTypeSelect';
+import { 
   Search, 
   FileText, 
   AlertTriangle,
@@ -85,6 +93,7 @@ export default function Documents() {
   
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [agencyFilter, setAgencyFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [projectFilter, setProjectFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
@@ -148,7 +157,7 @@ export default function Documents() {
     return acc;
   }, [] as { id: string; code: string; name: string }[]).sort((a, b) => a.code.localeCompare(b.code));
 
-  // Filter documents with derived status, project filter, tag filter, and enhanced search
+  // Filter documents with derived status, project filter, agency filter, tag filter, and enhanced search
   const filteredDocuments = documents.filter(doc => {
     const project = doc.projects as any;
     const searchLower = search.toLowerCase();
@@ -161,7 +170,18 @@ export default function Documents() {
       doc.title?.toLowerCase().includes(searchLower) ||
       doc.note?.toLowerCase().includes(searchLower);
     
-    const matchesType = typeFilter === 'all' || doc.doc_type === typeFilter;
+    // Type filter - check both doc_type_code and doc_type for backward compatibility
+    const matchesType = typeFilter === 'all' || 
+      doc.doc_type_code === typeFilter || 
+      doc.doc_type === typeFilter;
+    
+    // Agency filter - use doc_type_code or agency_code
+    let matchesAgency = agencyFilter === 'all';
+    if (!matchesAgency) {
+      const docAgency = doc.agency_code || getAgencyCodeByDocTypeCode(doc.doc_type_code || '');
+      matchesAgency = docAgency === agencyFilter;
+    }
+    
     const matchesProject = projectFilter === 'all' || doc.project_id === projectFilter;
     
     // Tag filter
@@ -191,7 +211,7 @@ export default function Documents() {
       matchesStatus = derivedStatus === statusFilter;
     }
     
-    return matchesSearch && matchesType && matchesStatus && matchesProject && matchesTag;
+    return matchesSearch && matchesType && matchesAgency && matchesStatus && matchesProject && matchesTag;
   });
 
   // Sorting
@@ -489,6 +509,22 @@ export default function Documents() {
               <SelectItem key={p.id} value={p.id}>
                 <span className="font-mono text-xs text-muted-foreground mr-1">{p.code}</span>
                 {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={agencyFilter} onValueChange={setAgencyFilter}>
+          <SelectTrigger className="w-full sm:w-[140px]">
+            <div className="flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              <SelectValue placeholder="發證機關" />
+            </div>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">全部機關</SelectItem>
+            {AGENCY_CODES.map(code => (
+              <SelectItem key={code} value={code}>
+                {AGENCY_CODE_TO_LABEL[code]}
               </SelectItem>
             ))}
           </SelectContent>

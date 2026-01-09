@@ -30,6 +30,7 @@ import Branding from "./pages/Branding";
 import Integrations from "./pages/Integrations";
 import PendingApproval from "./pages/PendingApproval";
 import DuplicateScanner from "./pages/DuplicateScanner";
+import DocumentTypeConfig from "./pages/DocumentTypeConfig";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -61,6 +62,7 @@ const App = () => (
             {/* 管理與設定 (Admin) - 系統設定 */}
             <Route path="/progress-settings" element={<ProtectedRoute adminOnly><Layout><ProgressSettings /></Layout></ProtectedRoute>} />
             <Route path="/system-options" element={<ProtectedRoute adminOnly><Layout><SystemOptions /></Layout></ProtectedRoute>} />
+            <Route path="/document-types" element={<ProtectedRoute adminOnly><Layout><DocumentTypeConfig /></Layout></ProtectedRoute>} />
             <Route path="/investor-codes" element={<ProtectedRoute adminOnly><Layout><InvestorCodeReference /></Layout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Layout><Settings /></Layout></ProtectedRoute>} />
             <Route path="/branding" element={<ProtectedRoute adminOnly><Layout><Branding /></Layout></ProtectedRoute>} />
