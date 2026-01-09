@@ -173,7 +173,6 @@ export function BatchUploadDialog({
       docType: docTypeLabel,
       date: new Date(),
       version: 1,
-      status: '未開始',
     }).replace(/\.[^/.]+$/, ''); // Remove extension for title
   }, [projectCode]);
 

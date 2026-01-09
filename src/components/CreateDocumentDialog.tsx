@@ -227,7 +227,6 @@ export function CreateDocumentDialog({
             docType: docTypeLabel,
             date: new Date(),
             version: 1,
-            status: issuedAt ? '已取得' : (submittedAt ? '已開始' : '未開始'),
             extension: ext,
           });
           
