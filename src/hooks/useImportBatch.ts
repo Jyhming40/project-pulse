@@ -416,27 +416,28 @@ export function useImportBatch() {
         .eq('is_archived', false);
       
       if (clearError) {
-        // Rollback: mark the new doc as deleted (only is_deleted, delete_reason exists in schema)
+        // Rollback: mark the new doc as deleted (no delete_reason to avoid field issues)
         await supabase
           .from('documents')
-          .update({ is_deleted: true, delete_reason: 'Rollback: failed to clear old current' })
+          .update({ is_deleted: true })
           .eq('id', newDocId)
           .eq('is_deleted', false);
         throw clearError;
       }
       
-      // Stage 3b: Set the new document as is_current=true (only if not deleted)
+      // Stage 3b: Set the new document as is_current=true (align with partial unique index conditions)
       const { error: setCurrentError } = await supabase
         .from('documents')
         .update({ is_current: true })
         .eq('id', newDocId)
-        .eq('is_deleted', false);
+        .eq('is_deleted', false)
+        .eq('is_archived', false);
       
       if (setCurrentError) {
-        // Rollback: mark the new doc as deleted
+        // Rollback: mark the new doc as deleted (no delete_reason)
         await supabase
           .from('documents')
-          .update({ is_deleted: true, delete_reason: 'Rollback: failed to set current' })
+          .update({ is_deleted: true })
           .eq('id', newDocId)
           .eq('is_deleted', false);
         throw setCurrentError;
@@ -453,16 +454,17 @@ export function useImportBatch() {
       });
       
       if (fileError) {
-        // Rollback: mark the new doc as deleted
+        // Rollback: mark the new doc as deleted (no delete_reason)
         await supabase
           .from('documents')
-          .update({ is_deleted: true, delete_reason: 'Rollback: failed to create file record' })
+          .update({ is_deleted: true })
           .eq('id', newDocId)
           .eq('is_deleted', false);
         throw fileError;
       }
       
-      // 4. Log audit using docData.version for consistency
+      // 4. Log audit with consistent inserted version
+      const insertedVersion = docData.version ?? freshVersion ?? 1;
       const { error: auditError } = await supabase.rpc('log_audit_action', {
         p_table_name: 'documents',
         p_record_id: newDocId,
@@ -471,11 +473,11 @@ export function useImportBatch() {
         p_new_data: { 
           doc_type_code: item.docTypeCode, 
           agency_code: item.agencyCode,
-          version: docData.version, // Use actual inserted version
-          is_new_version: (docData.version ?? 1) > 1,
+          version: insertedVersion,
+          is_new_version: insertedVersion > 1,
         },
-        p_reason: (docData.version ?? 1) > 1 
-          ? `批次匯入新版本 v${docData.version}` 
+        p_reason: insertedVersion > 1 
+          ? `批次匯入新版本 v${insertedVersion}` 
           : `批次匯入文件`,
       });
       
@@ -486,12 +488,12 @@ export function useImportBatch() {
       
       return true;
     } catch (error: any) {
-      // If we created a doc but failed later, ensure it's marked deleted
+      // If we created a doc but failed later, ensure it's marked deleted (no delete_reason)
       if (newDocId) {
         try {
           await supabase
             .from('documents')
-            .update({ is_deleted: true, delete_reason: `Rollback: ${error.message}` })
+            .update({ is_deleted: true })
             .eq('id', newDocId)
             .eq('is_deleted', false);
         } catch {
