@@ -3,9 +3,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { 
   DOC_TYPE_CODE_TO_SHORT, 
-  inferAgencyCodeFromDocTypeCode,
+  getAgencyCodeByDocTypeCode,
   AGENCY_CODE_TO_LABEL,
+  getDocTypeLabelByCode,
+  type AgencyCode,
 } from '@/lib/docTypeMapping';
+import { GroupedDocTypeSelect } from '@/components/GroupedDocTypeSelect';
 import {
   Dialog,
   DialogContent,
@@ -143,13 +146,7 @@ export function BatchUploadDialog({
   const [driveSubfolders, setDriveSubfolders] = useState(DEFAULT_SUBFOLDER_TEMPLATE);
 
   const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
-  const { options: agencyOptions } = useOptionsForCategory('agency');
 
-  // Get agency label from code
-  const getAgencyLabel = useCallback((code: string) => {
-    const opt = agencyOptions.find(o => o.value === code);
-    return opt?.label || AGENCY_CODE_TO_LABEL[code] || code;
-  }, [agencyOptions]);
   // Get subfolder name from code
   const getSubfolderName = useCallback((code: string) => {
     const folder = driveSubfolders.find(sf => sf.code === code);
@@ -187,7 +184,7 @@ export function BatchUploadDialog({
 
       const subfolderCode = getSubfolderCodeFromDocType(inferredDocType);
       // Infer agency code from doc_type_code
-      const agencyCode = inferAgencyCodeFromDocTypeCode(inferredDocType) || 'OTHER';
+      const agencyCode = getAgencyCodeByDocTypeCode(inferredDocType) || 'OTHER';
 
       return {
         id: generateId(),
@@ -217,7 +214,7 @@ export function BatchUploadDialog({
         updated.subfolderCode = newCode;
         updated.subfolderName = getSubfolderName(newCode);
         // Update agency code based on new doc type
-        const inferredAgency = inferAgencyCodeFromDocTypeCode(updates.documentType);
+        const inferredAgency = getAgencyCodeByDocTypeCode(updates.documentType);
         if (inferredAgency) {
           updated.agencyCode = inferredAgency;
         }
@@ -473,40 +470,23 @@ export function BatchUploadDialog({
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Select
+                        <GroupedDocTypeSelect
                           value={item.documentType}
-                          onValueChange={(value) => updateFileItem(item.id, { documentType: value })}
+                          onValueChange={(code, agencyCode) => {
+                            updateFileItem(item.id, { 
+                              documentType: code, 
+                              agencyCode: agencyCode 
+                            });
+                          }}
                           disabled={item.status !== 'pending'}
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue placeholder="選擇類型" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {docTypeOptions.map(opt => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                          className="h-8 w-[160px]"
+                          placeholder="選擇類型"
+                        />
                       </TableCell>
                       <TableCell>
-                        <Select
-                          value={item.agencyCode}
-                          onValueChange={(value) => updateFileItem(item.id, { agencyCode: value })}
-                          disabled={item.status !== 'pending'}
-                        >
-                          <SelectTrigger className="h-8">
-                            <SelectValue placeholder="選擇機關" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {agencyOptions.map(opt => (
-                              <SelectItem key={opt.value} value={opt.value}>
-                                {opt.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <span className="text-sm text-muted-foreground">
+                          {AGENCY_CODE_TO_LABEL[item.agencyCode as AgencyCode] || item.agencyCode}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <Input
