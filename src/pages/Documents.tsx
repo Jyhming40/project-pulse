@@ -106,7 +106,8 @@ export default function Documents() {
     queryFn: async () => {
       const { count, error: countError } = await supabase
         .from('documents')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('is_deleted', false);
       
       if (countError) throw countError;
       
@@ -120,6 +121,7 @@ export default function Documents() {
           supabase
             .from('documents')
             .select('*, projects(project_name, project_code), owner:profiles!documents_owner_user_id_fkey(full_name)')
+            .eq('is_deleted', false)
             .order('updated_at', { ascending: false })
             .range(i * pageSize, (i + 1) * pageSize - 1)
         );
