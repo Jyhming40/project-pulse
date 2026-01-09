@@ -416,26 +416,29 @@ export function useImportBatch() {
         .eq('is_archived', false);
       
       if (clearError) {
-        // Rollback: mark the new doc as deleted
+        // Rollback: mark the new doc as deleted (only is_deleted, delete_reason exists in schema)
         await supabase
           .from('documents')
           .update({ is_deleted: true, delete_reason: 'Rollback: failed to clear old current' })
-          .eq('id', newDocId);
+          .eq('id', newDocId)
+          .eq('is_deleted', false);
         throw clearError;
       }
       
-      // Stage 3b: Set the new document as is_current=true
+      // Stage 3b: Set the new document as is_current=true (only if not deleted)
       const { error: setCurrentError } = await supabase
         .from('documents')
         .update({ is_current: true })
-        .eq('id', newDocId);
+        .eq('id', newDocId)
+        .eq('is_deleted', false);
       
       if (setCurrentError) {
         // Rollback: mark the new doc as deleted
         await supabase
           .from('documents')
           .update({ is_deleted: true, delete_reason: 'Rollback: failed to set current' })
-          .eq('id', newDocId);
+          .eq('id', newDocId)
+          .eq('is_deleted', false);
         throw setCurrentError;
       }
       
@@ -454,11 +457,12 @@ export function useImportBatch() {
         await supabase
           .from('documents')
           .update({ is_deleted: true, delete_reason: 'Rollback: failed to create file record' })
-          .eq('id', newDocId);
+          .eq('id', newDocId)
+          .eq('is_deleted', false);
         throw fileError;
       }
       
-      // 4. Log audit (with error handling - non-critical, log but don't fail)
+      // 4. Log audit using docData.version for consistency
       const { error: auditError } = await supabase.rpc('log_audit_action', {
         p_table_name: 'documents',
         p_record_id: newDocId,
@@ -467,11 +471,11 @@ export function useImportBatch() {
         p_new_data: { 
           doc_type_code: item.docTypeCode, 
           agency_code: item.agencyCode,
-          version: freshVersion,
-          is_new_version: freshVersion > 1,
+          version: docData.version, // Use actual inserted version
+          is_new_version: (docData.version ?? 1) > 1,
         },
-        p_reason: freshVersion > 1 
-          ? `批次匯入新版本 v${freshVersion}` 
+        p_reason: (docData.version ?? 1) > 1 
+          ? `批次匯入新版本 v${docData.version}` 
           : `批次匯入文件`,
       });
       
@@ -488,7 +492,8 @@ export function useImportBatch() {
           await supabase
             .from('documents')
             .update({ is_deleted: true, delete_reason: `Rollback: ${error.message}` })
-            .eq('id', newDocId);
+            .eq('id', newDocId)
+            .eq('is_deleted', false);
         } catch {
           // Ignore rollback errors
         }
