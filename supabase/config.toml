@@ -53,3 +53,12 @@ verify_jwt = true
 
 [functions.admin-approve-user]
 verify_jwt = true
+
+[functions.send-milestone-notification]
+verify_jwt = false
+
+[functions.check-document-expiry]
+verify_jwt = false
+
+[functions.drive-verify-folder]
+verify_jwt = true
