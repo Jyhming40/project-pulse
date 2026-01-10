@@ -136,6 +136,7 @@ interface ProjectMilestoneRecord {
   id: string;
   milestone_code: string;
   is_completed: boolean;
+  note: string | null;
 }
 
 /**
@@ -225,7 +226,7 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
   // 2. 取得專案現有的里程碑記錄（包含工程里程碑，用於跨類型連動）
   const { data: existingMilestones, error: msError } = await supabase
     .from('project_milestones')
-    .select('id, milestone_code, is_completed')
+    .select('id, milestone_code, is_completed, note')
     .eq('project_id', projectId);
 
   if (msError) {
@@ -327,6 +328,21 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
     // 比對現有狀態，決定是否需要更新
     const existing = milestoneMap[rule.milestone_code];
     const currentCompleted = existing?.is_completed ?? false;
+    
+    // 檢查是否為手動完成（note 不包含 "SSOT" 或 "自動"）
+    const isManuallyCompleted = currentCompleted && existing?.note && 
+      !existing.note.includes('SSOT') && 
+      !existing.note.includes('自動');
+
+    // 如果是手動完成的，則保留原狀態，不自動取消
+    // 但如果文件也符合條件，則仍標記為 synced
+    if (isManuallyCompleted && !shouldComplete) {
+      console.log(`[${rule.milestone_code}] Preserving manual completion (note: ${existing?.note})`);
+      // 即使文件條件不符，也保留手動完成狀態
+      completedCodes.add(rule.milestone_code);
+      synced.push(rule.milestone_code);
+      continue; // 跳過此里程碑，不做任何更新
+    }
 
     if (shouldComplete !== currentCompleted) {
       changes.push({
