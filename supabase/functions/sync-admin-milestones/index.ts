@@ -145,6 +145,19 @@ interface ProjectMilestoneRecord {
 const CROSS_MILESTONE_TRIGGERS: { adminCode: string; engineeringCode: string }[] = [
   // 台電申請送件完成 → 現勘完成
   { adminCode: 'ADMIN_02_TAIPOWER_SUBMIT', engineeringCode: 'ENG_01_SITE_SURVEY' },
+  
+  // 報竣掛表完成 → 代表工程已完工，自動完成所有工程里程碑
+  // 這對於補登舊案件特別重要
+  { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_01_SITE_SURVEY' },
+  { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_02_DESIGN_FINAL' },
+  { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_03_MATERIAL_ORDER' },
+  { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_04_STRUCTURE' },
+  { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_05_MODULE' },
+  { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_06_ELECTRICAL' },
+  { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_07_INVERTER' },
+  { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_08_GRID_TEST' },
+  { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_09_DEFECT_FIX' },
+  { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_10_HANDOVER' },
 ];
 
 // deno-lint-ignore no-explicit-any
