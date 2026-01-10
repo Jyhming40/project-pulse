@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { deleteDriveFile } from '@/hooks/useDriveSync';
+import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
@@ -82,6 +83,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   const { isAuthorized: isDriveAuthorized, isLoading: isDriveLoading, authorize: authorizeDrive, isAuthorizing } = useDriveAuth();
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const syncMilestones = useSyncAdminMilestones();
 
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isBatchUploadOpen, setIsBatchUploadOpen] = useState(false);
@@ -253,6 +255,10 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
       queryClient.invalidateQueries({ queryKey: ['project', projectId] });
       queryClient.invalidateQueries({ queryKey: ['project-drawer', projectId] });
       queryClient.invalidateQueries({ queryKey: ['projects'] });
+      
+      // Sync admin milestones after document upload (SSOT)
+      syncMilestones.mutate(projectId);
+      
       toast.success(`文件上傳成功 (版本 ${result.document?.version || 1})`);
       setIsUploadOpen(false);
       setUploadForm({ documentType: '', title: '', file: null });

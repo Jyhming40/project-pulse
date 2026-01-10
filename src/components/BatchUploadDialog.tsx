@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
 import { 
   DOC_TYPE_CODE_TO_SHORT, 
   getAgencyCodeByDocTypeCode,
@@ -145,6 +146,7 @@ export function BatchUploadDialog({
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [driveSubfolders, setDriveSubfolders] = useState(DEFAULT_SUBFOLDER_TEMPLATE);
+  const syncMilestones = useSyncAdminMilestones();
 
   const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
 
@@ -347,6 +349,8 @@ export function BatchUploadDialog({
 
     if (successCount > 0) {
       toast.success(`成功上傳 ${successCount} 個檔案`);
+      // Sync admin milestones after batch upload (SSOT)
+      syncMilestones.mutate(projectId);
       onSuccess?.();
     }
     if (errorCount > 0) {

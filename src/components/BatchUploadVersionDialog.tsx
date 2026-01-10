@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
 import { format } from 'date-fns';
 import {
   Dialog,
@@ -61,6 +62,7 @@ export function BatchUploadVersionDialog({
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const syncMilestones = useSyncAdminMilestones();
   
   const [uploadItems, setUploadItems] = useState<Record<string, UploadItem>>(() =>
     Object.fromEntries(
@@ -131,8 +133,11 @@ export function BatchUploadVersionDialog({
       .update({ is_current: false })
       .eq('id', doc.id);
 
-    // Return the new version number from the uploaded document
-    return uploadResult.document?.version || (doc.version || 1) + 1;
+    // Return both the new version and project_id for sync
+    return {
+      version: uploadResult.document?.version || (doc.version || 1) + 1,
+      projectId: docData.project_id,
+    };
   };
 
   const handleBatchUpload = async () => {
@@ -146,6 +151,9 @@ export function BatchUploadVersionDialog({
     }
 
     setIsUploading(true);
+    
+    // Track project IDs that were successfully uploaded to
+    const successProjectIds = new Set<string>();
 
     for (const [docId, item] of itemsToUpload) {
       if (!item.file) continue;
@@ -159,11 +167,14 @@ export function BatchUploadVersionDialog({
         const doc = selectedDocuments.find(d => d.id === docId);
         if (!doc) throw new Error('找不到文件');
 
-        const newVersion = await uploadSingleDocument(doc, item.file);
+        const result = await uploadSingleDocument(doc, item.file);
+        
+        // Track the project ID for sync
+        successProjectIds.add(result.projectId);
         
         setUploadItems(prev => ({
           ...prev,
-          [docId]: { ...prev[docId], status: 'success', newVersion },
+          [docId]: { ...prev[docId], status: 'success', newVersion: result.version },
         }));
       } catch (error: any) {
         setUploadItems(prev => ({
@@ -182,6 +193,12 @@ export function BatchUploadVersionDialog({
     if (successCount > 0) {
       toast.success(`成功上傳 ${successCount} 個新版本`);
       queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+      
+      // Sync admin milestones for all affected projects (SSOT)
+      for (const projectId of successProjectIds) {
+        syncMilestones.mutate(projectId);
+      }
+      
       onSuccess?.();
     }
   };
