@@ -18,6 +18,7 @@ interface MilestoneRule {
   milestone_code: string;
   doc_type_code: string | null;  // null 表示非文件驅動
   doc_type_label: string | null; // 中文標籤（向後兼容）
+  doc_type_labels?: string[];    // 多個可能的中文標籤（任一匹配即可）
   check_field: 'issued_at' | 'submitted_at' | 'project_exists' | 'all_previous';
   prerequisites: string[];  // 前置里程碑代碼
 }
@@ -48,10 +49,12 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
     prerequisites: ['ADMIN_02_TAIPOWER_SUBMIT'],
   },
   // 頁次 4: 能源署同意備案 - 同意備案 issued_at 有值
+  // 支援多種文件類型標籤：同意備案、綠能容許
   {
     milestone_code: 'ADMIN_04_ENERGY_APPROVAL',
     doc_type_code: 'MOEA_CONSENT',
     doc_type_label: '同意備案',
+    doc_type_labels: ['同意備案', '綠能容許'],
     check_field: 'issued_at',
     prerequisites: ['ADMIN_03_TAIPOWER_OPINION'],
   },
@@ -80,10 +83,12 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
     prerequisites: ['ADMIN_06_TAIPOWER_DETAIL'],
   },
   // 頁次 8: 報竣掛表完成 - 報竣掛表 issued_at 有值
+  // 支援多種文件類型標籤：報竣掛表、正式躉售、派員訪查併聯函、電表租約
   {
     milestone_code: 'ADMIN_08_METER_INSTALLED',
     doc_type_code: 'TPC_METER',
     doc_type_label: '報竣掛表',
+    doc_type_labels: ['報竣掛表', '正式躉售', '派員訪查併聯函', '電表租約'],
     check_field: 'issued_at',
     prerequisites: ['ADMIN_07_PPA_SIGNED'],
   },
@@ -224,11 +229,25 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
     const prereqsMet = rule.prerequisites.every(prereq => completedCodes.has(prereq));
 
     if (prereqsMet) {
-      // 查找匹配的文件：先用 doc_type_code，若無則用 doc_type_label（中文）
+      // 查找匹配的文件：
+      // 1. 先用 doc_type_code（新系統）
+      // 2. 若無則用 doc_type_labels（多標籤匹配）
+      // 3. 最後用 doc_type_label（單標籤匹配，向後兼容）
       const findMatchingDoc = (): DocumentRecord | null => {
+        // 優先用 doc_type_code 匹配
         if (rule.doc_type_code && docByCode[rule.doc_type_code]) {
           return docByCode[rule.doc_type_code];
         }
+        // 多標籤匹配：任一標籤匹配即可
+        if (rule.doc_type_labels && rule.doc_type_labels.length > 0) {
+          for (const label of rule.doc_type_labels) {
+            if (docByLabel[label]) {
+              console.log(`[${rule.milestone_code}] Matched via multi-label: ${label}`);
+              return docByLabel[label];
+            }
+          }
+        }
+        // 單標籤匹配（向後兼容）
         if (rule.doc_type_label && docByLabel[rule.doc_type_label]) {
           return docByLabel[rule.doc_type_label];
         }
