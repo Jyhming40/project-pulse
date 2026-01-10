@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { deleteDriveFile } from '@/hooks/useDriveSync';
+import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { useCodebookOptions } from '@/hooks/useCodebook';
@@ -173,6 +174,9 @@ export function DocumentDetailDialog({
     enabled: open && (versions.length > 0 || !!documentId),
   });
 
+  // Sync admin milestones hook
+  const syncMilestones = useSyncAdminMilestones();
+
   // Update mutation
   const updateMutation = useMutation({
     mutationFn: async (data: typeof editData) => {
@@ -214,13 +218,22 @@ export function DocumentDetailDialog({
         p_new_data: updatePayload,
         p_reason: '編輯文件資訊',
       });
+
+      // Return project_id for milestone sync
+      return document?.project_id;
     },
-    onSuccess: () => {
+    onSuccess: (projectId) => {
       queryClient.invalidateQueries({ queryKey: ['document-detail', documentId] });
       queryClient.invalidateQueries({ queryKey: ['all-documents'] });
       queryClient.invalidateQueries({ queryKey: ['project-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['project-documents-versioned'] });
       toast.success('文件資訊已更新');
       setIsEditing(false);
+
+      // Sync milestones based on updated document status (SSOT)
+      if (projectId) {
+        syncMilestones.mutate(projectId);
+      }
     },
     onError: (error: Error) => {
       toast.error('更新失敗', { description: error.message });

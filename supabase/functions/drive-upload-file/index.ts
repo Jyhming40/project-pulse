@@ -637,166 +637,32 @@ serve(async (req) => {
       },
     });
 
-    // Auto-sync milestone completion based on document type
-    // First try to get doc_type_code from document_type_config
-    let milestoneCode: string | null = null;
-    
-    const { data: docTypeConfig } = await supabase
-      .from('document_type_config')
-      .select('code')
-      .eq('label', documentType)
-      .eq('is_active', true)
-      .maybeSingle();
-    
-    if (docTypeConfig?.code && DOC_TYPE_CODE_TO_MILESTONE[docTypeConfig.code]) {
-      milestoneCode = DOC_TYPE_CODE_TO_MILESTONE[docTypeConfig.code];
-    } else if (DOC_TYPE_LABEL_TO_MILESTONE[documentType]) {
-      // Fallback to label-based mapping
-      milestoneCode = DOC_TYPE_LABEL_TO_MILESTONE[documentType];
-    }
-
-    if (milestoneCode) {
-      console.log(`Auto-completing milestone: ${milestoneCode} for project ${projectId}`);
-      
-      // Check if milestone already exists
-      const { data: existingMilestone } = await supabase
-        .from('project_milestones')
-        .select('id, is_completed')
-        .eq('project_id', projectId)
-        .eq('milestone_code', milestoneCode)
-        .maybeSingle();
-
-      if (existingMilestone) {
-        // Update if not already completed
-        if (!existingMilestone.is_completed) {
-          await supabase
-            .from('project_milestones')
-            .update({
-              is_completed: true,
-              completed_at: new Date().toISOString(),
-              completed_by: user.id,
-              note: `透過文件上傳自動完成 (${title})`,
-            })
-            .eq('id', existingMilestone.id);
+    // Sync admin milestones based on document status (SSOT approach)
+    // This replaces the old "upload = complete milestone" logic
+    // Now milestones are completed based on document issued_at/submitted_at fields
+    try {
+      console.log(`Calling sync-admin-milestones for project ${projectId}`);
+      const syncResponse = await fetch(
+        `${supabaseUrl}/functions/v1/sync-admin-milestones`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+          },
+          body: JSON.stringify({ projectId }),
         }
+      );
+
+      if (syncResponse.ok) {
+        const syncResult = await syncResponse.json();
+        console.log('Milestone sync result:', syncResult);
       } else {
-        // Insert new milestone record
-        await supabase
-          .from('project_milestones')
-          .insert({
-            project_id: projectId,
-            milestone_code: milestoneCode,
-            is_completed: true,
-            completed_at: new Date().toISOString(),
-            completed_by: user.id,
-            note: `透過文件上傳自動完成 (${title})`,
-          });
+        console.warn('Milestone sync failed:', await syncResponse.text());
       }
-
-      // Auto-complete prerequisite milestones
-      const prerequisites = MILESTONE_PREREQUISITES[milestoneCode];
-      if (prerequisites && prerequisites.length > 0) {
-        console.log(`Auto-completing prerequisite milestones: ${prerequisites.join(', ')}`);
-        
-        for (const prereqCode of prerequisites) {
-          const { data: existingPrereq } = await supabase
-            .from('project_milestones')
-            .select('id, is_completed')
-            .eq('project_id', projectId)
-            .eq('milestone_code', prereqCode)
-            .maybeSingle();
-
-          if (existingPrereq) {
-            if (!existingPrereq.is_completed) {
-              await supabase
-                .from('project_milestones')
-                .update({
-                  is_completed: true,
-                  completed_at: new Date().toISOString(),
-                  completed_by: user.id,
-                  note: `因 ${milestoneCode} 完成而自動完成`,
-                })
-                .eq('id', existingPrereq.id);
-              console.log(`Prerequisite milestone ${prereqCode} auto-completed`);
-            }
-          } else {
-            await supabase
-              .from('project_milestones')
-              .insert({
-                project_id: projectId,
-                milestone_code: prereqCode,
-                is_completed: true,
-                completed_at: new Date().toISOString(),
-                completed_by: user.id,
-                note: `因 ${milestoneCode} 完成而自動完成`,
-              });
-            console.log(`Prerequisite milestone ${prereqCode} created and completed`);
-          }
-        }
-      }
-
-      // Recalculate progress directly (inline, not via separate edge function)
-      try {
-        const progressResult = await recalculateProgress(supabase, projectId);
-        console.log('Progress recalculated:', progressResult);
-        
-        // Update project with new progress values
-        await supabase
-          .from('projects')
-          .update({
-            admin_progress: progressResult.admin_progress,
-            engineering_progress: progressResult.engineering_progress,
-            overall_progress: progressResult.overall_progress,
-            admin_stage: progressResult.admin_stage,
-            engineering_stage: progressResult.engineering_stage,
-          })
-          .eq('id', projectId);
-        
-        console.log('Project progress updated successfully');
-      } catch (progressErr) {
-        console.error('Failed to recalculate progress:', progressErr);
-        // Don't fail the upload just because progress recalculation failed
-      }
-
-      // Get milestone name for notification
-      const { data: milestoneInfo } = await supabase
-        .from('progress_milestones')
-        .select('milestone_name, notify_on_complete')
-        .eq('milestone_code', milestoneCode)
-        .single();
-
-      // Trigger milestone notification if enabled
-      if (milestoneInfo?.notify_on_complete) {
-        try {
-          console.log(`Sending notification for milestone: ${milestoneCode}`);
-          const notificationResponse = await fetch(
-            `${supabaseUrl}/functions/v1/send-milestone-notification`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${supabaseServiceKey}`,
-              },
-              body: JSON.stringify({
-                projectId,
-                milestoneCode,
-                milestoneName: milestoneInfo.milestone_name,
-                completedBy: user.id,
-              }),
-            }
-          );
-          
-          if (notificationResponse.ok) {
-            const notificationResult = await notificationResponse.json();
-            console.log('Notification sent:', notificationResult);
-          } else {
-            console.error('Failed to send notification:', await notificationResponse.text());
-          }
-        } catch (notifyErr) {
-          console.error('Failed to send milestone notification:', notifyErr);
-          // Don't fail the upload just because notification failed
-        }
-      }
+    } catch (syncErr) {
+      console.error('Failed to sync milestones:', syncErr);
+      // Don't fail the upload just because milestone sync failed
     }
 
     // Auto-update project status based on document type (suggest new status if applicable)

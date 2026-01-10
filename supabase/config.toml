@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.drive-verify-folder]
 verify_jwt = true
+
+[functions.sync-admin-milestones]
+verify_jwt = true
