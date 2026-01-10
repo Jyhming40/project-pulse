@@ -252,7 +252,7 @@ export function useToggleProjectMilestone() {
             body: JSON.stringify({
               is_completed: isCompleted,
               completed_at: isCompleted ? new Date().toISOString() : null,
-              note,
+              note: note || (isCompleted ? '手動完成' : '手動取消完成'),
             }),
           }
         );
@@ -273,7 +273,7 @@ export function useToggleProjectMilestone() {
               milestone_code: milestoneCode,
               is_completed: isCompleted,
               completed_at: isCompleted ? new Date().toISOString() : null,
-              note,
+              note: note || (isCompleted ? '手動完成' : '手動取消完成'),
             }),
           }
         );
