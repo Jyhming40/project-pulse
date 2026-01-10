@@ -280,8 +280,32 @@ export function useToggleProjectMilestone() {
         if (!response.ok) throw new Error('Failed to create milestone');
       }
 
-      // Recalculate progress after milestone change
-      await recalculateProjectProgress(projectId, token);
+      // Determine milestone type and call appropriate sync function
+      const isEngineeringMilestone = milestoneCode.startsWith('ENG_');
+      const syncFunctionName = isEngineeringMilestone 
+        ? 'sync-engineering-milestones' 
+        : 'sync-admin-milestones';
+
+      // Call the sync function to recalculate and update derived values
+      try {
+        const syncResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${syncFunctionName}`,
+          {
+            method: 'POST',
+            headers: {
+              'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ project_id: projectId }),
+          }
+        );
+        if (!syncResponse.ok) {
+          console.warn(`Failed to sync ${isEngineeringMilestone ? 'engineering' : 'admin'} milestones`);
+        }
+      } catch (err) {
+        console.warn('Error syncing milestones:', err);
+      }
 
       // Send notification if completing milestone
       if (isCompleted) {
