@@ -133,6 +133,15 @@ interface ProjectMilestoneRecord {
   is_completed: boolean;
 }
 
+/**
+ * 跨類型里程碑連動規則
+ * 當行政里程碑完成時，自動完成對應的工程里程碑
+ */
+const CROSS_MILESTONE_TRIGGERS: { adminCode: string; engineeringCode: string }[] = [
+  // 台電申請送件完成 → 現勘完成
+  { adminCode: 'ADMIN_02_TAIPOWER_SUBMIT', engineeringCode: 'ENG_11_SITE_SURVEY' },
+];
+
 // deno-lint-ignore no-explicit-any
 async function syncAdminMilestones(supabase: any, projectId: string, userId: string): Promise<{
   synced: string[];
@@ -189,7 +198,7 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
   console.log(`DocByCode keys: ${Object.keys(docByCode).join(', ')}`);
   console.log(`DocByLabel keys: ${Object.keys(docByLabel).join(', ')}`);
 
-  // 2. 取得專案現有的里程碑記錄
+  // 2. 取得專案現有的里程碑記錄（包含工程里程碑，用於跨類型連動）
   const { data: existingMilestones, error: msError } = await supabase
     .from('project_milestones')
     .select('id, milestone_code, is_completed')
@@ -314,6 +323,53 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
             completed_by: userId,
             note: '依據文件狀態自動完成 (SSOT)',
           });
+      }
+    }
+  }
+
+  // 4. 處理跨類型里程碑連動（行政 → 工程）
+  for (const trigger of CROSS_MILESTONE_TRIGGERS) {
+    // 檢查行政里程碑是否已完成
+    if (completedCodes.has(trigger.adminCode)) {
+      const engMilestone = milestoneMap[trigger.engineeringCode];
+      const engCurrentCompleted = engMilestone?.is_completed ?? false;
+
+      // 如果工程里程碑尚未完成，則自動完成
+      if (!engCurrentCompleted) {
+        console.log(`[Cross-trigger] ${trigger.adminCode} completed → auto-complete ${trigger.engineeringCode}`);
+        
+        changes.push({
+          code: trigger.engineeringCode,
+          from: false,
+          to: true,
+        });
+        synced.push(trigger.engineeringCode);
+
+        if (engMilestone) {
+          // 更新現有記錄
+          await supabase
+            .from('project_milestones')
+            .update({
+              is_completed: true,
+              completed_at: new Date().toISOString(),
+              completed_by: userId,
+              note: `依據 ${trigger.adminCode} 完成自動連動完成`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', engMilestone.id);
+        } else {
+          // 新增記錄
+          await supabase
+            .from('project_milestones')
+            .insert({
+              project_id: projectId,
+              milestone_code: trigger.engineeringCode,
+              is_completed: true,
+              completed_at: new Date().toISOString(),
+              completed_by: userId,
+              note: `依據 ${trigger.adminCode} 完成自動連動完成`,
+            });
+        }
       }
     }
   }
