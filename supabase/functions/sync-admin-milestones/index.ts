@@ -143,11 +143,43 @@ interface ProjectMilestoneRecord {
  * 當行政里程碑完成時，自動完成對應的工程里程碑
  */
 const CROSS_MILESTONE_TRIGGERS: { adminCode: string; engineeringCode: string }[] = [
-  // 台電申請送件完成 → 現勘完成
+  // === 階段性連動規則 ===
+  // 台電申請送件完成 → 現勘完成、設計定稿
   { adminCode: 'ADMIN_02_TAIPOWER_SUBMIT', engineeringCode: 'ENG_01_SITE_SURVEY' },
+  { adminCode: 'ADMIN_02_TAIPOWER_SUBMIT', engineeringCode: 'ENG_02_DESIGN_FINAL' },
+  
+  // 台電審查意見書完成 → 材料下單
+  { adminCode: 'ADMIN_03_TAIPOWER_OPINION', engineeringCode: 'ENG_01_SITE_SURVEY' },
+  { adminCode: 'ADMIN_03_TAIPOWER_OPINION', engineeringCode: 'ENG_02_DESIGN_FINAL' },
+  { adminCode: 'ADMIN_03_TAIPOWER_OPINION', engineeringCode: 'ENG_03_MATERIAL_ORDER' },
+  
+  // 同意備案完成 → 結構施工、模組安裝（代表可以正式開工）
+  { adminCode: 'ADMIN_04_ENERGY_APPROVAL', engineeringCode: 'ENG_01_SITE_SURVEY' },
+  { adminCode: 'ADMIN_04_ENERGY_APPROVAL', engineeringCode: 'ENG_02_DESIGN_FINAL' },
+  { adminCode: 'ADMIN_04_ENERGY_APPROVAL', engineeringCode: 'ENG_03_MATERIAL_ORDER' },
+  { adminCode: 'ADMIN_04_ENERGY_APPROVAL', engineeringCode: 'ENG_04_STRUCTURE' },
+  { adminCode: 'ADMIN_04_ENERGY_APPROVAL', engineeringCode: 'ENG_05_MODULE' },
+  
+  // 細部協商完成 → 電氣配線、變流器安裝
+  { adminCode: 'ADMIN_06_TAIPOWER_DETAIL', engineeringCode: 'ENG_01_SITE_SURVEY' },
+  { adminCode: 'ADMIN_06_TAIPOWER_DETAIL', engineeringCode: 'ENG_02_DESIGN_FINAL' },
+  { adminCode: 'ADMIN_06_TAIPOWER_DETAIL', engineeringCode: 'ENG_03_MATERIAL_ORDER' },
+  { adminCode: 'ADMIN_06_TAIPOWER_DETAIL', engineeringCode: 'ENG_04_STRUCTURE' },
+  { adminCode: 'ADMIN_06_TAIPOWER_DETAIL', engineeringCode: 'ENG_05_MODULE' },
+  { adminCode: 'ADMIN_06_TAIPOWER_DETAIL', engineeringCode: 'ENG_06_ELECTRICAL' },
+  { adminCode: 'ADMIN_06_TAIPOWER_DETAIL', engineeringCode: 'ENG_07_INVERTER' },
+  
+  // 躉售合約簽訂完成 → 併網測試
+  { adminCode: 'ADMIN_07_PPA_SIGNED', engineeringCode: 'ENG_01_SITE_SURVEY' },
+  { adminCode: 'ADMIN_07_PPA_SIGNED', engineeringCode: 'ENG_02_DESIGN_FINAL' },
+  { adminCode: 'ADMIN_07_PPA_SIGNED', engineeringCode: 'ENG_03_MATERIAL_ORDER' },
+  { adminCode: 'ADMIN_07_PPA_SIGNED', engineeringCode: 'ENG_04_STRUCTURE' },
+  { adminCode: 'ADMIN_07_PPA_SIGNED', engineeringCode: 'ENG_05_MODULE' },
+  { adminCode: 'ADMIN_07_PPA_SIGNED', engineeringCode: 'ENG_06_ELECTRICAL' },
+  { adminCode: 'ADMIN_07_PPA_SIGNED', engineeringCode: 'ENG_07_INVERTER' },
+  { adminCode: 'ADMIN_07_PPA_SIGNED', engineeringCode: 'ENG_08_GRID_TEST' },
   
   // 報竣掛表完成 → 代表工程已完工，自動完成所有工程里程碑
-  // 這對於補登舊案件特別重要
   { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_01_SITE_SURVEY' },
   { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_02_DESIGN_FINAL' },
   { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_03_MATERIAL_ORDER' },
