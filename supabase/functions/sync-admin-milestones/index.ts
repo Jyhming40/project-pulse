@@ -17,6 +17,7 @@ const corsHeaders = {
 interface MilestoneRule {
   milestone_code: string;
   doc_type_code: string | null;  // null 表示非文件驅動
+  doc_type_label: string | null; // 中文標籤（向後兼容）
   check_field: 'issued_at' | 'submitted_at' | 'project_exists' | 'all_previous';
   prerequisites: string[];  // 前置里程碑代碼
 }
@@ -26,6 +27,7 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
   {
     milestone_code: 'ADMIN_01_CREATED',
     doc_type_code: null,
+    doc_type_label: null,
     check_field: 'project_exists',
     prerequisites: [],
   },
@@ -33,6 +35,7 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
   {
     milestone_code: 'ADMIN_02_TAIPOWER_SUBMIT',
     doc_type_code: 'TPC_REVIEW',
+    doc_type_label: '審查意見書',  // 中文標籤用於匹配
     check_field: 'submitted_at',
     prerequisites: ['ADMIN_01_CREATED'],
   },
@@ -40,6 +43,7 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
   {
     milestone_code: 'ADMIN_03_TAIPOWER_OPINION',
     doc_type_code: 'TPC_REVIEW',
+    doc_type_label: '審查意見書',
     check_field: 'issued_at',
     prerequisites: ['ADMIN_02_TAIPOWER_SUBMIT'],
   },
@@ -47,6 +51,7 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
   {
     milestone_code: 'ADMIN_04_ENERGY_APPROVAL',
     doc_type_code: 'MOEA_CONSENT',
+    doc_type_label: '同意備案',
     check_field: 'issued_at',
     prerequisites: ['ADMIN_03_TAIPOWER_OPINION'],
   },
@@ -54,6 +59,7 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
   {
     milestone_code: 'ADMIN_05_MISC_EXEMPT',
     doc_type_code: 'BUILD_EXEMPT_COMP',
+    doc_type_label: '免雜項竣工',
     check_field: 'issued_at',
     prerequisites: ['ADMIN_04_ENERGY_APPROVAL'],
   },
@@ -61,6 +67,7 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
   {
     milestone_code: 'ADMIN_06_TAIPOWER_DETAIL',
     doc_type_code: 'TPC_NEGOTIATION',
+    doc_type_label: '細部協商',
     check_field: 'issued_at',
     prerequisites: ['ADMIN_05_MISC_EXEMPT'],
   },
@@ -68,6 +75,7 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
   {
     milestone_code: 'ADMIN_07_PPA_SIGNED',
     doc_type_code: 'TPC_CONTRACT',
+    doc_type_label: '躉售合約',
     check_field: 'issued_at',
     prerequisites: ['ADMIN_06_TAIPOWER_DETAIL'],
   },
@@ -75,6 +83,7 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
   {
     milestone_code: 'ADMIN_08_METER_INSTALLED',
     doc_type_code: 'TPC_METER',
+    doc_type_label: '報竣掛表',
     check_field: 'issued_at',
     prerequisites: ['ADMIN_07_PPA_SIGNED'],
   },
@@ -82,6 +91,7 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
   {
     milestone_code: 'ADMIN_09_EQUIPMENT_REG',
     doc_type_code: 'MOEA_REGISTER',
+    doc_type_label: '設備登記',
     check_field: 'issued_at',
     prerequisites: ['ADMIN_08_METER_INSTALLED'],
   },
@@ -89,6 +99,7 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
   {
     milestone_code: 'ADMIN_10_CLOSED',
     doc_type_code: null,
+    doc_type_label: null,
     check_field: 'all_previous',
     prerequisites: [
       'ADMIN_01_CREATED',
@@ -106,7 +117,8 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
 
 interface DocumentRecord {
   id: string;
-  doc_type_code: string | null;
+  doc_type: string | null;        // 中文標籤（向後兼容）
+  doc_type_code: string | null;   // 文件類型代碼
   submitted_at: string | null;
   issued_at: string | null;
   is_current: boolean;
@@ -136,7 +148,7 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
   // 1. 取得專案的所有當前文件（is_current=true, is_deleted=false）及其檔案數量
   const { data: documents, error: docError } = await supabase
     .from('documents')
-    .select('id, doc_type_code, submitted_at, issued_at, is_current, is_deleted, drive_file_id, document_files(id)')
+    .select('id, doc_type, doc_type_code, submitted_at, issued_at, is_current, is_deleted, drive_file_id, document_files(id)')
     .eq('project_id', projectId)
     .eq('is_current', true)
     .eq('is_deleted', false)
@@ -150,6 +162,7 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
   // 計算每個文件的檔案數量
   const docs: DocumentRecord[] = (documents || []).map((doc: Record<string, unknown>) => ({
     id: doc.id as string,
+    doc_type: doc.doc_type as string | null,
     doc_type_code: doc.doc_type_code as string | null,
     submitted_at: doc.submitted_at as string | null,
     issued_at: doc.issued_at as string | null,
@@ -160,14 +173,21 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
   }));
   console.log(`Found ${docs.length} current documents`);
 
-  // 建立文件代碼到文件的映射（方便查詢）
+  // 建立文件代碼和標籤到文件的映射（方便查詢）
+  // 同時支援 doc_type_code（新）和 doc_type（舊中文標籤）匹配
   const docByCode: Record<string, DocumentRecord> = {};
+  const docByLabel: Record<string, DocumentRecord> = {};
   for (const doc of docs) {
     if (doc.doc_type_code) {
       // 如果同類型有多筆，取最新的（這裡假設 is_current=true 已經處理）
       docByCode[doc.doc_type_code] = doc;
     }
+    if (doc.doc_type) {
+      docByLabel[doc.doc_type] = doc;
+    }
   }
+  console.log(`DocByCode keys: ${Object.keys(docByCode).join(', ')}`);
+  console.log(`DocByLabel keys: ${Object.keys(docByLabel).join(', ')}`);
 
   // 2. 取得專案現有的里程碑記錄
   const { data: existingMilestones, error: msError } = await supabase
@@ -195,28 +215,52 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
     const prereqsMet = rule.prerequisites.every(prereq => completedCodes.has(prereq));
 
     if (prereqsMet) {
+      // 查找匹配的文件：先用 doc_type_code，若無則用 doc_type_label（中文）
+      const findMatchingDoc = (): DocumentRecord | null => {
+        if (rule.doc_type_code && docByCode[rule.doc_type_code]) {
+          return docByCode[rule.doc_type_code];
+        }
+        if (rule.doc_type_label && docByLabel[rule.doc_type_label]) {
+          return docByLabel[rule.doc_type_label];
+        }
+        return null;
+      };
+
       switch (rule.check_field) {
         case 'project_exists':
           // 專案存在即完成
           shouldComplete = true;
           break;
 
-        case 'submitted_at':
+        case 'submitted_at': {
           // 檢查對應文件的 submitted_at 是否有值
-          if (rule.doc_type_code && docByCode[rule.doc_type_code]) {
-            shouldComplete = !!docByCode[rule.doc_type_code].submitted_at;
+          // 注意：如果文件已取得（issued_at 有值或有上傳檔案），則 submitted_at 也視為完成
+          const doc = findMatchingDoc();
+          if (doc) {
+            const hasFile = (doc.file_count !== undefined && doc.file_count > 0) || !!doc.drive_file_id;
+            const isIssued = !!doc.issued_at || hasFile;
+            // 如果已送件或已取得，都算完成
+            shouldComplete = !!doc.submitted_at || isIssued;
+            console.log(`[${rule.milestone_code}] submitted_at check: doc found (type: ${doc.doc_type || doc.doc_type_code}), submitted_at=${doc.submitted_at}, isIssued=${isIssued}, result=${shouldComplete}`);
+          } else {
+            console.log(`[${rule.milestone_code}] submitted_at check: no matching doc for code=${rule.doc_type_code} or label=${rule.doc_type_label}`);
           }
           break;
+        }
 
-        case 'issued_at':
+        case 'issued_at': {
           // 檢查對應文件的 issued_at 是否有值，或是否有上傳檔案（document_files 或 Google Drive）
-          if (rule.doc_type_code && docByCode[rule.doc_type_code]) {
-            const doc = docByCode[rule.doc_type_code];
+          const doc = findMatchingDoc();
+          if (doc) {
             // 有 issued_at 或有上傳檔案（document_files 或 drive_file_id）都算「已取得」
             const hasFile = (doc.file_count !== undefined && doc.file_count > 0) || !!doc.drive_file_id;
             shouldComplete = !!doc.issued_at || hasFile;
+            console.log(`[${rule.milestone_code}] issued_at check: doc found (type: ${doc.doc_type || doc.doc_type_code}), issued_at=${doc.issued_at}, file_count=${doc.file_count}, drive_file_id=${doc.drive_file_id}, hasFile=${hasFile}, result=${shouldComplete}`);
+          } else {
+            console.log(`[${rule.milestone_code}] issued_at check: no matching doc for code=${rule.doc_type_code} or label=${rule.doc_type_label}`);
           }
           break;
+        }
 
         case 'all_previous':
           // 所有前置里程碑都必須完成
