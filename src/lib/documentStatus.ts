@@ -3,8 +3,9 @@
  * 
  * 狀態優先順序（由高到低）：
  * 1. 已取得 - issued_at（核發日）有日期
- * 2. 已開始 - issued_at 為空，且 submitted_at（送件日）有日期
- * 3. 未開始 - submitted_at 與 issued_at 皆為空
+ * 2. 已取得 - 有上傳檔案（document_files 有記錄）
+ * 3. 已開始 - issued_at 為空，且 submitted_at（送件日）有日期
+ * 4. 未開始 - submitted_at 與 issued_at 皆為空，且無上傳檔案
  */
 
 export type DerivedDocStatus = '已取得' | '已開始' | '未開始';
@@ -12,11 +13,12 @@ export type DerivedDocStatus = '已取得' | '已開始' | '未開始';
 interface DocumentDates {
   submitted_at?: string | null;
   issued_at?: string | null;
+  file_count?: number; // 上傳檔案數量
 }
 
 /**
- * 根據日期欄位推導文件狀態
- * @param doc 包含 submitted_at 和 issued_at 的文件物件
+ * 根據日期欄位與檔案上傳狀態推導文件狀態
+ * @param doc 包含 submitted_at、issued_at 和 file_count 的文件物件
  * @returns 推導出的狀態
  */
 export function getDerivedDocStatus(doc: DocumentDates): DerivedDocStatus {
@@ -25,12 +27,17 @@ export function getDerivedDocStatus(doc: DocumentDates): DerivedDocStatus {
     return '已取得';
   }
   
-  // 優先順序 2: 已開始（送件日有日期，但核發日為空）
+  // 優先順序 2: 已取得（有上傳檔案）
+  if (doc.file_count && doc.file_count > 0) {
+    return '已取得';
+  }
+  
+  // 優先順序 3: 已開始（送件日有日期，但核發日為空且無檔案）
   if (doc.submitted_at) {
     return '已開始';
   }
   
-  // 優先順序 3: 未開始（兩者皆為空）
+  // 優先順序 4: 未開始（皆無）
   return '未開始';
 }
 
@@ -50,7 +57,7 @@ export function getDerivedDocStatusColor(status: DerivedDocStatus): string {
 
 /**
  * 取得文件的推導狀態與顏色
- * @param doc 包含 submitted_at 和 issued_at 的文件物件
+ * @param doc 包含 submitted_at、issued_at 和 file_count 的文件物件
  * @returns 包含 status 和 colorClass 的物件
  */
 export function getDocStatusInfo(doc: DocumentDates): {
@@ -62,6 +69,6 @@ export function getDocStatusInfo(doc: DocumentDates): {
   return {
     status,
     colorClass: getDerivedDocStatusColor(status),
-    tooltip: '狀態由送件日 / 核發日自動判斷',
+    tooltip: '狀態由送件日 / 核發日 / 上傳檔案自動判斷',
   };
 }

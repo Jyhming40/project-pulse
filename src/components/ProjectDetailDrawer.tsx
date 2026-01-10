@@ -116,20 +116,25 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
     enabled: !!projectId && open,
   });
 
-  // Fetch documents
+  // Fetch documents with file counts
   const { data: documents = [] } = useQuery({
     queryKey: ['project-documents-drawer', projectId],
     queryFn: async () => {
       if (!projectId) return [];
       const { data, error } = await supabase
         .from('documents')
-        .select('*, owner:profiles!documents_owner_user_id_fkey(full_name, email)')
+        .select('*, owner:profiles!documents_owner_user_id_fkey(full_name, email), document_files(id)')
         .eq('project_id', projectId)
         .eq('is_deleted', false)
+        .eq('document_files.is_deleted', false)
         .order('created_at', { ascending: false })
         .limit(10);
       if (error) throw error;
-      return data;
+      // Add file_count to each document
+      return (data || []).map((doc: any) => ({
+        ...doc,
+        file_count: Array.isArray(doc.document_files) ? doc.document_files.length : 0,
+      }));
     },
     enabled: !!projectId && open,
   });

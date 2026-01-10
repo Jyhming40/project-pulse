@@ -110,7 +110,7 @@ export default function Documents() {
   const { tags } = useDocumentTags();
   const { data: tagAssignments } = useAllDocumentTagAssignments();
   
-  // Fetch documents with project info
+  // Fetch documents with project info and file counts
   const { data: documents = [], isLoading } = useQuery({
     queryKey: ['all-documents'],
     queryFn: async () => {
@@ -130,8 +130,9 @@ export default function Documents() {
         promises.push(
           supabase
             .from('documents')
-            .select('*, projects(project_name, project_code, drive_folder_id), owner:profiles!documents_owner_user_id_fkey(full_name)')
+            .select('*, projects(project_name, project_code, drive_folder_id), owner:profiles!documents_owner_user_id_fkey(full_name), document_files(id)')
             .eq('is_deleted', false)
+            .eq('document_files.is_deleted', false)
             .order('updated_at', { ascending: false })
             .range(i * pageSize, (i + 1) * pageSize - 1)
         );
@@ -142,7 +143,12 @@ export default function Documents() {
       const allData: any[] = [];
       for (const result of results) {
         if (result.error) throw result.error;
-        allData.push(...(result.data || []));
+        // Add file_count to each document
+        const docsWithFileCount = (result.data || []).map((doc: any) => ({
+          ...doc,
+          file_count: Array.isArray(doc.document_files) ? doc.document_files.length : 0,
+        }));
+        allData.push(...docsWithFileCount);
       }
       
       return allData;
