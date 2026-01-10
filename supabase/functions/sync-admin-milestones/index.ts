@@ -111,7 +111,8 @@ interface DocumentRecord {
   issued_at: string | null;
   is_current: boolean;
   is_deleted: boolean;
-  file_count?: number;  // 上傳檔案數量
+  file_count?: number;  // 上傳檔案數量（document_files）
+  drive_file_id?: string | null;  // Google Drive 檔案 ID
 }
 
 interface ProjectMilestoneRecord {
@@ -135,7 +136,7 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
   // 1. 取得專案的所有當前文件（is_current=true, is_deleted=false）及其檔案數量
   const { data: documents, error: docError } = await supabase
     .from('documents')
-    .select('id, doc_type_code, submitted_at, issued_at, is_current, is_deleted, document_files(id)')
+    .select('id, doc_type_code, submitted_at, issued_at, is_current, is_deleted, drive_file_id, document_files(id)')
     .eq('project_id', projectId)
     .eq('is_current', true)
     .eq('is_deleted', false)
@@ -155,6 +156,7 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
     is_current: doc.is_current as boolean,
     is_deleted: doc.is_deleted as boolean,
     file_count: Array.isArray(doc.document_files) ? doc.document_files.length : 0,
+    drive_file_id: doc.drive_file_id as string | null,
   }));
   console.log(`Found ${docs.length} current documents`);
 
@@ -207,11 +209,11 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
           break;
 
         case 'issued_at':
-          // 檢查對應文件的 issued_at 是否有值，或是否有上傳檔案
+          // 檢查對應文件的 issued_at 是否有值，或是否有上傳檔案（document_files 或 Google Drive）
           if (rule.doc_type_code && docByCode[rule.doc_type_code]) {
             const doc = docByCode[rule.doc_type_code];
-            // 有 issued_at 或有上傳檔案都算「已取得」
-            const hasFile = doc.file_count !== undefined && doc.file_count > 0;
+            // 有 issued_at 或有上傳檔案（document_files 或 drive_file_id）都算「已取得」
+            const hasFile = (doc.file_count !== undefined && doc.file_count > 0) || !!doc.drive_file_id;
             shouldComplete = !!doc.issued_at || hasFile;
           }
           break;

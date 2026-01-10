@@ -3,7 +3,7 @@
  * 
  * 狀態優先順序（由高到低）：
  * 1. 已取得 - issued_at（核發日）有日期
- * 2. 已取得 - 有上傳檔案（document_files 有記錄）
+ * 2. 已取得 - 有上傳檔案（document_files 有記錄 或 drive_file_id 有值）
  * 3. 已開始 - issued_at 為空，且 submitted_at（送件日）有日期
  * 4. 未開始 - submitted_at 與 issued_at 皆為空，且無上傳檔案
  */
@@ -13,12 +13,13 @@ export type DerivedDocStatus = '已取得' | '已開始' | '未開始';
 interface DocumentDates {
   submitted_at?: string | null;
   issued_at?: string | null;
-  file_count?: number; // 上傳檔案數量
+  file_count?: number; // 上傳檔案數量（document_files）
+  drive_file_id?: string | null; // Google Drive 檔案 ID
 }
 
 /**
  * 根據日期欄位與檔案上傳狀態推導文件狀態
- * @param doc 包含 submitted_at、issued_at 和 file_count 的文件物件
+ * @param doc 包含 submitted_at、issued_at、file_count 和 drive_file_id 的文件物件
  * @returns 推導出的狀態
  */
 export function getDerivedDocStatus(doc: DocumentDates): DerivedDocStatus {
@@ -27,8 +28,8 @@ export function getDerivedDocStatus(doc: DocumentDates): DerivedDocStatus {
     return '已取得';
   }
   
-  // 優先順序 2: 已取得（有上傳檔案）
-  if (doc.file_count && doc.file_count > 0) {
+  // 優先順序 2: 已取得（有上傳檔案 - document_files 或 Google Drive）
+  if ((doc.file_count && doc.file_count > 0) || doc.drive_file_id) {
     return '已取得';
   }
   
