@@ -127,7 +127,7 @@ const FILENAME_DOC_TYPE_PATTERNS: { keywords: string[]; docTypeCode: string }[] 
   { keywords: ['審查意見書', '審查意見'], docTypeCode: 'TPC_REVIEW' },
   { keywords: ['派員訪查', '訪查併聯', '併聯函'], docTypeCode: 'TPC_INSPECTION' },
   { keywords: ['細部協商'], docTypeCode: 'TPC_NEGOTIATION' },
-  { keywords: ['審訖圖'], docTypeCode: 'TPC_APPROVED_DRAWING' },
+  { keywords: ['審訖圖', '審迄圖'], docTypeCode: 'TPC_APPROVED_DRAWING' },
   { keywords: ['電表租約', '電錶租約'], docTypeCode: 'TPC_METER_LEASE' },
   { keywords: ['線補費', '線路補助費'], docTypeCode: 'TPC_LINE_COMP' },
   { keywords: ['躉售合約', '躉購合約'], docTypeCode: 'TPC_CONTRACT' },
@@ -141,8 +141,8 @@ const FILENAME_DOC_TYPE_PATTERNS: { keywords: string[]; docTypeCode: string }[] 
   { keywords: ['結構技師', '結構簽證', '結構計算'], docTypeCode: 'ENG_STRUCTURAL' },
   { keywords: ['電機技師', '電機簽證'], docTypeCode: 'ENG_ELECTRICAL' },
   // 建管
-  { keywords: ['免雜項申請', '免雜申請'], docTypeCode: 'BUILD_EXEMPT_APP' },
-  { keywords: ['免雜項竣工', '免雜竣工'], docTypeCode: 'BUILD_EXEMPT_COMP' },
+  { keywords: ['免雜項申請', '免雜申請', '免雜回函'], docTypeCode: 'BUILD_EXEMPT_APP' },
+  { keywords: ['免雜項竣工', '免雜竣工', '工程完竣回函'], docTypeCode: 'BUILD_EXEMPT_COMP' },
   // 縣市政府
   { keywords: ['綠能容許', '容許函'], docTypeCode: 'GOV_GREEN_PERMIT' },
   { keywords: ['使用分區', '分區'], docTypeCode: 'GOV_ZONING' },
