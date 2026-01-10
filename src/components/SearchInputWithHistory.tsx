@@ -94,7 +94,7 @@ export function SearchInputWithHistory({
 
   return (
     <div ref={containerRef} className={cn('relative', className)}>
-      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4 pointer-events-none" />
       <Input
         ref={inputRef}
         type="text"
@@ -116,29 +116,35 @@ export function SearchInputWithHistory({
       )}
 
       {/* History Dropdown */}
-      {isOpen && history.length > 0 && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-popover border rounded-md shadow-lg z-50 overflow-hidden">
-          <div className="px-3 py-2 text-xs text-muted-foreground border-b flex items-center gap-1">
+      {isOpen && history.length > 0 && !value && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-popover border border-border rounded-md shadow-lg z-[100] overflow-hidden">
+          <div className="px-3 py-2 text-xs text-muted-foreground border-b border-border flex items-center gap-1">
             <Clock className="h-3 w-3" />
             最近搜尋
           </div>
           <ul className="max-h-[200px] overflow-auto">
             {history.map((term, index) => (
-              <li key={index}>
-                <button
-                  type="button"
+              <li key={`${storageKey}-${index}`}>
+                <div
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handleSelectHistory(term)}
-                  className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center justify-between group"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      handleSelectHistory(term);
+                    }
+                  }}
+                  className="w-full px-3 py-2 text-left text-sm hover:bg-accent flex items-center justify-between group cursor-pointer"
                 >
-                  <span className="truncate">{term}</span>
+                  <span className="truncate flex-1">{term}</span>
                   <button
                     type="button"
                     onClick={(e) => removeFromHistory(term, e)}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity ml-2 shrink-0"
                   >
                     <X className="h-3 w-3" />
                   </button>
-                </button>
+                </div>
               </li>
             ))}
           </ul>
