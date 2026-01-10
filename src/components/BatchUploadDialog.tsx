@@ -72,47 +72,116 @@ const DOC_TYPE_TO_SUBFOLDER: Record<string, string> = {
   'TPC_REVIEW': 'TPC',
   'TPC_CONTRACT': 'TPC',
   'TPC_METER': 'TPC',
+  'TPC_FORMAL_FIT': 'TPC',
+  'TPC_INSPECTION': 'TPC',
+  'TPC_LINE_COMP': 'TPC',
+  'TPC_NEGOTIATION': 'TPC',
+  'TPC_APPROVED_DRAWING': 'TPC',
+  'TPC_METER_LEASE': 'TPC',
+  'TPC_POWER_BILL': 'TPC',
+  'TPC_AMENDMENT': 'TPC',
+  'TPC_OTHER': 'TPC',
   'MOEA_CONSENT': 'ENERGY_BUREAU',
   'MOEA_REGISTER': 'ENERGY_BUREAU',
-  'STRUCT_CERT': 'RELATED',
-  'LINE_COMP_NOTICE': 'TPC',
-  'OTHER': 'RELATED',
-  // Generic category codes (直接對應)
+  'MOEA_OTHER': 'ENERGY_BUREAU',
+  'ENG_STRUCTURAL': 'RELATED',
+  'ENG_ELECTRICAL': 'RELATED',
+  'ENG_OTHER': 'RELATED',
+  'BUILD_EXEMPT_APP': 'BUILDING_AUTH',
+  'BUILD_EXEMPT_COMP': 'BUILDING_AUTH',
+  'BUILD_OTHER': 'BUILDING_AUTH',
+  'GOV_GREEN_PERMIT': 'GREEN_PERMISSION',
+  'GOV_ZONING': 'RELATED',
+  'GOV_OTHER': 'RELATED',
+  'FIRE_REVIEW': 'RELATED',
+  'FIRE_INSPECTION': 'RELATED',
+  'FIRE_OTHER': 'RELATED',
+  'LAND_CONSENT': 'RELATED',
+  'LAND_TRANSCRIPT': 'RELATED',
+  'LAND_LEASE': 'RELATED',
+  'LAND_OWNER_ID': 'RELATED',
+  'LAND_OTHER': 'RELATED',
+  'CONST_START': 'CONSTRUCTION_PHOTO',
+  'CONST_COMPLETE': 'CONSTRUCTION_PHOTO',
+  'CONST_PERMIT': 'CONSTRUCTION_PHOTO',
+  'CONST_OTHER': 'CONSTRUCTION_PHOTO',
+  'INS_EQUIPMENT': 'RELATED',
+  'INS_FINANCING': 'RELATED',
+  'INS_OTHER': 'RELATED',
+  'OTHER_COMPANY': 'RELATED',
+  'OTHER_AGREEMENT': 'RELATED',
+  'OTHER_MISC': 'RELATED',
+  // Generic category codes
   'TPC': 'TPC',
   'ENERGY_BUREAU': 'ENERGY_BUREAU',
   'RELATED': 'RELATED',
   'BUILDING_AUTH': 'BUILDING_AUTH',
   'GREEN_PERMISSION': 'GREEN_PERMISSION',
-  // Short value keys (for backwards compatibility)
-  '台電審查意見書': 'TPC',
-  '台電報竣掛表': 'TPC',
-  '台電躉售合約': 'TPC',
-  '台電正式躉售': 'TPC',
-  '台電派員訪查併聯函': 'TPC',
-  '能源署同意備案': 'ENERGY_BUREAU',
-  '能源局同意備案': 'ENERGY_BUREAU',
-  '能源署設備登記': 'ENERGY_BUREAU',
-  '結構技師簽證': 'RELATED',
-  '結構簽證': 'RELATED',
-  '電機技師簽證': 'RELATED',
-  '承裝業簽證': 'RELATED',
-  '躉售合約': 'TPC',
-  '報竣掛表': 'TPC',
-  '設備登記': 'ENERGY_BUREAU',
-  '同意備案': 'ENERGY_BUREAU',
-  '線補費通知單': 'TPC',
-  '免雜執照同意備案': 'BUILDING_AUTH',
-  '免雜執照完竣': 'BUILDING_AUTH',
-  '附屬綠能設施同意函': 'GREEN_PERMISSION',
-  '最終掛表期限': 'TPC',
-  // Generic short values
-  '台電相關': 'TPC',
-  '能源署相關': 'ENERGY_BUREAU',
-  '其他相關文件': 'RELATED',
-  '建管處相關': 'BUILDING_AUTH',
-  '綠能設施': 'GREEN_PERMISSION',
-  '其他': 'RELATED',
 };
+
+// Filename keyword patterns to infer doc type code
+// Order matters - more specific patterns should come first
+const FILENAME_DOC_TYPE_PATTERNS: { keywords: string[]; docTypeCode: string }[] = [
+  // 台電文件
+  { keywords: ['正式躉售', '正式躉購'], docTypeCode: 'TPC_FORMAL_FIT' },
+  { keywords: ['審查意見書', '審查意見'], docTypeCode: 'TPC_REVIEW' },
+  { keywords: ['派員訪查', '訪查併聯', '併聯函'], docTypeCode: 'TPC_INSPECTION' },
+  { keywords: ['細部協商'], docTypeCode: 'TPC_NEGOTIATION' },
+  { keywords: ['審訖圖'], docTypeCode: 'TPC_APPROVED_DRAWING' },
+  { keywords: ['電表租約', '電錶租約'], docTypeCode: 'TPC_METER_LEASE' },
+  { keywords: ['線補費', '線路補助費'], docTypeCode: 'TPC_LINE_COMP' },
+  { keywords: ['躉售合約', '躉購合約'], docTypeCode: 'TPC_CONTRACT' },
+  { keywords: ['躉購電費', '電費單'], docTypeCode: 'TPC_POWER_BILL' },
+  { keywords: ['換文', '修約'], docTypeCode: 'TPC_AMENDMENT' },
+  { keywords: ['報竣掛表', '報竣', '掛表', '掛錶'], docTypeCode: 'TPC_METER' },
+  // 能源署文件
+  { keywords: ['同意備案', '備案函', '備案'], docTypeCode: 'MOEA_CONSENT' },
+  { keywords: ['設備登記', '登記'], docTypeCode: 'MOEA_REGISTER' },
+  // 技師簽證
+  { keywords: ['結構技師', '結構簽證', '結構計算'], docTypeCode: 'ENG_STRUCTURAL' },
+  { keywords: ['電機技師', '電機簽證'], docTypeCode: 'ENG_ELECTRICAL' },
+  // 建管
+  { keywords: ['免雜項申請', '免雜申請'], docTypeCode: 'BUILD_EXEMPT_APP' },
+  { keywords: ['免雜項竣工', '免雜竣工'], docTypeCode: 'BUILD_EXEMPT_COMP' },
+  // 縣市政府
+  { keywords: ['綠能容許', '容許函'], docTypeCode: 'GOV_GREEN_PERMIT' },
+  { keywords: ['使用分區', '分區'], docTypeCode: 'GOV_ZONING' },
+  // 消防
+  { keywords: ['消防審查'], docTypeCode: 'FIRE_REVIEW' },
+  { keywords: ['消防設備', '消防檢查'], docTypeCode: 'FIRE_INSPECTION' },
+  // 土地
+  { keywords: ['土地使用同意', '使用同意書'], docTypeCode: 'LAND_CONSENT' },
+  { keywords: ['地籍謄本', '謄本'], docTypeCode: 'LAND_TRANSCRIPT' },
+  { keywords: ['租賃契約', '租約'], docTypeCode: 'LAND_LEASE' },
+  { keywords: ['身分證', '身份證'], docTypeCode: 'LAND_OWNER_ID' },
+  // 施工
+  { keywords: ['開工報告', '開工'], docTypeCode: 'CONST_START' },
+  { keywords: ['竣工報告', '竣工'], docTypeCode: 'CONST_COMPLETE' },
+  { keywords: ['施工許可'], docTypeCode: 'CONST_PERMIT' },
+  // 保險
+  { keywords: ['設備保險', '保險單'], docTypeCode: 'INS_EQUIPMENT' },
+  { keywords: ['融資', '貸款'], docTypeCode: 'INS_FINANCING' },
+  // 其他
+  { keywords: ['公司登記', '營業登記'], docTypeCode: 'OTHER_COMPANY' },
+  { keywords: ['合作協議', '協議書'], docTypeCode: 'OTHER_AGREEMENT' },
+];
+
+/**
+ * Infer document type code from filename
+ */
+function inferDocTypeFromFilename(filename: string): string | null {
+  const lowerName = filename.toLowerCase();
+  
+  for (const pattern of FILENAME_DOC_TYPE_PATTERNS) {
+    for (const keyword of pattern.keywords) {
+      if (lowerName.includes(keyword.toLowerCase())) {
+        return pattern.docTypeCode;
+      }
+    }
+  }
+  
+  return null;
+}
 
 interface FileItem {
   id: string;
@@ -183,20 +252,15 @@ export function BatchUploadDialog({
     if (!selectedFiles) return;
 
     const newItems: FileItem[] = Array.from(selectedFiles).map(file => {
-      // Try to infer doc type from filename
-      let inferredDocType = '';
-      const lowerName = file.name.toLowerCase();
-      for (const [docType] of Object.entries(DOC_TYPE_TO_SUBFOLDER)) {
-        if (lowerName.includes(docType.toLowerCase()) || 
-            lowerName.includes(docType.replace(/[^\u4e00-\u9fff]/g, '').toLowerCase())) {
-          inferredDocType = docType;
-          break;
-        }
-      }
-
-      // If no inference, use first doc type or default
+      // Try to infer doc type from filename using pattern matching
+      let inferredDocType = inferDocTypeFromFilename(file.name);
+      
+      // If no inference from patterns, use first doc type or default
       if (!inferredDocType && docTypeOptions.length > 0) {
         inferredDocType = docTypeOptions[0].value;
+      }
+      if (!inferredDocType) {
+        inferredDocType = 'OTHER_MISC';
       }
 
       // Always use OFFICIAL_DOC as default subfolder
