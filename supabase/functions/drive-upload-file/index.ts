@@ -358,6 +358,60 @@ async function findFolderByName(
   return data.files?.[0] || null;
 }
 
+// Create folder in Drive
+async function createFolderInDrive(
+  accessToken: string,
+  name: string,
+  parentId: string
+): Promise<{ id: string; webViewLink: string }> {
+  console.log(`[drive-upload-file] Creating folder "${name}" in parent ${parentId}`);
+  
+  const metadata = {
+    name: name,
+    mimeType: 'application/vnd.google-apps.folder',
+    parents: [parentId],
+  };
+
+  const response = await fetch(
+    'https://www.googleapis.com/drive/v3/files?fields=id,webViewLink&supportsAllDrives=true',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(metadata),
+    }
+  );
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('[drive-upload-file] Failed to create folder:', errorText);
+    throw new Error(`建立資料夾失敗: ${response.status}`);
+  }
+
+  const data = await response.json();
+  console.log(`[drive-upload-file] Created folder with id: ${data.id}`);
+  return data;
+}
+
+// Find or create folder - auto-creates if not exists
+async function findOrCreateFolder(
+  accessToken: string,
+  name: string,
+  parentId: string
+): Promise<{ id: string; webViewLink: string }> {
+  // First try to find existing folder
+  const existingFolder = await findFolderByName(accessToken, name, parentId);
+  if (existingFolder) {
+    return existingFolder;
+  }
+  
+  // If not found, create it
+  console.log(`[drive-upload-file] Subfolder "${name}" not found, auto-creating...`);
+  return await createFolderInDrive(accessToken, name, parentId);
+}
+
 // Upload file to Drive using multipart upload
 async function uploadFileToDrive(
   accessToken: string,
@@ -536,15 +590,8 @@ serve(async (req) => {
       );
     }
 
-    // Find the subfolder in Drive
-    const subfolder = await findFolderByName(accessToken, subfolderConfig.folder, project.drive_folder_id);
-    
-    if (!subfolder) {
-      return new Response(
-        JSON.stringify({ error: `找不到子資料夾: ${subfolderConfig.folder}，請先建立資料夾結構` }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Find or create the subfolder in Drive (auto-creates if missing)
+    const subfolder = await findOrCreateFolder(accessToken, subfolderConfig.folder, project.drive_folder_id);
 
     // Read file content
     const fileBuffer = await file.arrayBuffer();
