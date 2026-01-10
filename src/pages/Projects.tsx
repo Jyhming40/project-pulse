@@ -164,6 +164,7 @@ export default function Projects() {
     power_voltage?: string;
     pole_status?: string;
     construction_status?: string;
+    intake_year?: number;
   }>({});
   
   // Selected investor code (for display)
@@ -255,6 +256,7 @@ export default function Projects() {
         body: {
           project_name: formData.project_name,
           investor_id: formData.investor_id,
+          intake_year: formData.intake_year || new Date().getFullYear(),
           status: formData.status,
           capacity_kwp: formData.capacity_kwp,
           feeder_code: formData.feeder_code,
@@ -937,13 +939,38 @@ export default function Projects() {
               </div>
             )}
 
-            {/* For new projects, show auto-generate info */}
+            {/* For new projects: Intake Year Selector & auto-generate info */}
             {!editingProject && (
-              <div className="p-3 rounded-lg bg-muted/50 border">
-                <p className="text-sm text-muted-foreground">
-                  📋 案場編號將依據規則自動生成：<span className="font-mono">{new Date().getFullYear()}{selectedInvestorCode || '??'}XXXX</span>
-                </p>
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="intake_year">收案年份</Label>
+                    <Select 
+                      value={String(formData.intake_year || new Date().getFullYear())} 
+                      onValueChange={(value) => setFormData({ ...formData, intake_year: parseInt(value, 10) })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {/* Generate years from 2020 to current year + 1 */}
+                        {Array.from({ length: new Date().getFullYear() - 2020 + 2 }, (_, i) => 2020 + i)
+                          .reverse()
+                          .map(year => (
+                            <SelectItem key={year} value={String(year)}>{year}</SelectItem>
+                          ))
+                        }
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">補登過往案件時可選擇歷史年份</p>
+                  </div>
+                </div>
+                <div className="p-3 rounded-lg bg-muted/50 border">
+                  <p className="text-sm text-muted-foreground">
+                    📋 案場編號將依據規則自動生成：<span className="font-mono">{formData.intake_year || new Date().getFullYear()}{selectedInvestorCode || '??'}XXXX</span>
+                  </p>
+                </div>
+              </>
             )}
 
             {/* For editing, show investor selection */}
