@@ -193,6 +193,7 @@ export function DataEnrichmentPanel({
   const [gridConnectionType, setGridConnectionType] = useState<string>('');
   const [city, setCity] = useState<string>('');
   const [selectedMilestones, setSelectedMilestones] = useState<Set<string>>(new Set());
+  const [milestoneAction, setMilestoneAction] = useState<'complete' | 'uncomplete'>('complete');
   
   const [showConfirm, setShowConfirm] = useState(false);
   const [showResults, setShowResults] = useState(false);
@@ -341,29 +342,60 @@ export function DataEnrichmentPanel({
 
       // Update milestones if enabled
       if (enabledFields.milestones && selectedMilestones.size > 0) {
+        const isCompleting = milestoneAction === 'complete';
+        
         for (const projectId of projectIds) {
           for (const milestoneCode of selectedMilestones) {
-            // Upsert milestone completion
-            const { error } = await supabase
-              .from('project_milestones')
-              .upsert({
-                project_id: projectId,
-                milestone_code: milestoneCode,
-                is_completed: true,
-                completed_at: new Date().toISOString(),
-              }, {
-                onConflict: 'project_id,milestone_code',
-              });
-            if (error) {
-              // If upsert fails due to no unique constraint, try insert
-              await supabase
+            if (isCompleting) {
+              // Mark as complete - upsert
+              const { error } = await supabase
                 .from('project_milestones')
-                .insert({
+                .upsert({
                   project_id: projectId,
                   milestone_code: milestoneCode,
                   is_completed: true,
                   completed_at: new Date().toISOString(),
+                  note: '批量標記完成',
+                }, {
+                  onConflict: 'project_id,milestone_code',
                 });
+              if (error) {
+                // If upsert fails due to no unique constraint, try insert
+                await supabase
+                  .from('project_milestones')
+                  .insert({
+                    project_id: projectId,
+                    milestone_code: milestoneCode,
+                    is_completed: true,
+                    completed_at: new Date().toISOString(),
+                    note: '批量標記完成',
+                  });
+              }
+            } else {
+              // Mark as uncomplete - update existing or upsert with is_completed = false
+              const { error } = await supabase
+                .from('project_milestones')
+                .upsert({
+                  project_id: projectId,
+                  milestone_code: milestoneCode,
+                  is_completed: false,
+                  completed_at: null,
+                  note: '批量取消完成',
+                }, {
+                  onConflict: 'project_id,milestone_code',
+                });
+              if (error) {
+                // If upsert fails, try update
+                await supabase
+                  .from('project_milestones')
+                  .update({
+                    is_completed: false,
+                    completed_at: null,
+                    note: '批量取消完成',
+                  })
+                  .eq('project_id', projectId)
+                  .eq('milestone_code', milestoneCode);
+              }
             }
           }
         }
@@ -555,6 +587,22 @@ export function DataEnrichmentPanel({
               </div>
               {enabledFields.milestones && (
                 <div className="space-y-4 pl-6">
+                  {/* Action selector: complete or uncomplete */}
+                  <div className="flex items-center gap-2 pb-2 border-b border-border">
+                    <Label className="text-sm">操作模式：</Label>
+                    <Select
+                      value={milestoneAction}
+                      onValueChange={(v: 'complete' | 'uncomplete') => setMilestoneAction(v)}
+                    >
+                      <SelectTrigger className="w-[140px] h-8">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="complete">標記為完成</SelectItem>
+                        <SelectItem value="uncomplete">取消完成</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                   {/* Global Select All / Deselect All */}
                   <div className="flex items-center gap-2 pb-2 border-b border-border">
                     <Checkbox
