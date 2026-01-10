@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
 import { generateDocumentDisplayName } from '@/lib/documentAgency';
 import { 
   docTypeCodeToEnum, 
@@ -63,6 +64,7 @@ export function CreateDocumentDialog({
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { isAuthorized: isDriveAuthorized, authorize: authorizeDrive, isAuthorizing } = useDriveAuth();
+  const syncMilestones = useSyncAdminMilestones();
   // Use doc_type_code as primary selection for governance
   const { options: docTypeCodeOptions } = useOptionsForCategory('doc_type_code');
   const { options: agencyCodeOptions } = useOptionsForCategory('agency');
@@ -302,9 +304,10 @@ export function CreateDocumentDialog({
         setIsUploading(false);
       }
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (docData) => {
       queryClient.invalidateQueries({ queryKey: ['all-documents'] });
       queryClient.invalidateQueries({ queryKey: ['project-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['project-documents-versioned'] });
       queryClient.invalidateQueries({ queryKey: ['project-milestones'] });
       queryClient.invalidateQueries({ queryKey: ['project'] });
       queryClient.invalidateQueries({ queryKey: ['project-drawer'] });
@@ -312,6 +315,11 @@ export function CreateDocumentDialog({
       toast.success('文件新增成功');
       onOpenChange(false);
       onSuccess?.();
+
+      // Sync milestones based on new document status (SSOT)
+      if (docData?.project_id) {
+        syncMilestones.mutate(docData.project_id);
+      }
     },
     onError: (error: Error) => {
       toast.error('新增失敗', { description: error.message });
