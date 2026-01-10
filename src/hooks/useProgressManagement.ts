@@ -297,7 +297,7 @@ export function useToggleProjectMilestone() {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ project_id: projectId }),
+            body: JSON.stringify({ projectId }),
           }
         );
         if (!syncResponse.ok) {
