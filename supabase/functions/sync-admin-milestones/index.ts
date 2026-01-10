@@ -139,7 +139,7 @@ interface ProjectMilestoneRecord {
  */
 const CROSS_MILESTONE_TRIGGERS: { adminCode: string; engineeringCode: string }[] = [
   // 台電申請送件完成 → 現勘完成
-  { adminCode: 'ADMIN_02_TAIPOWER_SUBMIT', engineeringCode: 'ENG_11_SITE_SURVEY' },
+  { adminCode: 'ADMIN_02_TAIPOWER_SUBMIT', engineeringCode: 'ENG_01_SITE_SURVEY' },
 ];
 
 // deno-lint-ignore no-explicit-any
