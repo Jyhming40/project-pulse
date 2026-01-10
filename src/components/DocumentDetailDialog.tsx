@@ -268,7 +268,8 @@ export function DocumentDetailDialog({
 
   const project = document?.projects as { project_code: string; project_name: string } | null;
   const owner = document?.owner as { full_name?: string; email?: string } | null;
-  const derivedStatus = document ? getDerivedDocStatus(document) : '未開始';
+  // Use files.length as file_count for status derivation
+  const derivedStatus = document ? getDerivedDocStatus({ ...document, file_count: files.length }) : '未開始';
   const statusColor = getDerivedDocStatusColor(derivedStatus);
 
   return (

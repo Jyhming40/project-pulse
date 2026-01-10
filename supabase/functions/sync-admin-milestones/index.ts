@@ -111,6 +111,7 @@ interface DocumentRecord {
   issued_at: string | null;
   is_current: boolean;
   is_deleted: boolean;
+  file_count?: number;  // 上傳檔案數量
 }
 
 interface ProjectMilestoneRecord {
@@ -131,20 +132,30 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
   const unsynced: string[] = [];
   const changes: { code: string; from: boolean; to: boolean }[] = [];
 
-  // 1. 取得專案的所有當前文件（is_current=true, is_deleted=false）
+  // 1. 取得專案的所有當前文件（is_current=true, is_deleted=false）及其檔案數量
   const { data: documents, error: docError } = await supabase
     .from('documents')
-    .select('id, doc_type_code, submitted_at, issued_at, is_current, is_deleted')
+    .select('id, doc_type_code, submitted_at, issued_at, is_current, is_deleted, document_files(id)')
     .eq('project_id', projectId)
     .eq('is_current', true)
-    .eq('is_deleted', false);
+    .eq('is_deleted', false)
+    .eq('document_files.is_deleted', false);
 
   if (docError) {
     console.error('Failed to fetch documents:', docError);
     throw new Error('無法取得文件資料');
   }
 
-  const docs = (documents || []) as DocumentRecord[];
+  // 計算每個文件的檔案數量
+  const docs: DocumentRecord[] = (documents || []).map((doc: Record<string, unknown>) => ({
+    id: doc.id as string,
+    doc_type_code: doc.doc_type_code as string | null,
+    submitted_at: doc.submitted_at as string | null,
+    issued_at: doc.issued_at as string | null,
+    is_current: doc.is_current as boolean,
+    is_deleted: doc.is_deleted as boolean,
+    file_count: Array.isArray(doc.document_files) ? doc.document_files.length : 0,
+  }));
   console.log(`Found ${docs.length} current documents`);
 
   // 建立文件代碼到文件的映射（方便查詢）
@@ -196,9 +207,12 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
           break;
 
         case 'issued_at':
-          // 檢查對應文件的 issued_at 是否有值
+          // 檢查對應文件的 issued_at 是否有值，或是否有上傳檔案
           if (rule.doc_type_code && docByCode[rule.doc_type_code]) {
-            shouldComplete = !!docByCode[rule.doc_type_code].issued_at;
+            const doc = docByCode[rule.doc_type_code];
+            // 有 issued_at 或有上傳檔案都算「已取得」
+            const hasFile = doc.file_count !== undefined && doc.file_count > 0;
+            shouldComplete = !!doc.issued_at || hasFile;
           }
           break;
 
