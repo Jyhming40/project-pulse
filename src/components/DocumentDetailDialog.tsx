@@ -7,7 +7,6 @@ import { deleteDriveFile } from '@/hooks/useDriveSync';
 import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { useCodebookOptions } from '@/hooks/useCodebook';
 import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
 import {
   Dialog,
@@ -111,9 +110,8 @@ export function DocumentDetailDialog({
     note: '',
   });
   
-  // Get doc_type_code options from system_options (single source of truth)
-  const { options: docTypeOptions } = useCodebookOptions('doc_type_code');
-  const { getLabel: getDocTypeLabel } = useDocTypeLabel();
+  // Get doc_type options from useDocTypeLabel (unified source: document_type_config)
+  const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions } = useDocTypeLabel();
 
   // Soft delete hook for documents
   const { softDelete, isDeleting } = useSoftDelete({

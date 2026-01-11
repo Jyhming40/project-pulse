@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
 import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
 import { generateDocumentDisplayName } from '@/lib/documentAgency';
 import { 
@@ -65,8 +66,8 @@ export function CreateDocumentDialog({
   const { user } = useAuth();
   const { isAuthorized: isDriveAuthorized, authorize: authorizeDrive, isAuthorizing } = useDriveAuth();
   const syncMilestones = useSyncAdminMilestones();
-  // Use doc_type_code as primary selection for governance
-  const { options: docTypeCodeOptions } = useOptionsForCategory('doc_type_code');
+  // Use doc_type_code as primary selection for governance (unified source: document_type_config)
+  const { dropdownOptions: docTypeCodeOptions } = useDocTypeLabel();
   const { options: agencyCodeOptions } = useOptionsForCategory('agency');
   
   const fileInputRef = useRef<HTMLInputElement>(null);

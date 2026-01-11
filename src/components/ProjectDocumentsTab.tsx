@@ -104,8 +104,8 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [singleDeleteDoc, setSingleDeleteDoc] = useState<{ id: string; title: string } | null>(null);
 
-  const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
-  const { getLabel: getDocTypeLabel } = useDocTypeLabel();
+  // Use unified doc type options from useDocTypeLabel (document_type_config)
+  const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions } = useDocTypeLabel();
 
   // Extended document type with new columns
   type ExtendedDocument = {
