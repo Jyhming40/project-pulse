@@ -380,6 +380,9 @@ export function useImportBatch() {
         : 1;
       
       // Stage 2: Insert new document with is_current=FALSE first (safe insert)
+      // Note: We do NOT auto-fill issued_at from filename date
+      // The filename date is typically the upload/version date, not the official issue date
+      // Let OCR or manual input populate issued_at with the actual document issue date
       const { data: docData, error: insertError } = await supabase
         .from('documents')
         .insert({
@@ -395,8 +398,8 @@ export function useImportBatch() {
           drive_path: drivePath,
           owner_user_id: userId,
           created_by: userId,
-          // Parse date from filename if available
-          issued_at: item.dateStr ? `${item.dateStr.slice(0, 4)}-${item.dateStr.slice(4, 6)}-${item.dateStr.slice(6, 8)}` : null,
+          // Do NOT auto-populate issued_at - let OCR detect the actual issue date from document content
+          // issued_at should come from OCR or manual entry, not from filename
         })
         .select()
         .single();
