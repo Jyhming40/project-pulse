@@ -54,6 +54,8 @@ import {
   Tag,
   Trash2,
   Cloud,
+  ScanText,
+  Loader2,
 } from 'lucide-react';
 import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
 import { DOC_TYPE_CODE_TO_SHORT, SHORT_TO_DOC_TYPE_CODE } from '@/lib/docTypeMapping';
@@ -80,6 +82,7 @@ export function DocumentDetailDialog({
   const [isEditing, setIsEditing] = useState(false);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isOcrProcessing, setIsOcrProcessing] = useState(false);
   const [editData, setEditData] = useState({
     doc_type: '',
     submitted_at: '',
@@ -264,6 +267,75 @@ export function DocumentDetailDialog({
     setIsEditing(false);
   };
 
+  // OCR date extraction handler
+  const handleOcrExtract = async () => {
+    if (!documentId || files.length === 0) {
+      toast.error('沒有可處理的檔案');
+      return;
+    }
+
+    const currentFile = files.find(f => f.document_id === documentId);
+    if (!currentFile) {
+      toast.error('找不到檔案');
+      return;
+    }
+
+    setIsOcrProcessing(true);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('請先登入');
+      }
+
+      // For Drive files, we need to get the file content from Drive
+      // For now, we'll use the storage_path as the file identifier
+      const response = await supabase.functions.invoke('ocr-extract-dates', {
+        body: {
+          documentId,
+          // If the file is stored in Drive, the edge function will need to fetch it
+          // For local storage, we'd pass the base64 content
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'OCR 處理失敗');
+      }
+
+      const result = response.data;
+      
+      if (result.success) {
+        const extractedCount = result.extractedDates?.length || 0;
+        const updatedCount = Object.keys(result.updatedFields || {}).length;
+        
+        if (updatedCount > 0) {
+          // Refresh document data
+          queryClient.invalidateQueries({ queryKey: ['document-detail', documentId] });
+          queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+          
+          const updates: string[] = [];
+          if (result.updatedFields.submitted_at) updates.push(`送件日: ${result.updatedFields.submitted_at}`);
+          if (result.updatedFields.issued_at) updates.push(`核發日: ${result.updatedFields.issued_at}`);
+          
+          toast.success('OCR 日期擷取成功', {
+            description: updates.join('、'),
+          });
+        } else if (extractedCount > 0) {
+          toast.info(`偵測到 ${extractedCount} 個日期，但無法確認類型`);
+        } else {
+          toast.info('未偵測到日期資訊');
+        }
+      } else {
+        throw new Error(result.error || 'OCR 處理失敗');
+      }
+    } catch (error: any) {
+      console.error('OCR error:', error);
+      toast.error('OCR 處理失敗', { description: error.message });
+    } finally {
+      setIsOcrProcessing(false);
+    }
+  };
+
   if (!open) return null;
 
   const project = document?.projects as { project_code: string; project_name: string } | null;
@@ -284,6 +356,24 @@ export function DocumentDetailDialog({
               </DialogTitle>
               {canEdit && !isEditing && document && (
                 <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={handleOcrExtract}
+                    disabled={isOcrProcessing || files.length === 0}
+                  >
+                    {isOcrProcessing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        處理中...
+                      </>
+                    ) : (
+                      <>
+                        <ScanText className="w-4 h-4 mr-2" />
+                        OCR 擷取日期
+                      </>
+                    )}
+                  </Button>
                   <Button variant="outline" size="sm" onClick={handleEdit}>
                     <Edit2 className="w-4 h-4 mr-2" />
                     編輯
