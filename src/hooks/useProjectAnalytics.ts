@@ -225,25 +225,29 @@ export function useAnalyticsSummary() {
       );
       
       if (!response.ok) throw new Error('Failed to fetch analytics summary');
-      const projects = (await response.json()) as ProjectAnalytics[];
+      const allProjects = (await response.json()) as ProjectAnalytics[];
+      
+      // 排除暫停/取消的專案進行統計
+      const activeProjects = allProjects.filter(p => !['暫停', '取消'].includes(p.current_project_status));
       
       return {
-        total_projects: projects.length,
-        at_risk_count: projects.filter(p => p.has_risk).length,
-        average_progress: projects.length > 0 
-          ? Math.round(projects.reduce((sum, p) => sum + p.overall_progress_percent, 0) / projects.length * 10) / 10
+        total_projects: allProjects.length,
+        // 風險案場只計算非暫停/取消的專案
+        at_risk_count: activeProjects.filter(p => p.has_risk).length,
+        average_progress: activeProjects.length > 0 
+          ? Math.round(activeProjects.reduce((sum, p) => sum + p.overall_progress_percent, 0) / activeProjects.length * 10) / 10
           : 0,
-        average_admin_progress: projects.length > 0
-          ? Math.round(projects.reduce((sum, p) => sum + p.admin_progress_percent, 0) / projects.length * 10) / 10
+        average_admin_progress: activeProjects.length > 0
+          ? Math.round(activeProjects.reduce((sum, p) => sum + p.admin_progress_percent, 0) / activeProjects.length * 10) / 10
           : 0,
-        average_engineering_progress: projects.length > 0
-          ? Math.round(projects.reduce((sum, p) => sum + p.engineering_progress_percent, 0) / projects.length * 10) / 10
+        average_engineering_progress: activeProjects.length > 0
+          ? Math.round(activeProjects.reduce((sum, p) => sum + p.engineering_progress_percent, 0) / activeProjects.length * 10) / 10
           : 0,
-        status_distribution: projects.reduce((acc, p) => {
+        status_distribution: allProjects.reduce((acc, p) => {
           acc[p.current_project_status] = (acc[p.current_project_status] || 0) + 1;
           return acc;
         }, {} as Record<string, number>),
-        construction_status_distribution: projects.reduce((acc, p) => {
+        construction_status_distribution: allProjects.reduce((acc, p) => {
           const status = p.construction_status || '未設定';
           acc[status] = (acc[status] || 0) + 1;
           return acc;
