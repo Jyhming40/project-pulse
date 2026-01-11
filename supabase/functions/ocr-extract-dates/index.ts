@@ -27,6 +27,12 @@ const DATE_PATTERNS = [
 // 設備登記函、免雜項竣工、免雜項申請：復台端 XXX年XX月XX日
 const SUBMISSION_PATTERN_FUTAN = /復台端\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
 
+// 免雜項竣工、其他政府函：復貴公司 XXX年XX月XX日
+const SUBMISSION_PATTERN_FUGUIGONGSI = /復貴公司\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
+
+// 審查意見書、台電函：依據貴公司 XXX年XX月XX日
+const SUBMISSION_PATTERN_YIJUGUIGONGSI = /依據貴公司\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
+
 // 躉售合約、審查意見書：臺端於 XXX年XX月XX日 或 台端於 XXX年XX月XX日
 const SUBMISSION_PATTERN_TAIDUAN = /[臺台]端於\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
 
@@ -35,7 +41,9 @@ const SUBMISSION_PATTERN_BENCHU = /本處業於\s*(?:中華)?民?國?\s*(\d{2,3}
 
 // 通用高優先送件日關鍵字
 const SUBMISSION_PATTERN_APPLY_DATE = /申請日[期]?[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-const SUBMISSION_PATTERN_RECEIPT = /(?:本府|本所|本局)\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*收文/;
+
+// 本府/本所/本局 XXX年XX月XX日 收件/收文
+const SUBMISSION_PATTERN_RECEIPT = /(?:本府|本所|本局)\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*(?:收文|收件)/;
 
 // 核發日關鍵字模式
 const ISSUE_PATTERN_OFFICIAL = /發文日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
@@ -160,7 +168,47 @@ function extractDatesFromText(text: string, docTitle?: string): ExtractedDate[] 
     }
   }
   
-  // 1b. 提取送件日 - 「臺端於/台端於 XXX年XX月XX日」（躉售合約、審查意見書）
+  // 1b. 提取送件日 - 「復貴公司 XXX年XX月XX日」（免雜項竣工、政府函）
+  const fuguigongsiMatch = text.match(SUBMISSION_PATTERN_FUGUIGONGSI);
+  if (fuguigongsiMatch) {
+    const date = extractDateFromPatternMatch(fuguigongsiMatch);
+    if (date && !processedDates.has(date + '_submission')) {
+      const idx = text.indexOf(fuguigongsiMatch[0]);
+      if (!isExcludedDate(text, idx)) {
+        processedDates.add(date + '_submission');
+        results.push({
+          type: 'submission',
+          date,
+          context: text.slice(Math.max(0, idx - 20), idx + fuguigongsiMatch[0].length + 20).replace(/\s+/g, ' '),
+          confidence: 0.98,
+          source: '復貴公司',
+        });
+        console.log(`[OCR] Found submission date via 復貴公司: ${date}`);
+      }
+    }
+  }
+  
+  // 1c. 提取送件日 - 「依據貴公司 XXX年XX月XX日」（審查意見書、台電函）
+  const yijuguigongsiMatch = text.match(SUBMISSION_PATTERN_YIJUGUIGONGSI);
+  if (yijuguigongsiMatch) {
+    const date = extractDateFromPatternMatch(yijuguigongsiMatch);
+    if (date && !processedDates.has(date + '_submission')) {
+      const idx = text.indexOf(yijuguigongsiMatch[0]);
+      if (!isExcludedDate(text, idx)) {
+        processedDates.add(date + '_submission');
+        results.push({
+          type: 'submission',
+          date,
+          context: text.slice(Math.max(0, idx - 20), idx + yijuguigongsiMatch[0].length + 20).replace(/\s+/g, ' '),
+          confidence: 0.98,
+          source: '依據貴公司',
+        });
+        console.log(`[OCR] Found submission date via 依據貴公司: ${date}`);
+      }
+    }
+  }
+  
+  // 1d. 提取送件日 - 「臺端於/台端於 XXX年XX月XX日」（躉售合約、審查意見書）
   const taiduanMatch = text.match(SUBMISSION_PATTERN_TAIDUAN);
   if (taiduanMatch) {
     const date = extractDateFromPatternMatch(taiduanMatch);
@@ -180,7 +228,7 @@ function extractDatesFromText(text: string, docTitle?: string): ExtractedDate[] 
     }
   }
   
-  // 1c. 提取送件日/掛表日 - 「本處業於 XXX年XX月XX日」（派員訪查併聯函）
+  // 1e. 提取送件日/掛表日 - 「本處業於 XXX年XX月XX日」（派員訪查併聯函）
   const benchuMatch = text.match(SUBMISSION_PATTERN_BENCHU);
   if (benchuMatch) {
     const date = extractDateFromPatternMatch(benchuMatch);
@@ -200,7 +248,7 @@ function extractDatesFromText(text: string, docTitle?: string): ExtractedDate[] 
     }
   }
   
-  // 1d. 提取送件日 - 「申請日: XXX年XX月XX日」
+  // 1f. 提取送件日 - 「申請日: XXX年XX月XX日」
   const applyMatch = text.match(SUBMISSION_PATTERN_APPLY_DATE);
   if (applyMatch) {
     const date = extractDateFromPatternMatch(applyMatch);
@@ -220,7 +268,7 @@ function extractDatesFromText(text: string, docTitle?: string): ExtractedDate[] 
     }
   }
   
-  // 1e. 提取送件日 - 「本府 XXX年XX月XX日 收文」
+  // 1g. 提取送件日 - 「本府 XXX年XX月XX日 收文/收件」
   const receiptMatch = text.match(SUBMISSION_PATTERN_RECEIPT);
   if (receiptMatch) {
     const date = extractDateFromPatternMatch(receiptMatch);
@@ -233,9 +281,9 @@ function extractDatesFromText(text: string, docTitle?: string): ExtractedDate[] 
           date,
           context: text.slice(Math.max(0, idx - 20), idx + receiptMatch[0].length + 20).replace(/\s+/g, ' '),
           confidence: 0.95,
-          source: '收文日',
+          source: '收文/收件',
         });
-        console.log(`[OCR] Found submission date via 收文: ${date}`);
+        console.log(`[OCR] Found submission date via 收文/收件: ${date}`);
       }
     }
   }
