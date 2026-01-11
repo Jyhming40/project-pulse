@@ -232,14 +232,20 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
 }
 
 // Use Lovable AI (Gemini) for OCR
-async function performOcrWithLovableAI(imageBase64: string, mimeType: string): Promise<string> {
+async function performOcrWithLovableAI(imageBase64: string, mimeType: string, maxPages: number = 1): Promise<string> {
   const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
   
   if (!lovableApiKey) {
     throw new Error('LOVABLE_API_KEY 未設定');
   }
 
-  console.log('[OCR] Using Lovable AI (Gemini) for OCR...');
+  const pageInstruction = maxPages === 0 
+    ? '請閱讀文件的所有頁面' 
+    : maxPages === 1 
+      ? '請只閱讀文件的第一頁' 
+      : `請只閱讀文件的前 ${maxPages} 頁`;
+
+  console.log(`[OCR] Using Lovable AI (Gemini) for OCR... (maxPages: ${maxPages})`);
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -255,7 +261,7 @@ async function performOcrWithLovableAI(imageBase64: string, mimeType: string): P
           content: [
             {
               type: 'text',
-              text: `請仔細閱讀這份文件圖片，並提取所有可見的文字內容。請特別注意：
+              text: `${pageInstruction}，並提取所有可見的文字內容。請特別注意：
 1. 提取所有日期資訊（民國年份或西元年份格式皆可）
 2. 注意「送件日」、「申請日」、「收件日」、「核發日」、「發文日」等關鍵字及其後的日期
 3. 輸出純文字內容，保持原始格式
@@ -329,11 +335,13 @@ serve(async (req) => {
     let documentId: string | null = null;
     let mimeType = 'application/pdf';
     let autoUpdate = false; // Default to NOT auto-update, let user confirm
+    let maxPages = 1; // Default to first page only
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
       documentId = formData.get('documentId') as string | null;
       autoUpdate = formData.get('autoUpdate') === 'true';
+      maxPages = parseInt(formData.get('maxPages') as string) || 1;
       const file = formData.get('file') as File | null;
       
       if (file) {
@@ -354,6 +362,7 @@ serve(async (req) => {
       imageBase64 = body.imageBase64;
       mimeType = body.mimeType || 'application/pdf';
       autoUpdate = body.autoUpdate === true;
+      maxPages = typeof body.maxPages === 'number' ? body.maxPages : 1;
     }
 
     // If no file provided but documentId exists, try to fetch from Drive
@@ -445,7 +454,8 @@ serve(async (req) => {
     console.log(`[OCR] Processing document, type: ${mimeType}, documentId: ${documentId}`);
 
     // Use Lovable AI (Gemini) for OCR - no API key needed!
-    const fullText = await performOcrWithLovableAI(imageBase64, mimeType);
+    console.log(`[OCR] Processing with maxPages: ${maxPages}`);
+    const fullText = await performOcrWithLovableAI(imageBase64, mimeType, maxPages);
 
     if (!fullText) {
       return new Response(

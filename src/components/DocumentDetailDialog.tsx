@@ -63,7 +63,7 @@ import { toast } from 'sonner';
 import { DocumentVersionCompare } from './DocumentVersionCompare';
 import { DocumentTagSelector } from './DocumentTagSelector';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
-import { OcrResultDialog } from './OcrResultDialog';
+import { OcrResultDialog, OcrSettingsDialog } from './OcrResultDialog';
 
 interface ExtractedDate {
   type: 'submission' | 'issue' | 'unknown';
@@ -91,6 +91,8 @@ export function DocumentDetailDialog({
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+  const [isOcrSettingsOpen, setIsOcrSettingsOpen] = useState(false);
+  const [ocrMaxPages, setOcrMaxPages] = useState(1);
   const [isOcrResultOpen, setIsOcrResultOpen] = useState(false);
   const [ocrResults, setOcrResults] = useState<{
     extractedDates: ExtractedDate[];
@@ -281,8 +283,8 @@ export function DocumentDetailDialog({
     setIsEditing(false);
   };
 
-  // OCR date extraction handler
-  const handleOcrExtract = async () => {
+  // Open OCR settings dialog instead of starting immediately
+  const handleOcrClick = () => {
     if (!documentId) {
       toast.error('沒有文件 ID');
       return;
@@ -297,6 +299,18 @@ export function DocumentDetailDialog({
       return;
     }
 
+    // Open settings dialog
+    setIsOcrSettingsOpen(true);
+  };
+
+  // OCR date extraction handler
+  const handleOcrExtract = async () => {
+    if (!documentId) {
+      toast.error('沒有文件 ID');
+      return;
+    }
+
+    setIsOcrSettingsOpen(false);
     setIsOcrProcessing(true);
 
     try {
@@ -310,6 +324,7 @@ export function DocumentDetailDialog({
         body: {
           documentId,
           autoUpdate: false, // Don't auto-update, show results for confirmation
+          maxPages: ocrMaxPages, // Pass the selected page count
         },
       });
 
@@ -432,7 +447,7 @@ export function DocumentDetailDialog({
                   <Button 
                     variant="outline" 
                     size="sm" 
-                    onClick={handleOcrExtract}
+                    onClick={handleOcrClick}
                     disabled={isOcrProcessing || (!document.drive_file_id && files.length === 0)}
                   >
                     {isOcrProcessing ? (
@@ -834,6 +849,16 @@ export function DocumentDetailDialog({
       tableName="documents"
       isPending={isDeleting}
       hasDriveFile={!!document?.drive_file_id}
+    />
+
+    {/* OCR Settings Dialog */}
+    <OcrSettingsDialog
+      open={isOcrSettingsOpen}
+      onOpenChange={setIsOcrSettingsOpen}
+      maxPages={ocrMaxPages}
+      onMaxPagesChange={setOcrMaxPages}
+      onStartOcr={handleOcrExtract}
+      isLoading={isOcrProcessing}
     />
 
     {/* OCR Result Confirmation Dialog */}
