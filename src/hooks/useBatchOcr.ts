@@ -59,65 +59,88 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
   
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Process a single document OCR
+  // Process a single document OCR with retry logic for transient errors
   const processDocument = useCallback(async (
     documentId: string,
     signal: AbortSignal
   ): Promise<{ success: boolean; error?: string; dates?: { submittedAt?: string; issuedAt?: string; meterDate?: string }; pvId?: string }> => {
-    try {
-      if (signal.aborted) {
-        return { success: false, error: '已取消' };
-      }
-
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        return { success: false, error: '未登入' };
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ocr-extract-dates`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            documentId,
-            maxPages,
-            autoUpdate,
-          }),
-          signal,
+    const maxRetries = 3;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        if (signal.aborted) {
+          return { success: false, error: '已取消' };
         }
-      );
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        return { success: false, error: errorData.error || `HTTP ${response.status}` };
-      }
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          return { success: false, error: '未登入' };
+        }
 
-      const result = await response.json();
-      
-      // Check if any dates were found
-      if ((!result.extractedDates || result.extractedDates.length === 0) && !result.pvId) {
-        return { success: true, dates: {}, pvId: undefined };
-      }
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ocr-extract-dates`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              documentId,
+              maxPages,
+              autoUpdate,
+            }),
+            signal,
+          }
+        );
 
-      return {
-        success: true,
-        dates: {
-          submittedAt: result.updatedFields?.submitted_at,
-          issuedAt: result.updatedFields?.issued_at,
-          meterDate: result.projectUpdatedFields?.actual_meter_date,
-        },
-        pvId: result.projectUpdatedFields?.taipower_pv_id || result.pvId,
-      };
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        return { success: false, error: '已取消' };
+        // Retry on 502, 503, 504 errors (transient/boot errors)
+        if ([502, 503, 504].includes(response.status) && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+          console.log(`[BatchOCR] Transient error ${response.status}, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          return { success: false, error: errorData.error || `HTTP ${response.status}` };
+        }
+
+        const result = await response.json();
+        
+        // Check if any dates were found
+        if ((!result.extractedDates || result.extractedDates.length === 0) && !result.pvId) {
+          return { success: true, dates: {}, pvId: undefined };
+        }
+
+        return {
+          success: true,
+          dates: {
+            submittedAt: result.updatedFields?.submitted_at,
+            issuedAt: result.updatedFields?.issued_at,
+            meterDate: result.projectUpdatedFields?.actual_meter_date,
+          },
+          pvId: result.projectUpdatedFields?.taipower_pv_id || result.pvId,
+        };
+      } catch (error: any) {
+        if (error.name === 'AbortError') {
+          return { success: false, error: '已取消' };
+        }
+        
+        // Retry on network errors
+        if (attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000;
+          console.log(`[BatchOCR] Network error, retrying in ${delay}ms (attempt ${attempt}/${maxRetries}):`, error.message);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        return { success: false, error: error.message };
       }
-      return { success: false, error: error.message };
     }
+    
+    return { success: false, error: '重試次數已達上限' };
   }, [autoUpdate, maxPages]);
 
   // Start batch OCR processing
