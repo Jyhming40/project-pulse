@@ -795,16 +795,34 @@ serve(async (req) => {
     if (!imageBase64 && documentId) {
       console.log(`[OCR] No file provided, attempting to fetch from Drive for document: ${documentId}`);
       
-      // Get document info including drive_file_id
-      const { data: docData, error: docError } = await supabase
-        .from('documents')
-        .select('drive_file_id, title')
-        .eq('id', documentId)
-        .single();
+      // Get document info including drive_file_id with retry for transient errors
+      let docData: { drive_file_id: string | null; title: string | null } | null = null;
+      let docError: Error | null = null;
+      
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('drive_file_id, title')
+          .eq('id', documentId)
+          .single();
+        
+        if (!error && data) {
+          docData = data;
+          break;
+        }
+        
+        docError = error;
+        console.log(`[OCR] Document lookup attempt ${attempt + 1} failed:`, error?.message);
+        
+        if (attempt < 2) {
+          await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1)));
+        }
+      }
       
       if (docError || !docData) {
+        console.error(`[OCR] Document not found after retries: ${documentId}`, docError?.message);
         return new Response(
-          JSON.stringify({ error: '找不到文件' }),
+          JSON.stringify({ error: '找不到文件', details: docError?.message }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
