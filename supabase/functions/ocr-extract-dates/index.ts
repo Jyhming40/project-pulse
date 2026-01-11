@@ -35,9 +35,56 @@ interface AIExtractedResult {
   raw_text?: string;
 }
 
+// ============================================================
+// Regex 備援模式 - 當 AI 沒抓到時使用
+// ============================================================
+
+// 送件日 patterns
+const SUBMISSION_PATTERNS = [
+  { pattern: /復台端\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, source: '復台端' },
+  { pattern: /復貴公司\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, source: '復貴公司' },
+  { pattern: /依據貴公司\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, source: '依據貴公司' },
+  { pattern: /依據[臺台]端\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, source: '依據臺端' },
+  { pattern: /[臺台]端於\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, source: '臺端於' },
+  { pattern: /本處業於\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, source: '本處業於' },
+  { pattern: /申請日[期]?[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, source: '申請日' },
+  { pattern: /收件日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, source: '收件日期' },
+  { pattern: /受理日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, source: '受理日期' },
+];
+
+// 核發日 patterns
+const ISSUE_PATTERNS = [
+  { pattern: /發文日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, source: '發文日期' },
+];
+
+// 掛表日 patterns
+const METER_PATTERNS = [
+  { pattern: /併聯(?:運轉)?日[期]?\s*[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, source: '併聯運轉日' },
+];
+
+// PV ID patterns
+const PV_ID_PATTERNS = [
+  /(?:本公司編號|PV編號|編號|受理號碼)[：:\s]*([A-Z0-9]{6,}PV[A-Z0-9]{4,})/i,
+  /\b(\d{6}PV\d{4})\b/,
+];
+
 // ROC year to Western year conversion
 function rocToWestern(rocYear: number): number {
   return rocYear + 1911;
+}
+
+// Extract date from regex match
+function extractDateFromMatch(match: RegExpMatchArray): string | null {
+  const rawYear = parseInt(match[1]);
+  const year = rawYear < 200 ? rocToWestern(rawYear) : rawYear;
+  const month = parseInt(match[2]);
+  const day = parseInt(match[3]);
+  
+  if (year < 1990 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+  
+  return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
 }
 
 // Parse a date string and convert ROC dates to Western format
@@ -93,13 +140,16 @@ function parseAndFormatDate(dateStr: string): string | null {
   return null;
 }
 
-// Convert AI extraction result to ExtractedData format
-function aiResultToExtractedData(aiResult: AIExtractedResult): ExtractedData {
+// Regex fallback extraction from OCR text
+function extractWithRegexFallback(text: string, aiResult: AIExtractedResult): ExtractedData {
   const results: ExtractedDate[] = [];
+  const processedDates = new Set<string>();
   
+  // 1. Add AI-extracted dates first
   if (aiResult.submitted_at) {
     const parsedDate = parseAndFormatDate(aiResult.submitted_at);
     if (parsedDate) {
+      processedDates.add(parsedDate + '_submission');
       results.push({
         type: 'submission',
         date: parsedDate,
@@ -113,6 +163,7 @@ function aiResultToExtractedData(aiResult: AIExtractedResult): ExtractedData {
   if (aiResult.issued_at) {
     const parsedDate = parseAndFormatDate(aiResult.issued_at);
     if (parsedDate) {
+      processedDates.add(parsedDate + '_issue');
       results.push({
         type: 'issue',
         date: parsedDate,
@@ -126,6 +177,7 @@ function aiResultToExtractedData(aiResult: AIExtractedResult): ExtractedData {
   if (aiResult.meter_date) {
     const parsedDate = parseAndFormatDate(aiResult.meter_date);
     if (parsedDate) {
+      processedDates.add(parsedDate + '_meter');
       results.push({
         type: 'meter_date',
         date: parsedDate,
@@ -136,10 +188,101 @@ function aiResultToExtractedData(aiResult: AIExtractedResult): ExtractedData {
     }
   }
   
+  // 2. Regex fallback for missing dates
+  const hasSubmission = results.some(r => r.type === 'submission');
+  const hasIssue = results.some(r => r.type === 'issue');
+  const hasMeter = results.some(r => r.type === 'meter_date');
+  
+  // Fallback: Find submission date with regex
+  if (!hasSubmission && text) {
+    for (const { pattern, source } of SUBMISSION_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        const date = extractDateFromMatch(match);
+        if (date && !processedDates.has(date + '_submission')) {
+          processedDates.add(date + '_submission');
+          const idx = text.indexOf(match[0]);
+          results.push({
+            type: 'submission',
+            date,
+            context: text.slice(Math.max(0, idx - 20), idx + match[0].length + 20).replace(/\s+/g, ' '),
+            confidence: 0.85,
+            source: `Regex 備援 (${source})`,
+          });
+          console.log(`[OCR] Regex fallback found submission: ${date} via ${source}`);
+          break;
+        }
+      }
+    }
+  }
+  
+  // Fallback: Find issue date with regex
+  if (!hasIssue && text) {
+    for (const { pattern, source } of ISSUE_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        const date = extractDateFromMatch(match);
+        if (date && !processedDates.has(date + '_issue')) {
+          processedDates.add(date + '_issue');
+          const idx = text.indexOf(match[0]);
+          results.push({
+            type: 'issue',
+            date,
+            context: text.slice(Math.max(0, idx - 20), idx + match[0].length + 20).replace(/\s+/g, ' '),
+            confidence: 0.85,
+            source: `Regex 備援 (${source})`,
+          });
+          console.log(`[OCR] Regex fallback found issue: ${date} via ${source}`);
+          break;
+        }
+      }
+    }
+  }
+  
+  // Fallback: Find meter date with regex
+  if (!hasMeter && text) {
+    for (const { pattern, source } of METER_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        const date = extractDateFromMatch(match);
+        if (date && !processedDates.has(date + '_meter')) {
+          processedDates.add(date + '_meter');
+          const idx = text.indexOf(match[0]);
+          results.push({
+            type: 'meter_date',
+            date,
+            context: text.slice(Math.max(0, idx - 20), idx + match[0].length + 20).replace(/\s+/g, ' '),
+            confidence: 0.85,
+            source: `Regex 備援 (${source})`,
+          });
+          console.log(`[OCR] Regex fallback found meter_date: ${date} via ${source}`);
+          break;
+        }
+      }
+    }
+  }
+  
+  // 3. Extract PV ID (AI first, then regex fallback)
+  let pvId = aiResult.pv_id;
+  let pvIdContext = aiResult.pv_id_context;
+  
+  if (!pvId && text) {
+    for (const pattern of PV_ID_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        pvId = match[1];
+        const idx = text.indexOf(match[0]);
+        pvIdContext = text.slice(Math.max(0, idx - 20), idx + match[0].length + 20);
+        console.log(`[OCR] Regex fallback found PV ID: ${pvId}`);
+        break;
+      }
+    }
+  }
+  
   return {
     dates: results,
-    pvId: aiResult.pv_id,
-    pvIdContext: aiResult.pv_id_context,
+    pvId,
+    pvIdContext,
   };
 }
 
@@ -183,12 +326,9 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
   try {
     console.log(`[OCR] Fetching Drive file: ${driveFileId}`);
     
-    // First get file metadata to check type and size
     const metaResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=mimeType,size,name`,
-      {
-        headers: { 'Authorization': `Bearer ${accessToken}` },
-      }
+      { headers: { 'Authorization': `Bearer ${accessToken}` } }
     );
     
     if (!metaResponse.ok) {
@@ -199,10 +339,8 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
     const metadata = await metaResponse.json();
     console.log(`[OCR] File metadata: name=${metadata.name}, type=${metadata.mimeType}, size=${metadata.size}`);
     
-    // Check file size limit
     const fileSize = parseInt(metadata.size || '0');
     if (fileSize > MAX_FILE_SIZE_BYTES) {
-      console.log(`[OCR] File too large: ${fileSize} bytes > ${MAX_FILE_SIZE_BYTES} bytes`);
       return { 
         content: '', 
         mimeType: metadata.mimeType,
@@ -214,7 +352,6 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
     let finalMimeType = metadata.mimeType;
     let downloadUrl: string;
     
-    // Handle Google Workspace files (export to PDF)
     if (metadata.mimeType.includes('google-apps')) {
       downloadUrl = `https://www.googleapis.com/drive/v3/files/${driveFileId}/export?mimeType=application/pdf`;
       finalMimeType = 'application/pdf';
@@ -233,9 +370,7 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
     
     const buffer = await fileResponse.arrayBuffer();
     
-    // Check actual downloaded size
     if (buffer.byteLength > MAX_FILE_SIZE_BYTES) {
-      console.log(`[OCR] Downloaded file too large: ${buffer.byteLength} bytes`);
       return { 
         content: '', 
         mimeType: finalMimeType,
@@ -262,7 +397,6 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
 }
 
 // Use AI semantic understanding to extract dates directly
-// This replaces the old regex-based approach with AI that understands document context
 async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitle?: string): Promise<AIExtractedResult> {
   const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
   
@@ -272,7 +406,6 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
 
   console.log(`[OCR] Using AI semantic understanding for date extraction...`);
 
-  // AI prompt that asks for semantic understanding, not just text extraction
   const systemPrompt = `你是專門辨識台灣政府公文的 AI 助手。你的任務是分析公文圖片，理解文件內容，並提取重要的日期和資訊。
 
 你需要辨識以下資訊：
@@ -305,7 +438,6 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
     ? `請分析這份公文圖片「${docTitle}」，提取送件日、核發日、掛表日和PV編號。`
     : `請分析這份公文圖片，提取送件日、核發日、掛表日和PV編號。`;
 
-  // Use tool calling for structured output
   const tools = [
     {
       type: "function",
@@ -359,7 +491,6 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
     }
   ];
 
-  // Retry logic
   const maxRetries = 3;
   let lastError: Error | null = null;
   
@@ -416,7 +547,6 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
 
       const data = await response.json();
       
-      // Extract the tool call result
       const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
       if (toolCall && toolCall.function?.arguments) {
         const result = JSON.parse(toolCall.function.arguments) as AIExtractedResult;
@@ -424,7 +554,6 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
         return result;
       }
       
-      // Fallback: try to parse from content if tool call not used
       const content = data.choices?.[0]?.message?.content;
       if (content) {
         console.log('[OCR] AI returned content instead of tool call, raw text length:', content.length);
@@ -482,7 +611,6 @@ serve(async (req) => {
       );
     }
 
-    // Parse request
     const contentType = req.headers.get('content-type') || '';
     let imageBase64: string | null = null;
     let documentId: string | null = null;
@@ -497,7 +625,6 @@ serve(async (req) => {
       
       if (file) {
         if (file.size > MAX_FILE_SIZE_BYTES) {
-          console.log(`[OCR] Uploaded file too large: ${file.size} bytes`);
           return new Response(
             JSON.stringify({ 
               success: true,
@@ -529,10 +656,8 @@ serve(async (req) => {
       autoUpdate = body.autoUpdate === true;
     }
 
-    // Track document title for smarter extraction
     let docTitle: string | null = null;
     
-    // If no file provided but documentId exists, try to fetch from Drive
     if (!imageBase64 && documentId) {
       console.log(`[OCR] No file provided, attempting to fetch from Drive for document: ${documentId}`);
       
@@ -560,7 +685,6 @@ serve(async (req) => {
       }
       
       if (docError || !docData) {
-        console.error(`[OCR] Document not found after retries: ${documentId}`, docError?.message);
         return new Response(
           JSON.stringify({ error: '找不到文件', details: docError?.message }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -623,7 +747,6 @@ serve(async (req) => {
       }
       
       if (driveFile.skipped) {
-        console.log(`[OCR] File skipped: ${driveFile.skipReason}`);
         return new Response(
           JSON.stringify({ 
             success: true,
@@ -650,16 +773,16 @@ serve(async (req) => {
 
     console.log(`[OCR] Processing document, type: ${mimeType}, documentId: ${documentId}`);
 
-    // Use AI semantic understanding (new approach - no more regex!)
+    // Step 1: AI semantic extraction
     const aiResult = await extractDatesWithAI(imageBase64, mimeType, docTitle || undefined);
     
-    // Convert to the expected format
-    const extractedData = aiResultToExtractedData(aiResult);
+    // Step 2: Regex fallback for missing dates
     const fullText = aiResult.raw_text || '';
+    const extractedData = extractWithRegexFallback(fullText, aiResult);
     
-    console.log(`[OCR] AI extracted ${extractedData.dates.length} dates, PV ID: ${extractedData.pvId || 'none'}`);
+    console.log(`[OCR] Final result: ${extractedData.dates.length} dates, PV ID: ${extractedData.pvId || 'none'}`);
 
-    // Only update if autoUpdate is true (for batch upload)
+    // Auto-update if requested
     if (autoUpdate && documentId && extractedData.dates.length > 0) {
       const submissionDate = extractedData.dates.find(d => d.type === 'submission')?.date;
       const issueDate = extractedData.dates.find(d => d.type === 'issue')?.date;
@@ -682,7 +805,6 @@ serve(async (req) => {
         }
       }
       
-      // Update project meter date if found
       if (meterDate) {
         const { data: docData } = await supabase
           .from('documents')
@@ -691,18 +813,13 @@ serve(async (req) => {
           .single();
         
         if (docData?.project_id) {
-          const { error: projectError } = await supabase
+          await supabase
             .from('projects')
             .update({ actual_meter_date: meterDate })
             .eq('id', docData.project_id);
-          
-          if (!projectError) {
-            console.log('[OCR] Updated project meter date');
-          }
         }
       }
       
-      // Update PV ID if found
       if (extractedData.pvId) {
         const { data: docData } = await supabase
           .from('documents')
@@ -711,14 +828,10 @@ serve(async (req) => {
           .single();
         
         if (docData?.project_id) {
-          const { error: pvError } = await supabase
+          await supabase
             .from('projects')
             .update({ taipower_pv_id: extractedData.pvId })
             .eq('id', docData.project_id);
-          
-          if (!pvError) {
-            console.log('[OCR] Updated project PV ID');
-          }
         }
       }
     }
