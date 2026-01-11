@@ -5,12 +5,15 @@ export interface OcrTask {
   documentId: string;
   documentTitle: string;
   projectCode: string;
+  projectId: string;
   status: 'pending' | 'processing' | 'success' | 'error' | 'skipped' | 'review';
   error?: string;
   extractedDates?: {
     submittedAt?: string;
     issuedAt?: string;
+    meterDate?: string;
   };
+  extractedPvId?: string;
   // For review status - multiple candidates found
   candidates?: Array<{
     date: string;
@@ -60,7 +63,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
   const processDocument = useCallback(async (
     documentId: string,
     signal: AbortSignal
-  ): Promise<{ success: boolean; error?: string; dates?: { submittedAt?: string; issuedAt?: string } }> => {
+  ): Promise<{ success: boolean; error?: string; dates?: { submittedAt?: string; issuedAt?: string; meterDate?: string }; pvId?: string }> => {
     try {
       if (signal.aborted) {
         return { success: false, error: '已取消' };
@@ -96,8 +99,8 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
       const result = await response.json();
       
       // Check if any dates were found
-      if (!result.extractedDates || result.extractedDates.length === 0) {
-        return { success: true, dates: {} };
+      if ((!result.extractedDates || result.extractedDates.length === 0) && !result.pvId) {
+        return { success: true, dates: {}, pvId: undefined };
       }
 
       return {
@@ -105,7 +108,9 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
         dates: {
           submittedAt: result.updatedFields?.submitted_at,
           issuedAt: result.updatedFields?.issued_at,
+          meterDate: result.projectUpdatedFields?.actual_meter_date,
         },
+        pvId: result.projectUpdatedFields?.taipower_pv_id || result.pvId,
       };
     } catch (error: any) {
       if (error.name === 'AbortError') {
@@ -120,6 +125,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
     id: string;
     title: string;
     projectCode: string;
+    projectId: string;
     hasDriveFile: boolean;
     hasSubmittedAt: boolean;
     hasIssuedAt: boolean;
@@ -138,6 +144,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
       documentId: doc.id,
       documentTitle: doc.title || '未命名',
       projectCode: doc.projectCode,
+      projectId: doc.projectId,
       status: 'pending',
     }));
 
@@ -184,6 +191,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
             status: result.success ? 'success' : 'error',
             error: result.error,
             extractedDates: result.dates,
+            extractedPvId: result.pvId,
           };
         }));
 

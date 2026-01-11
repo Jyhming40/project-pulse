@@ -165,10 +165,16 @@ export function BatchOcrDialog({
                     </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
-                    {task.extractedDates && (task.extractedDates.submittedAt || task.extractedDates.issuedAt) && (
+                    {task.extractedDates && (task.extractedDates.submittedAt || task.extractedDates.issuedAt || task.extractedDates.meterDate) && (
                       <span className="text-xs text-green-600">
                         {task.extractedDates.submittedAt && '送件日 '}
-                        {task.extractedDates.issuedAt && '核發日'}
+                        {task.extractedDates.issuedAt && '核發日 '}
+                        {task.extractedDates.meterDate && '掛表日'}
+                      </span>
+                    )}
+                    {task.extractedPvId && (
+                      <span className="text-xs text-blue-600">
+                        PV編號
                       </span>
                     )}
                     {task.error && task.status === 'error' && (

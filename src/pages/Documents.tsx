@@ -764,6 +764,7 @@ export default function Documents() {
                   id: doc.id,
                   title: doc.title || doc.doc_type,
                   projectCode: (doc.projects as any)?.project_code || '',
+                  projectId: doc.project_id,
                   hasDriveFile: !!doc.drive_file_id,
                   hasSubmittedAt: !!doc.submitted_at,
                   hasIssuedAt: !!doc.issued_at,
