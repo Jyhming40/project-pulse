@@ -7,6 +7,7 @@ import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
 import { useBatchSelect } from '@/hooks/useBatchSelect';
 import { useDocumentTags, useAllDocumentTagAssignments } from '@/hooks/useDocumentTags';
+import { useBatchOcr } from '@/hooks/useBatchOcr';
 import { deleteDriveFile } from '@/hooks/useDriveSync';
 import { format, isWithinInterval, subDays } from 'date-fns';
 import { TablePagination } from '@/components/ui/table-pagination';
@@ -16,6 +17,7 @@ import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
 import { CreateDocumentDialog } from '@/components/CreateDocumentDialog';
 import { DocumentDetailDialog } from '@/components/DocumentDetailDialog';
 import { BatchUploadVersionDialog } from '@/components/BatchUploadVersionDialog';
+import { BatchOcrDialog } from '@/components/BatchOcrDialog';
 import { DocumentTagBadge } from '@/components/DocumentTagBadge';
 import { getDerivedDocStatus, getDerivedDocStatusColor, DerivedDocStatus } from '@/lib/documentStatus';
 import { 
@@ -41,7 +43,9 @@ import {
   Bell,
   Loader2,
   Tag,
+  ScanText,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -65,7 +69,6 @@ import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
 import type { Database } from '@/integrations/supabase/types';
 import {
   Tooltip,
@@ -105,6 +108,10 @@ export default function Documents() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isBatchUploadOpen, setIsBatchUploadOpen] = useState(false);
   const [isSendingReminders, setIsSendingReminders] = useState(false);
+  const [isBatchOcrOpen, setIsBatchOcrOpen] = useState(false);
+
+  // Batch OCR hook
+  const batchOcr = useBatchOcr({ maxConcurrent: 3, maxBatchSize: 50, autoUpdate: true });
 
   // Fetch document tags and assignments
   const { tags } = useDocumentTags();
@@ -748,6 +755,33 @@ export default function Documents() {
           onClear={batchSelect.deselectAll}
           actions={[
             {
+              key: 'ocr',
+              label: '批次 OCR 辨識',
+              icon: <ScanText className="w-4 h-4" />,
+              onClick: async () => {
+                // Prepare documents for batch OCR
+                const docsForOcr = batchSelect.selectedItems.map(doc => ({
+                  id: doc.id,
+                  title: doc.title || doc.doc_type,
+                  projectCode: (doc.projects as any)?.project_code || '',
+                  hasDriveFile: !!doc.drive_file_id,
+                  hasSubmittedAt: !!doc.submitted_at,
+                  hasIssuedAt: !!doc.issued_at,
+                }));
+                
+                setIsBatchOcrOpen(true);
+                const result = await batchOcr.startBatchOcr(docsForOcr);
+                
+                if (!result.started) {
+                  toast.error('批次 OCR 無法開始', { description: result.message });
+                  setIsBatchOcrOpen(false);
+                } else {
+                  // Refresh data after OCR completes
+                  queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+                }
+              },
+            },
+            {
               key: 'upload',
               label: '批次上傳新版本',
               icon: <Upload className="w-4 h-4" />,
@@ -829,6 +863,20 @@ export default function Documents() {
         }))}
         onSuccess={() => {
           queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+          batchSelect.deselectAll();
+        }}
+      />
+
+      {/* Batch OCR Dialog */}
+      <BatchOcrDialog
+        open={isBatchOcrOpen}
+        onOpenChange={setIsBatchOcrOpen}
+        tasks={batchOcr.tasks}
+        progress={batchOcr.progress}
+        isRunning={batchOcr.isRunning}
+        onCancel={batchOcr.cancelBatchOcr}
+        onClose={() => {
+          batchOcr.reset();
           batchSelect.deselectAll();
         }}
       />
