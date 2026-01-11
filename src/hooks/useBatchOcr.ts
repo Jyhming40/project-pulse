@@ -6,7 +6,7 @@ export interface OcrTask {
   documentTitle: string;
   projectCode: string;
   projectId: string;
-  status: 'pending' | 'processing' | 'success' | 'error' | 'skipped' | 'review';
+  status: 'pending' | 'processing' | 'success' | 'error' | 'skipped' | 'review' | 'already_processed';
   error?: string;
   extractedDates?: {
     submittedAt?: string;
@@ -14,6 +14,14 @@ export interface OcrTask {
     meterDate?: string;
   };
   extractedPvId?: string;
+  // Flag for documents that already have OCR data
+  alreadyProcessed?: boolean;
+  // Existing data from previous OCR
+  existingData?: {
+    submittedAt?: string;
+    issuedAt?: string;
+    pvId?: string;
+  };
   // For review status - multiple candidates found
   candidates?: Array<{
     date: string;
@@ -158,32 +166,68 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
     hasDriveFile: boolean;
     hasSubmittedAt: boolean;
     hasIssuedAt: boolean;
+    submittedAt?: string | null;
+    issuedAt?: string | null;
+    pvId?: string | null;
   }>) => {
-    // Filter documents that need OCR (have drive file but missing dates)
-    const eligibleDocs = documents
-      .filter(doc => doc.hasDriveFile && (!doc.hasSubmittedAt || !doc.hasIssuedAt))
-      .slice(0, maxBatchSize);
-
-    if (eligibleDocs.length === 0) {
-      return { started: false, message: '沒有符合條件的文件（需有雲端檔案且缺少日期）' };
+    // Separate documents into already processed and needs processing
+    const allDocsWithDriveFile = documents.filter(doc => doc.hasDriveFile);
+    
+    // Already processed = has submitted_at OR issued_at OR pvId
+    const alreadyProcessedDocs = allDocsWithDriveFile.filter(
+      doc => doc.hasSubmittedAt || doc.hasIssuedAt || doc.pvId
+    );
+    
+    // Needs processing = no dates and no pvId
+    const needsProcessingDocs = allDocsWithDriveFile.filter(
+      doc => !doc.hasSubmittedAt && !doc.hasIssuedAt && !doc.pvId
+    );
+    
+    // Check if we have any documents to work with
+    if (allDocsWithDriveFile.length === 0) {
+      return { started: false, message: '沒有符合條件的文件（需有雲端檔案）' };
     }
 
-    // Initialize tasks
-    const initialTasks: OcrTask[] = eligibleDocs.map(doc => ({
-      documentId: doc.id,
-      documentTitle: doc.title || '未命名',
-      projectCode: doc.projectCode,
-      projectId: doc.projectId,
-      status: 'pending',
-    }));
+    // Limit total batch size
+    const limitedNeedsProcessing = needsProcessingDocs.slice(0, maxBatchSize);
+    const limitedAlreadyProcessed = alreadyProcessedDocs.slice(0, maxBatchSize - limitedNeedsProcessing.length);
+
+    // Initialize tasks - needs processing first, then already processed
+    const initialTasks: OcrTask[] = [
+      ...limitedNeedsProcessing.map(doc => ({
+        documentId: doc.id,
+        documentTitle: doc.title || '未命名',
+        projectCode: doc.projectCode,
+        projectId: doc.projectId,
+        status: 'pending' as const,
+        alreadyProcessed: false,
+      })),
+      ...limitedAlreadyProcessed.map(doc => ({
+        documentId: doc.id,
+        documentTitle: doc.title || '未命名',
+        projectCode: doc.projectCode,
+        projectId: doc.projectId,
+        status: 'already_processed' as const,
+        alreadyProcessed: true,
+        existingData: {
+          submittedAt: doc.submittedAt || undefined,
+          issuedAt: doc.issuedAt || undefined,
+          pvId: doc.pvId || undefined,
+        },
+      })),
+    ];
 
     setTasks(initialTasks);
+    
+    const toProcessCount = limitedNeedsProcessing.length;
+    const alreadyCount = limitedAlreadyProcessed.length;
+    
     setProgress({
-      total: eligibleDocs.length,
+      total: toProcessCount,
       completed: 0,
       success: 0,
       error: 0,
-      skipped: 0,
+      skipped: alreadyCount, // Count already processed as "skipped" in stats
       review: 0,
     });
     setIsRunning(true);
@@ -192,12 +236,15 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
     abortControllerRef.current = new AbortController();
     const signal = abortControllerRef.current.signal;
 
+    // Only process documents that need processing (not already processed)
+    const docsToProcess = limitedNeedsProcessing;
+
     // Process with concurrency control
     let taskIndex = 0;
     const processNext = async (): Promise<void> => {
-      while (taskIndex < eligibleDocs.length && !signal.aborted) {
+      while (taskIndex < docsToProcess.length && !signal.aborted) {
         const currentIndex = taskIndex++;
-        const doc = eligibleDocs[currentIndex];
+        const doc = docsToProcess[currentIndex];
 
         // Update status to processing
         setTasks(prev => prev.map((t, i) => 
@@ -235,7 +282,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
     };
 
     // Start concurrent processing
-    const workers = Array(Math.min(maxConcurrent, eligibleDocs.length))
+    const workers = Array(Math.min(maxConcurrent, docsToProcess.length || 1))
       .fill(null)
       .map(() => processNext());
 
@@ -244,7 +291,11 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
     setIsRunning(false);
     abortControllerRef.current = null;
 
-    return { started: true, processed: eligibleDocs.length };
+    return { 
+      started: true, 
+      processed: docsToProcess.length,
+      alreadyProcessed: alreadyCount,
+    };
   }, [maxBatchSize, maxConcurrent, processDocument]);
 
   // Cancel batch processing
