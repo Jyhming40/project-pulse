@@ -8,6 +8,7 @@ import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { useCodebookOptions } from '@/hooks/useCodebook';
+import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
 import {
   Dialog,
   DialogContent,
@@ -112,6 +113,7 @@ export function DocumentDetailDialog({
   
   // Get doc_type_code options from system_options (single source of truth)
   const { options: docTypeOptions } = useCodebookOptions('doc_type_code');
+  const { getLabel: getDocTypeLabel } = useDocTypeLabel();
 
   // Soft delete hook for documents
   const { softDelete, isDeleting } = useSoftDelete({
@@ -543,7 +545,7 @@ export function DocumentDetailDialog({
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h3 className="font-semibold text-lg">
-                      {document.title || document.doc_type}
+                      {document.title || getDocTypeLabel(document.doc_type_code, document.doc_type)}
                     </h3>
                     {project && (
                       <p className="text-sm text-muted-foreground mt-1">
@@ -553,7 +555,7 @@ export function DocumentDetailDialog({
                     )}
                   </div>
                   <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="outline">{document.doc_type}</Badge>
+                    <Badge variant="outline">{getDocTypeLabel(document.doc_type_code, document.doc_type)}</Badge>
                     <Badge className={statusColor}>{derivedStatus}</Badge>
                   </div>
                 </div>

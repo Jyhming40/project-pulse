@@ -6,6 +6,7 @@ import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { deleteDriveFile } from '@/hooks/useDriveSync';
 import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { CreateDocumentDialog } from '@/components/CreateDocumentDialog';
@@ -104,12 +105,14 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   const [singleDeleteDoc, setSingleDeleteDoc] = useState<{ id: string; title: string } | null>(null);
 
   const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
+  const { getLabel: getDocTypeLabel } = useDocTypeLabel();
 
   // Extended document type with new columns
   type ExtendedDocument = {
     id: string;
     project_id: string;
     doc_type: string;
+    doc_type_code?: string | null;
     doc_status: string;
     created_at: string;
     title?: string | null;
@@ -583,7 +586,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                           )}
                         </TableCell>
                         <TableCell className="whitespace-nowrap">
-                          <Badge variant="outline">{current.doc_type}</Badge>
+                          <Badge variant="outline">{getDocTypeLabel(current.doc_type_code, current.doc_type)}</Badge>
                         </TableCell>
                         <TableCell className="font-medium whitespace-nowrap">
                           {current.title || '-'}
@@ -625,7 +628,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                                 className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setSingleDeleteDoc({ id: current.id, title: current.title || current.doc_type });
+                                  setSingleDeleteDoc({ id: current.id, title: current.title || getDocTypeLabel(current.doc_type_code, current.doc_type) });
                                 }}
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -682,7 +685,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                                   size="sm"
                                   variant="ghost"
                                   className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  onClick={() => setSingleDeleteDoc({ id: doc.id, title: `${doc.title || doc.doc_type} v${doc.version || 1}` })}
+                                  onClick={() => setSingleDeleteDoc({ id: doc.id, title: `${doc.title || getDocTypeLabel(doc.doc_type_code, doc.doc_type)} v${doc.version || 1}` })}
                                 >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
