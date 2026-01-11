@@ -302,11 +302,13 @@ export function useImportBatch() {
   }, []);
   
   // Upload a single item with race-condition safety and three-stage write
+  // Upload a single item with race-condition safety and three-stage write
+  // Returns the new document ID on success for OCR processing
   const uploadItem = useCallback(async (
     item: ImportFileItem,
     userId: string,
     retryCount: number = 0
-  ): Promise<boolean> => {
+  ): Promise<string | null> => {
     if (!item.projectId || !item.docTypeCode) {
       throw new Error('缺少必要欄位');
     }
@@ -393,6 +395,8 @@ export function useImportBatch() {
           drive_path: drivePath,
           owner_user_id: userId,
           created_by: userId,
+          // Parse date from filename if available
+          issued_at: item.dateStr ? `${item.dateStr.slice(0, 4)}-${item.dateStr.slice(4, 6)}-${item.dateStr.slice(6, 8)}` : null,
         })
         .select()
         .single();
@@ -489,7 +493,8 @@ export function useImportBatch() {
         // Don't throw - audit failure shouldn't fail the upload
       }
       
-      return true;
+      // Return the new document ID for OCR processing
+      return newDocId;
     } catch (error: any) {
       // If we created a doc but failed later, ensure it's marked deleted (no delete_reason)
       if (newDocId) {
@@ -513,6 +518,56 @@ export function useImportBatch() {
     }
   }, [projects]);
   
+  // Run OCR on a file to extract dates
+  const runOcrOnFile = useCallback(async (file: File, documentId?: string): Promise<{
+    submitted_at?: string;
+    issued_at?: string;
+  } | null> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return null;
+      
+      // Only process images and PDFs for OCR (first page only for PDF)
+      const supportedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'application/pdf'];
+      if (!supportedTypes.includes(file.type)) {
+        console.log('[OCR] Skipping unsupported file type:', file.type);
+        return null;
+      }
+      
+      const formData = new FormData();
+      formData.append('file', file);
+      if (documentId) {
+        formData.append('documentId', documentId);
+      }
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ocr-extract-dates`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: formData,
+        }
+      );
+      
+      if (!response.ok) {
+        console.warn('[OCR] OCR request failed:', response.status);
+        return null;
+      }
+      
+      const result = await response.json();
+      if (result.success && result.updatedFields) {
+        return result.updatedFields;
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn('[OCR] OCR processing failed:', error);
+      return null;
+    }
+  }, []);
+  
   // Upload all ready items
   const uploadAll = useCallback(async (userId: string) => {
     const readyItems = items.filter(item => item.status === 'ready');
@@ -525,6 +580,7 @@ export function useImportBatch() {
     setIsUploading(true);
     let successCount = 0;
     let errorCount = 0;
+    let ocrSuccessCount = 0;
     
     for (const item of readyItems) {
       setItems(prev => prev.map(i => 
@@ -532,11 +588,23 @@ export function useImportBatch() {
       ));
       
       try {
-        await uploadItem(item, userId);
+        const newDocId = await uploadItem(item, userId);
         successCount++;
         setItems(prev => prev.map(i => 
           i.id === item.id ? { ...i, status: 'success' } : i
         ));
+        
+        // Run OCR in background after successful upload
+        if (newDocId && typeof newDocId === 'string') {
+          runOcrOnFile(item.file, newDocId).then(ocrResult => {
+            if (ocrResult && (ocrResult.submitted_at || ocrResult.issued_at)) {
+              ocrSuccessCount++;
+              console.log(`[OCR] Successfully extracted dates for document ${newDocId}:`, ocrResult);
+            }
+          }).catch(err => {
+            console.warn('[OCR] Background OCR failed:', err);
+          });
+        }
       } catch (error: any) {
         errorCount++;
         // Log original error for debugging (engineers only)
@@ -553,13 +621,13 @@ export function useImportBatch() {
     
     if (successCount > 0) {
       queryClient.invalidateQueries({ queryKey: ['all-documents'] });
-      toast.success(`成功上傳 ${successCount} 份文件`);
+      toast.success(`成功上傳 ${successCount} 份文件，OCR 日期擷取將在背景執行`);
     }
     
     if (errorCount > 0) {
       toast.error(`${errorCount} 份文件上傳失敗`);
     }
-  }, [items, uploadItem, queryClient]);
+  }, [items, uploadItem, queryClient, runOcrOnFile]);
   
   return {
     items,
