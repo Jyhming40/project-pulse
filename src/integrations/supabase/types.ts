@@ -1637,6 +1637,7 @@ export type Database = {
       projects: {
         Row: {
           actual_installed_capacity: number | null
+          actual_meter_date: string | null
           address: string | null
           admin_progress: number | null
           admin_stage: string | null
@@ -1689,6 +1690,7 @@ export type Database = {
         }
         Insert: {
           actual_installed_capacity?: number | null
+          actual_meter_date?: string | null
           address?: string | null
           admin_progress?: number | null
           admin_stage?: string | null
@@ -1741,6 +1743,7 @@ export type Database = {
         }
         Update: {
           actual_installed_capacity?: number | null
+          actual_meter_date?: string | null
           address?: string | null
           admin_progress?: number | null
           admin_stage?: string | null
