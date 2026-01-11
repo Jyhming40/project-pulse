@@ -68,3 +68,6 @@ verify_jwt = true
 
 [functions.sync-engineering-milestones]
 verify_jwt = true
+
+[functions.ocr-extract-dates]
+verify_jwt = false
