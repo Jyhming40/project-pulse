@@ -20,42 +20,33 @@ const DATE_PATTERNS = [
   /(\d{2,3})[\/\-](\d{1,2})[\/\-](\d{1,2})/g,
 ];
 
-// Keywords that indicate submission date (送件日) - 更完整的關鍵字列表
-const SUBMISSION_KEYWORDS = [
-  // 直接標註
-  '送件日', '申請日', '收件日', '收文日', '申請日期', '送件日期',
-  '受理日', '受理日期', '收件編號', '收文號', '收文日期',
-  // 間接標註 (申請書上會出現的)
-  '申請人簽章日', '立書人簽章', '申請者', '聲明日期',
-  '日 期 :', '申請 日', '收件 日',
-  // 文件類型相關 - 這些文件上的日期通常是送件日
-  '申請書', '聲請書', '承諾書', '切結書', '同意書申請',
-  '併聯申請', '再生能源發電設備設置申請',
-];
+// ============================================================
+// 文件類型特定的送件日關鍵字模式（優先級最高）
+// ============================================================
 
-// Keywords that indicate issue date (核發日) - 更完整的關鍵字列表
-const ISSUE_KEYWORDS = [
-  // 直接標註
-  '核發日', '發文日', '發照日', '發給日', '函覆日', '核准日',
-  '同意日', '發文日期', '核發日期', '核定日', '生效日',
-  '批准日', '許可日', '發證日', '簽發日', '公文日期',
-  // 政府機關回函特徵
-  '本府', '臺電公司', '台電公司', '經濟部', '能源署', '工業局',
-  '檢送', '函復', '函覆', '准予', '同意備案', '核准備案',
-  '審查意見', '審查通過', '准予備案', '核備',
-  '發文字號', '受文者', '主旨:', '說明:',
-];
+// 設備登記函、免雜項竣工、免雜項申請：復台端 XXX年XX月XX日
+const SUBMISSION_PATTERN_FUTAN = /復台端\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
 
-// 文件類型推斷：根據文件名或內容判斷日期類型
-const DOC_TYPE_SUBMISSION_PATTERNS = [
-  /申請書/i, /承諾書/i, /切結書/i, /聲請/i, /聲明書/i,
-  /同意書.*申請/i, /設備登記/i, /併聯申請/i,
-];
+// 躉售合約、審查意見書：臺端於 XXX年XX月XX日 或 台端於 XXX年XX月XX日
+const SUBMISSION_PATTERN_TAIDUAN = /[臺台]端於\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
 
-const DOC_TYPE_ISSUE_PATTERNS = [
-  /同意備案/i, /審查意見/i, /核准/i, /許可證/i, /執照/i,
-  /函/i, /公文/i, /核備/i, /設備登記函/i, /電表租約/i,
-  /正式躉售/i,
+// 派員訪查併聯函：本處業於 XXX年XX月XX日
+const SUBMISSION_PATTERN_BENCHU = /本處業於\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
+
+// 通用高優先送件日關鍵字
+const SUBMISSION_PATTERN_APPLY_DATE = /申請日[期]?[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
+const SUBMISSION_PATTERN_RECEIPT = /(?:本府|本所|本局)\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*收文/;
+
+// 核發日關鍵字模式
+const ISSUE_PATTERN_OFFICIAL = /發文日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
+
+// 排除關鍵字 - 這些日期不應被作為送件日或核發日
+const EXCLUDED_KEYWORDS = [
+  '簽約日', '契約日', '合約日期',
+  '施工日', '開工日', '完工日', '竣工日',
+  '檢查日', '驗收日', '查驗日',
+  '有效期限', '期限至', '届滿日',
+  '併聯日', '併網日',
 ];
 
 interface ExtractedDate {
@@ -63,6 +54,7 @@ interface ExtractedDate {
   date: string; // ISO format YYYY-MM-DD
   context: string; // surrounding text for reference
   confidence: number;
+  source?: string; // 來源說明
 }
 
 function rocToWestern(rocYear: number): number {
@@ -111,112 +103,209 @@ function parseDate(match: RegExpMatchArray, patternIndex: number): string | null
   }
 }
 
+// 從特定模式匹配中提取日期
+function extractDateFromPatternMatch(match: RegExpMatchArray): string | null {
+  const rawYear = parseInt(match[1]);
+  const year = rawYear < 200 ? rocToWestern(rawYear) : rawYear;
+  const month = parseInt(match[2]);
+  const day = parseInt(match[3]);
+  
+  if (year < 1990 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
+    return null;
+  }
+  
+  return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+}
+
+// 檢查日期是否應被排除
+function isExcludedDate(text: string, datePosition: number): boolean {
+  const nearbyText = text.slice(Math.max(0, datePosition - 30), datePosition + 50);
+  for (const keyword of EXCLUDED_KEYWORDS) {
+    if (nearbyText.includes(keyword)) {
+      console.log(`[OCR] Excluding date due to keyword: ${keyword}`);
+      return true;
+    }
+  }
+  return false;
+}
+
 function extractDatesFromText(text: string, docTitle?: string): ExtractedDate[] {
   const results: ExtractedDate[] = [];
   const processedDates = new Set<string>();
+  
+  console.log(`[OCR] Starting date extraction from ${text.length} chars of text`);
+  console.log(`[OCR] Document title: ${docTitle || 'none'}`);
 
-  // 先分析文件類型來輔助判斷
-  let docTypeHint: 'submission' | 'issue' | 'unknown' = 'unknown';
-  const textToCheck = (docTitle || '') + ' ' + text.slice(0, 500);
+  // ============================================================
+  // 優先級 1: 使用文件類型特定的模式提取（最高置信度）
+  // ============================================================
   
-  for (const pattern of DOC_TYPE_SUBMISSION_PATTERNS) {
-    if (pattern.test(textToCheck)) {
-      docTypeHint = 'submission';
-      console.log('[OCR] Document appears to be submission type based on patterns');
-      break;
-    }
-  }
-  
-  if (docTypeHint === 'unknown') {
-    for (const pattern of DOC_TYPE_ISSUE_PATTERNS) {
-      if (pattern.test(textToCheck)) {
-        docTypeHint = 'issue';
-        console.log('[OCR] Document appears to be issue type based on patterns');
-        break;
+  // 1a. 提取送件日 - 「復台端 XXX年XX月XX日」（設備登記函、免雜項竣工/申請）
+  const futanMatch = text.match(SUBMISSION_PATTERN_FUTAN);
+  if (futanMatch) {
+    const date = extractDateFromPatternMatch(futanMatch);
+    if (date && !processedDates.has(date + '_submission')) {
+      const idx = text.indexOf(futanMatch[0]);
+      if (!isExcludedDate(text, idx)) {
+        processedDates.add(date + '_submission');
+        results.push({
+          type: 'submission',
+          date,
+          context: text.slice(Math.max(0, idx - 20), idx + futanMatch[0].length + 20).replace(/\s+/g, ' '),
+          confidence: 0.98,
+          source: '復台端',
+        });
+        console.log(`[OCR] Found submission date via 復台端: ${date}`);
       }
     }
   }
-
+  
+  // 1b. 提取送件日 - 「臺端於/台端於 XXX年XX月XX日」（躉售合約、審查意見書）
+  const taiduanMatch = text.match(SUBMISSION_PATTERN_TAIDUAN);
+  if (taiduanMatch) {
+    const date = extractDateFromPatternMatch(taiduanMatch);
+    if (date && !processedDates.has(date + '_submission')) {
+      const idx = text.indexOf(taiduanMatch[0]);
+      if (!isExcludedDate(text, idx)) {
+        processedDates.add(date + '_submission');
+        results.push({
+          type: 'submission',
+          date,
+          context: text.slice(Math.max(0, idx - 20), idx + taiduanMatch[0].length + 20).replace(/\s+/g, ' '),
+          confidence: 0.98,
+          source: '臺端於',
+        });
+        console.log(`[OCR] Found submission date via 臺端於: ${date}`);
+      }
+    }
+  }
+  
+  // 1c. 提取送件日/掛表日 - 「本處業於 XXX年XX月XX日」（派員訪查併聯函）
+  const benchuMatch = text.match(SUBMISSION_PATTERN_BENCHU);
+  if (benchuMatch) {
+    const date = extractDateFromPatternMatch(benchuMatch);
+    if (date && !processedDates.has(date + '_submission')) {
+      const idx = text.indexOf(benchuMatch[0]);
+      if (!isExcludedDate(text, idx)) {
+        processedDates.add(date + '_submission');
+        results.push({
+          type: 'submission',
+          date,
+          context: text.slice(Math.max(0, idx - 20), idx + benchuMatch[0].length + 20).replace(/\s+/g, ' '),
+          confidence: 0.98,
+          source: '本處業於（送件日/實際掛表日）',
+        });
+        console.log(`[OCR] Found submission date via 本處業於: ${date}`);
+      }
+    }
+  }
+  
+  // 1d. 提取送件日 - 「申請日: XXX年XX月XX日」
+  const applyMatch = text.match(SUBMISSION_PATTERN_APPLY_DATE);
+  if (applyMatch) {
+    const date = extractDateFromPatternMatch(applyMatch);
+    if (date && !processedDates.has(date + '_submission')) {
+      const idx = text.indexOf(applyMatch[0]);
+      if (!isExcludedDate(text, idx)) {
+        processedDates.add(date + '_submission');
+        results.push({
+          type: 'submission',
+          date,
+          context: text.slice(Math.max(0, idx - 20), idx + applyMatch[0].length + 20).replace(/\s+/g, ' '),
+          confidence: 0.98,
+          source: '申請日',
+        });
+        console.log(`[OCR] Found submission date via 申請日: ${date}`);
+      }
+    }
+  }
+  
+  // 1e. 提取送件日 - 「本府 XXX年XX月XX日 收文」
+  const receiptMatch = text.match(SUBMISSION_PATTERN_RECEIPT);
+  if (receiptMatch) {
+    const date = extractDateFromPatternMatch(receiptMatch);
+    if (date && !processedDates.has(date + '_submission')) {
+      const idx = text.indexOf(receiptMatch[0]);
+      if (!isExcludedDate(text, idx)) {
+        processedDates.add(date + '_submission');
+        results.push({
+          type: 'submission',
+          date,
+          context: text.slice(Math.max(0, idx - 20), idx + receiptMatch[0].length + 20).replace(/\s+/g, ' '),
+          confidence: 0.95,
+          source: '收文日',
+        });
+        console.log(`[OCR] Found submission date via 收文: ${date}`);
+      }
+    }
+  }
+  
+  // ============================================================
+  // 優先級 2: 提取核發日 - 「發文日期: XXX年XX月XX日」
+  // ============================================================
+  const issueMatch = text.match(ISSUE_PATTERN_OFFICIAL);
+  if (issueMatch) {
+    const date = extractDateFromPatternMatch(issueMatch);
+    if (date && !processedDates.has(date + '_issue')) {
+      processedDates.add(date + '_issue');
+      const idx = text.indexOf(issueMatch[0]);
+      results.push({
+        type: 'issue',
+        date,
+        context: text.slice(Math.max(0, idx - 20), idx + issueMatch[0].length + 20).replace(/\s+/g, ' '),
+        confidence: 0.99,
+        source: '發文日期',
+      });
+      console.log(`[OCR] Found issue date via 發文日期: ${date}`);
+    }
+  }
+  
+  // ============================================================
+  // 優先級 3: 使用通用模式提取其他可能的日期（較低置信度）
+  // ============================================================
   DATE_PATTERNS.forEach((pattern, patternIndex) => {
-    // Reset lastIndex for global patterns
     pattern.lastIndex = 0;
     
     let match;
     while ((match = pattern.exec(text)) !== null) {
       const date = parseDate(match, patternIndex);
-      if (!date || processedDates.has(date)) continue;
+      if (!date) continue;
       
-      processedDates.add(date);
+      // 檢查這個日期是否已經被特定模式處理過
+      if (processedDates.has(date + '_submission') || processedDates.has(date + '_issue')) {
+        continue;
+      }
+      
+      const dateKey = date + '_unknown';
+      if (processedDates.has(dateKey)) continue;
+      processedDates.add(dateKey);
+      
+      // 檢查是否應該排除
+      if (isExcludedDate(text, match.index)) {
+        continue;
+      }
 
-      // Get surrounding context (150 chars before and after for better analysis)
-      const start = Math.max(0, match.index - 150);
-      const end = Math.min(text.length, match.index + match[0].length + 150);
+      // Get surrounding context
+      const start = Math.max(0, match.index - 100);
+      const end = Math.min(text.length, match.index + match[0].length + 100);
       const context = text.slice(start, end).replace(/\s+/g, ' ');
 
-      // Determine date type based on nearby keywords
-      let type: 'submission' | 'issue' | 'unknown' = 'unknown';
-      let confidence = 0.3; // 基礎信心度較低
-
-      // 擴大搜尋範圍
-      const nearbyText = text.slice(Math.max(0, match.index - 100), match.index + match[0].length + 100);
-      const nearbyTextWide = text.slice(Math.max(0, match.index - 300), match.index + match[0].length + 50);
-      
-      // 檢查直接關鍵字（高信心度）
-      for (const keyword of SUBMISSION_KEYWORDS) {
-        if (nearbyText.includes(keyword)) {
-          type = 'submission';
-          confidence = 0.95;
-          console.log(`[OCR] Found submission keyword "${keyword}" near date ${date}`);
-          break;
-        }
-      }
-
-      if (type === 'unknown') {
-        for (const keyword of ISSUE_KEYWORDS) {
-          if (nearbyText.includes(keyword)) {
-            type = 'issue';
-            confidence = 0.95;
-            console.log(`[OCR] Found issue keyword "${keyword}" near date ${date}`);
-            break;
-          }
-        }
-      }
-
-      // 如果沒找到直接關鍵字，使用更廣範圍的模糊匹配
-      if (type === 'unknown') {
-        // 檢查是否在申請人簽章區域（通常是送件日）
-        if (nearbyTextWide.includes('申請人') || nearbyTextWide.includes('立書人') || 
-            nearbyTextWide.includes('簽章') || nearbyTextWide.includes('填表日')) {
-          type = 'submission';
-          confidence = 0.7;
-          console.log(`[OCR] Inferred submission date from signature area near ${date}`);
-        }
-        // 檢查是否在政府機關發文區域（通常是核發日）
-        else if (nearbyTextWide.includes('發文字號') || nearbyTextWide.includes('速別') ||
-                 nearbyTextWide.includes('密等') || nearbyTextWide.includes('受文者')) {
-          type = 'issue';
-          confidence = 0.7;
-          console.log(`[OCR] Inferred issue date from official document header near ${date}`);
-        }
-      }
-
-      // 如果仍然未知，使用文件類型提示
-      if (type === 'unknown' && docTypeHint !== 'unknown') {
-        type = docTypeHint;
-        confidence = 0.5;
-        console.log(`[OCR] Using document type hint "${docTypeHint}" for date ${date}`);
-      }
-
-      results.push({ type, date, context, confidence });
+      results.push({
+        type: 'unknown',
+        date,
+        context,
+        confidence: 0.3,
+        source: '通用模式',
+      });
     }
   });
 
-  // Sort by confidence (highest first), then by type priority (submission/issue first)
+  // Sort by confidence (highest first), then by type priority
   return results.sort((a, b) => {
     if (b.confidence !== a.confidence) return b.confidence - a.confidence;
-    if (a.type !== 'unknown' && b.type === 'unknown') return -1;
-    if (a.type === 'unknown' && b.type !== 'unknown') return 1;
-    return 0;
+    // Prioritize known types over unknown
+    const typePriority = { issue: 1, submission: 2, unknown: 3 };
+    return typePriority[a.type] - typePriority[b.type];
   });
 }
 
