@@ -128,6 +128,91 @@ function extractDatesFromText(text: string): ExtractedDate[] {
   return results.sort((a, b) => b.confidence - a.confidence);
 }
 
+// Refresh Google OAuth access token using refresh token
+async function refreshAccessToken(refreshToken: string): Promise<string | null> {
+  try {
+    const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+    const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+    
+    if (!clientId || !clientSecret) {
+      console.error('[OCR] Missing Google OAuth credentials');
+      return null;
+    }
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken,
+        grant_type: 'refresh_token',
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('[OCR] Failed to refresh token:', await response.text());
+      return null;
+    }
+
+    const data = await response.json();
+    return data.access_token;
+  } catch (error) {
+    console.error('[OCR] Token refresh error:', error);
+    return null;
+  }
+}
+
+// Fetch file content from Google Drive
+async function fetchDriveFile(driveFileId: string, accessToken: string): Promise<{ content: string; mimeType: string } | null> {
+  try {
+    // First get file metadata to check mime type
+    const metaResponse = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=mimeType,name`,
+      {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+
+    if (!metaResponse.ok) {
+      console.error('[OCR] Failed to get file metadata:', await metaResponse.text());
+      return null;
+    }
+
+    const metadata = await metaResponse.json();
+    const mimeType = metadata.mimeType;
+    console.log(`[OCR] Fetching Drive file: ${metadata.name}, type: ${mimeType}`);
+
+    // For Google Docs/Sheets/Slides, export as PDF
+    let downloadUrl: string;
+    let finalMimeType = mimeType;
+    
+    if (mimeType.startsWith('application/vnd.google-apps')) {
+      downloadUrl = `https://www.googleapis.com/drive/v3/files/${driveFileId}/export?mimeType=application/pdf`;
+      finalMimeType = 'application/pdf';
+    } else {
+      downloadUrl = `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`;
+    }
+
+    const fileResponse = await fetch(downloadUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!fileResponse.ok) {
+      console.error('[OCR] Failed to download file:', await fileResponse.text());
+      return null;
+    }
+
+    const buffer = await fileResponse.arrayBuffer();
+    const content = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+    
+    return { content, mimeType: finalMimeType };
+  } catch (error) {
+    console.error('[OCR] Drive file fetch error:', error);
+    return null;
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -188,6 +273,85 @@ serve(async (req) => {
       mimeType = body.mimeType || 'application/pdf';
     }
 
+    // If no file provided but documentId exists, try to fetch from Drive
+    if (!imageBase64 && documentId) {
+      console.log(`[OCR] No file provided, attempting to fetch from Drive for document: ${documentId}`);
+      
+      // Get document info including drive_file_id
+      const { data: docData, error: docError } = await supabase
+        .from('documents')
+        .select('drive_file_id, title')
+        .eq('id', documentId)
+        .single();
+      
+      if (docError || !docData) {
+        return new Response(
+          JSON.stringify({ error: '找不到文件' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      if (!docData.drive_file_id) {
+        return new Response(
+          JSON.stringify({ error: '此文件沒有關聯的 Google Drive 檔案' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Get user's Drive token
+      const { data: tokenData, error: tokenError } = await supabase
+        .from('user_drive_tokens')
+        .select('access_token, refresh_token, token_expires_at')
+        .eq('user_id', user.id)
+        .single();
+
+      if (tokenError || !tokenData) {
+        return new Response(
+          JSON.stringify({ error: '未連接 Google Drive，請先授權' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Check if token is expired and refresh if needed
+      let accessToken = tokenData.access_token;
+      const expiresAt = new Date(tokenData.token_expires_at);
+      
+      if (expiresAt < new Date()) {
+        console.log('[OCR] Access token expired, refreshing...');
+        const newToken = await refreshAccessToken(tokenData.refresh_token);
+        if (!newToken) {
+          return new Response(
+            JSON.stringify({ error: 'Google Drive 授權已過期，請重新授權' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        accessToken = newToken;
+        
+        // Update token in database
+        await supabase
+          .from('user_drive_tokens')
+          .update({
+            access_token: newToken,
+            token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', user.id);
+      }
+
+      // Fetch file from Drive
+      const driveFile = await fetchDriveFile(docData.drive_file_id, accessToken);
+      if (!driveFile) {
+        return new Response(
+          JSON.stringify({ error: '無法從 Google Drive 取得檔案' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      imageBase64 = driveFile.content;
+      mimeType = driveFile.mimeType;
+      console.log(`[OCR] Successfully fetched file from Drive, size: ${imageBase64.length} chars`);
+    }
+
     if (!imageBase64) {
       return new Response(
         JSON.stringify({ error: '缺少檔案資料' }),
@@ -195,7 +359,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[ocr-extract-dates] Processing document, type: ${mimeType}, documentId: ${documentId}`);
+    console.log(`[OCR] Processing document, type: ${mimeType}, documentId: ${documentId}`);
 
     // Call Google Cloud Vision API for OCR
     const visionResponse = await fetch(
@@ -214,7 +378,7 @@ serve(async (req) => {
 
     if (!visionResponse.ok) {
       const errorText = await visionResponse.text();
-      console.error('[ocr-extract-dates] Vision API error:', errorText);
+      console.error('[OCR] Vision API error:', errorText);
       return new Response(
         JSON.stringify({ error: 'OCR 處理失敗', details: errorText }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -237,11 +401,11 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[ocr-extract-dates] OCR text length: ${fullText.length} chars`);
+    console.log(`[OCR] OCR text length: ${fullText.length} chars`);
 
     // Extract dates from OCR text
     const extractedDates = extractDatesFromText(fullText);
-    console.log(`[ocr-extract-dates] Extracted ${extractedDates.length} dates`);
+    console.log(`[OCR] Extracted ${extractedDates.length} dates`);
 
     // If documentId provided, optionally update the document
     let updatedFields: Record<string, string> = {};
@@ -269,9 +433,9 @@ serve(async (req) => {
           .eq('id', documentId);
 
         if (updateError) {
-          console.error('[ocr-extract-dates] Update error:', updateError);
+          console.error('[OCR] Update error:', updateError);
         } else {
-          console.log('[ocr-extract-dates] Document updated:', updatedFields);
+          console.log('[OCR] Document updated:', updatedFields);
         }
       }
     }
@@ -287,7 +451,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('[ocr-extract-dates] Error:', error);
+    console.error('[OCR] Error:', error);
     return new Response(
       JSON.stringify({ error: (error as Error).message }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
