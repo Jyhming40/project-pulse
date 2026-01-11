@@ -30,8 +30,11 @@ const SUBMISSION_PATTERN_FUTAN = /復台端\s*(?:中華)?民?國?\s*(\d{2,3})\s*
 // 免雜項竣工、其他政府函：復貴公司 XXX年XX月XX日
 const SUBMISSION_PATTERN_FUGUIGONGSI = /復貴公司\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
 
-// 審查意見書、台電函：依據貴公司 XXX年XX月XX日
+// 審查意見書、台電函：依據貴公司 XXX年XX月XX日 或 依據臺端/台端 XXX年XX月XX日
 const SUBMISSION_PATTERN_YIJUGUIGONGSI = /依據貴公司\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
+
+// 審查意見書：依據臺端/台端 XXX年XX月XX日（審查意見書常用格式）
+const SUBMISSION_PATTERN_YIJUTAIDUAN = /依據[臺台]端\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
 
 // 躉售合約、審查意見書：臺端於 XXX年XX月XX日 或 台端於 XXX年XX月XX日
 const SUBMISSION_PATTERN_TAIDUAN = /[臺台]端於\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
@@ -283,6 +286,26 @@ function extractDatesFromText(text: string, docTitle?: string): ExtractedData {
           source: '依據貴公司',
         });
         console.log(`[OCR] Found submission date via 依據貴公司: ${date}`);
+      }
+    }
+  }
+  
+  // 1c-2. 提取送件日 - 「依據臺端/台端 XXX年XX月XX日」（審查意見書常用格式）
+  const yijutaiduanMatch = text.match(SUBMISSION_PATTERN_YIJUTAIDUAN);
+  if (yijutaiduanMatch) {
+    const date = extractDateFromPatternMatch(yijutaiduanMatch);
+    if (date && !processedDates.has(date + '_submission')) {
+      const idx = text.indexOf(yijutaiduanMatch[0]);
+      if (!isExcludedDate(text, idx)) {
+        processedDates.add(date + '_submission');
+        results.push({
+          type: 'submission',
+          date,
+          context: text.slice(Math.max(0, idx - 20), idx + yijutaiduanMatch[0].length + 20).replace(/\s+/g, ' '),
+          confidence: 0.98,
+          source: '依據臺端',
+        });
+        console.log(`[OCR] Found submission date via 依據臺端: ${date}`);
       }
     }
   }
