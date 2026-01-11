@@ -66,10 +66,11 @@ import { DeleteConfirmDialog } from './DeleteConfirmDialog';
 import { OcrResultDialog, OcrSettingsDialog } from './OcrResultDialog';
 
 interface ExtractedDate {
-  type: 'submission' | 'issue' | 'unknown';
+  type: 'submission' | 'issue' | 'meter_date' | 'unknown';
   date: string;
   context: string;
   confidence: number;
+  source?: string;
 }
 
 interface DocumentDetailDialogProps {
@@ -97,6 +98,8 @@ export function DocumentDetailDialog({
   const [ocrResults, setOcrResults] = useState<{
     extractedDates: ExtractedDate[];
     fullText: string;
+    pvId?: string;
+    pvIdContext?: string;
   }>({ extractedDates: [], fullText: '' });
   const [isUpdatingFromOcr, setIsUpdatingFromOcr] = useState(false);
   const [editData, setEditData] = useState({
@@ -337,11 +340,13 @@ export function DocumentDetailDialog({
       if (result.success) {
         const extractedCount = result.extractedDates?.length || 0;
         
-        if (extractedCount > 0) {
+        if (extractedCount > 0 || result.pvId) {
           // Show OCR results dialog for user confirmation
           setOcrResults({
-            extractedDates: result.extractedDates,
+            extractedDates: result.extractedDates || [],
             fullText: result.fullText || '',
+            pvId: result.pvId,
+            pvIdContext: result.pvIdContext,
           });
           setIsOcrResultOpen(true);
         } else {
@@ -359,7 +364,7 @@ export function DocumentDetailDialog({
   };
 
   // Handle OCR result confirmation
-  const handleOcrConfirm = async (submittedAt: string | null, issuedAt: string | null) => {
+  const handleOcrConfirm = async (submittedAt: string | null, issuedAt: string | null, meterDate?: string | null, pvId?: string | null) => {
     if (!documentId) return;
 
     setIsUpdatingFromOcr(true);
@@ -397,6 +402,43 @@ export function DocumentDetailDialog({
         p_reason: 'OCR 日期擷取確認',
       });
 
+      // Update project if meterDate or pvId is provided
+      if ((meterDate || pvId) && document?.project_id) {
+        const projectUpdateData: Record<string, string | null> = {};
+        
+        if (meterDate) {
+          projectUpdateData.actual_meter_date = meterDate;
+        }
+        
+        if (pvId) {
+          projectUpdateData.taipower_pv_id = pvId;
+        }
+        
+        const { error: projectError } = await supabase
+          .from('projects')
+          .update(projectUpdateData)
+          .eq('id', document.project_id);
+          
+        if (projectError) {
+          console.error('Project update error:', projectError);
+          // Don't throw, just log - document update succeeded
+        } else {
+          // Log project audit
+          await supabase.rpc('log_audit_action', {
+            p_table_name: 'projects',
+            p_record_id: document.project_id,
+            p_action: 'UPDATE',
+            p_old_data: {},
+            p_new_data: projectUpdateData,
+            p_reason: 'OCR 擷取帶入專案資料',
+          });
+        }
+        
+        // Invalidate project queries
+        queryClient.invalidateQueries({ queryKey: ['project', document.project_id] });
+        queryClient.invalidateQueries({ queryKey: ['projects'] });
+      }
+
       // Refresh data
       queryClient.invalidateQueries({ queryKey: ['document-detail', documentId] });
       queryClient.invalidateQueries({ queryKey: ['all-documents'] });
@@ -410,8 +452,10 @@ export function DocumentDetailDialog({
       const updates: string[] = [];
       if (submittedAt) updates.push(`送件日: ${submittedAt}`);
       if (issuedAt) updates.push(`核發日: ${issuedAt}`);
+      if (meterDate) updates.push(`實際掛表日: ${meterDate}`);
+      if (pvId) updates.push(`PV編號: ${pvId}`);
       
-      toast.success('日期已更新', {
+      toast.success('資料已更新', {
         description: updates.join('、'),
       });
 
@@ -869,6 +913,8 @@ export function DocumentDetailDialog({
       fullText={ocrResults.fullText}
       currentSubmittedAt={document?.submitted_at || null}
       currentIssuedAt={document?.issued_at || null}
+      pvId={ocrResults.pvId}
+      pvIdContext={ocrResults.pvIdContext}
       onConfirm={handleOcrConfirm}
       isUpdating={isUpdatingFromOcr}
     />

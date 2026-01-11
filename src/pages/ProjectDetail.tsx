@@ -853,6 +853,10 @@ export default function ProjectDetail() {
                   <p className="text-sm text-muted-foreground">立桿狀態</p>
                   <p>{(project as any).pole_status || '-'}</p>
                 </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">實際掛表日</p>
+                  <p className="font-mono">{(project as any).actual_meter_date || '-'}</p>
+                </div>
               </div>
             </CardContent>
           </Card>
