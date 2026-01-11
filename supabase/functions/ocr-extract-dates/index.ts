@@ -20,16 +20,42 @@ const DATE_PATTERNS = [
   /(\d{2,3})[\/\-](\d{1,2})[\/\-](\d{1,2})/g,
 ];
 
-// Keywords that indicate submission date (送件日)
+// Keywords that indicate submission date (送件日) - 更完整的關鍵字列表
 const SUBMISSION_KEYWORDS = [
+  // 直接標註
   '送件日', '申請日', '收件日', '收文日', '申請日期', '送件日期',
-  '受理日', '受理日期', '來函', '收件編號', '收文號'
+  '受理日', '受理日期', '收件編號', '收文號', '收文日期',
+  // 間接標註 (申請書上會出現的)
+  '申請人簽章日', '立書人簽章', '申請者', '聲明日期',
+  '日 期 :', '申請 日', '收件 日',
+  // 文件類型相關 - 這些文件上的日期通常是送件日
+  '申請書', '聲請書', '承諾書', '切結書', '同意書申請',
+  '併聯申請', '再生能源發電設備設置申請',
 ];
 
-// Keywords that indicate issue date (核發日)
+// Keywords that indicate issue date (核發日) - 更完整的關鍵字列表
 const ISSUE_KEYWORDS = [
+  // 直接標註
   '核發日', '發文日', '發照日', '發給日', '函覆日', '核准日',
-  '同意日', '發文日期', '核發日期', '核定日', '生效日'
+  '同意日', '發文日期', '核發日期', '核定日', '生效日',
+  '批准日', '許可日', '發證日', '簽發日', '公文日期',
+  // 政府機關回函特徵
+  '本府', '臺電公司', '台電公司', '經濟部', '能源署', '工業局',
+  '檢送', '函復', '函覆', '准予', '同意備案', '核准備案',
+  '審查意見', '審查通過', '准予備案', '核備',
+  '發文字號', '受文者', '主旨:', '說明:',
+];
+
+// 文件類型推斷：根據文件名或內容判斷日期類型
+const DOC_TYPE_SUBMISSION_PATTERNS = [
+  /申請書/i, /承諾書/i, /切結書/i, /聲請/i, /聲明書/i,
+  /同意書.*申請/i, /設備登記/i, /併聯申請/i,
+];
+
+const DOC_TYPE_ISSUE_PATTERNS = [
+  /同意備案/i, /審查意見/i, /核准/i, /許可證/i, /執照/i,
+  /函/i, /公文/i, /核備/i, /設備登記函/i, /電表租約/i,
+  /正式躉售/i,
 ];
 
 interface ExtractedDate {
@@ -85,9 +111,31 @@ function parseDate(match: RegExpMatchArray, patternIndex: number): string | null
   }
 }
 
-function extractDatesFromText(text: string): ExtractedDate[] {
+function extractDatesFromText(text: string, docTitle?: string): ExtractedDate[] {
   const results: ExtractedDate[] = [];
   const processedDates = new Set<string>();
+
+  // 先分析文件類型來輔助判斷
+  let docTypeHint: 'submission' | 'issue' | 'unknown' = 'unknown';
+  const textToCheck = (docTitle || '') + ' ' + text.slice(0, 500);
+  
+  for (const pattern of DOC_TYPE_SUBMISSION_PATTERNS) {
+    if (pattern.test(textToCheck)) {
+      docTypeHint = 'submission';
+      console.log('[OCR] Document appears to be submission type based on patterns');
+      break;
+    }
+  }
+  
+  if (docTypeHint === 'unknown') {
+    for (const pattern of DOC_TYPE_ISSUE_PATTERNS) {
+      if (pattern.test(textToCheck)) {
+        docTypeHint = 'issue';
+        console.log('[OCR] Document appears to be issue type based on patterns');
+        break;
+      }
+    }
+  }
 
   DATE_PATTERNS.forEach((pattern, patternIndex) => {
     // Reset lastIndex for global patterns
@@ -100,21 +148,25 @@ function extractDatesFromText(text: string): ExtractedDate[] {
       
       processedDates.add(date);
 
-      // Get surrounding context (100 chars before and after)
-      const start = Math.max(0, match.index - 100);
-      const end = Math.min(text.length, match.index + match[0].length + 100);
+      // Get surrounding context (150 chars before and after for better analysis)
+      const start = Math.max(0, match.index - 150);
+      const end = Math.min(text.length, match.index + match[0].length + 150);
       const context = text.slice(start, end).replace(/\s+/g, ' ');
 
       // Determine date type based on nearby keywords
       let type: 'submission' | 'issue' | 'unknown' = 'unknown';
-      let confidence = 0.5;
+      let confidence = 0.3; // 基礎信心度較低
 
-      const nearbyText = text.slice(Math.max(0, match.index - 50), match.index + match[0].length + 50);
+      // 擴大搜尋範圍
+      const nearbyText = text.slice(Math.max(0, match.index - 100), match.index + match[0].length + 100);
+      const nearbyTextWide = text.slice(Math.max(0, match.index - 300), match.index + match[0].length + 50);
       
+      // 檢查直接關鍵字（高信心度）
       for (const keyword of SUBMISSION_KEYWORDS) {
         if (nearbyText.includes(keyword)) {
           type = 'submission';
-          confidence = 0.9;
+          confidence = 0.95;
+          console.log(`[OCR] Found submission keyword "${keyword}" near date ${date}`);
           break;
         }
       }
@@ -123,18 +175,49 @@ function extractDatesFromText(text: string): ExtractedDate[] {
         for (const keyword of ISSUE_KEYWORDS) {
           if (nearbyText.includes(keyword)) {
             type = 'issue';
-            confidence = 0.9;
+            confidence = 0.95;
+            console.log(`[OCR] Found issue keyword "${keyword}" near date ${date}`);
             break;
           }
         }
+      }
+
+      // 如果沒找到直接關鍵字，使用更廣範圍的模糊匹配
+      if (type === 'unknown') {
+        // 檢查是否在申請人簽章區域（通常是送件日）
+        if (nearbyTextWide.includes('申請人') || nearbyTextWide.includes('立書人') || 
+            nearbyTextWide.includes('簽章') || nearbyTextWide.includes('填表日')) {
+          type = 'submission';
+          confidence = 0.7;
+          console.log(`[OCR] Inferred submission date from signature area near ${date}`);
+        }
+        // 檢查是否在政府機關發文區域（通常是核發日）
+        else if (nearbyTextWide.includes('發文字號') || nearbyTextWide.includes('速別') ||
+                 nearbyTextWide.includes('密等') || nearbyTextWide.includes('受文者')) {
+          type = 'issue';
+          confidence = 0.7;
+          console.log(`[OCR] Inferred issue date from official document header near ${date}`);
+        }
+      }
+
+      // 如果仍然未知，使用文件類型提示
+      if (type === 'unknown' && docTypeHint !== 'unknown') {
+        type = docTypeHint;
+        confidence = 0.5;
+        console.log(`[OCR] Using document type hint "${docTypeHint}" for date ${date}`);
       }
 
       results.push({ type, date, context, confidence });
     }
   });
 
-  // Sort by confidence (highest first)
-  return results.sort((a, b) => b.confidence - a.confidence);
+  // Sort by confidence (highest first), then by type priority (submission/issue first)
+  return results.sort((a, b) => {
+    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+    if (a.type !== 'unknown' && b.type === 'unknown') return -1;
+    if (a.type === 'unknown' && b.type !== 'unknown') return 1;
+    return 0;
+  });
 }
 
 // Refresh Google OAuth access token using refresh token
@@ -374,6 +457,9 @@ serve(async (req) => {
       maxPages = typeof body.maxPages === 'number' ? body.maxPages : 1;
     }
 
+    // Track document title for smarter date extraction
+    let docTitle: string | null = null;
+    
     // If no file provided but documentId exists, try to fetch from Drive
     if (!imageBase64 && documentId) {
       console.log(`[OCR] No file provided, attempting to fetch from Drive for document: ${documentId}`);
@@ -391,6 +477,10 @@ serve(async (req) => {
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
+      
+      // Store title for smarter date extraction
+      docTitle = docData.title;
+      console.log(`[OCR] Document title: ${docTitle}`);
       
       if (!docData.drive_file_id) {
         return new Response(
@@ -480,8 +570,8 @@ serve(async (req) => {
 
     console.log(`[OCR] OCR text length: ${fullText.length} chars`);
 
-    // Extract dates from OCR text
-    const extractedDates = extractDatesFromText(fullText);
+    // Extract dates from OCR text (pass document title for smarter inference)
+    const extractedDates = extractDatesFromText(fullText, docTitle || undefined);
     console.log(`[OCR] Extracted ${extractedDates.length} dates`);
 
     // Only update if autoUpdate is true (for batch upload)
