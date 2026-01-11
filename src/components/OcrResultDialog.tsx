@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { format } from 'date-fns';
-import { zhTW } from 'date-fns/locale';
 import {
   Dialog,
   DialogContent,
@@ -16,11 +14,19 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
   Calendar,
   FileText,
   CheckCircle2,
   AlertCircle,
   Info,
+  Settings2,
 } from 'lucide-react';
 
 interface ExtractedDate {
@@ -39,6 +45,77 @@ interface OcrResultDialogProps {
   currentIssuedAt: string | null;
   onConfirm: (submittedAt: string | null, issuedAt: string | null) => void;
   isUpdating: boolean;
+}
+
+interface OcrSettingsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  maxPages: number;
+  onMaxPagesChange: (pages: number) => void;
+  onStartOcr: () => void;
+  isLoading: boolean;
+}
+
+export function OcrSettingsDialog({
+  open,
+  onOpenChange,
+  maxPages,
+  onMaxPagesChange,
+  onStartOcr,
+  isLoading,
+}: OcrSettingsDialogProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <Settings2 className="w-5 h-5 text-primary" />
+            OCR 辨識設定
+          </DialogTitle>
+          <DialogDescription>
+            設定辨識參數後開始擷取文件日期
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="py-4 space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="max-pages">辨識頁數</Label>
+            <Select
+              value={maxPages.toString()}
+              onValueChange={(value) => onMaxPagesChange(parseInt(value))}
+            >
+              <SelectTrigger id="max-pages">
+                <SelectValue placeholder="選擇頁數" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1">僅第 1 頁（建議）</SelectItem>
+                <SelectItem value="2">前 2 頁</SelectItem>
+                <SelectItem value="3">前 3 頁</SelectItem>
+                <SelectItem value="5">前 5 頁</SelectItem>
+                <SelectItem value="0">全部頁面</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              函文重點通常在第一頁，建議只辨識第一頁以節省時間與資源
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isLoading}
+          >
+            取消
+          </Button>
+          <Button onClick={onStartOcr} disabled={isLoading}>
+            {isLoading ? '辨識中...' : '開始辨識'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function OcrResultDialog({
@@ -236,16 +313,20 @@ export function OcrResultDialog({
               )}
             </div>
 
-            {/* OCR Text Preview */}
+            {/* OCR Text Preview with ScrollArea */}
             {fullText && (
               <>
                 <Separator />
                 <div className="space-y-2">
-                  <p className="text-sm font-medium">OCR 辨識文字 (前 500 字)</p>
-                  <div className="p-3 bg-muted rounded-lg text-xs font-mono whitespace-pre-wrap max-h-40 overflow-auto">
-                    {fullText.slice(0, 500)}
-                    {fullText.length > 500 && '...'}
-                  </div>
+                  <p className="text-sm font-medium">OCR 辨識文字</p>
+                  <ScrollArea className="h-48 w-full rounded-lg border bg-muted/30">
+                    <div className="p-3 text-xs font-mono whitespace-pre-wrap">
+                      {fullText}
+                    </div>
+                  </ScrollArea>
+                  <p className="text-xs text-muted-foreground">
+                    共 {fullText.length} 字
+                  </p>
                 </div>
               </>
             )}
