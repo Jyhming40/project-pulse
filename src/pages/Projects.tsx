@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModuleAccess, MODULES } from '@/hooks/usePermissions';
@@ -11,9 +10,10 @@ import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
 import { useBatchSelect } from '@/hooks/useBatchSelect';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
+import { useProjectFilters } from '@/hooks/useProjectFilters';
 
 import { CodebookSelect } from '@/components/CodebookSelect';
-import { SearchInputWithHistory } from '@/components/SearchInputWithHistory';
+import { ProjectFilterBar } from '@/components/projects/ProjectFilterBar';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
 import { BatchUpdateDialog, BatchUpdateField } from '@/components/BatchUpdateDialog';
@@ -135,7 +135,6 @@ const cities = [
 
 export default function Projects() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const { canEdit, isAdmin, user } = useAuth();
   const { canCreate, canEdit: canEditProjects, canDelete } = useModuleAccess(MODULES.PROJECTS);
   const queryClient = useQueryClient();
@@ -148,39 +147,11 @@ export default function Projects() {
   const { options: powerVoltageOptions } = useOptionsForCategory('power_voltage');
   const { options: poleStatusOptions } = useOptionsForCategory('pole_status');
   
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [cityFilter, setCityFilter] = useState<string>('all');
-  const [constructionFilter, setConstructionFilter] = useState<string>('all');
-  const [driveStatusFilter, setDriveStatusFilter] = useState<string>('all');
-  const [riskFilter, setRiskFilter] = useState<string>('all');
+  // 使用統一的篩選 hook
+  const filters = useProjectFilters();
+  
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
-
-  // Read URL params and apply filters
-  useEffect(() => {
-    const statusParam = searchParams.get('status');
-    const riskParam = searchParams.get('risk');
-    // 支援 construction 或 construction_status 兩種參數名稱
-    const constructionParam = searchParams.get('construction') || searchParams.get('construction_status');
-    
-    if (statusParam) {
-      // 支援逗號分隔的多狀態篩選
-      setStatusFilter(statusParam);
-    } else {
-      setStatusFilter('all');
-    }
-    if (riskParam) {
-      setRiskFilter(riskParam);
-    } else {
-      setRiskFilter('all');
-    }
-    if (constructionParam) {
-      setConstructionFilter(constructionParam);
-    } else {
-      setConstructionFilter('all');
-    }
-  }, [searchParams]);
 
   // Form state
   const [formData, setFormData] = useState<Partial<ProjectInsert> & {
@@ -271,7 +242,7 @@ export default function Projects() {
         .filter((p: any) => !['暫停', '取消'].includes(p.current_project_status))
         .map((p: any) => p.project_id);
     },
-    enabled: riskFilter === 'high' || riskFilter === 'true',
+    enabled: filters.hasAnyFilter('risk'),
   });
 
   // Fetch investors for dropdown
@@ -382,59 +353,48 @@ export default function Projects() {
     setDeletingProject(null);
   };
 
-  // Filter projects
-  const filteredProjects = projects.filter(project => {
-    const matchesSearch = 
-      project.project_name.toLowerCase().includes(search.toLowerCase()) ||
-      project.project_code.toLowerCase().includes(search.toLowerCase()) ||
-      ((project as any).site_code_display || '').toLowerCase().includes(search.toLowerCase()) ||
-      project.address?.toLowerCase().includes(search.toLowerCase()) ||
-      (project.investors as any)?.company_name?.toLowerCase().includes(search.toLowerCase());
+  // Filter projects using the new filter hook
+  const filteredProjects = useMemo(() => {
+    const searchLower = filters.search.toLowerCase();
     
-    // 支援逗號分隔的多狀態篩選
-    let matchesStatus = statusFilter === 'all';
-    if (!matchesStatus) {
-      const statusValues = statusFilter.split(',').map(s => decodeURIComponent(s.trim()));
-      matchesStatus = statusValues.includes(project.status);
-    }
-    
-    const matchesCity = cityFilter === 'all' || project.city === cityFilter;
-    
-    // 支援逗號分隔的多施工狀態篩選
-    let matchesConstruction = constructionFilter === 'all';
-    if (!matchesConstruction) {
-      const constructionValues = constructionFilter.split(',').map(s => decodeURIComponent(s.trim()));
-      const projectConstructionStatus = (project as any).construction_status;
-      // 如果篩選條件包含「尚未開工」，也要匹配 null 或空值
-      if (constructionValues.includes('尚未開工')) {
-        matchesConstruction = constructionValues.includes(projectConstructionStatus) || 
-                               !projectConstructionStatus || 
-                               projectConstructionStatus === '';
-      } else {
-        matchesConstruction = constructionValues.includes(projectConstructionStatus);
-      }
-    }
-    
-    // Risk filter - 使用從 project_analytics_view 查詢的風險案場 ID
-    let matchesRisk = true;
-    if (riskFilter === 'high' || riskFilter === 'true') {
-      matchesRisk = riskProjectIds.includes(project.id);
-    }
-    
-    // Drive status filter
-    const folderStatus = (project as any).folder_status;
-    const hasFolderId = !!(project as any).drive_folder_id;
-    let matchesDriveStatus = true;
-    if (driveStatusFilter === 'created') {
-      matchesDriveStatus = folderStatus === 'created' && hasFolderId;
-    } else if (driveStatusFilter === 'pending') {
-      matchesDriveStatus = folderStatus !== 'created' && folderStatus !== 'failed';
-    } else if (driveStatusFilter === 'failed') {
-      matchesDriveStatus = folderStatus === 'failed';
-    }
-    
-    return matchesSearch && matchesStatus && matchesCity && matchesConstruction && matchesDriveStatus && matchesRisk;
-  });
+    return projects.filter(project => {
+      // 搜尋匹配
+      const matchesSearch = !searchLower || 
+        project.project_name.toLowerCase().includes(searchLower) ||
+        project.project_code.toLowerCase().includes(searchLower) ||
+        ((project as any).site_code_display || '').toLowerCase().includes(searchLower) ||
+        project.address?.toLowerCase().includes(searchLower) ||
+        (project.investors as any)?.company_name?.toLowerCase().includes(searchLower);
+      
+      if (!matchesSearch) return false;
+      
+      // 使用 hook 的篩選匹配邏輯
+      const matchesFilters = filters.matchesFilters(project, (item, key) => {
+        switch (key) {
+          case 'status':
+            return item.status;
+          case 'construction_status':
+            return (item as any).construction_status;
+          case 'city':
+            return item.city;
+          case 'drive_status': {
+            const folderStatus = (item as any).folder_status;
+            const hasFolderId = !!(item as any).drive_folder_id;
+            if (folderStatus === 'created' && hasFolderId) return 'created';
+            if (folderStatus === 'failed') return 'failed';
+            return 'pending';
+          }
+          case 'risk':
+            // 風險篩選特殊處理
+            return riskProjectIds.includes(item.id) ? 'high' : 'none';
+          default:
+            return null;
+        }
+      });
+      
+      return matchesFilters;
+    });
+  }, [projects, filters.search, filters.filterStates, riskProjectIds]);
 
   // Sorting (multi-column support)
   const { sortedData: sortedProjects, sortConfig, handleSort, getSortInfo } = useTableSort(filteredProjects, {
@@ -692,60 +652,37 @@ export default function Projects() {
           </div>
         </div>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <SearchInputWithHistory
-          value={search}
-          onChange={setSearch}
-          placeholder="搜尋案場名稱、編號、地址、投資方..."
-          storageKey="projects-search-history"
-          className="flex-1"
-        />
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[180px]">
-            <SelectValue placeholder="狀態篩選" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全部狀態</SelectItem>
-            {statusOptions.map(opt => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={cityFilter} onValueChange={setCityFilter}>
-          <SelectTrigger className="w-full sm:w-[150px]">
-            <SelectValue placeholder="縣市篩選" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全部縣市</SelectItem>
-            {cities.map(city => (
-              <SelectItem key={city} value={city}>{city}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={constructionFilter} onValueChange={setConstructionFilter}>
-          <SelectTrigger className="w-full sm:w-[150px]">
-            <SelectValue placeholder="施工狀態" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全部施工狀態</SelectItem>
-            {constructionStatusOptions.map(opt => (
-              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={driveStatusFilter} onValueChange={setDriveStatusFilter}>
-          <SelectTrigger className="w-full sm:w-[150px]">
-            <SelectValue placeholder="Drive 狀態" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全部 Drive 狀態</SelectItem>
-            <SelectItem value="created">已建立</SelectItem>
-            <SelectItem value="pending">待建立</SelectItem>
-            <SelectItem value="failed">錯誤</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Filters - 使用新的 Badge-based FilterBar */}
+      <ProjectFilterBar
+        filters={filters}
+        filterGroups={[
+          {
+            key: 'status',
+            label: '狀態',
+            options: statusOptions,
+          },
+          {
+            key: 'construction_status',
+            label: '施工',
+            options: constructionStatusOptions,
+          },
+          {
+            key: 'city',
+            label: '縣市',
+            options: cities.map(c => ({ value: c, label: c })),
+          },
+          {
+            key: 'drive_status',
+            label: 'Drive',
+            options: [
+              { value: 'created', label: '已建立' },
+              { value: 'pending', label: '待建立' },
+              { value: 'failed', label: '錯誤' },
+            ],
+          },
+        ]}
+        riskProjectCount={riskProjectIds.length}
+      />
 
       {/* Table */}
       <div className="border rounded-lg bg-card overflow-hidden">
