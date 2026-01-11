@@ -96,17 +96,35 @@ export function Phase2TracksSection({ projects, isLoading }: Phase2TracksSection
     // === 行政線分析 ===
     const adminAnalysis = {
       total: phase2Projects.length,
-      completed: phase2Projects.filter(p => ['設備登記', '運維中'].includes(p.status)).length,
-      stuckAt: {} as Record<string, number>,
+      completed: phase2Projects.filter(p => ['運維中'].includes(p.status)).length,
+      distribution: {} as Record<string, number>,
       avgProgress: 0,
+      // 真正卡關：工程已完工但行政還在早期階段
+      bottlenecks: [] as { label: string; count: number }[],
     };
     
-    // 統計卡在哪個階段
+    // 統計各階段分佈
     phase2Projects.forEach(p => {
-      const stage = getAdminStageFromStatus(p.status);
-      const stageLabel = ADMIN_TRACK_STAGES[stage - 1]?.label || '備案中';
-      adminAnalysis.stuckAt[stageLabel] = (adminAnalysis.stuckAt[stageLabel] || 0) + 1;
+      adminAnalysis.distribution[p.status] = (adminAnalysis.distribution[p.status] || 0) + 1;
     });
+    
+    // 找出真正卡關的案件：工程已完成但行政落後
+    const engineeringDoneButAdminBehind = phase2Projects.filter(p => {
+      const isEngineeringDone = p.construction_status === '已完工' || p.construction_status === '已掛錶';
+      const isAdminBehind = ['同意備案', '工程施工', '報竣掛表'].includes(p.status);
+      return isEngineeringDone && isAdminBehind;
+    });
+    
+    if (engineeringDoneButAdminBehind.length > 0) {
+      // 按行政階段分組
+      const byAdminStage: Record<string, number> = {};
+      engineeringDoneButAdminBehind.forEach(p => {
+        byAdminStage[p.status] = (byAdminStage[p.status] || 0) + 1;
+      });
+      Object.entries(byAdminStage).forEach(([stage, count]) => {
+        adminAnalysis.bottlenecks.push({ label: `工程完成卡在${stage}`, count });
+      });
+    }
     
     adminAnalysis.avgProgress = phase2Projects.length > 0
       ? phase2Projects.reduce((sum, p) => sum + (p.admin_progress || 0), 0) / phase2Projects.length
@@ -118,15 +136,31 @@ export function Phase2TracksSection({ projects, isLoading }: Phase2TracksSection
       completed: phase2Projects.filter(p => 
         p.construction_status === '已完工' || p.construction_status === '已掛錶'
       ).length,
-      stuckAt: {} as Record<string, number>,
+      distribution: {} as Record<string, number>,
       avgProgress: 0,
       onHold: phase2Projects.filter(p => p.construction_status === '暫緩').length,
+      // 真正卡關：行政已過但工程未開始
+      bottlenecks: [] as { label: string; count: number }[],
     };
     
     phase2Projects.forEach(p => {
       const status = p.construction_status || '尚未開工';
-      engineeringAnalysis.stuckAt[status] = (engineeringAnalysis.stuckAt[status] || 0) + 1;
+      engineeringAnalysis.distribution[status] = (engineeringAnalysis.distribution[status] || 0) + 1;
     });
+    
+    // 找出真正卡關的案件：已備案但工程未開始
+    const adminPassedButEngineeringNotStarted = phase2Projects.filter(p => {
+      const isAdminPassed = ['同意備案', '工程施工', '報竣掛表', '設備登記'].includes(p.status);
+      const isEngineeringNotStarted = !p.construction_status || p.construction_status === '尚未開工';
+      return isAdminPassed && isEngineeringNotStarted;
+    });
+    
+    if (adminPassedButEngineeringNotStarted.length > 0) {
+      engineeringAnalysis.bottlenecks.push({ 
+        label: '已備案未開工', 
+        count: adminPassedButEngineeringNotStarted.length 
+      });
+    }
     
     engineeringAnalysis.avgProgress = phase2Projects.length > 0
       ? phase2Projects.reduce((sum, p) => sum + (p.engineering_progress || 0), 0) / phase2Projects.length
@@ -170,14 +204,6 @@ export function Phase2TracksSection({ projects, isLoading }: Phase2TracksSection
     };
   }, [phase2Projects, paymentSummary]);
 
-  // 找出最大瓶頸
-  const findBottleneck = (stuckAt: Record<string, number>): string | null => {
-    const entries = Object.entries(stuckAt);
-    if (entries.length === 0) return null;
-    const sorted = entries.sort((a, b) => b[1] - a[1]);
-    return sorted[0][0];
-  };
-
   const formatCurrency = (amount: number) => {
     if (amount >= 10000000) return `${(amount / 10000000).toFixed(1)}千萬`;
     if (amount >= 10000) return `${(amount / 10000).toFixed(0)}萬`;
@@ -201,8 +227,9 @@ export function Phase2TracksSection({ projects, isLoading }: Phase2TracksSection
     );
   }
 
-  const adminBottleneck = findBottleneck(trackData.admin.stuckAt);
-  const engineeringBottleneck = findBottleneck(trackData.engineering.stuckAt);
+  // 取得最大的真正卡關項目
+  const topAdminBottleneck = trackData.admin.bottlenecks[0];
+  const topEngineeringBottleneck = trackData.engineering.bottlenecks[0];
 
   return (
     <Card>
@@ -249,12 +276,12 @@ export function Phase2TracksSection({ projects, isLoading }: Phase2TracksSection
                   <span className="font-medium text-success">{trackData.admin.completed}</span>
                 </div>
                 
-                {adminBottleneck && (
-                  <div className="flex items-center gap-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 mt-2">
+                {topAdminBottleneck && (
+                  <div className="flex items-center gap-1 text-xs text-destructive bg-destructive/10 rounded px-2 py-1 mt-2">
                     <AlertTriangle className="w-3 h-3" />
-                    <span>卡在 {adminBottleneck}</span>
-                    <Badge variant="secondary" className="ml-auto text-[10px] h-4">
-                      {trackData.admin.stuckAt[adminBottleneck]}
+                    <span className="truncate">{topAdminBottleneck.label}</span>
+                    <Badge variant="destructive" className="ml-auto text-[10px] h-4">
+                      {topAdminBottleneck.count}
                     </Badge>
                   </div>
                 )}
@@ -300,12 +327,12 @@ export function Phase2TracksSection({ projects, isLoading }: Phase2TracksSection
                   </div>
                 )}
                 
-                {engineeringBottleneck && engineeringBottleneck !== '已完工' && engineeringBottleneck !== '已掛錶' && (
-                  <div className="flex items-center gap-1 text-xs text-warning bg-warning/10 rounded px-2 py-1 mt-2">
+                {topEngineeringBottleneck && (
+                  <div className="flex items-center gap-1 text-xs text-destructive bg-destructive/10 rounded px-2 py-1 mt-2">
                     <AlertTriangle className="w-3 h-3" />
-                    <span>{engineeringBottleneck}</span>
-                    <Badge variant="secondary" className="ml-auto text-[10px] h-4">
-                      {trackData.engineering.stuckAt[engineeringBottleneck]}
+                    <span className="truncate">{topEngineeringBottleneck.label}</span>
+                    <Badge variant="destructive" className="ml-auto text-[10px] h-4">
+                      {topEngineeringBottleneck.count}
                     </Badge>
                   </div>
                 )}
