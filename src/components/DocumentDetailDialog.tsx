@@ -417,7 +417,7 @@ export function DocumentDetailDialog({
             document.doc_type_code === 'TPC_INSPECTION';
           
           if (isInspectionDoc) {
-            (projectUpdateData as Record<string, string | null>).construction_status = '已掛表';
+            (projectUpdateData as Record<string, string | null>).construction_status = '已掛錶';
           }
         }
         
