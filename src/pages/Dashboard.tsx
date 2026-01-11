@@ -26,7 +26,7 @@ import {
   ActionRequiredSection,
   HealthKPICards,
   PhaseOverviewSection,
-  FinancialOverviewSection,
+  Phase2TracksSection,
 } from '@/components/dashboard';
 import { useAnalyticsSummary, useRiskProjects } from '@/hooks/useProjectAnalytics';
 
@@ -123,19 +123,22 @@ export default function Dashboard() {
       {/* Section 1: Phase Overview - 兩階段流程概覽 */}
       <PhaseOverviewSection projects={projects as any} />
 
-      {/* Section 2: Health KPIs + Financial Overview */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <HealthKPICards
-          totalProjects={summary?.total_projects ?? 0}
-          atRiskCount={summary?.at_risk_count ?? 0}
-          averageProgress={summary?.average_progress ?? 0}
-          pendingFixCount={pendingFixCount}
-          isLoading={summaryLoading}
-        />
-        <FinancialOverviewSection isLoading={summaryLoading} />
-      </div>
+      {/* Section 2: Phase 2 多軌並行追蹤 */}
+      <Phase2TracksSection 
+        projects={projects as any} 
+        isLoading={summaryLoading} 
+      />
 
-      {/* Section 3: Action Required - 需要立即處理的事項 */}
+      {/* Section 3: Health KPIs */}
+      <HealthKPICards
+        totalProjects={summary?.total_projects ?? 0}
+        atRiskCount={summary?.at_risk_count ?? 0}
+        averageProgress={summary?.average_progress ?? 0}
+        pendingFixCount={pendingFixCount}
+        isLoading={summaryLoading}
+      />
+
+      {/* Section 4: Action Required - 需要立即處理的事項 */}
       <ActionRequiredSection
         riskProjects={riskProjects}
         allProjects={projects as any}
