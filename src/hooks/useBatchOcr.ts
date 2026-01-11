@@ -114,14 +114,20 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
           return { success: true, dates: {}, pvId: undefined };
         }
 
+        // Parse extractedDates array from edge function response
+        // Format: [{ date: "2024-01-01", type: "submission|issue|meter_date" }]
+        const submittedAt = result.extractedDates?.find((d: { type: string; date: string }) => d.type === 'submission')?.date;
+        const issuedAt = result.extractedDates?.find((d: { type: string; date: string }) => d.type === 'issue')?.date;
+        const meterDate = result.extractedDates?.find((d: { type: string; date: string }) => d.type === 'meter_date')?.date;
+
         return {
           success: true,
           dates: {
-            submittedAt: result.updatedFields?.submitted_at,
-            issuedAt: result.updatedFields?.issued_at,
-            meterDate: result.projectUpdatedFields?.actual_meter_date,
+            submittedAt,
+            issuedAt,
+            meterDate,
           },
-          pvId: result.projectUpdatedFields?.taipower_pv_id || result.pvId,
+          pvId: result.pvId,
         };
       } catch (error: any) {
         if (error.name === 'AbortError') {
