@@ -166,22 +166,25 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
 // Fetch file content from Google Drive
 async function fetchDriveFile(driveFileId: string, accessToken: string): Promise<{ content: string; mimeType: string } | null> {
   try {
+    console.log(`[OCR] Attempting to fetch Drive file: ${driveFileId}`);
+    
     // First get file metadata to check mime type
     const metaResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=mimeType,name`,
+      `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=mimeType,name,size`,
       {
         headers: { Authorization: `Bearer ${accessToken}` },
       }
     );
 
     if (!metaResponse.ok) {
-      console.error('[OCR] Failed to get file metadata:', await metaResponse.text());
+      const errorText = await metaResponse.text();
+      console.error(`[OCR] Failed to get file metadata (${metaResponse.status}):`, errorText);
       return null;
     }
 
     const metadata = await metaResponse.json();
     const mimeType = metadata.mimeType;
-    console.log(`[OCR] Fetching Drive file: ${metadata.name}, type: ${mimeType}`);
+    console.log(`[OCR] Drive file metadata: ${metadata.name}, type: ${mimeType}, size: ${metadata.size || 'unknown'}`);
 
     // For Google Docs/Sheets/Slides, export as PDF
     let downloadUrl: string;
@@ -190,22 +193,37 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
     if (mimeType.startsWith('application/vnd.google-apps')) {
       downloadUrl = `https://www.googleapis.com/drive/v3/files/${driveFileId}/export?mimeType=application/pdf`;
       finalMimeType = 'application/pdf';
+      console.log('[OCR] Exporting Google Workspace file as PDF');
     } else {
       downloadUrl = `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`;
     }
 
+    console.log(`[OCR] Downloading from: ${downloadUrl.substring(0, 80)}...`);
+    
     const fileResponse = await fetch(downloadUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     if (!fileResponse.ok) {
-      console.error('[OCR] Failed to download file:', await fileResponse.text());
+      const errorText = await fileResponse.text();
+      console.error(`[OCR] Failed to download file (${fileResponse.status}):`, errorText);
       return null;
     }
 
     const buffer = await fileResponse.arrayBuffer();
-    const content = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+    console.log(`[OCR] Downloaded ${buffer.byteLength} bytes`);
     
+    // Handle large files more efficiently
+    const uint8Array = new Uint8Array(buffer);
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < uint8Array.length; i += chunkSize) {
+      const chunk = uint8Array.subarray(i, i + chunkSize);
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    const content = btoa(binary);
+    
+    console.log(`[OCR] Base64 encoded content length: ${content.length}`);
     return { content, mimeType: finalMimeType };
   } catch (error) {
     console.error('[OCR] Drive file fetch error:', error);
