@@ -12,8 +12,9 @@ import { zhTW } from 'date-fns/locale';
 import { useRecycleBin, type DeletedRecord } from '@/hooks/useRecycleBin';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
 import { tableDisplayNames, softDeleteTables, type SoftDeleteTable } from '@/hooks/useDeletionPolicy';
+
 
 export default function RecycleBin() {
   const [selectedTable, setSelectedTable] = useState<SoftDeleteTable | 'all'>('all');
@@ -22,8 +23,8 @@ export default function RecycleBin() {
   const [operatingId, setOperatingId] = useState<string | null>(null);
   const { isAdmin } = useAuth();
 
-  // Fetch doc_type_code options for document type filter (single source of truth)
-  const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
+  // Use unified doc type label hook
+  const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions } = useDocTypeLabel();
 
   const tableFilter = selectedTable === 'all' ? undefined : selectedTable;
   const { data: deletedRecords = [], isLoading, refetch } = useRecycleBin(tableFilter);
@@ -237,7 +238,9 @@ export default function RecycleBin() {
                     {showDocTypeFilter && (
                       <TableCell>
                         {record.table_name === 'documents' && record.raw_data?.doc_type ? (
-                          <Badge variant="outline">{record.raw_data.doc_type as string}</Badge>
+                          <Badge variant="outline">
+                            {getDocTypeLabel(record.raw_data?.doc_type_code as string, record.raw_data.doc_type as string)}
+                          </Badge>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
