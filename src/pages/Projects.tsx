@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useModuleAccess, MODULES } from '@/hooks/usePermissions';
@@ -134,6 +135,7 @@ const cities = [
 
 export default function Projects() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { canEdit, isAdmin, user } = useAuth();
   const { canCreate, canEdit: canEditProjects, canDelete } = useModuleAccess(MODULES.PROJECTS);
   const queryClient = useQueryClient();
@@ -151,8 +153,26 @@ export default function Projects() {
   const [cityFilter, setCityFilter] = useState<string>('all');
   const [constructionFilter, setConstructionFilter] = useState<string>('all');
   const [driveStatusFilter, setDriveStatusFilter] = useState<string>('all');
+  const [riskFilter, setRiskFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+
+  // Read URL params and apply filters
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    const riskParam = searchParams.get('risk');
+    const constructionParam = searchParams.get('construction');
+    
+    if (statusParam) {
+      setStatusFilter(statusParam);
+    }
+    if (riskParam) {
+      setRiskFilter(riskParam);
+    }
+    if (constructionParam) {
+      setConstructionFilter(constructionParam);
+    }
+  }, [searchParams]);
 
   // Form state
   const [formData, setFormData] = useState<Partial<ProjectInsert> & {
@@ -327,6 +347,47 @@ export default function Projects() {
     setDeletingProject(null);
   };
 
+  // Helper function to calculate risk level (same logic as RiskSection)
+  const calculateRiskLevel = (project: any): string => {
+    // 排除已完成、暫停、取消的案場
+    if (['暫停', '取消', '運維中'].includes(project.status)) return 'none';
+    
+    const now = new Date();
+    const updatedAt = new Date(project.updated_at);
+    const daysSinceUpdate = Math.floor((now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
+    
+    let riskScore = 0;
+    
+    // 風險來源 1: 長時間未更新
+    if (daysSinceUpdate >= 30) {
+      riskScore += 40;
+    } else if (daysSinceUpdate >= 21) {
+      riskScore += 20;
+    }
+    
+    // 風險來源 2: 行政進度卡關
+    const adminProgress = project.admin_progress ?? 0;
+    if (adminProgress < 50 && adminProgress > 0) {
+      riskScore += 30;
+    }
+    
+    // 風險來源 3: 工程進度落後
+    const engineeringProgress = project.engineering_progress ?? 0;
+    if (project.construction_status === '已開工' && engineeringProgress < 50) {
+      riskScore += 25;
+    }
+    
+    // 風險來源 4: 待掛錶狀態
+    if (project.construction_status === '待掛錶') {
+      riskScore += 15;
+    }
+    
+    if (riskScore >= 50) return 'high';
+    if (riskScore >= 25) return 'medium';
+    if (riskScore > 0) return 'low';
+    return 'none';
+  };
+
   // Filter projects
   const filteredProjects = projects.filter(project => {
     const matchesSearch = 
@@ -340,6 +401,13 @@ export default function Projects() {
     const matchesCity = cityFilter === 'all' || project.city === cityFilter;
     const matchesConstruction = constructionFilter === 'all' || (project as any).construction_status === constructionFilter;
     
+    // Risk filter
+    let matchesRisk = true;
+    if (riskFilter !== 'all') {
+      const projectRisk = calculateRiskLevel(project);
+      matchesRisk = projectRisk === riskFilter;
+    }
+    
     // Drive status filter
     const folderStatus = (project as any).folder_status;
     const hasFolderId = !!(project as any).drive_folder_id;
@@ -352,7 +420,7 @@ export default function Projects() {
       matchesDriveStatus = folderStatus === 'failed';
     }
     
-    return matchesSearch && matchesStatus && matchesCity && matchesConstruction && matchesDriveStatus;
+    return matchesSearch && matchesStatus && matchesCity && matchesConstruction && matchesDriveStatus && matchesRisk;
   });
 
   // Sorting (multi-column support)
