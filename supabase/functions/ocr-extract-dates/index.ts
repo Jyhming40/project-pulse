@@ -10,6 +10,8 @@ const corsHeaders = {
 const DATE_PATTERNS = [
   // ROC date format: 民國XXX年XX月XX日 or 中華民國XXX年XX月XX日
   /(?:中華)?民國\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g,
+  // ROC date without 民國 prefix: XXX年XX月XX日 (2-3 digit year, assumed ROC)
+  /(?<!西元)(?<!\d)(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g,
   // Western date: YYYY年MM月DD日
   /(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g,
   // Western date: YYYY/MM/DD or YYYY-MM-DD
@@ -52,13 +54,20 @@ function parseDate(match: RegExpMatchArray, patternIndex: number): string | null
       year = rocToWestern(parseInt(match[1]));
       month = parseInt(match[2]);
       day = parseInt(match[3]);
-    } else if (patternIndex === 1 || patternIndex === 2) {
+    } else if (patternIndex === 1) {
+      // ROC date without 民國 prefix (e.g., 110年11月24日)
+      const rawYear = parseInt(match[1]);
+      // If year is 2-3 digits and less than 200, assume ROC year
+      year = rawYear < 200 ? rocToWestern(rawYear) : rawYear;
+      month = parseInt(match[2]);
+      day = parseInt(match[3]);
+    } else if (patternIndex === 2 || patternIndex === 3) {
       // Western date
       year = parseInt(match[1]);
       month = parseInt(match[2]);
       day = parseInt(match[3]);
     } else {
-      // ROC date without 民國 (assume if year < 200, it's ROC)
+      // ROC date with slashes (assume if year < 200, it's ROC)
       const rawYear = parseInt(match[1]);
       year = rawYear < 200 ? rocToWestern(rawYear) : rawYear;
       month = parseInt(match[2]);
