@@ -380,26 +380,40 @@ export function useImportBatch() {
         : 1;
       
       // Stage 2: Insert new document with is_current=FALSE first (safe insert)
-      // Note: We do NOT auto-fill issued_at from filename date
-      // The filename date is typically the upload/version date, not the official issue date
-      // Let OCR or manual input populate issued_at with the actual document issue date
+      // Smart issued_at logic:
+      // - If filename date is > 7 days ago, it's likely the actual issue date → use it
+      // - If filename date is within 7 days, it's likely just the upload date → leave null for OCR
+      let issuedAtValue: string | null = null;
+      if (item.dateStr) {
+        const fileDate = new Date(
+          `${item.dateStr.slice(0, 4)}-${item.dateStr.slice(4, 6)}-${item.dateStr.slice(6, 8)}`
+        );
+        const today = new Date();
+        const daysDiff = Math.floor((today.getTime() - fileDate.getTime()) / (1000 * 60 * 60 * 24));
+        
+        if (daysDiff > 7) {
+          // Date is more than 7 days ago - likely the actual issue date
+          issuedAtValue = `${item.dateStr.slice(0, 4)}-${item.dateStr.slice(4, 6)}-${item.dateStr.slice(6, 8)}`;
+        }
+        // else: Date is recent (within 7 days) - skip, let OCR detect actual date
+      }
+      
       const { data: docData, error: insertError } = await supabase
         .from('documents')
         .insert({
           project_id: item.projectId,
           doc_type: docType,
-          doc_type_code: item.docTypeCode, // New field
-          agency_code: item.agencyCode, // New field
+          doc_type_code: item.docTypeCode,
+          agency_code: item.agencyCode,
           title: item.displayNamePreview.replace(`.${ext}`, ''),
           version: freshVersion,
-          is_current: false, // Start with false to avoid constraint violation
+          is_current: false,
           drive_file_id: driveFileId,
           drive_web_view_link: driveWebViewLink,
           drive_path: drivePath,
           owner_user_id: userId,
           created_by: userId,
-          // Do NOT auto-populate issued_at - let OCR detect the actual issue date from document content
-          // issued_at should come from OCR or manual entry, not from filename
+          issued_at: issuedAtValue,
         })
         .select()
         .single();
