@@ -626,52 +626,86 @@ async function performOcrWithLovableAI(imageBase64: string, mimeType: string, ma
 
 請輸出第一頁的完整文字內容：`;
 
-  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${lovableApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'google/gemini-2.5-flash',
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: ocrPrompt
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${mimeType};base64,${imageBase64}`
-              }
-            }
-          ]
-        }
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error(`[OCR] Lovable AI error (${response.status}):`, errorText);
-    
-    if (response.status === 429) {
-      throw new Error('AI 服務請求過於頻繁，請稍後再試');
-    }
-    if (response.status === 402) {
-      throw new Error('AI 服務額度不足');
-    }
-    throw new Error(`AI OCR 處理失敗: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const extractedText = data.choices?.[0]?.message?.content || '';
+  // Retry logic with exponential backoff for transient errors (502, 503, 504)
+  const maxRetries = 3;
+  let lastError: Error | null = null;
   
-  console.log(`[OCR] Lovable AI extracted ${extractedText.length} chars from first page`);
-  return extractedText;
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${lovableApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'google/gemini-2.5-flash',
+          messages: [
+            {
+              role: 'user',
+              content: [
+                {
+                  type: 'text',
+                  text: ocrPrompt
+                },
+                {
+                  type: 'image_url',
+                  image_url: {
+                    url: `data:${mimeType};base64,${imageBase64}`
+                  }
+                }
+              ]
+            }
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(`[OCR] Lovable AI error (${response.status}, attempt ${attempt}/${maxRetries}):`, errorText);
+        
+        if (response.status === 429) {
+          throw new Error('AI 服務請求過於頻繁，請稍後再試');
+        }
+        if (response.status === 402) {
+          throw new Error('AI 服務額度不足');
+        }
+        
+        // Retry on transient errors (502, 503, 504)
+        if ([502, 503, 504].includes(response.status) && attempt < maxRetries) {
+          const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+          console.log(`[OCR] Transient error ${response.status}, retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+        
+        throw new Error(`AI OCR 處理失敗: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const extractedText = data.choices?.[0]?.message?.content || '';
+      
+      console.log(`[OCR] Lovable AI extracted ${extractedText.length} chars from first page`);
+      return extractedText;
+      
+    } catch (error) {
+      lastError = error as Error;
+      
+      // Don't retry on non-transient errors
+      if ((error as Error).message.includes('請求過於頻繁') || 
+          (error as Error).message.includes('額度不足')) {
+        throw error;
+      }
+      
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt) * 1000;
+        console.log(`[OCR] Error occurred, retrying in ${delay}ms...`, (error as Error).message);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  
+  throw lastError || new Error('AI OCR 處理失敗');
 }
 
 serve(async (req) => {
