@@ -191,33 +191,37 @@ export function OcrResultDialog({
                   偵測到 {extractedDates.length} 個日期
                 </div>
 
-                {/* All detected dates */}
-                <div className="space-y-3">
-                  {extractedDates.map((dateInfo, index) => (
-                    <div
-                      key={index}
-                      className="p-3 border rounded-lg bg-muted/30 space-y-2"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span className="font-mono font-medium">{dateInfo.date}</span>
-                          <Badge className={getTypeBadgeColor(dateInfo.type)}>
-                            {getTypeLabel(dateInfo.type)}
-                          </Badge>
+                {/* All detected dates with scrollable context */}
+                <ScrollArea className="max-h-48">
+                  <div className="space-y-3 pr-3">
+                    {extractedDates.map((dateInfo, index) => (
+                      <div
+                        key={index}
+                        className="p-3 border rounded-lg bg-muted/30 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-muted-foreground" />
+                            <span className="font-mono font-medium">{dateInfo.date}</span>
+                            <Badge className={getTypeBadgeColor(dateInfo.type)}>
+                              {getTypeLabel(dateInfo.type)}
+                            </Badge>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            信心度: {formatConfidence(dateInfo.confidence)}
+                          </span>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          信心度: {formatConfidence(dateInfo.confidence)}
-                        </span>
+                        {dateInfo.context && (
+                          <ScrollArea className="h-20 w-full">
+                            <div className="text-xs text-muted-foreground bg-background p-2 rounded whitespace-pre-wrap">
+                              ...{dateInfo.context}...
+                            </div>
+                          </ScrollArea>
+                        )}
                       </div>
-                      {dateInfo.context && (
-                        <p className="text-xs text-muted-foreground line-clamp-2 bg-background p-2 rounded">
-                          ...{dateInfo.context}...
-                        </p>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                </ScrollArea>
               </div>
             ) : (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
