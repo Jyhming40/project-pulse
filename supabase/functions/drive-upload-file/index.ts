@@ -533,12 +533,25 @@ serve(async (req) => {
     const file = formData.get('file') as File;
     // Optional: allow manual subfolder override from batch upload
     const manualSubfolderCode = formData.get('subfolderCode') as string | null;
+    // Optional: issued date from filename (ISO format: YYYY-MM-DD)
+    const issuedAtStr = formData.get('issuedAt') as string | null;
 
     if (!projectId || !documentType || !title || !file) {
       return new Response(
         JSON.stringify({ error: '缺少必要參數：projectId, documentType, title, file' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+    
+    // Parse issued_at date if provided
+    let issuedAt: string | null = null;
+    if (issuedAtStr) {
+      // Validate date format (YYYY-MM-DD)
+      const dateMatch = issuedAtStr.match(/^\d{4}-\d{2}-\d{2}$/);
+      if (dateMatch) {
+        issuedAt = issuedAtStr;
+        console.log(`[drive-upload-file] Parsed issued_at from filename: ${issuedAt}`);
+      }
     }
 
     // Get project
@@ -644,23 +657,31 @@ serve(async (req) => {
       }
     }
 
-    // Insert new document record
+    // Insert new document record with issued_at if available
+    const insertData: Record<string, unknown> = {
+      project_id: projectId,
+      doc_type: documentType,
+      doc_status: 'draft',
+      title: title,
+      version: newVersion,
+      is_current: true,
+      drive_file_id: uploadResult.id,
+      drive_web_view_link: uploadResult.webViewLink,
+      drive_path: drivePath,
+      drive_parent_folder_id: subfolder.id,
+      created_by: user.id,
+      owner_user_id: user.id,
+    };
+    
+    // Add issued_at if extracted from filename
+    if (issuedAt) {
+      insertData.issued_at = issuedAt;
+      console.log(`[drive-upload-file] Setting issued_at to: ${issuedAt}`);
+    }
+    
     const { data: newDoc, error: insertError } = await supabase
       .from('documents')
-      .insert({
-        project_id: projectId,
-        doc_type: documentType,
-        doc_status: 'draft',
-        title: title,
-        version: newVersion,
-        is_current: true,
-        drive_file_id: uploadResult.id,
-        drive_web_view_link: uploadResult.webViewLink,
-        drive_path: drivePath,
-        drive_parent_folder_id: subfolder.id,
-        created_by: user.id,
-        owner_user_id: user.id,
-      })
+      .insert(insertData)
       .select()
       .single();
 

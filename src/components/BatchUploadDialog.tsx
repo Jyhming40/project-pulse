@@ -183,6 +183,32 @@ function inferDocTypeFromFilename(filename: string): string | null {
   return null;
 }
 
+// Parse date from filename (YYYYMMDD format)
+function parseDateFromFilename(filename: string): string | null {
+  // Match YYYYMMDD pattern (e.g., 20260110)
+  const match = filename.match(/(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])/);
+  if (match) {
+    return match[0]; // Return YYYYMMDD
+  }
+  
+  // Match YYYY-MM-DD pattern
+  const dashMatch = filename.match(/(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])/);
+  if (dashMatch) {
+    return dashMatch[0].replace(/-/g, '');
+  }
+  
+  return null;
+}
+
+// Convert YYYYMMDD to ISO date string
+function convertToISODate(dateStr: string | null): string | null {
+  if (!dateStr || dateStr.length !== 8) return null;
+  const year = dateStr.substring(0, 4);
+  const month = dateStr.substring(4, 6);
+  const day = dateStr.substring(6, 8);
+  return `${year}-${month}-${day}`;
+}
+
 interface FileItem {
   id: string;
   file: File;
@@ -191,6 +217,7 @@ interface FileItem {
   title: string;
   subfolderCode: string;
   subfolderName: string;
+  issuedDateStr: string | null; // YYYYMMDD format extracted from filename
   status: 'pending' | 'uploading' | 'success' | 'error';
   error?: string;
 }
@@ -267,6 +294,9 @@ export function BatchUploadDialog({
       const subfolderCode = 'OFFICIAL_DOC';
       // Infer agency code from doc_type_code
       const agencyCode = getAgencyCodeByDocTypeCode(inferredDocType) || 'OTHER';
+      
+      // Parse date from filename (e.g., 20260110 from "2021HYE011-2021_台電_審訖圖_20260110_v01")
+      const issuedDateStr = parseDateFromFilename(file.name);
 
       // Generate standardized title
       const standardTitle = generateStandardTitle(inferredDocType, agencyCode);
@@ -279,6 +309,7 @@ export function BatchUploadDialog({
         title: standardTitle,
         subfolderCode,
         subfolderName: getSubfolderName(subfolderCode),
+        issuedDateStr,
         status: 'pending' as const,
       };
     });
@@ -337,6 +368,14 @@ export function BatchUploadDialog({
     formData.append('file', item.file);
     // Pass the selected subfolder code to override default
     formData.append('subfolderCode', item.subfolderCode);
+    
+    // Pass issued date if extracted from filename
+    if (item.issuedDateStr) {
+      const isoDate = convertToISODate(item.issuedDateStr);
+      if (isoDate) {
+        formData.append('issuedAt', isoDate);
+      }
+    }
 
     try {
       const response = await fetch(
