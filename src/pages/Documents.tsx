@@ -198,6 +198,13 @@ export default function Documents() {
         if (selectedOption && doc.doc_type === selectedOption.label) {
           matchesType = true;
         }
+        // 額外處理：比對顯示的標籤（處理舊代碼如 OTHER → 其他）
+        if (!matchesType && selectedOption) {
+          const displayLabel = getDocTypeLabel(doc.doc_type_code, doc.doc_type);
+          if (displayLabel === selectedOption.label) {
+            matchesType = true;
+          }
+        }
       }
     }
     
