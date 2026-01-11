@@ -17,6 +17,7 @@ import {
   Loader2,
   Clock,
   AlertTriangle,
+  HelpCircle,
 } from 'lucide-react';
 import type { OcrTask, BatchOcrProgress } from '@/hooks/useBatchOcr';
 
@@ -55,6 +56,8 @@ export function BatchOcrDialog({
         return <XCircle className="w-4 h-4 text-destructive" />;
       case 'skipped':
         return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+      case 'review':
+        return <HelpCircle className="w-4 h-4 text-orange-500" />;
     }
   };
 
@@ -70,6 +73,8 @@ export function BatchOcrDialog({
         return <Badge variant="destructive">失敗</Badge>;
       case 'skipped':
         return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">已跳過</Badge>;
+      case 'review':
+        return <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">需確認</Badge>;
     }
   };
 
@@ -109,7 +114,7 @@ export function BatchOcrDialog({
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-4 gap-2 text-center text-sm">
+          <div className="grid grid-cols-5 gap-2 text-center text-sm">
             <div className="p-2 rounded-lg bg-muted">
               <p className="text-lg font-bold">{progress.total}</p>
               <p className="text-xs text-muted-foreground">總計</p>
@@ -117,6 +122,10 @@ export function BatchOcrDialog({
             <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
               <p className="text-lg font-bold text-green-600 dark:text-green-400">{progress.success}</p>
               <p className="text-xs text-green-600 dark:text-green-400">成功</p>
+            </div>
+            <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+              <p className="text-lg font-bold text-orange-600 dark:text-orange-400">{progress.review}</p>
+              <p className="text-xs text-orange-600 dark:text-orange-400">需確認</p>
             </div>
             <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
               <p className="text-lg font-bold text-red-600 dark:text-red-400">{progress.error}</p>
@@ -130,9 +139,9 @@ export function BatchOcrDialog({
         </div>
 
         {/* Task List */}
-        <ScrollArea className="flex-1 border rounded-lg">
+        <ScrollArea className="flex-1 min-h-[200px] max-h-[40vh] border rounded-lg">
           <div className="p-2 space-y-1">
-            {tasks.map((task, index) => (
+            {tasks.map((task) => (
               <div
                 key={task.documentId}
                 className={`flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${
@@ -142,7 +151,9 @@ export function BatchOcrDialog({
                       ? 'bg-green-50 dark:bg-green-900/10'
                       : task.status === 'error'
                         ? 'bg-red-50 dark:bg-red-900/10'
-                        : 'hover:bg-muted/50'
+                        : task.status === 'review'
+                          ? 'bg-orange-50 dark:bg-orange-900/10'
+                          : 'hover:bg-muted/50'
                 }`}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
