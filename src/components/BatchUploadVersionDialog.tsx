@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
+import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
 import { format } from 'date-fns';
 import {
   Dialog,
@@ -63,6 +64,7 @@ export function BatchUploadVersionDialog({
   const queryClient = useQueryClient();
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const syncMilestones = useSyncAdminMilestones();
+  const { getLabel: getDocTypeLabel } = useDocTypeLabel();
   
   const [uploadItems, setUploadItems] = useState<Record<string, UploadItem>>(() =>
     Object.fromEntries(
@@ -262,7 +264,7 @@ export function BatchUploadVersionDialog({
                     <div className="flex items-center gap-2">
                       <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
                       <span className="font-medium truncate">
-                        {doc.title || doc.doc_type}
+                        {doc.title || getDocTypeLabel(null, doc.doc_type)}
                       </span>
                       <Badge variant="outline" className="shrink-0">
                         v{doc.version || 1}

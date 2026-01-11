@@ -45,6 +45,27 @@ const SUBMISSION_PATTERN_APPLY_DATE = /申請日[期]?[：:]\s*(?:中華)?民?�
 // 本府/本所/本局 XXX年XX月XX日 收件/收文
 const SUBMISSION_PATTERN_RECEIPT = /(?:本府|本所|本局)\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*(?:收文|收件)/;
 
+// ============================================================
+// 審查意見書專用的送件日模式（新增）
+// ============================================================
+// 「貴公司 XXX年XX月XX日 XXX號函申請」模式
+const SUBMISSION_PATTERN_GUIGONGSI_SHENQING = /貴公司\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*[\w\d]*(?:號)?(?:函)?(?:申請|辦理|送件)/;
+
+// 「貴公司申請...收件日期」模式
+const SUBMISSION_PATTERN_SHOUJIAN_RIQI = /收件日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
+
+// 「申請人...XXX年XX月XX日...申請」模式（審查意見書常見）
+const SUBMISSION_PATTERN_SHENQINGREN = /申請[人者]\s*[\w\W]*?(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*[\w\W]{0,20}(?:申請|辦理|送件)/;
+
+// 「復XXX年XX月XX日函」或「復...XXX年XX月XX日」模式
+const SUBMISSION_PATTERN_FU_HAN = /復[^\d]*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日(?:\s*函)?/;
+
+// 「受理日期：XXX年XX月XX日」模式
+const SUBMISSION_PATTERN_SHOULI = /受理日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
+
+// 「掛號日期：XXX年XX月XX日」模式
+const SUBMISSION_PATTERN_GUAHAO = /掛號日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
+
 // 核發日關鍵字模式
 const ISSUE_PATTERN_OFFICIAL = /發文日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
 
@@ -347,7 +368,120 @@ function extractDatesFromText(text: string, docTitle?: string): ExtractedData {
   }
   
   // ============================================================
-  // 優先級 1.5: 派員訪查併聯函 - 提取「實際掛表日」
+  // 優先級 1.5: 審查意見書專用送件日模式
+  // ============================================================
+  if (isShenchaYijian && !results.some(r => r.type === 'submission')) {
+    // 1.5a. 「貴公司 XXX年XX月XX日 函申請」
+    const guigongsiShenqingMatch = text.match(SUBMISSION_PATTERN_GUIGONGSI_SHENQING);
+    if (guigongsiShenqingMatch) {
+      const date = extractDateFromPatternMatch(guigongsiShenqingMatch);
+      if (date && !processedDates.has(date + '_submission')) {
+        const idx = text.indexOf(guigongsiShenqingMatch[0]);
+        if (!isExcludedDate(text, idx)) {
+          processedDates.add(date + '_submission');
+          results.push({
+            type: 'submission',
+            date,
+            context: text.slice(Math.max(0, idx - 20), idx + guigongsiShenqingMatch[0].length + 20).replace(/\s+/g, ' '),
+            confidence: 0.95,
+            source: '貴公司函申請',
+          });
+          console.log(`[OCR] Found submission date via 貴公司函申請: ${date}`);
+        }
+      }
+    }
+    
+    // 1.5b. 「收件日期：XXX年XX月XX日」
+    if (!results.some(r => r.type === 'submission')) {
+      const shoujianRiqiMatch = text.match(SUBMISSION_PATTERN_SHOUJIAN_RIQI);
+      if (shoujianRiqiMatch) {
+        const date = extractDateFromPatternMatch(shoujianRiqiMatch);
+        if (date && !processedDates.has(date + '_submission')) {
+          const idx = text.indexOf(shoujianRiqiMatch[0]);
+          if (!isExcludedDate(text, idx)) {
+            processedDates.add(date + '_submission');
+            results.push({
+              type: 'submission',
+              date,
+              context: text.slice(Math.max(0, idx - 20), idx + shoujianRiqiMatch[0].length + 20).replace(/\s+/g, ' '),
+              confidence: 0.95,
+              source: '收件日期',
+            });
+            console.log(`[OCR] Found submission date via 收件日期: ${date}`);
+          }
+        }
+      }
+    }
+    
+    // 1.5c. 「受理日期：XXX年XX月XX日」
+    if (!results.some(r => r.type === 'submission')) {
+      const shouliMatch = text.match(SUBMISSION_PATTERN_SHOULI);
+      if (shouliMatch) {
+        const date = extractDateFromPatternMatch(shouliMatch);
+        if (date && !processedDates.has(date + '_submission')) {
+          const idx = text.indexOf(shouliMatch[0]);
+          if (!isExcludedDate(text, idx)) {
+            processedDates.add(date + '_submission');
+            results.push({
+              type: 'submission',
+              date,
+              context: text.slice(Math.max(0, idx - 20), idx + shouliMatch[0].length + 20).replace(/\s+/g, ' '),
+              confidence: 0.93,
+              source: '受理日期',
+            });
+            console.log(`[OCR] Found submission date via 受理日期: ${date}`);
+          }
+        }
+      }
+    }
+    
+    // 1.5d. 「掛號日期：XXX年XX月XX日」
+    if (!results.some(r => r.type === 'submission')) {
+      const guahaoMatch = text.match(SUBMISSION_PATTERN_GUAHAO);
+      if (guahaoMatch) {
+        const date = extractDateFromPatternMatch(guahaoMatch);
+        if (date && !processedDates.has(date + '_submission')) {
+          const idx = text.indexOf(guahaoMatch[0]);
+          if (!isExcludedDate(text, idx)) {
+            processedDates.add(date + '_submission');
+            results.push({
+              type: 'submission',
+              date,
+              context: text.slice(Math.max(0, idx - 20), idx + guahaoMatch[0].length + 20).replace(/\s+/g, ' '),
+              confidence: 0.90,
+              source: '掛號日期',
+            });
+            console.log(`[OCR] Found submission date via 掛號日期: ${date}`);
+          }
+        }
+      }
+    }
+    
+    // 1.5e. 「復...XXX年XX月XX日函」
+    if (!results.some(r => r.type === 'submission')) {
+      const fuHanMatch = text.match(SUBMISSION_PATTERN_FU_HAN);
+      if (fuHanMatch) {
+        const date = extractDateFromPatternMatch(fuHanMatch);
+        if (date && !processedDates.has(date + '_submission')) {
+          const idx = text.indexOf(fuHanMatch[0]);
+          if (!isExcludedDate(text, idx)) {
+            processedDates.add(date + '_submission');
+            results.push({
+              type: 'submission',
+              date,
+              context: text.slice(Math.max(0, idx - 20), idx + fuHanMatch[0].length + 20).replace(/\s+/g, ' '),
+              confidence: 0.88,
+              source: '復函',
+            });
+            console.log(`[OCR] Found submission date via 復函: ${date}`);
+          }
+        }
+      }
+    }
+  }
+  
+  // ============================================================
+  // 優先級 1.6: 派員訪查併聯函 - 提取「實際掛表日」
   // ============================================================
   if (isPaiyuanFangcha) {
     // 嘗試匹配「併聯運轉日: XXX年XX月XX日」
@@ -388,11 +522,12 @@ function extractDatesFromText(text: string, docTitle?: string): ExtractedData {
   }
   
   // ============================================================
-  // 優先級 1.6: 審查意見書 - 提取「PV 編號」
+  // 優先級 1.7: 審查意見書 - 提取「PV 編號」
   // ============================================================
   if (isShenchaYijian) {
     extractedPvId = extractPvId(text);
   }
+
   
   // ============================================================
   // 優先級 2: 提取核發日 - 「發文日期: XXX年XX月XX日」
