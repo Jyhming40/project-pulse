@@ -410,6 +410,15 @@ export function DocumentDetailDialog({
         
         if (meterDate) {
           projectUpdateData.actual_meter_date = meterDate;
+          
+          // If this is a 派員訪查併聯函, also update construction_status to 已掛表
+          const isInspectionDoc = 
+            document.doc_type === '派員訪查併聯函' || 
+            document.doc_type_code === 'TPC_INSPECTION';
+          
+          if (isInspectionDoc) {
+            (projectUpdateData as Record<string, string | null>).construction_status = '已掛表';
+          }
         }
         
         if (pvId) {
@@ -432,7 +441,9 @@ export function DocumentDetailDialog({
             p_action: 'UPDATE',
             p_old_data: {},
             p_new_data: projectUpdateData,
-            p_reason: 'OCR 擷取帶入專案資料',
+            p_reason: meterDate && (document.doc_type === '派員訪查併聯函' || document.doc_type_code === 'TPC_INSPECTION') 
+              ? 'OCR 擷取帶入專案資料，並自動更新工程狀態為已掛表' 
+              : 'OCR 擷取帶入專案資料',
           });
         }
         
