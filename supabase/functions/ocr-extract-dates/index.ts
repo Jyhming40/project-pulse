@@ -18,6 +18,8 @@ const DATE_PATTERNS = [
   /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/g,
   // ROC date: XXX/MM/DD (ROC year format)
   /(\d{2,3})[\/\-](\d{1,2})[\/\-](\d{1,2})/g,
+  // ROC date with dots: XXX. M. DD or XXX.M.DD (審查章常用格式)
+  /(\d{2,3})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})/g,
 ];
 
 // ============================================================
@@ -71,6 +73,15 @@ const SUBMISSION_PATTERN_GUAHAO = /掛號日期[：:]\s*(?:中華)?民?國?\s*(\
 
 // 核發日關鍵字模式
 const ISSUE_PATTERN_OFFICIAL = /發文日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
+
+// ============================================================
+// 審查章日期模式 - 用於細部協商、審訖圖等文件的核發日
+// ============================================================
+// 審查章日期格式：「XXX. M. DD」或「XXX.M.DD」（用點分隔的民國年月日）
+// 通常出現在「台灣電力公司XX區營業處 審查章」附近
+const STAMP_DATE_PATTERN_DOTS = /(\d{2,3})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})/;
+// 審查章關鍵字
+const STAMP_KEYWORDS = ['審查章', '審核章', '審定章', '審訖章', '核章', '核准章', '營業處'];
 
 // 排除關鍵字 - 這些日期不應被作為送件日或核發日
 const EXCLUDED_KEYWORDS = [
@@ -224,7 +235,17 @@ function extractDatesFromText(text: string, docTitle?: string): ExtractedData {
                           text.includes('審查意見書') ||
                           text.includes('再生能源發電設備');
   
-  console.log(`[OCR] Document type detection: isPaiyuanFangcha=${isPaiyuanFangcha}, isShenchaYijian=${isShenchaYijian}`);
+  // 檢查是否為細部協商或審訖圖（這類文件常有審查章）
+  const isXiebuXieshang = docTitle?.includes('細部協商') ||
+                          docTitle?.includes('審訖圖') ||
+                          docTitle?.includes('配電外線') ||
+                          text.includes('細部協商') ||
+                          text.includes('審訖圖');
+  
+  // 檢查文字中是否有審查章相關關鍵字
+  const hasStampKeyword = STAMP_KEYWORDS.some(kw => text.includes(kw));
+  
+  console.log(`[OCR] Document type detection: isPaiyuanFangcha=${isPaiyuanFangcha}, isShenchaYijian=${isShenchaYijian}, isXiebuXieshang=${isXiebuXieshang}, hasStampKeyword=${hasStampKeyword}`);
 
   // ============================================================
   // 優先級 1: 使用文件類型特定的模式提取（最高置信度）
@@ -569,6 +590,35 @@ function extractDatesFromText(text: string, docTitle?: string): ExtractedData {
         source: '發文日期',
       });
       console.log(`[OCR] Found issue date via 發文日期: ${date}`);
+    }
+  }
+  
+  // ============================================================
+  // 優先級 2.5: 審查章日期辨識（細部協商、審訖圖等文件）
+  // 審查章上的日期通常為核發日，格式為「XXX. M. DD」
+  // ============================================================
+  if ((isXiebuXieshang || hasStampKeyword) && !results.some(r => r.type === 'issue')) {
+    const stampDateMatch = text.match(STAMP_DATE_PATTERN_DOTS);
+    if (stampDateMatch) {
+      const date = extractDateFromPatternMatch(stampDateMatch);
+      if (date && !processedDates.has(date + '_issue')) {
+        const idx = text.indexOf(stampDateMatch[0]);
+        // 確認這個日期附近有審查章相關關鍵字
+        const nearbyText = text.slice(Math.max(0, idx - 150), Math.min(text.length, idx + 150));
+        const hasNearbyStampKeyword = STAMP_KEYWORDS.some(kw => nearbyText.includes(kw));
+        
+        if (hasNearbyStampKeyword) {
+          processedDates.add(date + '_issue');
+          results.push({
+            type: 'issue',
+            date,
+            context: text.slice(Math.max(0, idx - 50), idx + stampDateMatch[0].length + 50).replace(/\s+/g, ' '),
+            confidence: 0.95,
+            source: '審查章日期',
+          });
+          console.log(`[OCR] Found issue date via 審查章: ${date}`);
+        }
+      }
     }
   }
   
