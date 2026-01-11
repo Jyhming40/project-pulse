@@ -269,14 +269,17 @@ export function DocumentDetailDialog({
 
   // OCR date extraction handler
   const handleOcrExtract = async () => {
-    if (!documentId || files.length === 0) {
-      toast.error('沒有可處理的檔案');
+    if (!documentId) {
+      toast.error('沒有文件 ID');
       return;
     }
 
-    const currentFile = files.find(f => f.document_id === documentId);
-    if (!currentFile) {
-      toast.error('找不到檔案');
+    // Check if document has a Drive file or local files
+    const hasDriveFile = !!document?.drive_file_id;
+    const hasLocalFile = files.some(f => f.document_id === documentId);
+    
+    if (!hasDriveFile && !hasLocalFile) {
+      toast.error('沒有可處理的檔案');
       return;
     }
 
@@ -360,7 +363,7 @@ export function DocumentDetailDialog({
                     variant="outline" 
                     size="sm" 
                     onClick={handleOcrExtract}
-                    disabled={isOcrProcessing || files.length === 0}
+                    disabled={isOcrProcessing || (!document.drive_file_id && files.length === 0)}
                   >
                     {isOcrProcessing ? (
                       <>
