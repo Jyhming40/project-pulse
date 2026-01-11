@@ -779,7 +779,7 @@ export default function Documents() {
               label: '批次 OCR 辨識',
               icon: <ScanText className="w-4 h-4" />,
               onClick: async () => {
-                // Prepare documents for batch OCR
+                // Prepare documents for batch OCR with existing data info
                 const docsForOcr = batchSelect.selectedItems.map(doc => ({
                   id: doc.id,
                   title: doc.title || doc.doc_type,
@@ -788,6 +788,9 @@ export default function Documents() {
                   hasDriveFile: !!doc.drive_file_id,
                   hasSubmittedAt: !!doc.submitted_at,
                   hasIssuedAt: !!doc.issued_at,
+                  submittedAt: doc.submitted_at,
+                  issuedAt: doc.issued_at,
+                  pvId: (doc as any).taipower_pv_id || null,
                 }));
                 
                 setIsBatchOcrOpen(true);
