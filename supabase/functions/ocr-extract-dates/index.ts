@@ -328,10 +328,12 @@ serve(async (req) => {
     let imageBase64: string | null = null;
     let documentId: string | null = null;
     let mimeType = 'application/pdf';
+    let autoUpdate = false; // Default to NOT auto-update, let user confirm
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
       documentId = formData.get('documentId') as string | null;
+      autoUpdate = formData.get('autoUpdate') === 'true';
       const file = formData.get('file') as File | null;
       
       if (file) {
@@ -351,6 +353,7 @@ serve(async (req) => {
       documentId = body.documentId;
       imageBase64 = body.imageBase64;
       mimeType = body.mimeType || 'application/pdf';
+      autoUpdate = body.autoUpdate === true;
     }
 
     // If no file provided but documentId exists, try to fetch from Drive
@@ -462,9 +465,10 @@ serve(async (req) => {
     const extractedDates = extractDatesFromText(fullText);
     console.log(`[OCR] Extracted ${extractedDates.length} dates`);
 
-    // If documentId provided, optionally update the document
+    // Only update if autoUpdate is true (for batch upload)
+    // Otherwise just return results for user confirmation
     let updatedFields: Record<string, string> = {};
-    if (documentId && extractedDates.length > 0) {
+    if (autoUpdate && documentId && extractedDates.length > 0) {
       // Find best submission and issue dates
       const submissionDate = extractedDates.find(d => d.type === 'submission');
       const issueDate = extractedDates.find(d => d.type === 'issue');
@@ -490,9 +494,11 @@ serve(async (req) => {
         if (updateError) {
           console.error('[OCR] Update error:', updateError);
         } else {
-          console.log('[OCR] Document updated:', updatedFields);
+          console.log('[OCR] Document auto-updated:', updatedFields);
         }
       }
+    } else {
+      console.log('[OCR] Returning results for user confirmation (autoUpdate=false)');
     }
 
     return new Response(

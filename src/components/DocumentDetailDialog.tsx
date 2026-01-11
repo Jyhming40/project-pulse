@@ -63,6 +63,14 @@ import { toast } from 'sonner';
 import { DocumentVersionCompare } from './DocumentVersionCompare';
 import { DocumentTagSelector } from './DocumentTagSelector';
 import { DeleteConfirmDialog } from './DeleteConfirmDialog';
+import { OcrResultDialog } from './OcrResultDialog';
+
+interface ExtractedDate {
+  type: 'submission' | 'issue' | 'unknown';
+  date: string;
+  context: string;
+  confidence: number;
+}
 
 interface DocumentDetailDialogProps {
   open: boolean;
@@ -83,6 +91,12 @@ export function DocumentDetailDialog({
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+  const [isOcrResultOpen, setIsOcrResultOpen] = useState(false);
+  const [ocrResults, setOcrResults] = useState<{
+    extractedDates: ExtractedDate[];
+    fullText: string;
+  }>({ extractedDates: [], fullText: '' });
+  const [isUpdatingFromOcr, setIsUpdatingFromOcr] = useState(false);
   const [editData, setEditData] = useState({
     doc_type: '',
     submitted_at: '',
@@ -291,13 +305,11 @@ export function DocumentDetailDialog({
         throw new Error('請先登入');
       }
 
-      // For Drive files, we need to get the file content from Drive
-      // For now, we'll use the storage_path as the file identifier
+      // Call OCR without auto-update - let user confirm
       const response = await supabase.functions.invoke('ocr-extract-dates', {
         body: {
           documentId,
-          // If the file is stored in Drive, the edge function will need to fetch it
-          // For local storage, we'd pass the base64 content
+          autoUpdate: false, // Don't auto-update, show results for confirmation
         },
       });
 
@@ -309,22 +321,14 @@ export function DocumentDetailDialog({
       
       if (result.success) {
         const extractedCount = result.extractedDates?.length || 0;
-        const updatedCount = Object.keys(result.updatedFields || {}).length;
         
-        if (updatedCount > 0) {
-          // Refresh document data
-          queryClient.invalidateQueries({ queryKey: ['document-detail', documentId] });
-          queryClient.invalidateQueries({ queryKey: ['all-documents'] });
-          
-          const updates: string[] = [];
-          if (result.updatedFields.submitted_at) updates.push(`送件日: ${result.updatedFields.submitted_at}`);
-          if (result.updatedFields.issued_at) updates.push(`核發日: ${result.updatedFields.issued_at}`);
-          
-          toast.success('OCR 日期擷取成功', {
-            description: updates.join('、'),
+        if (extractedCount > 0) {
+          // Show OCR results dialog for user confirmation
+          setOcrResults({
+            extractedDates: result.extractedDates,
+            fullText: result.fullText || '',
           });
-        } else if (extractedCount > 0) {
-          toast.info(`偵測到 ${extractedCount} 個日期，但無法確認類型`);
+          setIsOcrResultOpen(true);
         } else {
           toast.info('未偵測到日期資訊');
         }
@@ -336,6 +340,72 @@ export function DocumentDetailDialog({
       toast.error('OCR 處理失敗', { description: error.message });
     } finally {
       setIsOcrProcessing(false);
+    }
+  };
+
+  // Handle OCR result confirmation
+  const handleOcrConfirm = async (submittedAt: string | null, issuedAt: string | null) => {
+    if (!documentId) return;
+
+    setIsUpdatingFromOcr(true);
+
+    try {
+      const updateData: Record<string, string | null> = {
+        updated_at: new Date().toISOString(),
+      };
+      
+      if (submittedAt) {
+        updateData.submitted_at = submittedAt;
+      }
+      
+      if (issuedAt) {
+        updateData.issued_at = issuedAt;
+      }
+
+      const { error } = await supabase
+        .from('documents')
+        .update(updateData)
+        .eq('id', documentId);
+
+      if (error) throw error;
+
+      // Log audit
+      await supabase.rpc('log_audit_action', {
+        p_table_name: 'documents',
+        p_record_id: documentId,
+        p_action: 'UPDATE',
+        p_old_data: {
+          submitted_at: document?.submitted_at,
+          issued_at: document?.issued_at,
+        },
+        p_new_data: updateData,
+        p_reason: 'OCR 日期擷取確認',
+      });
+
+      // Refresh data
+      queryClient.invalidateQueries({ queryKey: ['document-detail', documentId] });
+      queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+      queryClient.invalidateQueries({ queryKey: ['project-documents'] });
+
+      // Sync milestones if needed
+      if (document?.project_id) {
+        syncMilestones.mutate(document.project_id);
+      }
+
+      const updates: string[] = [];
+      if (submittedAt) updates.push(`送件日: ${submittedAt}`);
+      if (issuedAt) updates.push(`核發日: ${issuedAt}`);
+      
+      toast.success('日期已更新', {
+        description: updates.join('、'),
+      });
+
+      setIsOcrResultOpen(false);
+    } catch (error: any) {
+      console.error('Update error:', error);
+      toast.error('更新失敗', { description: error.message });
+    } finally {
+      setIsUpdatingFromOcr(false);
     }
   };
 
@@ -764,6 +834,18 @@ export function DocumentDetailDialog({
       tableName="documents"
       isPending={isDeleting}
       hasDriveFile={!!document?.drive_file_id}
+    />
+
+    {/* OCR Result Confirmation Dialog */}
+    <OcrResultDialog
+      open={isOcrResultOpen}
+      onOpenChange={setIsOcrResultOpen}
+      extractedDates={ocrResults.extractedDates}
+      fullText={ocrResults.fullText}
+      currentSubmittedAt={document?.submitted_at || null}
+      currentIssuedAt={document?.issued_at || null}
+      onConfirm={handleOcrConfirm}
+      isUpdating={isUpdatingFromOcr}
     />
   </>
   );
