@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { 
@@ -22,6 +23,8 @@ export function HealthKPICards({
   pendingFixCount,
   isLoading = false,
 }: HealthKPICardsProps) {
+  const navigate = useNavigate();
+
   if (isLoading) {
     return (
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -44,6 +47,7 @@ export function HealthKPICards({
       icon: Building2,
       iconColor: 'text-primary',
       bgColor: 'bg-primary/10',
+      onClick: () => navigate('/projects'),
     },
     {
       title: '風險案場',
@@ -52,6 +56,7 @@ export function HealthKPICards({
       iconColor: 'text-destructive',
       bgColor: 'bg-destructive/10',
       highlight: atRiskCount > 0,
+      onClick: () => navigate('/projects?risk=high'),
     },
     {
       title: '待補件',
@@ -60,6 +65,7 @@ export function HealthKPICards({
       iconColor: 'text-warning',
       bgColor: 'bg-warning/10',
       highlight: pendingFixCount > 0,
+      onClick: () => navigate('/projects?status=台電審查'),
     },
     {
       title: '平均進度',
@@ -74,7 +80,11 @@ export function HealthKPICards({
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
       {cards.map((card) => (
-        <Card key={card.title} className={card.highlight ? 'border-destructive/50' : ''}>
+        <Card 
+          key={card.title} 
+          className={`${card.highlight ? 'border-destructive/50' : ''} ${card.onClick ? 'cursor-pointer hover:bg-accent/50 transition-colors' : ''}`}
+          onClick={card.onClick}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
