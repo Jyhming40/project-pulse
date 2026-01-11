@@ -184,9 +184,15 @@ export default function Documents() {
       doc.note?.toLowerCase().includes(searchLower);
     
     // Type filter - check both doc_type_code and doc_type for backward compatibility
-    const matchesType = typeFilter === 'all' || 
+    // Special handling: '審查意見書' filter should also match 'TPC_REVIEW_SIMPLE' and doc_type '審查意見書'
+    let matchesType = typeFilter === 'all' || 
       doc.doc_type_code === typeFilter || 
       doc.doc_type === typeFilter;
+    
+    // Handle special case for 審查意見書 (matches both label and old doc_type values)
+    if (!matchesType && typeFilter === 'TPC_REVIEW_SIMPLE') {
+      matchesType = doc.doc_type === '審查意見書';
+    }
     
     // Agency filter - use doc_type_code or agency_code
     let matchesAgency = agencyFilter === 'all';
