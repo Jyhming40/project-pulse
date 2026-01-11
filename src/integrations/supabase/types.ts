@@ -1159,6 +1159,45 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_milestones: {
+        Row: {
+          created_at: string | null
+          default_percentage: number | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          payment_code: string
+          payment_name: string
+          sort_order: number | null
+          trigger_milestone_code: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          default_percentage?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          payment_code: string
+          payment_name: string
+          sort_order?: number | null
+          trigger_milestone_code?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          default_percentage?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          payment_code?: string
+          payment_name?: string
+          sort_order?: number | null
+          trigger_milestone_code?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1582,6 +1621,75 @@ export type Database = {
           },
           {
             foreignKeyName: "project_milestones_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_payments: {
+        Row: {
+          contract_amount: number | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          invoice_number: string | null
+          invoiced_amount: number | null
+          invoiced_at: string | null
+          note: string | null
+          paid_amount: number | null
+          paid_at: string | null
+          payment_code: string
+          payment_status: string | null
+          project_id: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          contract_amount?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoiced_amount?: number | null
+          invoiced_at?: string | null
+          note?: string | null
+          paid_amount?: number | null
+          paid_at?: string | null
+          payment_code: string
+          payment_status?: string | null
+          project_id: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          contract_amount?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          invoice_number?: string | null
+          invoiced_amount?: number | null
+          invoiced_at?: string | null
+          note?: string | null
+          paid_amount?: number | null
+          paid_at?: string | null
+          payment_code?: string
+          payment_status?: string | null
+          project_id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_payments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_payments_project_id_fkey"
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
