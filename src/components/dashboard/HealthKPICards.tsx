@@ -78,31 +78,33 @@ export function HealthKPICards({
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {cards.map((card) => (
-        <Card 
-          key={card.title} 
-          className={`${card.highlight ? 'border-destructive/50' : ''} ${card.onClick ? 'cursor-pointer hover:bg-accent/50 transition-colors' : ''}`}
-          onClick={card.onClick}
-        >
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">{card.title}</p>
-                <p className={`text-2xl font-bold ${card.highlight ? 'text-destructive' : ''}`}>
-                  {card.value}
-                </p>
-                {card.progress !== undefined && (
-                  <Progress value={card.progress} className="h-1.5 mt-2 w-16" />
-                )}
-              </div>
-              <div className={`w-9 h-9 rounded-lg ${card.bgColor} flex items-center justify-center`}>
-                <card.icon className={`w-4 h-4 ${card.iconColor}`} />
+    <Card>
+      <CardContent className="p-4">
+        <div className="grid grid-cols-2 gap-3">
+          {cards.map((card) => (
+            <div 
+              key={card.title} 
+              className={`p-3 rounded-lg ${card.highlight ? 'bg-destructive/5 border border-destructive/20' : 'bg-muted/30'} ${card.onClick ? 'cursor-pointer hover:bg-muted/50 transition-colors' : ''}`}
+              onClick={card.onClick}
+            >
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground">{card.title}</p>
+                  <p className={`text-xl font-bold ${card.highlight ? 'text-destructive' : ''}`}>
+                    {card.value}
+                  </p>
+                  {card.progress !== undefined && (
+                    <Progress value={card.progress} className="h-1.5 mt-2 w-16" />
+                  )}
+                </div>
+                <div className={`w-8 h-8 rounded-lg ${card.bgColor} flex items-center justify-center`}>
+                  <card.icon className={`w-3.5 h-3.5 ${card.iconColor}`} />
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

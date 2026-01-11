@@ -8,3 +8,5 @@ export { StatusDistributionChart } from './StatusDistributionChart';
 export { RiskProjectsList } from './RiskProjectsList';
 export { ActionRequiredSection } from './ActionRequiredSection';
 export { HealthKPICards } from './HealthKPICards';
+export { PhaseOverviewSection } from './PhaseOverviewSection';
+export { FinancialOverviewSection } from './FinancialOverviewSection';
