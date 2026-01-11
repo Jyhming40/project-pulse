@@ -10,3 +10,4 @@ export { ActionRequiredSection } from './ActionRequiredSection';
 export { HealthKPICards } from './HealthKPICards';
 export { PhaseOverviewSection } from './PhaseOverviewSection';
 export { FinancialOverviewSection } from './FinancialOverviewSection';
+export { Phase2TracksSection } from './Phase2TracksSection';
