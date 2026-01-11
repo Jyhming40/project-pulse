@@ -486,7 +486,7 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
   }
 }
 
-// Use Lovable AI (Gemini) for OCR
+// Use Lovable AI (Gemini) for OCR - optimized for government documents
 async function performOcrWithLovableAI(imageBase64: string, mimeType: string, maxPages: number = 1): Promise<string> {
   const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
   
@@ -494,13 +494,25 @@ async function performOcrWithLovableAI(imageBase64: string, mimeType: string, ma
     throw new Error('LOVABLE_API_KEY 未設定');
   }
 
-  const pageInstruction = maxPages === 0 
-    ? '請閱讀文件的所有頁面' 
-    : maxPages === 1 
-      ? '請只閱讀文件的第一頁' 
-      : `請只閱讀文件的前 ${maxPages} 頁`;
-
   console.log(`[OCR] Using Lovable AI (Gemini) for OCR... (maxPages: ${maxPages})`);
+
+  // 針對政府函文優化的 prompt - 強調只讀第一頁，並專注於日期關鍵字
+  const ocrPrompt = `你是專門辨識台灣政府公文的 OCR 助手。
+
+【重要】這是一份多頁 PDF 文件，但你只需要辨識「第一頁」的內容。請忽略第二頁及之後的所有內容。
+
+請從第一頁中提取所有文字，特別注意以下日期相關關鍵字：
+- 「發文日期：」後面的日期 → 這是核發日
+- 「復台端」、「復貴公司」後面的日期 → 這是送件日（申請人送件的日期）
+- 「依據貴公司」、「臺端於」、「台端於」後面的日期 → 這是送件日
+- 「本處業於」、「本府」後面的日期 → 這是送件日或收件日
+- 「申請日」、「收文」、「收件」後面的日期 → 這是送件日
+
+日期格式可能是：
+- 民國年份：如「113年05月20日」或「中華民國113年5月20日」
+- 西元年份：如「2024年5月20日」
+
+請輸出第一頁的完整文字內容：`;
 
   const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
     method: 'POST',
@@ -516,12 +528,7 @@ async function performOcrWithLovableAI(imageBase64: string, mimeType: string, ma
           content: [
             {
               type: 'text',
-              text: `${pageInstruction}，並提取所有可見的文字內容。請特別注意：
-1. 提取所有日期資訊（民國年份或西元年份格式皆可）
-2. 注意「送件日」、「申請日」、「收件日」、「核發日」、「發文日」等關鍵字及其後的日期
-3. 輸出純文字內容，保持原始格式
-
-請輸出文件中的所有文字：`
+              text: ocrPrompt
             },
             {
               type: 'image_url',
@@ -551,7 +558,7 @@ async function performOcrWithLovableAI(imageBase64: string, mimeType: string, ma
   const data = await response.json();
   const extractedText = data.choices?.[0]?.message?.content || '';
   
-  console.log(`[OCR] Lovable AI extracted ${extractedText.length} chars`);
+  console.log(`[OCR] Lovable AI extracted ${extractedText.length} chars from first page`);
   return extractedText;
 }
 
