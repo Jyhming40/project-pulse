@@ -329,44 +329,41 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
     const existing = milestoneMap[rule.milestone_code];
     const currentCompleted = existing?.is_completed ?? false;
     
-    // 檢查是否為手動完成（note 不包含 "SSOT" 或 "自動"）
-    const isManuallyCompleted = currentCompleted && existing?.note && 
-      !existing.note.includes('SSOT') && 
-      !existing.note.includes('自動');
-
-    // 如果是手動完成的，則保留原狀態，不自動取消
-    // 但如果文件也符合條件，則仍標記為 synced
-    if (isManuallyCompleted && !shouldComplete) {
-      console.log(`[${rule.milestone_code}] Preserving manual completion (note: ${existing?.note})`);
-      // 即使文件條件不符，也保留手動完成狀態
+    // ===== 只進不退原則 =====
+    // 如果里程碑已經完成，無論任何原因都不取消完成
+    // 這確保已達成的進度不會因為後續操作（如 OCR 補填日期）而退回
+    if (currentCompleted) {
+      // 已完成的里程碑：保持完成狀態，加入 completedCodes 以供後續里程碑檢查前置條件
       completedCodes.add(rule.milestone_code);
-      synced.push(rule.milestone_code);
+      if (!synced.includes(rule.milestone_code)) {
+        synced.push(rule.milestone_code);
+      }
+      console.log(`[${rule.milestone_code}] Already completed - preserving status (只進不退)`);
       continue; // 跳過此里程碑，不做任何更新
     }
 
-    if (shouldComplete !== currentCompleted) {
+    // 只有當里程碑尚未完成，且現在應該完成時，才進行更新
+    if (shouldComplete && !currentCompleted) {
       changes.push({
         code: rule.milestone_code,
-        from: currentCompleted,
-        to: shouldComplete,
+        from: false,
+        to: true,
       });
 
       if (existing) {
-        // 更新現有記錄
+        // 更新現有記錄為完成
         await supabase
           .from('project_milestones')
           .update({
-            is_completed: shouldComplete,
-            completed_at: shouldComplete ? new Date().toISOString() : null,
-            completed_by: shouldComplete ? userId : null,
-            note: shouldComplete 
-              ? '依據文件狀態自動完成 (SSOT)' 
-              : '文件狀態不符，自動取消完成',
+            is_completed: true,
+            completed_at: new Date().toISOString(),
+            completed_by: userId,
+            note: '依據文件狀態自動完成 (SSOT)',
             updated_at: new Date().toISOString(),
           })
           .eq('id', existing.id);
-      } else if (shouldComplete) {
-        // 新增記錄（僅在需要完成時）
+      } else {
+        // 新增記錄
         await supabase
           .from('project_milestones')
           .insert({
