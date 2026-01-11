@@ -88,8 +88,8 @@ export function BatchOcrDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5 text-primary" />
             批次 OCR 辨識
@@ -138,51 +138,53 @@ export function BatchOcrDialog({
           </div>
         </div>
 
-        {/* Task List */}
-        <ScrollArea className="flex-1 min-h-[200px] max-h-[40vh] border rounded-lg">
-          <div className="p-2 space-y-1">
-            {tasks.map((task) => (
-              <div
-                key={task.documentId}
-                className={`flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${
-                  task.status === 'processing' 
-                    ? 'bg-blue-50 dark:bg-blue-900/20' 
-                    : task.status === 'success'
-                      ? 'bg-green-50 dark:bg-green-900/10'
-                      : task.status === 'error'
-                        ? 'bg-red-50 dark:bg-red-900/10'
-                        : task.status === 'review'
-                          ? 'bg-orange-50 dark:bg-orange-900/10'
-                          : 'hover:bg-muted/50'
-                }`}
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  {getStatusIcon(task.status)}
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{task.documentTitle}</p>
-                    <p className="text-xs text-muted-foreground">{task.projectCode}</p>
+        {/* Task List - Fixed height with scrollbar */}
+        <div className="flex-1 min-h-0 border rounded-lg overflow-hidden">
+          <ScrollArea className="h-[280px]">
+            <div className="p-2 space-y-1">
+              {tasks.map((task) => (
+                <div
+                  key={task.documentId}
+                  className={`flex items-center justify-between p-2 rounded-lg text-sm transition-colors ${
+                    task.status === 'processing' 
+                      ? 'bg-blue-50 dark:bg-blue-900/20' 
+                      : task.status === 'success'
+                        ? 'bg-green-50 dark:bg-green-900/10'
+                        : task.status === 'error'
+                          ? 'bg-red-50 dark:bg-red-900/10'
+                          : task.status === 'review'
+                            ? 'bg-orange-50 dark:bg-orange-900/10'
+                            : 'hover:bg-muted/50'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    {getStatusIcon(task.status)}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{task.documentTitle}</p>
+                      <p className="text-xs text-muted-foreground">{task.projectCode}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {task.extractedDates && (task.extractedDates.submittedAt || task.extractedDates.issuedAt) && (
+                      <span className="text-xs text-green-600">
+                        {task.extractedDates.submittedAt && '送件日 '}
+                        {task.extractedDates.issuedAt && '核發日'}
+                      </span>
+                    )}
+                    {task.error && task.status === 'error' && (
+                      <span className="text-xs text-destructive truncate max-w-32" title={task.error}>
+                        {task.error}
+                      </span>
+                    )}
+                    {getStatusBadge(task.status)}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {task.extractedDates && (task.extractedDates.submittedAt || task.extractedDates.issuedAt) && (
-                    <span className="text-xs text-green-600">
-                      {task.extractedDates.submittedAt && '送件日 '}
-                      {task.extractedDates.issuedAt && '核發日'}
-                    </span>
-                  )}
-                  {task.error && task.status === 'error' && (
-                    <span className="text-xs text-destructive truncate max-w-32" title={task.error}>
-                      {task.error}
-                    </span>
-                  )}
-                  {getStatusBadge(task.status)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </ScrollArea>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
+        <DialogFooter className="flex-shrink-0 gap-2 sm:gap-0">
           {isRunning ? (
             <Button variant="destructive" onClick={onCancel}>
               取消處理
