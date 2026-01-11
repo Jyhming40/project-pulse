@@ -30,10 +30,11 @@ import {
 } from 'lucide-react';
 
 interface ExtractedDate {
-  type: 'submission' | 'issue' | 'unknown';
+  type: 'submission' | 'issue' | 'meter_date' | 'unknown';
   date: string;
   context: string;
   confidence: number;
+  source?: string;
 }
 
 interface OcrResultDialogProps {
@@ -43,7 +44,9 @@ interface OcrResultDialogProps {
   fullText: string;
   currentSubmittedAt: string | null;
   currentIssuedAt: string | null;
-  onConfirm: (submittedAt: string | null, issuedAt: string | null) => void;
+  pvId?: string;
+  pvIdContext?: string;
+  onConfirm: (submittedAt: string | null, issuedAt: string | null, meterDate?: string | null, pvId?: string | null) => void;
   isUpdating: boolean;
 }
 
@@ -125,17 +128,22 @@ export function OcrResultDialog({
   fullText,
   currentSubmittedAt,
   currentIssuedAt,
+  pvId,
+  pvIdContext,
   onConfirm,
   isUpdating,
 }: OcrResultDialogProps) {
   // Find suggested dates from OCR
   const suggestedSubmission = extractedDates.find(d => d.type === 'submission');
   const suggestedIssue = extractedDates.find(d => d.type === 'issue');
+  const suggestedMeterDate = extractedDates.find(d => d.type === 'meter_date');
   const unknownDates = extractedDates.filter(d => d.type === 'unknown');
 
   // State for user-selected dates
   const [selectedSubmittedAt, setSelectedSubmittedAt] = useState<string>('');
   const [selectedIssuedAt, setSelectedIssuedAt] = useState<string>('');
+  const [selectedMeterDate, setSelectedMeterDate] = useState<string>('');
+  const [selectedPvId, setSelectedPvId] = useState<string>('');
 
   // State for unknown dates field selection (default to 'none' meaning not applied)
   const [unknownDateSelections, setUnknownDateSelections] = useState<Record<number, string>>({});
@@ -156,16 +164,28 @@ export function OcrResultDialog({
         setSelectedIssuedAt(currentIssuedAt.split('T')[0]);
       }
       
+      // Auto-fill meter date if detected
+      if (suggestedMeterDate?.date) {
+        setSelectedMeterDate(suggestedMeterDate.date);
+      }
+      
+      // Auto-fill PV ID if detected
+      if (pvId) {
+        setSelectedPvId(pvId);
+      }
+      
       // Reset unknown date selections
       setUnknownDateSelections({});
     }
-  }, [open, extractedDates, suggestedSubmission?.date, suggestedIssue?.date, currentSubmittedAt, currentIssuedAt]);
+  }, [open, extractedDates, suggestedSubmission?.date, suggestedIssue?.date, suggestedMeterDate?.date, currentSubmittedAt, currentIssuedAt, pvId]);
 
   // Reset state when dialog closes
   useEffect(() => {
     if (!open) {
       setSelectedSubmittedAt('');
       setSelectedIssuedAt('');
+      setSelectedMeterDate('');
+      setSelectedPvId('');
       setUnknownDateSelections({});
     }
   }, [open]);
@@ -188,7 +208,9 @@ export function OcrResultDialog({
   const handleConfirm = () => {
     onConfirm(
       selectedSubmittedAt || null,
-      selectedIssuedAt || null
+      selectedIssuedAt || null,
+      selectedMeterDate || null,
+      selectedPvId || null
     );
   };
 
@@ -196,6 +218,7 @@ export function OcrResultDialog({
     switch (type) {
       case 'submission': return '送件日';
       case 'issue': return '核發日';
+      case 'meter_date': return '實際掛表日';
       default: return '未知類型';
     }
   };
@@ -204,6 +227,7 @@ export function OcrResultDialog({
     switch (type) {
       case 'submission': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
       case 'issue': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'meter_date': return 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200';
       default: return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
     }
   };
@@ -329,6 +353,26 @@ export function OcrResultDialog({
 
             <Separator />
 
+            {/* PV ID Detection */}
+            {pvId && (
+              <div className="p-3 border rounded-lg bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                    PV 編號
+                  </Badge>
+                  <span className="font-mono font-medium">{pvId}</span>
+                  <span className="text-xs text-purple-600">→ 將更新至專案「台電 PV 編號」</span>
+                </div>
+                {pvIdContext && (
+                  <div className="text-xs text-muted-foreground bg-background p-2 rounded">
+                    ...{pvIdContext}...
+                  </div>
+                )}
+              </div>
+            )}
+
+            <Separator />
+
             {/* Date Selection - Final values */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium">
@@ -381,6 +425,44 @@ export function OcrResultDialog({
                   )}
                 </div>
               </div>
+
+              {/* Meter Date and PV ID - only show if detected */}
+              {(suggestedMeterDate || pvId) && (
+                <div className="grid grid-cols-2 gap-4 pt-2">
+                  {suggestedMeterDate && (
+                    <div className="space-y-2">
+                      <Label htmlFor="ocr-meter-date">
+                        實際掛表日
+                        <span className="ml-2 text-xs text-orange-600">
+                          (將更新至專案)
+                        </span>
+                      </Label>
+                      <Input
+                        id="ocr-meter-date"
+                        type="date"
+                        value={selectedMeterDate}
+                        onChange={(e) => setSelectedMeterDate(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {pvId && (
+                    <div className="space-y-2">
+                      <Label htmlFor="ocr-pv-id">
+                        台電 PV 編號
+                        <span className="ml-2 text-xs text-purple-600">
+                          (將更新至專案)
+                        </span>
+                      </Label>
+                      <Input
+                        id="ocr-pv-id"
+                        type="text"
+                        value={selectedPvId}
+                        onChange={(e) => setSelectedPvId(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* OCR Text Preview with ScrollArea */}
@@ -413,7 +495,7 @@ export function OcrResultDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isUpdating || (!selectedSubmittedAt && !selectedIssuedAt)}
+            disabled={isUpdating || (!selectedSubmittedAt && !selectedIssuedAt && !selectedMeterDate && !selectedPvId)}
           >
             {isUpdating ? '更新中...' : '確認套用'}
           </Button>

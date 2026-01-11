@@ -54,15 +54,36 @@ const EXCLUDED_KEYWORDS = [
   '施工日', '開工日', '完工日', '竣工日',
   '檢查日', '驗收日', '查驗日',
   '有效期限', '期限至', '届滿日',
-  '併聯日', '併網日',
 ];
 
+// ============================================================
+// 派員訪查併聯函特有的模式 - 提取「實際掛表日」
+// ============================================================
+// 併聯運轉日: XXX年XX月XX日 (派員訪查併聯函中的關鍵資訊)
+const METER_DATE_PATTERN_BINGLIAN = /併聯(?:運轉)?日[期]?\s*[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
+// 本處業於 XXX年XX月XX日 派員訪查 (派員訪查併聯函)
+const METER_DATE_PATTERN_FANGCHA = /本處業於\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*(?:派員)?(?:訪查|查驗)/;
+
+// ============================================================
+// 審查意見書特有的模式 - 提取「PV編號」
+// ============================================================
+// PV編號格式：通常是 XXXXXXPVXXXX 格式
+const PV_ID_PATTERN = /(?:本公司編號|PV編號|編號)[：:\s]*([A-Z0-9]{6,}PV[A-Z0-9]{4,})/i;
+// 備用模式：直接匹配 PV 編號格式
+const PV_ID_PATTERN_DIRECT = /\b(\d{6}PV\d{4})\b/;
+
 interface ExtractedDate {
-  type: 'submission' | 'issue' | 'unknown';
+  type: 'submission' | 'issue' | 'meter_date' | 'unknown';
   date: string; // ISO format YYYY-MM-DD
   context: string; // surrounding text for reference
   confidence: number;
   source?: string; // 來源說明
+}
+
+interface ExtractedData {
+  dates: ExtractedDate[];
+  pvId?: string;
+  pvIdContext?: string;
 }
 
 function rocToWestern(rocYear: number): number {
@@ -137,12 +158,49 @@ function isExcludedDate(text: string, datePosition: number): boolean {
   return false;
 }
 
-function extractDatesFromText(text: string, docTitle?: string): ExtractedDate[] {
+// 從文字中提取 PV 編號
+function extractPvId(text: string): { pvId: string; context: string } | null {
+  // 首先嘗試帶有關鍵字的模式
+  const keywordMatch = text.match(PV_ID_PATTERN);
+  if (keywordMatch) {
+    const idx = text.indexOf(keywordMatch[0]);
+    const context = text.slice(Math.max(0, idx - 20), idx + keywordMatch[0].length + 20);
+    console.log(`[OCR] Found PV ID via keyword: ${keywordMatch[1]}`);
+    return { pvId: keywordMatch[1], context };
+  }
+  
+  // 備用：直接匹配 PV 編號格式
+  const directMatch = text.match(PV_ID_PATTERN_DIRECT);
+  if (directMatch) {
+    const idx = text.indexOf(directMatch[0]);
+    const context = text.slice(Math.max(0, idx - 20), idx + directMatch[0].length + 20);
+    console.log(`[OCR] Found PV ID via direct pattern: ${directMatch[1]}`);
+    return { pvId: directMatch[1], context };
+  }
+  
+  return null;
+}
+
+function extractDatesFromText(text: string, docTitle?: string): ExtractedData {
   const results: ExtractedDate[] = [];
   const processedDates = new Set<string>();
+  let extractedPvId: { pvId: string; context: string } | null = null;
   
   console.log(`[OCR] Starting date extraction from ${text.length} chars of text`);
   console.log(`[OCR] Document title: ${docTitle || 'none'}`);
+  
+  // 檢查是否為派員訪查併聯函
+  const isPaiyuanFangcha = docTitle?.includes('派員訪查') || 
+                           docTitle?.includes('併聯') ||
+                           text.includes('派員訪查') ||
+                           text.includes('併聯運轉');
+  
+  // 檢查是否為審查意見書
+  const isShenchaYijian = docTitle?.includes('審查意見書') ||
+                          text.includes('審查意見書') ||
+                          text.includes('再生能源發電設備');
+  
+  console.log(`[OCR] Document type detection: isPaiyuanFangcha=${isPaiyuanFangcha}, isShenchaYijian=${isShenchaYijian}`);
 
   // ============================================================
   // 優先級 1: 使用文件類型特定的模式提取（最高置信度）
@@ -289,6 +347,54 @@ function extractDatesFromText(text: string, docTitle?: string): ExtractedDate[] 
   }
   
   // ============================================================
+  // 優先級 1.5: 派員訪查併聯函 - 提取「實際掛表日」
+  // ============================================================
+  if (isPaiyuanFangcha) {
+    // 嘗試匹配「併聯運轉日: XXX年XX月XX日」
+    const binglianMatch = text.match(METER_DATE_PATTERN_BINGLIAN);
+    if (binglianMatch) {
+      const date = extractDateFromPatternMatch(binglianMatch);
+      if (date && !processedDates.has(date + '_meter_date')) {
+        processedDates.add(date + '_meter_date');
+        const idx = text.indexOf(binglianMatch[0]);
+        results.push({
+          type: 'meter_date',
+          date,
+          context: text.slice(Math.max(0, idx - 20), idx + binglianMatch[0].length + 20).replace(/\s+/g, ' '),
+          confidence: 0.99,
+          source: '併聯運轉日（實際掛表日）',
+        });
+        console.log(`[OCR] Found meter date via 併聯運轉日: ${date}`);
+      }
+    }
+    
+    // 嘗試匹配「本處業於 XXX年XX月XX日 派員訪查」
+    const fangchaMatch = text.match(METER_DATE_PATTERN_FANGCHA);
+    if (fangchaMatch && !results.some(r => r.type === 'meter_date')) {
+      const date = extractDateFromPatternMatch(fangchaMatch);
+      if (date && !processedDates.has(date + '_meter_date')) {
+        processedDates.add(date + '_meter_date');
+        const idx = text.indexOf(fangchaMatch[0]);
+        results.push({
+          type: 'meter_date',
+          date,
+          context: text.slice(Math.max(0, idx - 20), idx + fangchaMatch[0].length + 20).replace(/\s+/g, ' '),
+          confidence: 0.95,
+          source: '本處業於...派員訪查（實際掛表日）',
+        });
+        console.log(`[OCR] Found meter date via 派員訪查: ${date}`);
+      }
+    }
+  }
+  
+  // ============================================================
+  // 優先級 1.6: 審查意見書 - 提取「PV 編號」
+  // ============================================================
+  if (isShenchaYijian) {
+    extractedPvId = extractPvId(text);
+  }
+  
+  // ============================================================
   // 優先級 2: 提取核發日 - 「發文日期: XXX年XX月XX日」
   // ============================================================
   const issueMatch = text.match(ISSUE_PATTERN_OFFICIAL);
@@ -349,12 +455,18 @@ function extractDatesFromText(text: string, docTitle?: string): ExtractedDate[] 
   });
 
   // Sort by confidence (highest first), then by type priority
-  return results.sort((a, b) => {
+  const sortedResults = results.sort((a, b) => {
     if (b.confidence !== a.confidence) return b.confidence - a.confidence;
     // Prioritize known types over unknown
-    const typePriority = { issue: 1, submission: 2, unknown: 3 };
-    return typePriority[a.type] - typePriority[b.type];
+    const typePriority: Record<string, number> = { issue: 1, submission: 2, meter_date: 3, unknown: 4 };
+    return (typePriority[a.type] || 99) - (typePriority[b.type] || 99);
   });
+  
+  return {
+    dates: sortedResults,
+    pvId: extractedPvId?.pvId,
+    pvIdContext: extractedPvId?.context,
+  };
 }
 
 // Refresh Google OAuth access token using refresh token
@@ -770,17 +882,20 @@ serve(async (req) => {
 
     console.log(`[OCR] OCR text length: ${fullText.length} chars`);
 
-    // Extract dates from OCR text (pass document title for smarter inference)
-    const extractedDates = extractDatesFromText(fullText, docTitle || undefined);
-    console.log(`[OCR] Extracted ${extractedDates.length} dates`);
+    // Extract dates and data from OCR text (pass document title for smarter inference)
+    const extractedData = extractDatesFromText(fullText, docTitle || undefined);
+    console.log(`[OCR] Extracted ${extractedData.dates.length} dates, PV ID: ${extractedData.pvId || 'none'}`);
 
     // Only update if autoUpdate is true (for batch upload)
     // Otherwise just return results for user confirmation
     let updatedFields: Record<string, string> = {};
-    if (autoUpdate && documentId && extractedDates.length > 0) {
-      // Find best submission and issue dates
-      const submissionDate = extractedDates.find(d => d.type === 'submission');
-      const issueDate = extractedDates.find(d => d.type === 'issue');
+    let projectUpdatedFields: Record<string, string> = {};
+    
+    if (autoUpdate && documentId && extractedData.dates.length > 0) {
+      // Find best submission, issue, and meter dates
+      const submissionDate = extractedData.dates.find(d => d.type === 'submission');
+      const issueDate = extractedData.dates.find(d => d.type === 'issue');
+      const meterDate = extractedData.dates.find(d => d.type === 'meter_date');
 
       if (submissionDate || issueDate) {
         const updateData: Record<string, string | null> = {};
@@ -801,9 +916,44 @@ serve(async (req) => {
           .eq('id', documentId);
 
         if (updateError) {
-          console.error('[OCR] Update error:', updateError);
+          console.error('[OCR] Document update error:', updateError);
         } else {
           console.log('[OCR] Document auto-updated:', updatedFields);
+        }
+      }
+      
+      // 如果有實際掛表日或 PV 編號，更新專案資料
+      if (meterDate || extractedData.pvId) {
+        // 先取得文件所屬的專案 ID
+        const { data: docData } = await supabase
+          .from('documents')
+          .select('project_id')
+          .eq('id', documentId)
+          .single();
+          
+        if (docData?.project_id) {
+          const projectUpdateData: Record<string, string | null> = {};
+          
+          if (meterDate) {
+            projectUpdateData.actual_meter_date = meterDate.date;
+            projectUpdatedFields.actual_meter_date = meterDate.date;
+          }
+          
+          if (extractedData.pvId) {
+            projectUpdateData.taipower_pv_id = extractedData.pvId;
+            projectUpdatedFields.taipower_pv_id = extractedData.pvId;
+          }
+          
+          const { error: projectUpdateError } = await supabase
+            .from('projects')
+            .update(projectUpdateData)
+            .eq('id', docData.project_id);
+            
+          if (projectUpdateError) {
+            console.error('[OCR] Project update error:', projectUpdateError);
+          } else {
+            console.log('[OCR] Project auto-updated:', projectUpdatedFields);
+          }
         }
       }
     } else {
@@ -813,9 +963,12 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: true,
-        extractedDates,
+        extractedDates: extractedData.dates,
+        pvId: extractedData.pvId,
+        pvIdContext: extractedData.pvIdContext,
         fullText: fullText.slice(0, 2000), // Return first 2000 chars for debugging
         updatedFields,
+        projectUpdatedFields,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
