@@ -133,13 +133,31 @@ export function OcrResultDialog({
   const suggestedIssue = extractedDates.find(d => d.type === 'issue');
   const unknownDates = extractedDates.filter(d => d.type === 'unknown');
 
-  // State for user-selected dates
+  // State for user-selected dates - auto-fill from detected types
   const [selectedSubmittedAt, setSelectedSubmittedAt] = useState<string>(
     suggestedSubmission?.date || currentSubmittedAt?.split('T')[0] || ''
   );
   const [selectedIssuedAt, setSelectedIssuedAt] = useState<string>(
     suggestedIssue?.date || currentIssuedAt?.split('T')[0] || ''
   );
+
+  // State for unknown dates field selection (default to 'none' meaning not applied)
+  const [unknownDateSelections, setUnknownDateSelections] = useState<Record<number, string>>({});
+
+  const handleUnknownDateSelection = (index: number, field: string) => {
+    setUnknownDateSelections(prev => ({ ...prev, [index]: field }));
+    
+    const dateValue = unknownDates[index]?.date;
+    if (!dateValue) return;
+
+    // Apply the date to the selected field
+    if (field === 'submission') {
+      setSelectedSubmittedAt(dateValue);
+    } else if (field === 'issue') {
+      setSelectedIssuedAt(dateValue);
+    }
+    // 'none' means don't apply
+  };
 
   const handleConfirm = () => {
     onConfirm(
@@ -168,6 +186,9 @@ export function OcrResultDialog({
     return `${Math.round(confidence * 100)}%`;
   };
 
+  // Separate known type dates and unknown dates for display
+  const knownTypeDates = extractedDates.filter(d => d.type !== 'unknown');
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
@@ -191,28 +212,30 @@ export function OcrResultDialog({
                   偵測到 {extractedDates.length} 個日期
                 </div>
 
-                {/* All detected dates with scrollable context */}
-                <ScrollArea className="max-h-48">
-                  <div className="space-y-3 pr-3">
-                    {extractedDates.map((dateInfo, index) => (
+                {/* Known type dates - display only */}
+                {knownTypeDates.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground font-medium">已識別類型日期（自動帶入下方欄位）：</p>
+                    {knownTypeDates.map((dateInfo, index) => (
                       <div
-                        key={index}
-                        className="p-3 border rounded-lg bg-muted/30 space-y-2"
+                        key={`known-${index}`}
+                        className="p-3 border rounded-lg bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 space-y-2"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Calendar className="w-4 h-4 text-muted-foreground" />
+                            <Calendar className="w-4 h-4 text-green-600" />
                             <span className="font-mono font-medium">{dateInfo.date}</span>
                             <Badge className={getTypeBadgeColor(dateInfo.type)}>
                               {getTypeLabel(dateInfo.type)}
                             </Badge>
+                            <span className="text-xs text-green-600 font-medium">→ 已自動帶入</span>
                           </div>
                           <span className="text-xs text-muted-foreground">
                             信心度: {formatConfidence(dateInfo.confidence)}
                           </span>
                         </div>
                         {dateInfo.context && (
-                          <ScrollArea className="h-20 w-full">
+                          <ScrollArea className="h-16 w-full">
                             <div className="text-xs text-muted-foreground bg-background p-2 rounded whitespace-pre-wrap">
                               ...{dateInfo.context}...
                             </div>
@@ -221,7 +244,55 @@ export function OcrResultDialog({
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
+                )}
+
+                {/* Unknown dates - with dropdown selector */}
+                {unknownDates.length > 0 && (
+                  <div className="space-y-3">
+                    <p className="text-xs text-muted-foreground font-medium">其他日期（請選擇套用欄位）：</p>
+                    {unknownDates.map((dateInfo, index) => (
+                      <div
+                        key={`unknown-${index}`}
+                        className="p-3 border rounded-lg bg-muted/30 space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4 text-muted-foreground" />
+                            <span className="font-mono font-medium">{dateInfo.date}</span>
+                            <Badge className={getTypeBadgeColor(dateInfo.type)}>
+                              {getTypeLabel(dateInfo.type)}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">
+                              信心度: {formatConfidence(dateInfo.confidence)}
+                            </span>
+                            <Select
+                              value={unknownDateSelections[index] || 'none'}
+                              onValueChange={(value) => handleUnknownDateSelection(index, value)}
+                            >
+                              <SelectTrigger className="w-32 h-8 text-xs">
+                                <SelectValue placeholder="選擇欄位" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">不套用</SelectItem>
+                                <SelectItem value="submission">送件日</SelectItem>
+                                <SelectItem value="issue">核發日</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        {dateInfo.context && (
+                          <ScrollArea className="h-16 w-full">
+                            <div className="text-xs text-muted-foreground bg-background p-2 rounded whitespace-pre-wrap">
+                              ...{dateInfo.context}...
+                            </div>
+                          </ScrollArea>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -232,20 +303,20 @@ export function OcrResultDialog({
 
             <Separator />
 
-            {/* Date Selection */}
+            {/* Date Selection - Final values */}
             <div className="space-y-4">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Info className="w-4 h-4 text-blue-500" />
-                選擇要套用的日期
+                確認要套用的日期
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="ocr-submitted-at">
                     送件日
-                    {suggestedSubmission && (
+                    {suggestedSubmission && selectedSubmittedAt === suggestedSubmission.date && (
                       <span className="ml-2 text-xs text-green-600">
-                        (建議: {suggestedSubmission.date})
+                        (自動帶入)
                       </span>
                     )}
                   </Label>
@@ -265,9 +336,9 @@ export function OcrResultDialog({
                 <div className="space-y-2">
                   <Label htmlFor="ocr-issued-at">
                     核發日
-                    {suggestedIssue && (
+                    {suggestedIssue && selectedIssuedAt === suggestedIssue.date && (
                       <span className="ml-2 text-xs text-green-600">
-                        (建議: {suggestedIssue.date})
+                        (自動帶入)
                       </span>
                     )}
                   </Label>
@@ -284,37 +355,6 @@ export function OcrResultDialog({
                   )}
                 </div>
               </div>
-
-              {/* Quick apply buttons for unknown dates */}
-              {unknownDates.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">
-                    其他偵測到的日期 (點擊套用):
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {unknownDates.map((dateInfo, index) => (
-                      <div key={index} className="flex gap-1">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedSubmittedAt(dateInfo.date)}
-                        >
-                          {dateInfo.date} → 送件日
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedIssuedAt(dateInfo.date)}
-                        >
-                          {dateInfo.date} → 核發日
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* OCR Text Preview with ScrollArea */}
