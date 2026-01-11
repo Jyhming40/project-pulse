@@ -344,12 +344,15 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
   }
 }
 
-// Fetch file content from Google Drive
-async function fetchDriveFile(driveFileId: string, accessToken: string): Promise<{ content: string; mimeType: string } | null> {
+// Maximum file size for OCR (3MB to avoid memory issues)
+const MAX_FILE_SIZE_BYTES = 3 * 1024 * 1024;
+
+// Fetch file content from Google Drive with size limit
+async function fetchDriveFile(driveFileId: string, accessToken: string): Promise<{ content: string; mimeType: string; skipped?: boolean; skipReason?: string } | null> {
   try {
     console.log(`[OCR] Attempting to fetch Drive file: ${driveFileId}`);
     
-    // First get file metadata to check mime type
+    // First get file metadata to check mime type and SIZE
     const metaResponse = await fetch(
       `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=mimeType,name,size`,
       {
@@ -365,7 +368,19 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
 
     const metadata = await metaResponse.json();
     const mimeType = metadata.mimeType;
-    console.log(`[OCR] Drive file metadata: ${metadata.name}, type: ${mimeType}, size: ${metadata.size || 'unknown'}`);
+    const fileSize = parseInt(metadata.size || '0');
+    console.log(`[OCR] Drive file metadata: ${metadata.name}, type: ${mimeType}, size: ${fileSize} bytes`);
+
+    // Check file size limit
+    if (fileSize > MAX_FILE_SIZE_BYTES) {
+      console.log(`[OCR] File too large (${fileSize} bytes > ${MAX_FILE_SIZE_BYTES} bytes), skipping OCR`);
+      return { 
+        content: '', 
+        mimeType, 
+        skipped: true, 
+        skipReason: `檔案過大 (${(fileSize / 1024 / 1024).toFixed(1)}MB > 3MB)，請手動輸入日期` 
+      };
+    }
 
     // For Google Docs/Sheets/Slides, export as PDF
     let downloadUrl: string;
@@ -394,7 +409,18 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
     const buffer = await fileResponse.arrayBuffer();
     console.log(`[OCR] Downloaded ${buffer.byteLength} bytes`);
     
-    // Handle large files more efficiently
+    // Double-check downloaded size
+    if (buffer.byteLength > MAX_FILE_SIZE_BYTES) {
+      console.log(`[OCR] Downloaded file too large, skipping`);
+      return { 
+        content: '', 
+        mimeType: finalMimeType, 
+        skipped: true, 
+        skipReason: `檔案過大，請手動輸入日期` 
+      };
+    }
+    
+    // More memory-efficient base64 encoding using btoa with chunks
     const uint8Array = new Uint8Array(buffer);
     let binary = '';
     const chunkSize = 8192;
@@ -526,6 +552,21 @@ serve(async (req) => {
       const file = formData.get('file') as File | null;
       
       if (file) {
+        // Check file size limit for uploaded files
+        if (file.size > MAX_FILE_SIZE_BYTES) {
+          console.log(`[OCR] Uploaded file too large: ${file.size} bytes`);
+          return new Response(
+            JSON.stringify({ 
+              success: true,
+              skipped: true,
+              skipReason: `檔案過大 (${(file.size / 1024 / 1024).toFixed(1)}MB > 3MB)，請手動輸入日期`,
+              extractedDates: [],
+              fullText: ''
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+        
         const buffer = await file.arrayBuffer();
         const uint8Array = new Uint8Array(buffer);
         let binary = '';
@@ -618,12 +659,27 @@ serve(async (req) => {
           .eq('user_id', user.id);
       }
 
-      // Fetch file from Drive
+      // Fetch file from Drive (with size limit check)
       const driveFile = await fetchDriveFile(docData.drive_file_id, accessToken);
       if (!driveFile) {
         return new Response(
           JSON.stringify({ error: '無法從 Google Drive 取得檔案' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Handle skipped files (too large)
+      if (driveFile.skipped) {
+        console.log(`[OCR] File skipped: ${driveFile.skipReason}`);
+        return new Response(
+          JSON.stringify({ 
+            success: true,
+            skipped: true,
+            skipReason: driveFile.skipReason,
+            extractedDates: [],
+            fullText: ''
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
