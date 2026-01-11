@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -133,16 +133,42 @@ export function OcrResultDialog({
   const suggestedIssue = extractedDates.find(d => d.type === 'issue');
   const unknownDates = extractedDates.filter(d => d.type === 'unknown');
 
-  // State for user-selected dates - auto-fill from detected types
-  const [selectedSubmittedAt, setSelectedSubmittedAt] = useState<string>(
-    suggestedSubmission?.date || currentSubmittedAt?.split('T')[0] || ''
-  );
-  const [selectedIssuedAt, setSelectedIssuedAt] = useState<string>(
-    suggestedIssue?.date || currentIssuedAt?.split('T')[0] || ''
-  );
+  // State for user-selected dates
+  const [selectedSubmittedAt, setSelectedSubmittedAt] = useState<string>('');
+  const [selectedIssuedAt, setSelectedIssuedAt] = useState<string>('');
 
   // State for unknown dates field selection (default to 'none' meaning not applied)
   const [unknownDateSelections, setUnknownDateSelections] = useState<Record<number, string>>({});
+
+  // Effect to auto-fill dates when extractedDates changes (after OCR completes)
+  useEffect(() => {
+    if (open && extractedDates.length > 0) {
+      // Auto-fill from detected types
+      if (suggestedSubmission?.date) {
+        setSelectedSubmittedAt(suggestedSubmission.date);
+      } else if (currentSubmittedAt) {
+        setSelectedSubmittedAt(currentSubmittedAt.split('T')[0]);
+      }
+      
+      if (suggestedIssue?.date) {
+        setSelectedIssuedAt(suggestedIssue.date);
+      } else if (currentIssuedAt) {
+        setSelectedIssuedAt(currentIssuedAt.split('T')[0]);
+      }
+      
+      // Reset unknown date selections
+      setUnknownDateSelections({});
+    }
+  }, [open, extractedDates, suggestedSubmission?.date, suggestedIssue?.date, currentSubmittedAt, currentIssuedAt]);
+
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setSelectedSubmittedAt('');
+      setSelectedIssuedAt('');
+      setUnknownDateSelections({});
+    }
+  }, [open]);
 
   const handleUnknownDateSelection = (index: number, field: string) => {
     setUnknownDateSelections(prev => ({ ...prev, [index]: field }));
