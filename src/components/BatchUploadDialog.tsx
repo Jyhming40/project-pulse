@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
 import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
 import { 
   DOC_TYPE_CODE_TO_SHORT, 
@@ -244,7 +245,8 @@ export function BatchUploadDialog({
   const [driveSubfolders, setDriveSubfolders] = useState(DEFAULT_SUBFOLDER_TEMPLATE);
   const syncMilestones = useSyncAdminMilestones();
 
-  const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
+  // Use unified doc type options from useDocTypeLabel (document_type_config)
+  const { dropdownOptions: docTypeOptions } = useDocTypeLabel();
 
   // Get subfolder name from code
   const getSubfolderName = useCallback((code: string) => {
