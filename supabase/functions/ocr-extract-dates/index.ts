@@ -6,106 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Common date patterns in Chinese government documents
-const DATE_PATTERNS = [
-  // ROC date format: 民國XXX年XX月XX日 or 中華民國XXX年XX月XX日
-  /(?:中華)?民國\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g,
-  // ROC date without 民國 prefix: XXX年XX月XX日 (2-3 digit year, assumed ROC)
-  /(?<!西元)(?<!\d)(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g,
-  // Western date: YYYY年MM月DD日
-  /(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/g,
-  // Western date: YYYY/MM/DD or YYYY-MM-DD
-  /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/g,
-  // ROC date: XXX/MM/DD (ROC year format)
-  /(\d{2,3})[\/\-](\d{1,2})[\/\-](\d{1,2})/g,
-  // ROC date with dots: XXX. M. DD or XXX.M.DD (審查章常用格式)
-  /(\d{2,3})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})/g,
-];
-
-// ============================================================
-// 文件類型特定的送件日關鍵字模式（優先級最高）
-// ============================================================
-
-// 設備登記函、免雜項竣工、免雜項申請：復台端 XXX年XX月XX日
-const SUBMISSION_PATTERN_FUTAN = /復台端\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-
-// 免雜項竣工、其他政府函：復貴公司 XXX年XX月XX日
-const SUBMISSION_PATTERN_FUGUIGONGSI = /復貴公司\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-
-// 審查意見書、台電函：依據貴公司 XXX年XX月XX日 或 依據臺端/台端 XXX年XX月XX日
-const SUBMISSION_PATTERN_YIJUGUIGONGSI = /依據貴公司\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-
-// 審查意見書：依據臺端/台端 XXX年XX月XX日（審查意見書常用格式）
-const SUBMISSION_PATTERN_YIJUTAIDUAN = /依據[臺台]端\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-
-// 躉售合約、審查意見書：臺端於 XXX年XX月XX日 或 台端於 XXX年XX月XX日
-const SUBMISSION_PATTERN_TAIDUAN = /[臺台]端於\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-
-// 派員訪查併聯函：本處業於 XXX年XX月XX日
-const SUBMISSION_PATTERN_BENCHU = /本處業於\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-
-// 通用高優先送件日關鍵字
-const SUBMISSION_PATTERN_APPLY_DATE = /申請日[期]?[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-
-// 本府/本所/本局 XXX年XX月XX日 收件/收文
-const SUBMISSION_PATTERN_RECEIPT = /(?:本府|本所|本局)\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*(?:收文|收件)/;
-
-// ============================================================
-// 審查意見書專用的送件日模式（新增）
-// ============================================================
-// 「貴公司 XXX年XX月XX日 XXX號函申請」模式
-const SUBMISSION_PATTERN_GUIGONGSI_SHENQING = /貴公司\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*[\w\d]*(?:號)?(?:函)?(?:申請|辦理|送件)/;
-
-// 「貴公司申請...收件日期」模式
-const SUBMISSION_PATTERN_SHOUJIAN_RIQI = /收件日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-
-// 「申請人...XXX年XX月XX日...申請」模式（審查意見書常見）
-const SUBMISSION_PATTERN_SHENQINGREN = /申請[人者]\s*[\w\W]*?(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*[\w\W]{0,20}(?:申請|辦理|送件)/;
-
-// 「復XXX年XX月XX日函」或「復...XXX年XX月XX日」模式
-const SUBMISSION_PATTERN_FU_HAN = /復[^\d]*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日(?:\s*函)?/;
-
-// 「受理日期：XXX年XX月XX日」模式
-const SUBMISSION_PATTERN_SHOULI = /受理日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-
-// 「掛號日期：XXX年XX月XX日」模式
-const SUBMISSION_PATTERN_GUAHAO = /掛號日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-
-// 核發日關鍵字模式
-const ISSUE_PATTERN_OFFICIAL = /發文日期[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-
-// ============================================================
-// 審查章日期模式 - 用於細部協商、審訖圖等文件的核發日
-// ============================================================
-// 審查章日期格式：「XXX. M. DD」或「XXX.M.DD」（用點分隔的民國年月日）
-// 通常出現在「台灣電力公司XX區營業處 審查章」附近
-const STAMP_DATE_PATTERN_DOTS = /(\d{2,3})\s*\.\s*(\d{1,2})\s*\.\s*(\d{1,2})/;
-// 審查章關鍵字
-const STAMP_KEYWORDS = ['審查章', '審核章', '審定章', '審訖章', '核章', '核准章', '營業處'];
-
-// 排除關鍵字 - 這些日期不應被作為送件日或核發日
-const EXCLUDED_KEYWORDS = [
-  '簽約日', '契約日', '合約日期',
-  '施工日', '開工日', '完工日', '竣工日',
-  '檢查日', '驗收日', '查驗日',
-  '有效期限', '期限至', '届滿日',
-];
-
-// ============================================================
-// 派員訪查併聯函特有的模式 - 提取「實際掛表日」
-// ============================================================
-// 併聯運轉日: XXX年XX月XX日 (派員訪查併聯函中的關鍵資訊)
-const METER_DATE_PATTERN_BINGLIAN = /併聯(?:運轉)?日[期]?\s*[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/;
-// 本處業於 XXX年XX月XX日 派員訪查 (派員訪查併聯函)
-const METER_DATE_PATTERN_FANGCHA = /本處業於\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日\s*(?:派員)?(?:訪查|查驗)/;
-
-// ============================================================
-// 審查意見書特有的模式 - 提取「PV編號」
-// ============================================================
-// PV編號格式：通常是 XXXXXXPVXXXX 格式
-const PV_ID_PATTERN = /(?:本公司編號|PV編號|編號)[：:\s]*([A-Z0-9]{6,}PV[A-Z0-9]{4,})/i;
-// 備用模式：直接匹配 PV 編號格式
-const PV_ID_PATTERN_DIRECT = /\b(\d{6}PV\d{4})\b/;
+// Maximum file size for OCR processing (3MB)
+const MAX_FILE_SIZE_BYTES = 3 * 1024 * 1024;
 
 interface ExtractedDate {
   type: 'submission' | 'issue' | 'meter_date' | 'unknown';
@@ -121,573 +23,137 @@ interface ExtractedData {
   pvIdContext?: string;
 }
 
+interface AIExtractedResult {
+  submitted_at?: string;
+  submitted_at_context?: string;
+  issued_at?: string;
+  issued_at_context?: string;
+  meter_date?: string;
+  meter_date_context?: string;
+  pv_id?: string;
+  pv_id_context?: string;
+  raw_text?: string;
+}
+
+// ROC year to Western year conversion
 function rocToWestern(rocYear: number): number {
   return rocYear + 1911;
 }
 
-function parseDate(match: RegExpMatchArray, patternIndex: number): string | null {
-  try {
-    let year: number;
-    let month: number;
-    let day: number;
-
-    if (patternIndex === 0) {
-      // ROC date with 民國
-      year = rocToWestern(parseInt(match[1]));
-      month = parseInt(match[2]);
-      day = parseInt(match[3]);
-    } else if (patternIndex === 1) {
-      // ROC date without 民國 prefix (e.g., 110年11月24日)
-      const rawYear = parseInt(match[1]);
-      // If year is 2-3 digits and less than 200, assume ROC year
-      year = rawYear < 200 ? rocToWestern(rawYear) : rawYear;
-      month = parseInt(match[2]);
-      day = parseInt(match[3]);
-    } else if (patternIndex === 2 || patternIndex === 3) {
-      // Western date
-      year = parseInt(match[1]);
-      month = parseInt(match[2]);
-      day = parseInt(match[3]);
-    } else {
-      // ROC date with slashes (assume if year < 200, it's ROC)
-      const rawYear = parseInt(match[1]);
-      year = rawYear < 200 ? rocToWestern(rawYear) : rawYear;
-      month = parseInt(match[2]);
-      day = parseInt(match[3]);
-    }
-
-    // Validate date
-    if (year < 1990 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
-      return null;
-    }
-
-    return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-  } catch {
-    return null;
-  }
-}
-
-// 從特定模式匹配中提取日期
-function extractDateFromPatternMatch(match: RegExpMatchArray): string | null {
-  const rawYear = parseInt(match[1]);
-  const year = rawYear < 200 ? rocToWestern(rawYear) : rawYear;
-  const month = parseInt(match[2]);
-  const day = parseInt(match[3]);
+// Parse a date string and convert ROC dates to Western format
+function parseAndFormatDate(dateStr: string): string | null {
+  if (!dateStr) return null;
   
-  if (year < 1990 || year > 2100 || month < 1 || month > 12 || day < 1 || day > 31) {
-    return null;
-  }
-  
-  return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-}
-
-// 檢查日期是否應被排除
-function isExcludedDate(text: string, datePosition: number): boolean {
-  const nearbyText = text.slice(Math.max(0, datePosition - 30), datePosition + 50);
-  for (const keyword of EXCLUDED_KEYWORDS) {
-    if (nearbyText.includes(keyword)) {
-      console.log(`[OCR] Excluding date due to keyword: ${keyword}`);
-      return true;
+  // Already in YYYY-MM-DD format
+  const isoMatch = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (isoMatch) {
+    const year = parseInt(isoMatch[1]);
+    const month = parseInt(isoMatch[2]);
+    const day = parseInt(isoMatch[3]);
+    if (year >= 1990 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
     }
   }
-  return false;
-}
-
-// 從文字中提取 PV 編號
-function extractPvId(text: string): { pvId: string; context: string } | null {
-  // 首先嘗試帶有關鍵字的模式
-  const keywordMatch = text.match(PV_ID_PATTERN);
-  if (keywordMatch) {
-    const idx = text.indexOf(keywordMatch[0]);
-    const context = text.slice(Math.max(0, idx - 20), idx + keywordMatch[0].length + 20);
-    console.log(`[OCR] Found PV ID via keyword: ${keywordMatch[1]}`);
-    return { pvId: keywordMatch[1], context };
+  
+  // ROC date format: 民國XXX年XX月XX日 or 中華民國XXX年XX月XX日
+  const rocMatch = dateStr.match(/(?:中華)?民國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+  if (rocMatch) {
+    const year = rocToWestern(parseInt(rocMatch[1]));
+    const month = parseInt(rocMatch[2]);
+    const day = parseInt(rocMatch[3]);
+    if (year >= 1990 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    }
   }
   
-  // 備用：直接匹配 PV 編號格式
-  const directMatch = text.match(PV_ID_PATTERN_DIRECT);
-  if (directMatch) {
-    const idx = text.indexOf(directMatch[0]);
-    const context = text.slice(Math.max(0, idx - 20), idx + directMatch[0].length + 20);
-    console.log(`[OCR] Found PV ID via direct pattern: ${directMatch[1]}`);
-    return { pvId: directMatch[1], context };
+  // Plain year format: XXX年XX月XX日 (assume ROC if year < 200)
+  const plainMatch = dateStr.match(/(\d{2,4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/);
+  if (plainMatch) {
+    let year = parseInt(plainMatch[1]);
+    if (year < 200) year = rocToWestern(year);
+    const month = parseInt(plainMatch[2]);
+    const day = parseInt(plainMatch[3]);
+    if (year >= 1990 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    }
+  }
+  
+  // Slash or dash format: YYYY/MM/DD or XXX/MM/DD
+  const slashMatch = dateStr.match(/(\d{2,4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+  if (slashMatch) {
+    let year = parseInt(slashMatch[1]);
+    if (year < 200) year = rocToWestern(year);
+    const month = parseInt(slashMatch[2]);
+    const day = parseInt(slashMatch[3]);
+    if (year >= 1990 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    }
   }
   
   return null;
 }
 
-function extractDatesFromText(text: string, docTitle?: string): ExtractedData {
+// Convert AI extraction result to ExtractedData format
+function aiResultToExtractedData(aiResult: AIExtractedResult): ExtractedData {
   const results: ExtractedDate[] = [];
-  const processedDates = new Set<string>();
-  let extractedPvId: { pvId: string; context: string } | null = null;
   
-  console.log(`[OCR] Starting date extraction from ${text.length} chars of text`);
-  console.log(`[OCR] Document title: ${docTitle || 'none'}`);
-  
-  // 檢查是否為派員訪查併聯函
-  const isPaiyuanFangcha = docTitle?.includes('派員訪查') || 
-                           docTitle?.includes('併聯') ||
-                           text.includes('派員訪查') ||
-                           text.includes('併聯運轉');
-  
-  // 檢查是否為審查意見書
-  const isShenchaYijian = docTitle?.includes('審查意見書') ||
-                          text.includes('審查意見書') ||
-                          text.includes('再生能源發電設備');
-  
-  // 檢查是否為細部協商或審訖圖（這類文件常有審查章）
-  const isXiebuXieshang = docTitle?.includes('細部協商') ||
-                          docTitle?.includes('審訖圖') ||
-                          docTitle?.includes('配電外線') ||
-                          text.includes('細部協商') ||
-                          text.includes('審訖圖');
-  
-  // 檢查文字中是否有審查章相關關鍵字
-  const hasStampKeyword = STAMP_KEYWORDS.some(kw => text.includes(kw));
-  
-  console.log(`[OCR] Document type detection: isPaiyuanFangcha=${isPaiyuanFangcha}, isShenchaYijian=${isShenchaYijian}, isXiebuXieshang=${isXiebuXieshang}, hasStampKeyword=${hasStampKeyword}`);
-
-  // ============================================================
-  // 優先級 1: 使用文件類型特定的模式提取（最高置信度）
-  // ============================================================
-  
-  // 1a. 提取送件日 - 「復台端 XXX年XX月XX日」（設備登記函、免雜項竣工/申請）
-  const futanMatch = text.match(SUBMISSION_PATTERN_FUTAN);
-  if (futanMatch) {
-    const date = extractDateFromPatternMatch(futanMatch);
-    if (date && !processedDates.has(date + '_submission')) {
-      const idx = text.indexOf(futanMatch[0]);
-      if (!isExcludedDate(text, idx)) {
-        processedDates.add(date + '_submission');
-        results.push({
-          type: 'submission',
-          date,
-          context: text.slice(Math.max(0, idx - 20), idx + futanMatch[0].length + 20).replace(/\s+/g, ' '),
-          confidence: 0.98,
-          source: '復台端',
-        });
-        console.log(`[OCR] Found submission date via 復台端: ${date}`);
-      }
+  if (aiResult.submitted_at) {
+    const parsedDate = parseAndFormatDate(aiResult.submitted_at);
+    if (parsedDate) {
+      results.push({
+        type: 'submission',
+        date: parsedDate,
+        context: aiResult.submitted_at_context || aiResult.submitted_at,
+        confidence: 0.95,
+        source: 'AI 語意辨識',
+      });
     }
   }
   
-  // 1b. 提取送件日 - 「復貴公司 XXX年XX月XX日」（免雜項竣工、政府函）
-  const fuguigongsiMatch = text.match(SUBMISSION_PATTERN_FUGUIGONGSI);
-  if (fuguigongsiMatch) {
-    const date = extractDateFromPatternMatch(fuguigongsiMatch);
-    if (date && !processedDates.has(date + '_submission')) {
-      const idx = text.indexOf(fuguigongsiMatch[0]);
-      if (!isExcludedDate(text, idx)) {
-        processedDates.add(date + '_submission');
-        results.push({
-          type: 'submission',
-          date,
-          context: text.slice(Math.max(0, idx - 20), idx + fuguigongsiMatch[0].length + 20).replace(/\s+/g, ' '),
-          confidence: 0.98,
-          source: '復貴公司',
-        });
-        console.log(`[OCR] Found submission date via 復貴公司: ${date}`);
-      }
-    }
-  }
-  
-  // 1c. 提取送件日 - 「依據貴公司 XXX年XX月XX日」（審查意見書、台電函）
-  const yijuguigongsiMatch = text.match(SUBMISSION_PATTERN_YIJUGUIGONGSI);
-  if (yijuguigongsiMatch) {
-    const date = extractDateFromPatternMatch(yijuguigongsiMatch);
-    if (date && !processedDates.has(date + '_submission')) {
-      const idx = text.indexOf(yijuguigongsiMatch[0]);
-      if (!isExcludedDate(text, idx)) {
-        processedDates.add(date + '_submission');
-        results.push({
-          type: 'submission',
-          date,
-          context: text.slice(Math.max(0, idx - 20), idx + yijuguigongsiMatch[0].length + 20).replace(/\s+/g, ' '),
-          confidence: 0.98,
-          source: '依據貴公司',
-        });
-        console.log(`[OCR] Found submission date via 依據貴公司: ${date}`);
-      }
-    }
-  }
-  
-  // 1c-2. 提取送件日 - 「依據臺端/台端 XXX年XX月XX日」（審查意見書常用格式）
-  const yijutaiduanMatch = text.match(SUBMISSION_PATTERN_YIJUTAIDUAN);
-  if (yijutaiduanMatch) {
-    const date = extractDateFromPatternMatch(yijutaiduanMatch);
-    if (date && !processedDates.has(date + '_submission')) {
-      const idx = text.indexOf(yijutaiduanMatch[0]);
-      if (!isExcludedDate(text, idx)) {
-        processedDates.add(date + '_submission');
-        results.push({
-          type: 'submission',
-          date,
-          context: text.slice(Math.max(0, idx - 20), idx + yijutaiduanMatch[0].length + 20).replace(/\s+/g, ' '),
-          confidence: 0.98,
-          source: '依據臺端',
-        });
-        console.log(`[OCR] Found submission date via 依據臺端: ${date}`);
-      }
-    }
-  }
-  
-  // 1d. 提取送件日 - 「臺端於/台端於 XXX年XX月XX日」（躉售合約、審查意見書）
-  const taiduanMatch = text.match(SUBMISSION_PATTERN_TAIDUAN);
-  if (taiduanMatch) {
-    const date = extractDateFromPatternMatch(taiduanMatch);
-    if (date && !processedDates.has(date + '_submission')) {
-      const idx = text.indexOf(taiduanMatch[0]);
-      if (!isExcludedDate(text, idx)) {
-        processedDates.add(date + '_submission');
-        results.push({
-          type: 'submission',
-          date,
-          context: text.slice(Math.max(0, idx - 20), idx + taiduanMatch[0].length + 20).replace(/\s+/g, ' '),
-          confidence: 0.98,
-          source: '臺端於',
-        });
-        console.log(`[OCR] Found submission date via 臺端於: ${date}`);
-      }
-    }
-  }
-  
-  // 1e. 提取送件日/掛表日 - 「本處業於 XXX年XX月XX日」（派員訪查併聯函）
-  const benchuMatch = text.match(SUBMISSION_PATTERN_BENCHU);
-  if (benchuMatch) {
-    const date = extractDateFromPatternMatch(benchuMatch);
-    if (date && !processedDates.has(date + '_submission')) {
-      const idx = text.indexOf(benchuMatch[0]);
-      if (!isExcludedDate(text, idx)) {
-        processedDates.add(date + '_submission');
-        results.push({
-          type: 'submission',
-          date,
-          context: text.slice(Math.max(0, idx - 20), idx + benchuMatch[0].length + 20).replace(/\s+/g, ' '),
-          confidence: 0.98,
-          source: '本處業於（送件日/實際掛表日）',
-        });
-        console.log(`[OCR] Found submission date via 本處業於: ${date}`);
-      }
-    }
-  }
-  
-  // 1f. 提取送件日 - 「申請日: XXX年XX月XX日」
-  const applyMatch = text.match(SUBMISSION_PATTERN_APPLY_DATE);
-  if (applyMatch) {
-    const date = extractDateFromPatternMatch(applyMatch);
-    if (date && !processedDates.has(date + '_submission')) {
-      const idx = text.indexOf(applyMatch[0]);
-      if (!isExcludedDate(text, idx)) {
-        processedDates.add(date + '_submission');
-        results.push({
-          type: 'submission',
-          date,
-          context: text.slice(Math.max(0, idx - 20), idx + applyMatch[0].length + 20).replace(/\s+/g, ' '),
-          confidence: 0.98,
-          source: '申請日',
-        });
-        console.log(`[OCR] Found submission date via 申請日: ${date}`);
-      }
-    }
-  }
-  
-  // 1g. 提取送件日 - 「本府 XXX年XX月XX日 收文/收件」
-  const receiptMatch = text.match(SUBMISSION_PATTERN_RECEIPT);
-  if (receiptMatch) {
-    const date = extractDateFromPatternMatch(receiptMatch);
-    if (date && !processedDates.has(date + '_submission')) {
-      const idx = text.indexOf(receiptMatch[0]);
-      if (!isExcludedDate(text, idx)) {
-        processedDates.add(date + '_submission');
-        results.push({
-          type: 'submission',
-          date,
-          context: text.slice(Math.max(0, idx - 20), idx + receiptMatch[0].length + 20).replace(/\s+/g, ' '),
-          confidence: 0.95,
-          source: '收文/收件',
-        });
-        console.log(`[OCR] Found submission date via 收文/收件: ${date}`);
-      }
-    }
-  }
-  
-  // ============================================================
-  // 優先級 1.5: 審查意見書專用送件日模式
-  // ============================================================
-  if (isShenchaYijian && !results.some(r => r.type === 'submission')) {
-    // 1.5a. 「貴公司 XXX年XX月XX日 函申請」
-    const guigongsiShenqingMatch = text.match(SUBMISSION_PATTERN_GUIGONGSI_SHENQING);
-    if (guigongsiShenqingMatch) {
-      const date = extractDateFromPatternMatch(guigongsiShenqingMatch);
-      if (date && !processedDates.has(date + '_submission')) {
-        const idx = text.indexOf(guigongsiShenqingMatch[0]);
-        if (!isExcludedDate(text, idx)) {
-          processedDates.add(date + '_submission');
-          results.push({
-            type: 'submission',
-            date,
-            context: text.slice(Math.max(0, idx - 20), idx + guigongsiShenqingMatch[0].length + 20).replace(/\s+/g, ' '),
-            confidence: 0.95,
-            source: '貴公司函申請',
-          });
-          console.log(`[OCR] Found submission date via 貴公司函申請: ${date}`);
-        }
-      }
-    }
-    
-    // 1.5b. 「收件日期：XXX年XX月XX日」
-    if (!results.some(r => r.type === 'submission')) {
-      const shoujianRiqiMatch = text.match(SUBMISSION_PATTERN_SHOUJIAN_RIQI);
-      if (shoujianRiqiMatch) {
-        const date = extractDateFromPatternMatch(shoujianRiqiMatch);
-        if (date && !processedDates.has(date + '_submission')) {
-          const idx = text.indexOf(shoujianRiqiMatch[0]);
-          if (!isExcludedDate(text, idx)) {
-            processedDates.add(date + '_submission');
-            results.push({
-              type: 'submission',
-              date,
-              context: text.slice(Math.max(0, idx - 20), idx + shoujianRiqiMatch[0].length + 20).replace(/\s+/g, ' '),
-              confidence: 0.95,
-              source: '收件日期',
-            });
-            console.log(`[OCR] Found submission date via 收件日期: ${date}`);
-          }
-        }
-      }
-    }
-    
-    // 1.5c. 「受理日期：XXX年XX月XX日」
-    if (!results.some(r => r.type === 'submission')) {
-      const shouliMatch = text.match(SUBMISSION_PATTERN_SHOULI);
-      if (shouliMatch) {
-        const date = extractDateFromPatternMatch(shouliMatch);
-        if (date && !processedDates.has(date + '_submission')) {
-          const idx = text.indexOf(shouliMatch[0]);
-          if (!isExcludedDate(text, idx)) {
-            processedDates.add(date + '_submission');
-            results.push({
-              type: 'submission',
-              date,
-              context: text.slice(Math.max(0, idx - 20), idx + shouliMatch[0].length + 20).replace(/\s+/g, ' '),
-              confidence: 0.93,
-              source: '受理日期',
-            });
-            console.log(`[OCR] Found submission date via 受理日期: ${date}`);
-          }
-        }
-      }
-    }
-    
-    // 1.5d. 「掛號日期：XXX年XX月XX日」
-    if (!results.some(r => r.type === 'submission')) {
-      const guahaoMatch = text.match(SUBMISSION_PATTERN_GUAHAO);
-      if (guahaoMatch) {
-        const date = extractDateFromPatternMatch(guahaoMatch);
-        if (date && !processedDates.has(date + '_submission')) {
-          const idx = text.indexOf(guahaoMatch[0]);
-          if (!isExcludedDate(text, idx)) {
-            processedDates.add(date + '_submission');
-            results.push({
-              type: 'submission',
-              date,
-              context: text.slice(Math.max(0, idx - 20), idx + guahaoMatch[0].length + 20).replace(/\s+/g, ' '),
-              confidence: 0.90,
-              source: '掛號日期',
-            });
-            console.log(`[OCR] Found submission date via 掛號日期: ${date}`);
-          }
-        }
-      }
-    }
-    
-    // 1.5e. 「復...XXX年XX月XX日函」
-    if (!results.some(r => r.type === 'submission')) {
-      const fuHanMatch = text.match(SUBMISSION_PATTERN_FU_HAN);
-      if (fuHanMatch) {
-        const date = extractDateFromPatternMatch(fuHanMatch);
-        if (date && !processedDates.has(date + '_submission')) {
-          const idx = text.indexOf(fuHanMatch[0]);
-          if (!isExcludedDate(text, idx)) {
-            processedDates.add(date + '_submission');
-            results.push({
-              type: 'submission',
-              date,
-              context: text.slice(Math.max(0, idx - 20), idx + fuHanMatch[0].length + 20).replace(/\s+/g, ' '),
-              confidence: 0.88,
-              source: '復函',
-            });
-            console.log(`[OCR] Found submission date via 復函: ${date}`);
-          }
-        }
-      }
-    }
-  }
-  
-  // ============================================================
-  // 優先級 1.6: 派員訪查併聯函 - 提取「實際掛表日」
-  // ============================================================
-  if (isPaiyuanFangcha) {
-    // 嘗試匹配「併聯運轉日: XXX年XX月XX日」
-    const binglianMatch = text.match(METER_DATE_PATTERN_BINGLIAN);
-    if (binglianMatch) {
-      const date = extractDateFromPatternMatch(binglianMatch);
-      if (date && !processedDates.has(date + '_meter_date')) {
-        processedDates.add(date + '_meter_date');
-        const idx = text.indexOf(binglianMatch[0]);
-        results.push({
-          type: 'meter_date',
-          date,
-          context: text.slice(Math.max(0, idx - 20), idx + binglianMatch[0].length + 20).replace(/\s+/g, ' '),
-          confidence: 0.99,
-          source: '併聯運轉日（實際掛表日）',
-        });
-        console.log(`[OCR] Found meter date via 併聯運轉日: ${date}`);
-      }
-    }
-    
-    // 嘗試匹配「本處業於 XXX年XX月XX日 派員訪查」
-    const fangchaMatch = text.match(METER_DATE_PATTERN_FANGCHA);
-    if (fangchaMatch && !results.some(r => r.type === 'meter_date')) {
-      const date = extractDateFromPatternMatch(fangchaMatch);
-      if (date && !processedDates.has(date + '_meter_date')) {
-        processedDates.add(date + '_meter_date');
-        const idx = text.indexOf(fangchaMatch[0]);
-        results.push({
-          type: 'meter_date',
-          date,
-          context: text.slice(Math.max(0, idx - 20), idx + fangchaMatch[0].length + 20).replace(/\s+/g, ' '),
-          confidence: 0.95,
-          source: '本處業於...派員訪查（實際掛表日）',
-        });
-        console.log(`[OCR] Found meter date via 派員訪查: ${date}`);
-      }
-    }
-  }
-  
-  // ============================================================
-  // 優先級 1.7: 審查意見書 - 提取「PV 編號」
-  // ============================================================
-  if (isShenchaYijian) {
-    extractedPvId = extractPvId(text);
-  }
-
-  
-  // ============================================================
-  // 優先級 2: 提取核發日 - 「發文日期: XXX年XX月XX日」
-  // ============================================================
-  const issueMatch = text.match(ISSUE_PATTERN_OFFICIAL);
-  if (issueMatch) {
-    const date = extractDateFromPatternMatch(issueMatch);
-    if (date && !processedDates.has(date + '_issue')) {
-      processedDates.add(date + '_issue');
-      const idx = text.indexOf(issueMatch[0]);
+  if (aiResult.issued_at) {
+    const parsedDate = parseAndFormatDate(aiResult.issued_at);
+    if (parsedDate) {
       results.push({
         type: 'issue',
-        date,
-        context: text.slice(Math.max(0, idx - 20), idx + issueMatch[0].length + 20).replace(/\s+/g, ' '),
-        confidence: 0.99,
-        source: '發文日期',
+        date: parsedDate,
+        context: aiResult.issued_at_context || aiResult.issued_at,
+        confidence: 0.95,
+        source: 'AI 語意辨識',
       });
-      console.log(`[OCR] Found issue date via 發文日期: ${date}`);
     }
   }
   
-  // ============================================================
-  // 優先級 2.5: 審查章日期辨識（細部協商、審訖圖等文件）
-  // 審查章上的日期通常為核發日，格式為「XXX. M. DD」
-  // ============================================================
-  if ((isXiebuXieshang || hasStampKeyword) && !results.some(r => r.type === 'issue')) {
-    const stampDateMatch = text.match(STAMP_DATE_PATTERN_DOTS);
-    if (stampDateMatch) {
-      const date = extractDateFromPatternMatch(stampDateMatch);
-      if (date && !processedDates.has(date + '_issue')) {
-        const idx = text.indexOf(stampDateMatch[0]);
-        // 確認這個日期附近有審查章相關關鍵字
-        const nearbyText = text.slice(Math.max(0, idx - 150), Math.min(text.length, idx + 150));
-        const hasNearbyStampKeyword = STAMP_KEYWORDS.some(kw => nearbyText.includes(kw));
-        
-        if (hasNearbyStampKeyword) {
-          processedDates.add(date + '_issue');
-          results.push({
-            type: 'issue',
-            date,
-            context: text.slice(Math.max(0, idx - 50), idx + stampDateMatch[0].length + 50).replace(/\s+/g, ' '),
-            confidence: 0.95,
-            source: '審查章日期',
-          });
-          console.log(`[OCR] Found issue date via 審查章: ${date}`);
-        }
-      }
-    }
-  }
-  
-  // ============================================================
-  // 優先級 3: 使用通用模式提取其他可能的日期（較低置信度）
-  // ============================================================
-  DATE_PATTERNS.forEach((pattern, patternIndex) => {
-    pattern.lastIndex = 0;
-    
-    let match;
-    while ((match = pattern.exec(text)) !== null) {
-      const date = parseDate(match, patternIndex);
-      if (!date) continue;
-      
-      // 檢查這個日期是否已經被特定模式處理過
-      if (processedDates.has(date + '_submission') || processedDates.has(date + '_issue')) {
-        continue;
-      }
-      
-      const dateKey = date + '_unknown';
-      if (processedDates.has(dateKey)) continue;
-      processedDates.add(dateKey);
-      
-      // 檢查是否應該排除
-      if (isExcludedDate(text, match.index)) {
-        continue;
-      }
-
-      // Get surrounding context
-      const start = Math.max(0, match.index - 100);
-      const end = Math.min(text.length, match.index + match[0].length + 100);
-      const context = text.slice(start, end).replace(/\s+/g, ' ');
-
+  if (aiResult.meter_date) {
+    const parsedDate = parseAndFormatDate(aiResult.meter_date);
+    if (parsedDate) {
       results.push({
-        type: 'unknown',
-        date,
-        context,
-        confidence: 0.3,
-        source: '通用模式',
+        type: 'meter_date',
+        date: parsedDate,
+        context: aiResult.meter_date_context || aiResult.meter_date,
+        confidence: 0.95,
+        source: 'AI 語意辨識',
       });
     }
-  });
-
-  // Sort by confidence (highest first), then by type priority
-  const sortedResults = results.sort((a, b) => {
-    if (b.confidence !== a.confidence) return b.confidence - a.confidence;
-    // Prioritize known types over unknown
-    const typePriority: Record<string, number> = { issue: 1, submission: 2, meter_date: 3, unknown: 4 };
-    return (typePriority[a.type] || 99) - (typePriority[b.type] || 99);
-  });
+  }
   
   return {
-    dates: sortedResults,
-    pvId: extractedPvId?.pvId,
-    pvIdContext: extractedPvId?.context,
+    dates: results,
+    pvId: aiResult.pv_id,
+    pvIdContext: aiResult.pv_id_context,
   };
 }
 
-// Refresh Google OAuth access token using refresh token
+// Refresh Google Drive access token
 async function refreshAccessToken(refreshToken: string): Promise<string | null> {
+  const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+  
+  if (!clientId || !clientSecret) {
+    console.error('[OCR] Missing Google OAuth credentials');
+    return null;
+  }
+  
   try {
-    const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-    const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
-    
-    if (!clientId || !clientSecret) {
-      console.error('[OCR] Missing Google OAuth credentials');
-      return null;
-    }
-
     const response = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -698,12 +164,12 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
         grant_type: 'refresh_token',
       }),
     });
-
+    
     if (!response.ok) {
-      console.error('[OCR] Failed to refresh token:', await response.text());
+      console.error('[OCR] Token refresh failed:', await response.text());
       return null;
     }
-
+    
     const data = await response.json();
     return data.access_token;
   } catch (error) {
@@ -712,83 +178,72 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
   }
 }
 
-// Maximum file size for OCR (3MB to avoid memory issues)
-const MAX_FILE_SIZE_BYTES = 3 * 1024 * 1024;
-
-// Fetch file content from Google Drive with size limit
+// Fetch file from Google Drive
 async function fetchDriveFile(driveFileId: string, accessToken: string): Promise<{ content: string; mimeType: string; skipped?: boolean; skipReason?: string } | null> {
   try {
-    console.log(`[OCR] Attempting to fetch Drive file: ${driveFileId}`);
+    console.log(`[OCR] Fetching Drive file: ${driveFileId}`);
     
-    // First get file metadata to check mime type and SIZE
+    // First get file metadata to check type and size
     const metaResponse = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=mimeType,name,size`,
+      `https://www.googleapis.com/drive/v3/files/${driveFileId}?fields=mimeType,size,name`,
       {
-        headers: { Authorization: `Bearer ${accessToken}` },
+        headers: { 'Authorization': `Bearer ${accessToken}` },
       }
     );
-
+    
     if (!metaResponse.ok) {
-      const errorText = await metaResponse.text();
-      console.error(`[OCR] Failed to get file metadata (${metaResponse.status}):`, errorText);
+      console.error('[OCR] Failed to get file metadata:', await metaResponse.text());
       return null;
     }
-
+    
     const metadata = await metaResponse.json();
-    const mimeType = metadata.mimeType;
-    const fileSize = parseInt(metadata.size || '0');
-    console.log(`[OCR] Drive file metadata: ${metadata.name}, type: ${mimeType}, size: ${fileSize} bytes`);
-
+    console.log(`[OCR] File metadata: name=${metadata.name}, type=${metadata.mimeType}, size=${metadata.size}`);
+    
     // Check file size limit
+    const fileSize = parseInt(metadata.size || '0');
     if (fileSize > MAX_FILE_SIZE_BYTES) {
-      console.log(`[OCR] File too large (${fileSize} bytes > ${MAX_FILE_SIZE_BYTES} bytes), skipping OCR`);
+      console.log(`[OCR] File too large: ${fileSize} bytes > ${MAX_FILE_SIZE_BYTES} bytes`);
       return { 
         content: '', 
-        mimeType, 
-        skipped: true, 
-        skipReason: `檔案過大 (${(fileSize / 1024 / 1024).toFixed(1)}MB > 3MB)，請手動輸入日期` 
+        mimeType: metadata.mimeType,
+        skipped: true,
+        skipReason: `檔案過大 (${(fileSize / 1024 / 1024).toFixed(1)}MB > 3MB)，請手動輸入日期`
       };
     }
-
-    // For Google Docs/Sheets/Slides, export as PDF
-    let downloadUrl: string;
-    let finalMimeType = mimeType;
     
-    if (mimeType.startsWith('application/vnd.google-apps')) {
+    let finalMimeType = metadata.mimeType;
+    let downloadUrl: string;
+    
+    // Handle Google Workspace files (export to PDF)
+    if (metadata.mimeType.includes('google-apps')) {
       downloadUrl = `https://www.googleapis.com/drive/v3/files/${driveFileId}/export?mimeType=application/pdf`;
       finalMimeType = 'application/pdf';
-      console.log('[OCR] Exporting Google Workspace file as PDF');
     } else {
       downloadUrl = `https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`;
     }
-
-    console.log(`[OCR] Downloading from: ${downloadUrl.substring(0, 80)}...`);
     
     const fileResponse = await fetch(downloadUrl, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: { 'Authorization': `Bearer ${accessToken}` },
     });
-
+    
     if (!fileResponse.ok) {
-      const errorText = await fileResponse.text();
-      console.error(`[OCR] Failed to download file (${fileResponse.status}):`, errorText);
+      console.error('[OCR] Failed to download file:', await fileResponse.text());
       return null;
     }
-
-    const buffer = await fileResponse.arrayBuffer();
-    console.log(`[OCR] Downloaded ${buffer.byteLength} bytes`);
     
-    // Double-check downloaded size
+    const buffer = await fileResponse.arrayBuffer();
+    
+    // Check actual downloaded size
     if (buffer.byteLength > MAX_FILE_SIZE_BYTES) {
-      console.log(`[OCR] Downloaded file too large, skipping`);
+      console.log(`[OCR] Downloaded file too large: ${buffer.byteLength} bytes`);
       return { 
         content: '', 
-        mimeType: finalMimeType, 
-        skipped: true, 
-        skipReason: `檔案過大，請手動輸入日期` 
+        mimeType: finalMimeType,
+        skipped: true,
+        skipReason: `檔案過大 (${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB > 3MB)，請手動輸入日期`
       };
     }
     
-    // More memory-efficient base64 encoding using btoa with chunks
     const uint8Array = new Uint8Array(buffer);
     let binary = '';
     const chunkSize = 8192;
@@ -806,35 +261,105 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
   }
 }
 
-// Use Lovable AI (Gemini) for OCR - optimized for government documents
-async function performOcrWithLovableAI(imageBase64: string, mimeType: string, maxPages: number = 1): Promise<string> {
+// Use AI semantic understanding to extract dates directly
+// This replaces the old regex-based approach with AI that understands document context
+async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitle?: string): Promise<AIExtractedResult> {
   const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
   
   if (!lovableApiKey) {
     throw new Error('LOVABLE_API_KEY 未設定');
   }
 
-  console.log(`[OCR] Using Lovable AI (Gemini) for OCR... (maxPages: ${maxPages})`);
+  console.log(`[OCR] Using AI semantic understanding for date extraction...`);
 
-  // 針對政府函文優化的 prompt - 強調只讀第一頁，並專注於日期關鍵字
-  const ocrPrompt = `你是專門辨識台灣政府公文的 OCR 助手。
+  // AI prompt that asks for semantic understanding, not just text extraction
+  const systemPrompt = `你是專門辨識台灣政府公文的 AI 助手。你的任務是分析公文圖片，理解文件內容，並提取重要的日期和資訊。
 
-【重要】這是一份多頁 PDF 文件，但你只需要辨識「第一頁」的內容。請忽略第二頁及之後的所有內容。
+你需要辨識以下資訊：
 
-請從第一頁中提取所有文字，特別注意以下日期相關關鍵字：
-- 「發文日期：」後面的日期 → 這是核發日
-- 「復台端」、「復貴公司」後面的日期 → 這是送件日（申請人送件的日期）
-- 「依據貴公司」、「臺端於」、「台端於」後面的日期 → 這是送件日
-- 「本處業於」、「本府」後面的日期 → 這是送件日或收件日
-- 「申請日」、「收文」、「收件」後面的日期 → 這是送件日
+1. **送件日（submitted_at）**：申請人提交申請的日期
+   - 通常出現在「復台端 X年X月X日」、「依據貴公司 X年X月X日」、「臺端於 X年X月X日申請」等語句中
+   - 或是「收件日期」、「申請日期」、「受理日期」的值
+   - 這是申請方送出申請的日期，不是政府回覆的日期
 
-日期格式可能是：
-- 民國年份：如「113年05月20日」或「中華民國113年5月20日」
-- 西元年份：如「2024年5月20日」
+2. **核發日（issued_at）**：政府機關發文的日期
+   - 通常在「發文日期：」後面
+   - 或是審查章、核准章上蓋的日期
+   - 這是政府回覆公文的發文日期
 
-請輸出第一頁的完整文字內容：`;
+3. **掛表日（meter_date）**：太陽能電錶安裝運轉的日期
+   - 通常出現在「併聯運轉日」、「派員訪查」相關內容中
+   - 只有派員訪查併聯函才會有這個日期
 
-  // Retry logic with exponential backoff for transient errors (502, 503, 504)
+4. **PV編號（pv_id）**：台電的案件編號
+   - 格式通常是 6位數+PV+4位數，如「108114PV0784」
+   - 可能出現在「受理號碼」、「本公司編號」等處
+
+【重要規則】
+- 請只分析「第一頁」的內容
+- 日期可能是民國年份（如「114年11月21日」）或西元年份
+- 如果某個日期找不到，請不要填寫，不要猜測
+- 請在 context 欄位說明日期是從什麼語句或位置提取的`;
+
+  const userPrompt = docTitle 
+    ? `請分析這份公文圖片「${docTitle}」，提取送件日、核發日、掛表日和PV編號。`
+    : `請分析這份公文圖片，提取送件日、核發日、掛表日和PV編號。`;
+
+  // Use tool calling for structured output
+  const tools = [
+    {
+      type: "function",
+      function: {
+        name: "extract_document_info",
+        description: "從公文中提取日期和編號資訊",
+        parameters: {
+          type: "object",
+          properties: {
+            submitted_at: {
+              type: "string",
+              description: "送件日（申請人提交申請的日期），格式為民國年或西元年，如「114年11月21日」或「2025-11-21」"
+            },
+            submitted_at_context: {
+              type: "string",
+              description: "送件日的上下文，說明是從什麼語句提取的"
+            },
+            issued_at: {
+              type: "string",
+              description: "核發日（發文日期），格式為民國年或西元年"
+            },
+            issued_at_context: {
+              type: "string",
+              description: "核發日的上下文，說明是從什麼語句提取的"
+            },
+            meter_date: {
+              type: "string",
+              description: "掛表日/併聯運轉日（只有派員訪查函才有）"
+            },
+            meter_date_context: {
+              type: "string",
+              description: "掛表日的上下文"
+            },
+            pv_id: {
+              type: "string",
+              description: "PV編號，格式如 108114PV0784"
+            },
+            pv_id_context: {
+              type: "string",
+              description: "PV編號的上下文"
+            },
+            raw_text: {
+              type: "string",
+              description: "OCR 辨識出的主要文字內容（前500字）"
+            }
+          },
+          required: [],
+          additionalProperties: false
+        }
+      }
+    }
+  ];
+
+  // Retry logic
   const maxRetries = 3;
   let lastError: Error | null = null;
   
@@ -849,13 +374,11 @@ async function performOcrWithLovableAI(imageBase64: string, mimeType: string, ma
         body: JSON.stringify({
           model: 'google/gemini-2.5-flash',
           messages: [
+            { role: 'system', content: systemPrompt },
             {
               role: 'user',
               content: [
-                {
-                  type: 'text',
-                  text: ocrPrompt
-                },
+                { type: 'text', text: userPrompt },
                 {
                   type: 'image_url',
                   image_url: {
@@ -865,12 +388,14 @@ async function performOcrWithLovableAI(imageBase64: string, mimeType: string, ma
               ]
             }
           ],
+          tools,
+          tool_choice: { type: "function", function: { name: "extract_document_info" } },
         }),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[OCR] Lovable AI error (${response.status}, attempt ${attempt}/${maxRetries}):`, errorText);
+        console.error(`[OCR] AI error (${response.status}, attempt ${attempt}/${maxRetries}):`, errorText);
         
         if (response.status === 429) {
           throw new Error('AI 服務請求過於頻繁，請稍後再試');
@@ -879,27 +404,39 @@ async function performOcrWithLovableAI(imageBase64: string, mimeType: string, ma
           throw new Error('AI 服務額度不足');
         }
         
-        // Retry on transient errors (502, 503, 504)
         if ([502, 503, 504].includes(response.status) && attempt < maxRetries) {
-          const delay = Math.pow(2, attempt) * 1000; // 2s, 4s, 8s
+          const delay = Math.pow(2, attempt) * 1000;
           console.log(`[OCR] Transient error ${response.status}, retrying in ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
         
-        throw new Error(`AI OCR 處理失敗: ${response.status}`);
+        throw new Error(`AI 處理失敗: ${response.status}`);
       }
 
       const data = await response.json();
-      const extractedText = data.choices?.[0]?.message?.content || '';
       
-      console.log(`[OCR] Lovable AI extracted ${extractedText.length} chars from first page`);
-      return extractedText;
+      // Extract the tool call result
+      const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
+      if (toolCall && toolCall.function?.arguments) {
+        const result = JSON.parse(toolCall.function.arguments) as AIExtractedResult;
+        console.log('[OCR] AI extracted result:', JSON.stringify(result, null, 2));
+        return result;
+      }
+      
+      // Fallback: try to parse from content if tool call not used
+      const content = data.choices?.[0]?.message?.content;
+      if (content) {
+        console.log('[OCR] AI returned content instead of tool call, raw text length:', content.length);
+        return { raw_text: content };
+      }
+      
+      console.log('[OCR] No valid response from AI');
+      return {};
       
     } catch (error) {
       lastError = error as Error;
       
-      // Don't retry on non-transient errors
       if ((error as Error).message.includes('請求過於頻繁') || 
           (error as Error).message.includes('額度不足')) {
         throw error;
@@ -913,7 +450,7 @@ async function performOcrWithLovableAI(imageBase64: string, mimeType: string, ma
     }
   }
   
-  throw lastError || new Error('AI OCR 處理失敗');
+  throw lastError || new Error('AI 處理失敗');
 }
 
 serve(async (req) => {
@@ -950,18 +487,15 @@ serve(async (req) => {
     let imageBase64: string | null = null;
     let documentId: string | null = null;
     let mimeType = 'application/pdf';
-    let autoUpdate = false; // Default to NOT auto-update, let user confirm
-    let maxPages = 1; // Default to first page only
+    let autoUpdate = false;
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
       documentId = formData.get('documentId') as string | null;
       autoUpdate = formData.get('autoUpdate') === 'true';
-      maxPages = parseInt(formData.get('maxPages') as string) || 1;
       const file = formData.get('file') as File | null;
       
       if (file) {
-        // Check file size limit for uploaded files
         if (file.size > MAX_FILE_SIZE_BYTES) {
           console.log(`[OCR] Uploaded file too large: ${file.size} bytes`);
           return new Response(
@@ -993,17 +527,15 @@ serve(async (req) => {
       imageBase64 = body.imageBase64;
       mimeType = body.mimeType || 'application/pdf';
       autoUpdate = body.autoUpdate === true;
-      maxPages = typeof body.maxPages === 'number' ? body.maxPages : 1;
     }
 
-    // Track document title for smarter date extraction
+    // Track document title for smarter extraction
     let docTitle: string | null = null;
     
     // If no file provided but documentId exists, try to fetch from Drive
     if (!imageBase64 && documentId) {
       console.log(`[OCR] No file provided, attempting to fetch from Drive for document: ${documentId}`);
       
-      // Get document info including drive_file_id with retry for transient errors
       let docData: { drive_file_id: string | null; title: string | null } | null = null;
       let docError: Error | null = null;
       
@@ -1035,7 +567,6 @@ serve(async (req) => {
         );
       }
       
-      // Store title for smarter date extraction
       docTitle = docData.title;
       console.log(`[OCR] Document title: ${docTitle}`);
       
@@ -1046,7 +577,6 @@ serve(async (req) => {
         );
       }
 
-      // Get user's Drive token
       const { data: tokenData, error: tokenError } = await supabase
         .from('user_drive_tokens')
         .select('access_token, refresh_token, token_expires_at')
@@ -1060,7 +590,6 @@ serve(async (req) => {
         );
       }
 
-      // Check if token is expired and refresh if needed
       let accessToken = tokenData.access_token;
       const expiresAt = new Date(tokenData.token_expires_at);
       
@@ -1075,7 +604,6 @@ serve(async (req) => {
         }
         accessToken = newToken;
         
-        // Update token in database
         await supabase
           .from('user_drive_tokens')
           .update({
@@ -1086,7 +614,6 @@ serve(async (req) => {
           .eq('user_id', user.id);
       }
 
-      // Fetch file from Drive (with size limit check)
       const driveFile = await fetchDriveFile(docData.drive_file_id, accessToken);
       if (!driveFile) {
         return new Response(
@@ -1095,7 +622,6 @@ serve(async (req) => {
         );
       }
       
-      // Handle skipped files (too large)
       if (driveFile.skipped) {
         console.log(`[OCR] File skipped: ${driveFile.skipReason}`);
         return new Response(
@@ -1124,100 +650,77 @@ serve(async (req) => {
 
     console.log(`[OCR] Processing document, type: ${mimeType}, documentId: ${documentId}`);
 
-    // Use Lovable AI (Gemini) for OCR - no API key needed!
-    console.log(`[OCR] Processing with maxPages: ${maxPages}`);
-    const fullText = await performOcrWithLovableAI(imageBase64, mimeType, maxPages);
-
-    if (!fullText) {
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: '未偵測到文字',
-          extractedDates: [],
-          fullText: ''
-        }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    console.log(`[OCR] OCR text length: ${fullText.length} chars`);
-
-    // Extract dates and data from OCR text (pass document title for smarter inference)
-    const extractedData = extractDatesFromText(fullText, docTitle || undefined);
-    console.log(`[OCR] Extracted ${extractedData.dates.length} dates, PV ID: ${extractedData.pvId || 'none'}`);
+    // Use AI semantic understanding (new approach - no more regex!)
+    const aiResult = await extractDatesWithAI(imageBase64, mimeType, docTitle || undefined);
+    
+    // Convert to the expected format
+    const extractedData = aiResultToExtractedData(aiResult);
+    const fullText = aiResult.raw_text || '';
+    
+    console.log(`[OCR] AI extracted ${extractedData.dates.length} dates, PV ID: ${extractedData.pvId || 'none'}`);
 
     // Only update if autoUpdate is true (for batch upload)
-    // Otherwise just return results for user confirmation
-    let updatedFields: Record<string, string> = {};
-    let projectUpdatedFields: Record<string, string> = {};
-    
     if (autoUpdate && documentId && extractedData.dates.length > 0) {
-      // Find best submission, issue, and meter dates
-      const submissionDate = extractedData.dates.find(d => d.type === 'submission');
-      const issueDate = extractedData.dates.find(d => d.type === 'issue');
-      const meterDate = extractedData.dates.find(d => d.type === 'meter_date');
-
-      if (submissionDate || issueDate) {
-        const updateData: Record<string, string | null> = {};
-        
-        if (submissionDate) {
-          updateData.submitted_at = submissionDate.date;
-          updatedFields.submitted_at = submissionDate.date;
-        }
-        
-        if (issueDate) {
-          updateData.issued_at = issueDate.date;
-          updatedFields.issued_at = issueDate.date;
-        }
-
+      const submissionDate = extractedData.dates.find(d => d.type === 'submission')?.date;
+      const issueDate = extractedData.dates.find(d => d.type === 'issue')?.date;
+      const meterDate = extractedData.dates.find(d => d.type === 'meter_date')?.date;
+      
+      const updateData: Record<string, string> = {};
+      if (submissionDate) updateData.submitted_at = submissionDate;
+      if (issueDate) updateData.issued_at = issueDate;
+      
+      if (Object.keys(updateData).length > 0) {
         const { error: updateError } = await supabase
           .from('documents')
           .update(updateData)
           .eq('id', documentId);
-
+        
         if (updateError) {
-          console.error('[OCR] Document update error:', updateError);
+          console.error('[OCR] Failed to auto-update document:', updateError);
         } else {
-          console.log('[OCR] Document auto-updated:', updatedFields);
+          console.log('[OCR] Auto-updated document with extracted dates');
         }
       }
       
-      // 如果有實際掛表日或 PV 編號，更新專案資料
-      if (meterDate || extractedData.pvId) {
-        // 先取得文件所屬的專案 ID
+      // Update project meter date if found
+      if (meterDate) {
         const { data: docData } = await supabase
           .from('documents')
           .select('project_id')
           .eq('id', documentId)
           .single();
-          
+        
         if (docData?.project_id) {
-          const projectUpdateData: Record<string, string | null> = {};
-          
-          if (meterDate) {
-            projectUpdateData.actual_meter_date = meterDate.date;
-            projectUpdatedFields.actual_meter_date = meterDate.date;
-          }
-          
-          if (extractedData.pvId) {
-            projectUpdateData.taipower_pv_id = extractedData.pvId;
-            projectUpdatedFields.taipower_pv_id = extractedData.pvId;
-          }
-          
-          const { error: projectUpdateError } = await supabase
+          const { error: projectError } = await supabase
             .from('projects')
-            .update(projectUpdateData)
+            .update({ actual_meter_date: meterDate })
             .eq('id', docData.project_id);
-            
-          if (projectUpdateError) {
-            console.error('[OCR] Project update error:', projectUpdateError);
-          } else {
-            console.log('[OCR] Project auto-updated:', projectUpdatedFields);
+          
+          if (!projectError) {
+            console.log('[OCR] Updated project meter date');
           }
         }
       }
-    } else {
-      console.log('[OCR] Returning results for user confirmation (autoUpdate=false)');
+      
+      // Update PV ID if found
+      if (extractedData.pvId) {
+        const { data: docData } = await supabase
+          .from('documents')
+          .select('project_id')
+          .eq('id', documentId)
+          .single();
+        
+        if (docData?.project_id) {
+          const { error: pvError } = await supabase
+            .from('projects')
+            .update({ taipower_pv_id: extractedData.pvId })
+            .eq('id', docData.project_id);
+          
+          if (!pvError) {
+            console.log('[OCR] Updated project PV ID');
+          }
+        }
+      }
     }
 
     return new Response(
@@ -1226,9 +729,7 @@ serve(async (req) => {
         extractedDates: extractedData.dates,
         pvId: extractedData.pvId,
         pvIdContext: extractedData.pvIdContext,
-        fullText: fullText.slice(0, 2000), // Return first 2000 chars for debugging
-        updatedFields,
-        projectUpdatedFields,
+        fullText: fullText,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -1236,7 +737,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('[OCR] Error:', error);
     return new Response(
-      JSON.stringify({ error: (error as Error).message }),
+      JSON.stringify({ 
+        error: error instanceof Error ? error.message : '處理失敗',
+        details: error instanceof Error ? error.stack : undefined
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
