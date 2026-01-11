@@ -161,7 +161,8 @@ export default function Projects() {
   useEffect(() => {
     const statusParam = searchParams.get('status');
     const riskParam = searchParams.get('risk');
-    const constructionParam = searchParams.get('construction');
+    // 支援 construction 或 construction_status 兩種參數名稱
+    const constructionParam = searchParams.get('construction') || searchParams.get('construction_status');
     
     if (statusParam) {
       // 支援逗號分隔的多狀態篩選
@@ -403,7 +404,15 @@ export default function Projects() {
     let matchesConstruction = constructionFilter === 'all';
     if (!matchesConstruction) {
       const constructionValues = constructionFilter.split(',').map(s => decodeURIComponent(s.trim()));
-      matchesConstruction = constructionValues.includes((project as any).construction_status);
+      const projectConstructionStatus = (project as any).construction_status;
+      // 如果篩選條件包含「尚未開工」，也要匹配 null 或空值
+      if (constructionValues.includes('尚未開工')) {
+        matchesConstruction = constructionValues.includes(projectConstructionStatus) || 
+                               !projectConstructionStatus || 
+                               projectConstructionStatus === '';
+      } else {
+        matchesConstruction = constructionValues.includes(projectConstructionStatus);
+      }
     }
     
     // Risk filter - 使用從 project_analytics_view 查詢的風險案場 ID

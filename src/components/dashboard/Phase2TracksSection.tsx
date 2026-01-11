@@ -277,7 +277,17 @@ export function Phase2TracksSection({ projects, isLoading }: Phase2TracksSection
                 </div>
                 
                 {topAdminBottleneck && (
-                  <div className="flex items-center gap-1 text-xs text-destructive bg-destructive/10 rounded px-2 py-1 mt-2">
+                  <div 
+                    className="flex items-center gap-1 text-xs text-destructive bg-destructive/10 rounded px-2 py-1 mt-2 cursor-pointer hover:bg-destructive/20 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // 工程完成卡在某行政階段
+                      const stageMatch = topAdminBottleneck.label.match(/工程完成卡在(.+)/);
+                      if (stageMatch) {
+                        navigate(`/projects?construction_status=已完工,已掛錶&status=${encodeURIComponent(stageMatch[1])}`);
+                      }
+                    }}
+                  >
                     <AlertTriangle className="w-3 h-3" />
                     <span className="truncate">{topAdminBottleneck.label}</span>
                     <Badge variant="destructive" className="ml-auto text-[10px] h-4">
@@ -318,7 +328,13 @@ export function Phase2TracksSection({ projects, isLoading }: Phase2TracksSection
                 </div>
                 
                 {trackData.engineering.onHold > 0 && (
-                  <div className="flex items-center gap-1 text-xs text-destructive bg-destructive/10 rounded px-2 py-1 mt-2">
+                  <div 
+                    className="flex items-center gap-1 text-xs text-destructive bg-destructive/10 rounded px-2 py-1 mt-2 cursor-pointer hover:bg-destructive/20 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/projects?construction_status=暫緩');
+                    }}
+                  >
                     <Clock className="w-3 h-3" />
                     <span>暫緩中</span>
                     <Badge variant="destructive" className="ml-auto text-[10px] h-4">
@@ -328,7 +344,14 @@ export function Phase2TracksSection({ projects, isLoading }: Phase2TracksSection
                 )}
                 
                 {topEngineeringBottleneck && (
-                  <div className="flex items-center gap-1 text-xs text-destructive bg-destructive/10 rounded px-2 py-1 mt-2">
+                  <div 
+                    className="flex items-center gap-1 text-xs text-destructive bg-destructive/10 rounded px-2 py-1 mt-2 cursor-pointer hover:bg-destructive/20 transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // 已備案未開工
+                      navigate('/projects?status=同意備案,工程施工,報竣掛表,設備登記&construction_status=尚未開工');
+                    }}
+                  >
                     <AlertTriangle className="w-3 h-3" />
                     <span className="truncate">{topEngineeringBottleneck.label}</span>
                     <Badge variant="destructive" className="ml-auto text-[10px] h-4">
