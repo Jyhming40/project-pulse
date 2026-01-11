@@ -8,6 +8,20 @@ import {
   type AgencyCode 
 } from '@/lib/docTypeMapping';
 
+// 舊系統遺留的代碼 → 中文標籤的 mapping
+// 這些代碼來自 codebookConfig.ts 或舊資料，不在 document_type_config 中
+const LEGACY_CODE_TO_LABEL: Record<string, string> = {
+  'LINE_COMP_NOTICE': '線補費通知單',
+  'STRUCT_CERT': '結構簽證',
+  'TPC': '台電相關',
+  'ENERGY_BUREAU': '能源署相關',
+  'RELATED': '其他相關文件',
+  'BUILDING_AUTH': '建管處相關',
+  'GREEN_PERMISSION': '綠能設施',
+  'OTHER': '其他',
+  // 其他可能的舊代碼
+};
+
 interface DocTypeConfigRecord {
   code: string;
   label: string;
@@ -42,15 +56,22 @@ export function useDocTypeLabel() {
   const codeLabelMap = useMemo(() => {
     const map = new Map<string, string>();
     
-    // 先載入資料庫的設定（優先）
+    // 1. 先載入資料庫的設定（最高優先）
     dbDocTypes.forEach(dt => {
       map.set(dt.code, dt.label);
     });
     
-    // 再載入靜態定義（作為備援）
+    // 2. 再載入靜態定義（作為備援）
     DOC_TYPE_DEFINITIONS.forEach(def => {
       if (!map.has(def.code)) {
         map.set(def.code, def.label);
+      }
+    });
+    
+    // 3. 載入舊系統遺留代碼（最後備援）
+    Object.entries(LEGACY_CODE_TO_LABEL).forEach(([code, label]) => {
+      if (!map.has(code)) {
+        map.set(code, label);
       }
     });
     
@@ -80,28 +101,43 @@ export function useDocTypeLabel() {
    * @param fallbackDocType - 如果 code 找不到，用舊的 doc_type 作為備援
    */
   const getLabel = (docTypeCode: string | null | undefined, fallbackDocType?: string | null): string => {
-    // 1. 如果有 doc_type_code，先查找
+    // 1. 如果有 doc_type_code，先從 codeLabelMap 查找
     if (docTypeCode) {
       const label = codeLabelMap.get(docTypeCode);
       if (label) return label;
     }
     
-    // 2. 如果 docTypeCode 本身就是中文標籤（舊資料），直接返回
-    if (docTypeCode && labelCodeMap.has(docTypeCode)) {
-      return docTypeCode; // 它本身就是標籤
-    }
-    
-    // 3. 使用 fallbackDocType（舊的 doc_type 欄位值）
+    // 2. 嘗試 fallbackDocType（舊的 doc_type 欄位值）
     if (fallbackDocType) {
-      // 檢查是否為已知標籤
+      // 2a. fallbackDocType 可能是舊代碼，嘗試查找
+      const labelFromFallback = codeLabelMap.get(fallbackDocType);
+      if (labelFromFallback) return labelFromFallback;
+      
+      // 2b. 檢查是否為已知標籤（反向查找確認它是中文標籤）
       if (labelCodeMap.has(fallbackDocType)) {
         return fallbackDocType;
       }
-      // 否則直接返回（可能是使用者自定義的類型名稱）
+      
+      // 2c. 嘗試從 LEGACY_CODE_TO_LABEL 查找
+      if (LEGACY_CODE_TO_LABEL[fallbackDocType]) {
+        return LEGACY_CODE_TO_LABEL[fallbackDocType];
+      }
+      
+      // 2d. 否則直接返回（可能是使用者自定義的類型名稱或中文）
       return fallbackDocType;
     }
     
-    // 4. 最後備援
+    // 3. docTypeCode 本身可能是中文標籤（舊資料）
+    if (docTypeCode && labelCodeMap.has(docTypeCode)) {
+      return docTypeCode;
+    }
+    
+    // 4. 嘗試從 LEGACY_CODE_TO_LABEL 查找 docTypeCode
+    if (docTypeCode && LEGACY_CODE_TO_LABEL[docTypeCode]) {
+      return LEGACY_CODE_TO_LABEL[docTypeCode];
+    }
+    
+    // 5. 最後備援
     return docTypeCode || '未知類型';
   };
 

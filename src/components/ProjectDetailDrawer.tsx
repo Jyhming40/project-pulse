@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, Link } from 'react-router-dom';
 import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
+import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import {
@@ -82,6 +83,7 @@ const getConstructionStatusColor = (status: string) => {
 
 export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDetailDrawerProps) {
   const navigate = useNavigate();
+  const { getLabel: getDocTypeLabel } = useDocTypeLabel();
 
   // Fetch project
   const { data: project, isLoading } = useQuery({
@@ -519,7 +521,7 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                <span className="text-sm truncate">{doc.doc_type}</span>
+                                <span className="text-sm truncate">{getDocTypeLabel(doc.doc_type_code, doc.doc_type)}</span>
                               </div>
                               <Badge className={`${getDerivedDocStatusColor(derivedStatus)} text-xs flex-shrink-0`} variant="secondary">
                                 {derivedStatus}
