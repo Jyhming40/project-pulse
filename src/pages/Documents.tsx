@@ -2,12 +2,12 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
 import { useBatchSelect } from '@/hooks/useBatchSelect';
 import { useDocumentTags, useAllDocumentTagAssignments } from '@/hooks/useDocumentTags';
 import { useBatchOcr } from '@/hooks/useBatchOcr';
+import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
 import { deleteDriveFile } from '@/hooks/useDriveSync';
 import { format, isWithinInterval, subDays } from 'date-fns';
 import { TablePagination } from '@/components/ui/table-pagination';
@@ -23,7 +23,6 @@ import { getDerivedDocStatus, getDerivedDocStatusColor, DerivedDocStatus } from 
 import { 
   AGENCY_CODE_TO_LABEL, 
   AGENCY_CODES, 
-  getDocTypeLabelByCode, 
   getAgencyCodeByDocTypeCode,
   type AgencyCode 
 } from '@/lib/docTypeMapping';
@@ -91,8 +90,8 @@ export default function Documents() {
   const queryClient = useQueryClient();
   const { canEdit, isAdmin } = useAuth();
   
-  // Fetch doc_type_code options (single source of truth)
-  const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
+  // 使用統一的文件類型標籤 hook
+  const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions } = useDocTypeLabel();
   
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -175,23 +174,31 @@ export default function Documents() {
     const project = doc.projects as any;
     const searchLower = search.toLowerCase();
     
+    // 取得統一的文件類型標籤用於搜尋
+    const docTypeLabel = getDocTypeLabel(doc.doc_type_code, doc.doc_type);
+    
     // Enhanced search across multiple fields
     const matchesSearch = !search || 
       project?.project_name?.toLowerCase().includes(searchLower) ||
       project?.project_code?.toLowerCase().includes(searchLower) ||
-      doc.doc_type.toLowerCase().includes(searchLower) ||
+      docTypeLabel.toLowerCase().includes(searchLower) ||
+      doc.doc_type?.toLowerCase().includes(searchLower) ||
       doc.title?.toLowerCase().includes(searchLower) ||
       doc.note?.toLowerCase().includes(searchLower);
     
-    // Type filter - check both doc_type_code and doc_type for backward compatibility
-    // Special handling: '審查意見書' filter should also match 'TPC_REVIEW_SIMPLE' and doc_type '審查意見書'
-    let matchesType = typeFilter === 'all' || 
-      doc.doc_type_code === typeFilter || 
-      doc.doc_type === typeFilter;
-    
-    // Handle special case for 審查意見書 (matches both label and old doc_type values)
-    if (!matchesType && typeFilter === 'TPC_REVIEW_SIMPLE') {
-      matchesType = doc.doc_type === '審查意見書';
+    // Type filter - check doc_type_code, or match doc_type with selected label
+    let matchesType = typeFilter === 'all';
+    if (!matchesType) {
+      // 選擇的 filter 是 code，需要比對
+      if (doc.doc_type_code === typeFilter) {
+        matchesType = true;
+      } else {
+        // 舊資料可能沒有 doc_type_code，比對 doc_type 與選擇項目的 label
+        const selectedOption = docTypeOptions.find(opt => opt.value === typeFilter);
+        if (selectedOption && doc.doc_type === selectedOption.label) {
+          matchesType = true;
+        }
+      }
     }
     
     // Agency filter - use doc_type_code or agency_code
@@ -346,10 +353,10 @@ export default function Documents() {
   // To change status, update the date fields directly in the document detail page
   const batchUpdateFields: BatchUpdateField[] = [
     {
-      key: 'doc_type',
+      key: 'doc_type_code',
       label: '文件類型',
       type: 'select',
-      options: docTypeOptions,
+      options: docTypeOptions.map(opt => ({ value: opt.value, label: opt.label })),
       placeholder: '選擇類型',
     },
   ];
@@ -674,7 +681,7 @@ export default function Documents() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <FileText className="w-4 h-4 text-muted-foreground" />
-                        {doc.doc_type}
+                        {getDocTypeLabel(doc.doc_type_code, doc.doc_type)}
                       </div>
                     </TableCell>
                     <TableCell>
