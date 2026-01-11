@@ -164,13 +164,20 @@ export default function Projects() {
     const constructionParam = searchParams.get('construction');
     
     if (statusParam) {
+      // 支援逗號分隔的多狀態篩選
       setStatusFilter(statusParam);
+    } else {
+      setStatusFilter('all');
     }
     if (riskParam) {
       setRiskFilter(riskParam);
+    } else {
+      setRiskFilter('all');
     }
     if (constructionParam) {
       setConstructionFilter(constructionParam);
+    } else {
+      setConstructionFilter('all');
     }
   }, [searchParams]);
 
@@ -237,6 +244,33 @@ export default function Projects() {
       if (error) throw error;
       return data;
     },
+  });
+
+  // Fetch risk project IDs from analytics view (for risk filtering)
+  const { data: riskProjectIds = [] } = useQuery({
+    queryKey: ['risk-project-ids'],
+    queryFn: async () => {
+      const session = await supabase.auth.getSession();
+      const token = session.data.session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+      
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/project_analytics_view?has_risk=eq.true&select=project_id,current_project_status`,
+        {
+          headers: {
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'Authorization': `Bearer ${token}`,
+          },
+        }
+      );
+      
+      if (!response.ok) return [];
+      const data = await response.json();
+      // 排除暫停/取消的專案
+      return data
+        .filter((p: any) => !['暫停', '取消'].includes(p.current_project_status))
+        .map((p: any) => p.project_id);
+    },
+    enabled: riskFilter === 'high' || riskFilter === 'true',
   });
 
   // Fetch investors for dropdown
@@ -347,47 +381,6 @@ export default function Projects() {
     setDeletingProject(null);
   };
 
-  // Helper function to calculate risk level (same logic as RiskSection)
-  const calculateRiskLevel = (project: any): string => {
-    // 排除已完成、暫停、取消的案場
-    if (['暫停', '取消', '運維中'].includes(project.status)) return 'none';
-    
-    const now = new Date();
-    const updatedAt = new Date(project.updated_at);
-    const daysSinceUpdate = Math.floor((now.getTime() - updatedAt.getTime()) / (1000 * 60 * 60 * 24));
-    
-    let riskScore = 0;
-    
-    // 風險來源 1: 長時間未更新
-    if (daysSinceUpdate >= 30) {
-      riskScore += 40;
-    } else if (daysSinceUpdate >= 21) {
-      riskScore += 20;
-    }
-    
-    // 風險來源 2: 行政進度卡關
-    const adminProgress = project.admin_progress ?? 0;
-    if (adminProgress < 50 && adminProgress > 0) {
-      riskScore += 30;
-    }
-    
-    // 風險來源 3: 工程進度落後
-    const engineeringProgress = project.engineering_progress ?? 0;
-    if (project.construction_status === '已開工' && engineeringProgress < 50) {
-      riskScore += 25;
-    }
-    
-    // 風險來源 4: 待掛錶狀態
-    if (project.construction_status === '待掛錶') {
-      riskScore += 15;
-    }
-    
-    if (riskScore >= 50) return 'high';
-    if (riskScore >= 25) return 'medium';
-    if (riskScore > 0) return 'low';
-    return 'none';
-  };
-
   // Filter projects
   const filteredProjects = projects.filter(project => {
     const matchesSearch = 
@@ -397,15 +390,26 @@ export default function Projects() {
       project.address?.toLowerCase().includes(search.toLowerCase()) ||
       (project.investors as any)?.company_name?.toLowerCase().includes(search.toLowerCase());
     
-    const matchesStatus = statusFilter === 'all' || project.status === statusFilter;
-    const matchesCity = cityFilter === 'all' || project.city === cityFilter;
-    const matchesConstruction = constructionFilter === 'all' || (project as any).construction_status === constructionFilter;
+    // 支援逗號分隔的多狀態篩選
+    let matchesStatus = statusFilter === 'all';
+    if (!matchesStatus) {
+      const statusValues = statusFilter.split(',').map(s => decodeURIComponent(s.trim()));
+      matchesStatus = statusValues.includes(project.status);
+    }
     
-    // Risk filter
+    const matchesCity = cityFilter === 'all' || project.city === cityFilter;
+    
+    // 支援逗號分隔的多施工狀態篩選
+    let matchesConstruction = constructionFilter === 'all';
+    if (!matchesConstruction) {
+      const constructionValues = constructionFilter.split(',').map(s => decodeURIComponent(s.trim()));
+      matchesConstruction = constructionValues.includes((project as any).construction_status);
+    }
+    
+    // Risk filter - 使用從 project_analytics_view 查詢的風險案場 ID
     let matchesRisk = true;
-    if (riskFilter !== 'all') {
-      const projectRisk = calculateRiskLevel(project);
-      matchesRisk = projectRisk === riskFilter;
+    if (riskFilter === 'high' || riskFilter === 'true') {
+      matchesRisk = riskProjectIds.includes(project.id);
     }
     
     // Drive status filter
