@@ -16,9 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Loader2, Eye, EyeOff } from 'lucide-react';
 import { BatchUpdatePreview } from './BatchUpdatePreview';
-
 export interface BatchUpdateField {
   key: string;
   label: string;
@@ -82,73 +82,75 @@ export function BatchUpdateDialog<T = unknown>({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
             {description || `將批次更新 ${selectedCount} 筆資料`}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-4 py-4">
-          {fields.map((field) => (
-            <div key={field.key} className="grid gap-2">
-              <Label>{field.label}</Label>
-              <Select
-                value={values[field.key] || '__none__'}
-                onValueChange={(value) =>
-                  setValues((prev) => ({ ...prev, [field.key]: value }))
-                }
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={field.placeholder || '不變更'} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">不變更</SelectItem>
-                  {field.options.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          ))}
-        </div>
-
-        {selectedItems.length > 0 && hasChanges && (
-          <div className="border-t pt-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="mb-2"
-              onClick={() => setShowPreview(!showPreview)}
-            >
-              {showPreview ? (
-                <>
-                  <EyeOff className="mr-2 h-4 w-4" />
-                  隱藏預覽
-                </>
-              ) : (
-                <>
-                  <Eye className="mr-2 h-4 w-4" />
-                  顯示變更預覽
-                </>
-              )}
-            </Button>
-            {showPreview && (
-              <BatchUpdatePreview
-                selectedItems={selectedItems}
-                values={values}
-                fields={fields}
-                getDisplayValue={getDisplayValue}
-                getItemLabel={getItemLabel}
-              />
-            )}
+        <ScrollArea className="flex-1 -mx-6 px-6">
+          <div className="grid gap-4 py-4">
+            {fields.map((field) => (
+              <div key={field.key} className="grid gap-2">
+                <Label>{field.label}</Label>
+                <Select
+                  value={values[field.key] || '__none__'}
+                  onValueChange={(value) =>
+                    setValues((prev) => ({ ...prev, [field.key]: value }))
+                  }
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={field.placeholder || '不變更'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">不變更</SelectItem>
+                    {field.options.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ))}
           </div>
-        )}
 
-        <DialogFooter>
+          {selectedItems.length > 0 && hasChanges && (
+            <div className="border-t pt-4 pb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mb-2"
+                onClick={() => setShowPreview(!showPreview)}
+              >
+                {showPreview ? (
+                  <>
+                    <EyeOff className="mr-2 h-4 w-4" />
+                    隱藏預覽
+                  </>
+                ) : (
+                  <>
+                    <Eye className="mr-2 h-4 w-4" />
+                    顯示變更預覽
+                  </>
+                )}
+              </Button>
+              {showPreview && (
+                <BatchUpdatePreview
+                  selectedItems={selectedItems}
+                  values={values}
+                  fields={fields}
+                  getDisplayValue={getDisplayValue}
+                  getItemLabel={getItemLabel}
+                />
+              )}
+            </div>
+          )}
+        </ScrollArea>
+
+        <DialogFooter className="flex-shrink-0 border-t pt-4">
           <Button variant="outline" onClick={handleClose} disabled={isLoading}>
             取消
           </Button>
