@@ -231,6 +231,69 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
   }
 }
 
+// Use Lovable AI (Gemini) for OCR
+async function performOcrWithLovableAI(imageBase64: string, mimeType: string): Promise<string> {
+  const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
+  
+  if (!lovableApiKey) {
+    throw new Error('LOVABLE_API_KEY 未設定');
+  }
+
+  console.log('[OCR] Using Lovable AI (Gemini) for OCR...');
+
+  const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${lovableApiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'google/gemini-2.5-flash',
+      messages: [
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: `請仔細閱讀這份文件圖片，並提取所有可見的文字內容。請特別注意：
+1. 提取所有日期資訊（民國年份或西元年份格式皆可）
+2. 注意「送件日」、「申請日」、「收件日」、「核發日」、「發文日」等關鍵字及其後的日期
+3. 輸出純文字內容，保持原始格式
+
+請輸出文件中的所有文字：`
+            },
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${mimeType};base64,${imageBase64}`
+              }
+            }
+          ]
+        }
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`[OCR] Lovable AI error (${response.status}):`, errorText);
+    
+    if (response.status === 429) {
+      throw new Error('AI 服務請求過於頻繁，請稍後再試');
+    }
+    if (response.status === 402) {
+      throw new Error('AI 服務額度不足');
+    }
+    throw new Error(`AI OCR 處理失敗: ${response.status}`);
+  }
+
+  const data = await response.json();
+  const extractedText = data.choices?.[0]?.message?.content || '';
+  
+  console.log(`[OCR] Lovable AI extracted ${extractedText.length} chars`);
+  return extractedText;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -247,14 +310,6 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const visionApiKey = Deno.env.get('GOOGLE_VISION_API_KEY');
-
-    if (!visionApiKey) {
-      return new Response(
-        JSON.stringify({ error: 'Google Vision API Key 未設定' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -281,7 +336,14 @@ serve(async (req) => {
       
       if (file) {
         const buffer = await file.arrayBuffer();
-        imageBase64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
+        const uint8Array = new Uint8Array(buffer);
+        let binary = '';
+        const chunkSize = 8192;
+        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+          const chunk = uint8Array.subarray(i, i + chunkSize);
+          binary += String.fromCharCode.apply(null, Array.from(chunk));
+        }
+        imageBase64 = btoa(binary);
         mimeType = file.type || 'application/pdf';
       }
     } else {
@@ -379,33 +441,8 @@ serve(async (req) => {
 
     console.log(`[OCR] Processing document, type: ${mimeType}, documentId: ${documentId}`);
 
-    // Call Google Cloud Vision API for OCR
-    const visionResponse = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${visionApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requests: [{
-            image: { content: imageBase64 },
-            features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
-          }],
-        }),
-      }
-    );
-
-    if (!visionResponse.ok) {
-      const errorText = await visionResponse.text();
-      console.error('[OCR] Vision API error:', errorText);
-      return new Response(
-        JSON.stringify({ error: 'OCR 處理失敗', details: errorText }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const visionResult = await visionResponse.json();
-    const textAnnotations = visionResult.responses?.[0]?.textAnnotations;
-    const fullText = textAnnotations?.[0]?.description || '';
+    // Use Lovable AI (Gemini) for OCR - no API key needed!
+    const fullText = await performOcrWithLovableAI(imageBase64, mimeType);
 
     if (!fullText) {
       return new Response(
