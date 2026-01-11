@@ -5,12 +5,18 @@ export interface OcrTask {
   documentId: string;
   documentTitle: string;
   projectCode: string;
-  status: 'pending' | 'processing' | 'success' | 'error' | 'skipped';
+  status: 'pending' | 'processing' | 'success' | 'error' | 'skipped' | 'review';
   error?: string;
   extractedDates?: {
     submittedAt?: string;
     issuedAt?: string;
   };
+  // For review status - multiple candidates found
+  candidates?: Array<{
+    date: string;
+    type: 'submitted' | 'issued' | 'unknown';
+    confidence?: number;
+  }>;
 }
 
 export interface BatchOcrProgress {
@@ -19,6 +25,7 @@ export interface BatchOcrProgress {
   success: number;
   error: number;
   skipped: number;
+  review: number;
 }
 
 interface UseBatchOcrOptions {
@@ -44,6 +51,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
     success: 0,
     error: 0,
     skipped: 0,
+    review: 0,
   });
   
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -140,6 +148,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
       success: 0,
       error: 0,
       skipped: 0,
+      review: 0,
     });
     setIsRunning(true);
 
@@ -217,6 +226,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
       success: 0,
       error: 0,
       skipped: 0,
+      review: 0,
     });
     setIsRunning(false);
   }, []);
