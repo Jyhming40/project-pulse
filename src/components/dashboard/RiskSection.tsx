@@ -154,7 +154,10 @@ export function RiskSection({
     <div className="space-y-4">
       {/* 風險統計 */}
       <div className="grid grid-cols-3 gap-3">
-        <Card className={`${riskStats.high > 0 ? 'border-destructive/50' : ''}`}>
+        <Card 
+          className={`cursor-pointer hover:bg-accent/50 transition-colors ${riskStats.high > 0 ? 'border-destructive/50' : ''}`}
+          onClick={() => navigate('/projects?risk=high')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -168,7 +171,10 @@ export function RiskSection({
           </CardContent>
         </Card>
 
-        <Card className={`${riskStats.medium > 0 ? 'border-warning/50' : ''}`}>
+        <Card 
+          className={`cursor-pointer hover:bg-accent/50 transition-colors ${riskStats.medium > 0 ? 'border-warning/50' : ''}`}
+          onClick={() => navigate('/projects?risk=medium')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -182,7 +188,10 @@ export function RiskSection({
           </CardContent>
         </Card>
 
-        <Card>
+        <Card 
+          className="cursor-pointer hover:bg-accent/50 transition-colors"
+          onClick={() => navigate('/projects?risk=low')}
+        >
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
