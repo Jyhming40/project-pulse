@@ -6,33 +6,10 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Maximum file size for OCR processing
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB - standard limit
-const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024; // 10MB - above this, extract first page only
-const ABSOLUTE_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB - absolute maximum (first page only)
-
-// Document types that commonly have important info on first page only
-// 躉售合約、正式躉售等大型合約文件
-const FIRST_PAGE_ONLY_DOC_TYPES = [
-  'TPC_FORMAL_FIT', // 正式躉售
-  'TPC_CONTRACT',   // 躉售合約
-  'CONTRACT',       // 合約
-];
-
-// Check if a doc type should only process first page for large files
-function shouldExtractFirstPageOnly(docTypeCode: string | null, fileSize: number): boolean {
-  // If file is very large (>10MB), always try first page only
-  if (fileSize > LARGE_FILE_THRESHOLD) {
-    return true;
-  }
-  
-  // For known contract types, use first page only for moderate-sized files (>5MB)
-  if (docTypeCode && FIRST_PAGE_ONLY_DOC_TYPES.some(t => docTypeCode.includes(t))) {
-    return fileSize > 5 * 1024 * 1024;
-  }
-  
-  return false;
-}
+// Maximum file size for OCR processing (10MB)
+// Note: Larger PDFs cannot be partially processed as it creates invalid files
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB - maximum for processing
+const ABSOLUTE_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB - skip with clear message
 
 interface ExtractedDate {
   type: 'submission' | 'issue' | 'meter_date' | 'unknown';
@@ -587,25 +564,6 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
   }
 }
 
-// Extract first page from PDF using basic PDF parsing
-// This is a simplified approach - extract content until we find a page break
-function extractFirstPageFromPdf(pdfBuffer: ArrayBuffer): ArrayBuffer {
-  const uint8Array = new Uint8Array(pdfBuffer);
-  const text = new TextDecoder('latin1').decode(uint8Array);
-  
-  // For PDF, we'll look for page breaks and try to estimate first page content
-  // A typical PDF has 20-100KB per page for scanned documents
-  // We'll take approximately the first ~3MB which should cover the first few pages
-  const FIRST_PAGE_APPROX_SIZE = 3 * 1024 * 1024; // 3MB for first page estimation
-  
-  if (uint8Array.length <= FIRST_PAGE_APPROX_SIZE) {
-    return pdfBuffer;
-  }
-  
-  // Just take the first portion - the AI will only see what's visible
-  console.log(`[OCR] Extracting first ~3MB from ${(uint8Array.length / 1024 / 1024).toFixed(1)}MB PDF`);
-  return pdfBuffer.slice(0, FIRST_PAGE_APPROX_SIZE);
-}
 
 // Fetch file from Google Drive with optional first-page-only mode
 async function fetchDriveFile(
@@ -644,13 +602,8 @@ async function fetchDriveFile(
       };
     }
     
-    // Determine if we should extract first page only
-    const useFirstPageOnly = options?.firstPageOnly || 
-      shouldExtractFirstPageOnly(options?.docTypeCode || null, fileSize);
-    
-    if (useFirstPageOnly && fileSize > LARGE_FILE_THRESHOLD) {
-      console.log(`[OCR] Large file detected (${fileSizeMB.toFixed(1)}MB), will extract first page only`);
-    }
+    // Note: We no longer try to extract first page from PDFs as it creates invalid files
+    // Large PDFs will be checked after download and skipped if too large
     
     let finalMimeType = metadata.mimeType;
     let downloadUrl: string;
@@ -671,24 +624,30 @@ async function fetchDriveFile(
       return null;
     }
     
-    let buffer = await fileResponse.arrayBuffer();
-    let isFirstPageOnly = false;
+    const buffer = await fileResponse.arrayBuffer();
+    const bufferSizeMB = buffer.byteLength / 1024 / 1024;
     
-    // For large PDF files, extract first page only
-    if (useFirstPageOnly && buffer.byteLength > LARGE_FILE_THRESHOLD && finalMimeType === 'application/pdf') {
-      console.log(`[OCR] Extracting first page from large PDF (${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB)`);
-      buffer = extractFirstPageFromPdf(buffer);
-      isFirstPageOnly = true;
-    }
-    
-    // Check if still too large after extraction
-    if (buffer.byteLength > MAX_FILE_SIZE_BYTES && !isFirstPageOnly) {
-      console.log(`[OCR] Downloaded buffer too large, skipping: ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`);
+    // For large PDF files, we cannot simply slice bytes - it creates invalid PDFs
+    // The AI API rejects truncated PDFs with "The document has no pages" error
+    // So we need to skip large PDFs and ask for manual input
+    if (finalMimeType === 'application/pdf' && buffer.byteLength > MAX_FILE_SIZE_BYTES) {
+      console.log(`[OCR] PDF too large for OCR processing (${bufferSizeMB.toFixed(1)}MB > ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB), skipping`);
       return { 
         content: '', 
         mimeType: finalMimeType,
         skipped: true,
-        skipReason: `檔案過大 (${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB)，超過 ${(MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB 限制，請手動輸入日期`
+        skipReason: `PDF 檔案過大 (${bufferSizeMB.toFixed(1)}MB)，超過 ${(MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB 限制。由於無法正確截取 PDF 第一頁，請手動輸入日期資訊。`
+      };
+    }
+    
+    // Check if non-PDF file is too large
+    if (buffer.byteLength > MAX_FILE_SIZE_BYTES) {
+      console.log(`[OCR] File too large, skipping: ${bufferSizeMB.toFixed(1)}MB`);
+      return { 
+        content: '', 
+        mimeType: finalMimeType,
+        skipped: true,
+        skipReason: `檔案過大 (${bufferSizeMB.toFixed(1)}MB)，超過 ${(MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB 限制，請手動輸入日期`
       };
     }
     
@@ -701,8 +660,8 @@ async function fetchDriveFile(
     }
     const content = btoa(binary);
     
-    console.log(`[OCR] Base64 encoded content length: ${content.length}${isFirstPageOnly ? ' (first page only)' : ''}`);
-    return { content, mimeType: finalMimeType, firstPageOnly: isFirstPageOnly };
+    console.log(`[OCR] Base64 encoded content length: ${content.length}`);
+    return { content, mimeType: finalMimeType };
   } catch (error) {
     console.error('[OCR] Drive file fetch error:', error);
     return null;
