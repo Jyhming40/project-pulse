@@ -27,8 +27,7 @@ import {
   Link2,
   FolderOpen,
   Copy,
-  Briefcase,
-  BarChart3,
+  Briefcase
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -69,7 +68,6 @@ const investorItems = [
 // ==========================================
 const documentItems = [
   { to: '/documents', icon: FileText, label: '文件管理', module: MODULES.DOCUMENTS },
-  { to: '/document-gap-analysis', icon: BarChart3, label: '文件缺口分析', module: MODULES.DOCUMENTS },
   { to: '/import-batch', icon: FolderOpen, label: '批次匯入', module: MODULES.DOCUMENTS },
   { to: '/investor-codes', icon: BookOpen, label: '代碼對照表', adminOnly: true },
 ];

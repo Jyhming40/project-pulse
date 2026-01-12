@@ -14,7 +14,6 @@ import Investors from "./pages/Investors";
 import InvestorCodeReference from "./pages/InvestorCodeReference";
 import InvestorDataManagement from "./pages/InvestorDataManagement";
 import Documents from "./pages/Documents";
-import DocumentGapAnalysis from "./pages/DocumentGapAnalysis";
 import ImportBatch from "./pages/ImportBatch";
 import Settings from "./pages/Settings";
 import Users from "./pages/Users";
@@ -52,7 +51,6 @@ const App = () => (
             <Route path="/projects" element={<ProtectedRoute><Layout><Projects /></Layout></ProtectedRoute>} />
             <Route path="/projects/:id" element={<ProtectedRoute><Layout><ProjectDetail /></Layout></ProtectedRoute>} />
             <Route path="/documents" element={<ProtectedRoute><Layout><Documents /></Layout></ProtectedRoute>} />
-            <Route path="/document-gap-analysis" element={<ProtectedRoute><Layout><DocumentGapAnalysis /></Layout></ProtectedRoute>} />
             <Route path="/import-batch" element={<ProtectedRoute><Layout><ImportBatch /></Layout></ProtectedRoute>} />
             <Route path="/investors" element={<ProtectedRoute><Layout><Investors /></Layout></ProtectedRoute>} />
             <Route path="/investor-data" element={<ProtectedRoute><Layout><InvestorDataManagement /></Layout></ProtectedRoute>} />
