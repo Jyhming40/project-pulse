@@ -6,8 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Maximum file size for OCR processing (3MB)
-const MAX_FILE_SIZE_BYTES = 3 * 1024 * 1024;
+// Maximum file size for OCR processing (10MB - increased for larger PDFs)
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 
 interface ExtractedDate {
   type: 'submission' | 'issue' | 'meter_date' | 'unknown';
@@ -581,12 +581,15 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
     console.log(`[OCR] File metadata: name=${metadata.name}, type=${metadata.mimeType}, size=${metadata.size}`);
     
     const fileSize = parseInt(metadata.size || '0');
+    console.log(`[OCR] File size check: ${(fileSize / 1024 / 1024).toFixed(2)}MB, limit: ${(MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB`);
+    
     if (fileSize > MAX_FILE_SIZE_BYTES) {
+      console.log(`[OCR] File too large, skipping: ${(fileSize / 1024 / 1024).toFixed(1)}MB > ${(MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB`);
       return { 
         content: '', 
         mimeType: metadata.mimeType,
         skipped: true,
-        skipReason: `檔案過大 (${(fileSize / 1024 / 1024).toFixed(1)}MB > 3MB)，請手動輸入日期`
+        skipReason: `檔案過大 (${(fileSize / 1024 / 1024).toFixed(1)}MB)，超過 ${(MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB 限制，請手動輸入日期`
       };
     }
     
@@ -612,11 +615,12 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
     const buffer = await fileResponse.arrayBuffer();
     
     if (buffer.byteLength > MAX_FILE_SIZE_BYTES) {
+      console.log(`[OCR] Downloaded buffer too large, skipping: ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`);
       return { 
         content: '', 
         mimeType: finalMimeType,
         skipped: true,
-        skipReason: `檔案過大 (${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB > 3MB)，請手動輸入日期`
+        skipReason: `檔案過大 (${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB)，超過 ${(MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB 限制，請手動輸入日期`
       };
     }
     
