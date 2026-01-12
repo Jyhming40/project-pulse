@@ -6,6 +6,7 @@ export interface OcrTask {
   documentTitle: string;
   projectCode: string;
   projectId: string;
+  docTypeCode?: string | null; // 文件類型代碼
   status: 'pending' | 'processing' | 'success' | 'error' | 'skipped' | 'review' | 'already_processed';
   error?: string;
   extractedDates?: {
@@ -73,6 +74,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
   // Process a single document OCR with retry logic for transient errors
   const processDocument = useCallback(async (
     documentId: string,
+    docTypeCode: string | null | undefined,
     signal: AbortSignal
   ): Promise<{ success: boolean; error?: string; dates?: { submittedAt?: string; issuedAt?: string; meterDate?: string }; pvId?: string }> => {
     const maxRetries = 3;
@@ -100,6 +102,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
               documentId,
               maxPages,
               autoUpdate,
+              docTypeCode: docTypeCode || undefined,
             }),
             signal,
           }
@@ -172,6 +175,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
     submittedAt?: string | null;
     issuedAt?: string | null;
     pvId?: string | null;
+    docTypeCode?: string | null; // 文件類型代碼
   }>, forceReprocessAll: boolean = false) => {
     // Separate documents into already processed and needs processing
     const allDocsWithDriveFile = documents.filter(doc => doc.hasDriveFile);
@@ -213,6 +217,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
         documentTitle: doc.title || '未命名',
         projectCode: doc.projectCode,
         projectId: doc.projectId,
+        docTypeCode: doc.docTypeCode,
         status: 'pending' as const,
         alreadyProcessed: false,
       })),
@@ -265,8 +270,8 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
           i === currentIndex ? { ...t, status: 'processing' } : t
         ));
 
-        // Process the document
-        const result = await processDocument(doc.id, signal);
+        // Process the document with docTypeCode for proper filtering
+        const result = await processDocument(doc.id, doc.docTypeCode, signal);
 
         // Update task result
         setTasks(prev => prev.map((t, i) => {
