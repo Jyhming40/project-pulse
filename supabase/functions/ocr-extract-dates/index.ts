@@ -62,10 +62,13 @@ const METER_PATTERNS = [
   { pattern: /併聯(?:運轉)?日[期]?\s*[：:]\s*(?:中華)?民?國?\s*(\d{2,3})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/, source: '併聯運轉日' },
 ];
 
-// PV ID patterns
+// 台電 PV ID patterns - 格式：6位區處代碼(純數字) + PV + 4位流水號
+// 例如：120114PV0442, 108114PV0784
+// ⚠️ 排除能源署備案編號格式：YUN-114PV0349（有英文前綴）
 const PV_ID_PATTERNS = [
-  /(?:本公司編號|PV編號|編號|受理號碼)[：:\s]*([A-Z0-9]{6,}PV[A-Z0-9]{4,})/i,
-  /\b(\d{6}PV\d{4})\b/,
+  /(?:本公司編號|受理號碼|契約編號)[：:\s]*(\d{6}PV\d{4})/i,
+  /(?:公司編號[：:\s]*)(\d{6}PV\d{4})/i,
+  /\b(\d{6}PV\d{4})\b/,  // 純數字開頭的 PV 編號
 ];
 
 // ROC year to Western year conversion
@@ -434,11 +437,15 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
      * 「派員訪查」相關內容中的日期
    - ⚠️ 注意：「抄表日」、「正式購售電能日」都是掛表日，不是送件日
 
-4. **PV編號（pv_id）**：台電的案件編號
-   - 格式通常是：
-     * 6位數+PV+4位數，如「108114PV0784」
-     * XX-PV-XXX-XXXX，如「19-PV-113-0362」
-   - 常見位置：「受理號碼」、「本公司編號」、「契約編號」
+4. **台電 PV 編號（pv_id）**：台電公司的案件編號
+   - 格式固定為：6位數字 + PV + 4位數字
+     * 例如：「120114PV0442」、「108114PV0784」
+     * 前6位是區處代碼（純數字），後4位是流水號
+   - 常見位置：「本公司編號：」、「受理號碼：」、「契約編號：」
+   - ⚠️ 重要：請勿混淆「能源署備案編號」！
+     * 能源署備案編號格式：「YUN-114PV0349」（有英文縣市代碼開頭）
+     * 台電 PV 編號格式：「120114PV0442」（純數字開頭）
+   - 只提取台電 PV 編號，忽略能源署備案編號
 
 【重要規則】
 - 請只分析「第一頁」的內容
@@ -488,7 +495,7 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
             },
             pv_id: {
               type: "string",
-              description: "PV編號，格式如 108114PV0784"
+              description: "台電 PV 編號（純數字開頭），格式固定為6位數字+PV+4位數字，如「120114PV0442」。注意：不是能源署備案編號（如 YUN-114PV0349）"
             },
             pv_id_context: {
               type: "string",
