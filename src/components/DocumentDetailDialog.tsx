@@ -384,19 +384,32 @@ export function DocumentDetailDialog({
       const result = response.data;
       
       if (result.success) {
+        // Check if file was skipped (e.g., too large)
+        if (result.skipped) {
+          toast.warning('無法處理此檔案', {
+            description: result.skipReason || '檔案可能過大或格式不支援',
+            duration: 6000,
+          });
+          return;
+        }
+        
         const extractedCount = result.extractedDates?.length || 0;
         
-        if (extractedCount > 0 || result.pvId) {
+        if (extractedCount > 0 || result.pvId || result.energyPermitId) {
           // Show OCR results dialog for user confirmation
           setOcrResults({
             extractedDates: result.extractedDates || [],
             fullText: result.fullText || '',
             pvId: result.pvId,
             pvIdContext: result.pvIdContext,
+            energyPermitId: result.energyPermitId,
+            energyPermitIdContext: result.energyPermitIdContext,
           });
           setIsOcrResultOpen(true);
         } else {
-          toast.info('未偵測到日期資訊');
+          toast.info('未偵測到日期資訊', {
+            description: '文件可能為掃描品質不佳或非標準公文格式',
+          });
         }
       } else {
         throw new Error(result.error || 'OCR 處理失敗');
