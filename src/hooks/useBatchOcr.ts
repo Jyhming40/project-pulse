@@ -44,6 +44,7 @@ interface UseBatchOcrOptions {
   maxBatchSize?: number;
   autoUpdate?: boolean;
   maxPages?: number;
+  forceReprocess?: boolean;
 }
 
 export function useBatchOcr(options: UseBatchOcrOptions = {}) {
@@ -53,6 +54,8 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
     autoUpdate = true,
     maxPages = 1,
   } = options;
+  
+  const [forceReprocess, setForceReprocess] = useState(false);
 
   const [tasks, setTasks] = useState<OcrTask[]>([]);
   const [isRunning, setIsRunning] = useState(false);
@@ -169,19 +172,30 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
     submittedAt?: string | null;
     issuedAt?: string | null;
     pvId?: string | null;
-  }>) => {
+  }>, forceReprocessAll: boolean = false) => {
     // Separate documents into already processed and needs processing
     const allDocsWithDriveFile = documents.filter(doc => doc.hasDriveFile);
     
-    // Already processed = has submitted_at OR issued_at OR pvId
-    const alreadyProcessedDocs = allDocsWithDriveFile.filter(
-      doc => doc.hasSubmittedAt || doc.hasIssuedAt || doc.pvId
-    );
+    // When forceReprocessAll is true, process all documents regardless of existing data
+    let alreadyProcessedDocs: typeof allDocsWithDriveFile = [];
+    let needsProcessingDocs: typeof allDocsWithDriveFile = [];
     
-    // Needs processing = no dates and no pvId
-    const needsProcessingDocs = allDocsWithDriveFile.filter(
-      doc => !doc.hasSubmittedAt && !doc.hasIssuedAt && !doc.pvId
-    );
+    if (forceReprocessAll) {
+      // Force reprocess: treat all docs as needing processing
+      needsProcessingDocs = allDocsWithDriveFile;
+      alreadyProcessedDocs = [];
+    } else {
+      // Normal mode: skip already processed
+      // Already processed = has submitted_at OR issued_at OR pvId
+      alreadyProcessedDocs = allDocsWithDriveFile.filter(
+        doc => doc.hasSubmittedAt || doc.hasIssuedAt || doc.pvId
+      );
+      
+      // Needs processing = no dates and no pvId
+      needsProcessingDocs = allDocsWithDriveFile.filter(
+        doc => !doc.hasSubmittedAt && !doc.hasIssuedAt && !doc.pvId
+      );
+    }
     
     // Check if we have any documents to work with
     if (allDocsWithDriveFile.length === 0) {
@@ -326,5 +340,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
     startBatchOcr,
     cancelBatchOcr,
     reset,
+    forceReprocess,
+    setForceReprocess,
   };
 }
