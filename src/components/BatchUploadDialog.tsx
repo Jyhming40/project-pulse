@@ -192,10 +192,16 @@ function parseDateFromFilename(filename: string): string | null {
     return match[0]; // Return YYYYMMDD
   }
   
-  // Match YYYY-MM-DD pattern
+  // Match YYYY-MM-DD pattern (dash separated)
   const dashMatch = filename.match(/(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])/);
   if (dashMatch) {
     return dashMatch[0].replace(/-/g, '');
+  }
+  
+  // Match YYYY.MM.DD pattern (dot separated, e.g., 2025.08.01)
+  const dotMatch = filename.match(/(\d{4})\.(0[1-9]|1[0-2])\.(0[1-9]|[12]\d|3[01])/);
+  if (dotMatch) {
+    return dotMatch[0].replace(/\./g, '');
   }
   
   return null;
@@ -263,15 +269,25 @@ export function BatchUploadDialog({
   const generateId = () => Math.random().toString(36).substring(2, 9);
 
   // Generate standardized title based on encoding format
-  const generateStandardTitle = useCallback((docTypeCode: string, agencyCode: string) => {
+  // Use extracted date from filename if available, otherwise use current date
+  const generateStandardTitle = useCallback((docTypeCode: string, agencyCode: string, issuedDateStr?: string | null) => {
     const docTypeLabel = getDocTypeLabelByCode(docTypeCode) || docTypeCode;
     const agencyLabel = AGENCY_CODE_TO_LABEL[agencyCode as AgencyCode] || agencyCode;
+    
+    // Parse date from issuedDateStr (YYYYMMDD) or use current date
+    let dateToUse = new Date();
+    if (issuedDateStr && issuedDateStr.length === 8) {
+      const year = parseInt(issuedDateStr.substring(0, 4), 10);
+      const month = parseInt(issuedDateStr.substring(4, 6), 10) - 1; // Month is 0-indexed
+      const day = parseInt(issuedDateStr.substring(6, 8), 10);
+      dateToUse = new Date(year, month, day);
+    }
     
     return generateDocumentDisplayName({
       projectCode,
       agency: agencyLabel,
       docType: docTypeLabel,
-      date: new Date(),
+      date: dateToUse,
       version: 1,
     }).replace(/\.[^/.]+$/, ''); // Remove extension for title
   }, [projectCode]);
@@ -297,11 +313,11 @@ export function BatchUploadDialog({
       // Infer agency code from doc_type_code
       const agencyCode = getAgencyCodeByDocTypeCode(inferredDocType) || 'OTHER';
       
-      // Parse date from filename (e.g., 20260110 from "2021HYE011-2021_台電_審訖圖_20260110_v01")
+      // Parse date from filename (e.g., 2025.08.01 from "[審查意見書]同昌肉品_2025.08.01.pdf")
       const issuedDateStr = parseDateFromFilename(file.name);
 
-      // Generate standardized title
-      const standardTitle = generateStandardTitle(inferredDocType, agencyCode);
+      // Generate standardized title using extracted date
+      const standardTitle = generateStandardTitle(inferredDocType, agencyCode, issuedDateStr);
 
       return {
         id: generateId(),
@@ -333,8 +349,8 @@ export function BatchUploadDialog({
         if (inferredAgency) {
           updated.agencyCode = inferredAgency;
         }
-        // Regenerate standardized title
-        updated.title = generateStandardTitle(updates.documentType, updated.agencyCode);
+        // Regenerate standardized title using existing issuedDateStr
+        updated.title = generateStandardTitle(updates.documentType, updated.agencyCode, item.issuedDateStr);
         // Do NOT change subfolder - keep it as user set or default (OFFICIAL_DOC)
       }
       
