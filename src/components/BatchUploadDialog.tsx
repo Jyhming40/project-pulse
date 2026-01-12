@@ -227,6 +227,9 @@ interface FileItem {
   issuedDateStr: string | null; // YYYYMMDD format extracted from filename
   status: 'pending' | 'uploading' | 'success' | 'error';
   error?: string;
+  documentId?: string; // Store created document ID for OCR
+  ocrStatus?: 'pending' | 'processing' | 'success' | 'error' | 'skipped';
+  ocrError?: string;
 }
 
 interface BatchUploadDialogProps {
@@ -248,6 +251,8 @@ export function BatchUploadDialog({
   const [files, setFiles] = useState<FileItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [ocrProgress, setOcrProgress] = useState(0);
+  const [isOcrRunning, setIsOcrRunning] = useState(false);
   const [driveSubfolders, setDriveSubfolders] = useState(DEFAULT_SUBFOLDER_TEMPLATE);
   const syncMilestones = useSyncAdminMilestones();
 
@@ -374,8 +379,8 @@ export function BatchUploadDialog({
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
-  // Upload single file
-  const uploadSingleFile = async (item: FileItem, accessToken: string): Promise<boolean> => {
+  // Upload single file - returns documentId if successful
+  const uploadSingleFile = async (item: FileItem, accessToken: string): Promise<string | null> => {
     // Convert doc_type_code to short value for database storage
     const docTypeShort = DOC_TYPE_CODE_TO_SHORT[item.documentType] || item.documentType;
     
@@ -413,12 +418,46 @@ export function BatchUploadDialog({
         throw new Error(result.error || '上傳失敗');
       }
 
-      updateFileItem(item.id, { status: 'success' });
-      return true;
+      const documentId = result.documentId || result.document?.id;
+      updateFileItem(item.id, { 
+        status: 'success',
+        documentId,
+        ocrStatus: documentId ? 'pending' : 'skipped'
+      });
+      return documentId || null;
     } catch (err) {
       updateFileItem(item.id, { 
         status: 'error', 
         error: (err as Error).message 
+      });
+      return null;
+    }
+  };
+
+  // Run OCR on a single document
+  const runOcrForDocument = async (item: FileItem, accessToken: string): Promise<boolean> => {
+    if (!item.documentId) return false;
+
+    try {
+      updateFileItem(item.id, { ocrStatus: 'processing' });
+
+      const response = await supabase.functions.invoke('ocr-extract-dates', {
+        body: {
+          documentId: item.documentId,
+          autoUpdate: true, // Auto-apply OCR results
+        },
+      });
+
+      if (response.error) {
+        throw new Error(response.error.message || 'OCR 辨識失敗');
+      }
+
+      updateFileItem(item.id, { ocrStatus: 'success' });
+      return true;
+    } catch (err) {
+      updateFileItem(item.id, { 
+        ocrStatus: 'error',
+        ocrError: (err as Error).message
       });
       return false;
     }
@@ -451,14 +490,18 @@ export function BatchUploadDialog({
 
     let successCount = 0;
     let errorCount = 0;
+    const uploadedItems: FileItem[] = [];
 
+    // Phase 1: Upload all files
     for (let i = 0; i < pendingFiles.length; i++) {
       const item = pendingFiles[i];
       updateFileItem(item.id, { status: 'uploading' });
 
-      const success = await uploadSingleFile(item, session.access_token);
-      if (success) {
+      const documentId = await uploadSingleFile(item, session.access_token);
+      if (documentId) {
         successCount++;
+        // Track items with documentId for OCR
+        uploadedItems.push({ ...item, documentId });
       } else {
         errorCount++;
       }
@@ -469,7 +512,7 @@ export function BatchUploadDialog({
     setIsUploading(false);
 
     if (successCount > 0) {
-      toast.success(`成功上傳 ${successCount} 個檔案`);
+      toast.success(`成功上傳 ${successCount} 個檔案，開始背景 OCR 辨識...`);
       // Sync admin milestones after batch upload (SSOT)
       syncMilestones.mutate(projectId);
       onSuccess?.();
@@ -478,47 +521,115 @@ export function BatchUploadDialog({
       toast.error(`${errorCount} 個檔案上傳失敗`);
     }
 
-    // If all succeeded, close dialog
+    // Phase 2: Run OCR in background for uploaded files
+    if (uploadedItems.length > 0) {
+      setIsOcrRunning(true);
+      setOcrProgress(0);
+
+      let ocrSuccessCount = 0;
+      let ocrErrorCount = 0;
+
+      for (let i = 0; i < uploadedItems.length; i++) {
+        const item = uploadedItems[i];
+        const success = await runOcrForDocument(item, session.access_token);
+        if (success) {
+          ocrSuccessCount++;
+        } else {
+          ocrErrorCount++;
+        }
+        setOcrProgress(Math.round(((i + 1) / uploadedItems.length) * 100));
+      }
+
+      setIsOcrRunning(false);
+
+      if (ocrSuccessCount > 0) {
+        toast.success(`OCR 辨識完成：${ocrSuccessCount} 個成功`);
+        // Refresh to show OCR results
+        onSuccess?.();
+      }
+      if (ocrErrorCount > 0) {
+        toast.warning(`${ocrErrorCount} 個檔案 OCR 辨識失敗`);
+      }
+    }
+
+    // If all uploads succeeded, close dialog after OCR
     if (errorCount === 0 && successCount > 0) {
       clearFiles();
       onOpenChange(false);
     }
   };
 
-  // Status badge
+  // Status badge - shows both upload and OCR status
   const getStatusBadge = (item: FileItem) => {
-    switch (item.status) {
-      case 'uploading':
-        return (
-          <Badge variant="secondary" className="bg-primary/15 text-primary">
-            <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-            上傳中
-          </Badge>
-        );
-      case 'success':
-        return (
-          <Badge variant="secondary" className="bg-success/15 text-success">
-            <CheckCircle2 className="w-3 h-3 mr-1" />
-            完成
-          </Badge>
-        );
-      case 'error':
-        return (
-          <Badge variant="destructive" title={item.error}>
-            <AlertCircle className="w-3 h-3 mr-1" />
-            失敗
-          </Badge>
-        );
-      default:
-        return (
-          <Badge variant="outline">待上傳</Badge>
-        );
+    // First show upload status
+    if (item.status === 'uploading') {
+      return (
+        <Badge variant="secondary" className="bg-primary/15 text-primary">
+          <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+          上傳中
+        </Badge>
+      );
     }
+    if (item.status === 'error') {
+      return (
+        <Badge variant="destructive" title={item.error}>
+          <AlertCircle className="w-3 h-3 mr-1" />
+          上傳失敗
+        </Badge>
+      );
+    }
+    if (item.status === 'pending') {
+      return <Badge variant="outline">待上傳</Badge>;
+    }
+    
+    // Upload succeeded - now show OCR status
+    if (item.ocrStatus === 'processing') {
+      return (
+        <Badge variant="secondary" className="bg-amber-500/15 text-amber-600">
+          <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+          OCR 辨識中
+        </Badge>
+      );
+    }
+    if (item.ocrStatus === 'success') {
+      return (
+        <Badge variant="secondary" className="bg-success/15 text-success">
+          <CheckCircle2 className="w-3 h-3 mr-1" />
+          完成 + OCR
+        </Badge>
+      );
+    }
+    if (item.ocrStatus === 'error') {
+      return (
+        <Badge variant="secondary" className="bg-amber-500/15 text-amber-600" title={item.ocrError}>
+          <CheckCircle2 className="w-3 h-3 mr-1" />
+          完成 (OCR 失敗)
+        </Badge>
+      );
+    }
+    if (item.ocrStatus === 'pending') {
+      return (
+        <Badge variant="secondary" className="bg-success/15 text-success">
+          <CheckCircle2 className="w-3 h-3 mr-1" />
+          上傳完成
+        </Badge>
+      );
+    }
+    
+    // Default success without OCR
+    return (
+      <Badge variant="secondary" className="bg-success/15 text-success">
+        <CheckCircle2 className="w-3 h-3 mr-1" />
+        完成
+      </Badge>
+    );
   };
 
   const pendingCount = files.filter(f => f.status === 'pending').length;
   const successCount = files.filter(f => f.status === 'success').length;
   const errorCount = files.filter(f => f.status === 'error').length;
+  const ocrProcessingCount = files.filter(f => f.ocrStatus === 'processing').length;
+  const ocrSuccessCount = files.filter(f => f.ocrStatus === 'success').length;
 
   return (
     <Dialog open={open} onOpenChange={(open) => {
@@ -548,7 +659,7 @@ export function BatchUploadDialog({
             <Button
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isUploading}
+              disabled={isUploading || isOcrRunning}
             >
               <Plus className="w-4 h-4 mr-2" />
               選擇檔案
@@ -558,7 +669,7 @@ export function BatchUploadDialog({
                 variant="ghost"
                 size="sm"
                 onClick={clearFiles}
-                disabled={isUploading}
+                disabled={isUploading || isOcrRunning}
               >
                 清除全部
               </Button>
@@ -570,10 +681,31 @@ export function BatchUploadDialog({
                   共 {files.length} 個檔案
                   {successCount > 0 && <span className="text-success ml-2">✓ {successCount}</span>}
                   {errorCount > 0 && <span className="text-destructive ml-2">✗ {errorCount}</span>}
+                  {ocrSuccessCount > 0 && <span className="text-amber-600 ml-2">OCR {ocrSuccessCount}</span>}
                 </>
               )}
             </div>
           </div>
+
+          {/* Progress bars */}
+          {isUploading && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-sm">
+                <span>上傳進度</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <Progress value={uploadProgress} className="h-2" />
+            </div>
+          )}
+          {isOcrRunning && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-amber-600">OCR 辨識中...</span>
+                <span>{ocrProgress}%</span>
+              </div>
+              <Progress value={ocrProgress} className="h-2 [&>div]:bg-amber-500" />
+            </div>
+          )}
 
           {/* File list */}
           {files.length === 0 ? (
@@ -683,33 +815,29 @@ export function BatchUploadDialog({
             </ScrollArea>
           )}
 
-          {/* Upload progress */}
-          {isUploading && (
-            <div className="space-y-2">
-              <Progress value={uploadProgress} />
-              <p className="text-sm text-center text-muted-foreground">
-                正在上傳... {uploadProgress}%
-              </p>
-            </div>
-          )}
         </div>
 
         <DialogFooter className="mt-4">
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)}
-            disabled={isUploading}
+            disabled={isUploading || isOcrRunning}
           >
             {successCount > 0 && errorCount === 0 ? '完成' : '取消'}
           </Button>
           <Button
             onClick={handleUploadAll}
-            disabled={pendingCount === 0 || isUploading}
+            disabled={pendingCount === 0 || isUploading || isOcrRunning}
           >
             {isUploading ? (
               <>
                 <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
                 上傳中
+              </>
+            ) : isOcrRunning ? (
+              <>
+                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                OCR 辨識中
               </>
             ) : (
               <>
