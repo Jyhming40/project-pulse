@@ -48,7 +48,36 @@ interface OcrResultDialogProps {
   pvIdContext?: string;
   energyPermitId?: string; // 能源署備案編號
   energyPermitIdContext?: string;
-  onConfirm: (submittedAt: string | null, issuedAt: string | null, meterDate?: string | null, pvId?: string | null, energyPermitId?: string | null) => void;
+  // 派員訪查併聯函資料
+  taipowerContractNo?: string;
+  taipowerContractNoContext?: string;
+  meterNumber?: string;
+  meterNumberContext?: string;
+  actualInstalledCapacity?: number;
+  powerVoltage?: string;
+  gridConnectionType?: string;
+  pvModuleModel?: string;
+  inverterModel?: string;
+  panelWattage?: number;
+  panelCount?: number;
+  onConfirm: (
+    submittedAt: string | null, 
+    issuedAt: string | null, 
+    meterDate?: string | null, 
+    pvId?: string | null, 
+    energyPermitId?: string | null,
+    inspectionData?: {
+      taipowerContractNo?: string | null;
+      meterNumber?: string | null;
+      actualInstalledCapacity?: number | null;
+      powerVoltage?: string | null;
+      gridConnectionType?: string | null;
+      pvModuleModel?: string | null;
+      inverterModel?: string | null;
+      panelWattage?: number | null;
+      panelCount?: number | null;
+    }
+  ) => void;
   isUpdating: boolean;
 }
 
@@ -134,6 +163,17 @@ export function OcrResultDialog({
   pvIdContext,
   energyPermitId,
   energyPermitIdContext,
+  taipowerContractNo,
+  taipowerContractNoContext,
+  meterNumber,
+  meterNumberContext,
+  actualInstalledCapacity,
+  powerVoltage,
+  gridConnectionType,
+  pvModuleModel,
+  inverterModel,
+  panelWattage,
+  panelCount,
   onConfirm,
   isUpdating,
 }: OcrResultDialogProps) {
@@ -149,6 +189,17 @@ export function OcrResultDialog({
   const [selectedMeterDate, setSelectedMeterDate] = useState<string>('');
   const [selectedPvId, setSelectedPvId] = useState<string>('');
   const [selectedEnergyPermitId, setSelectedEnergyPermitId] = useState<string>('');
+  
+  // State for inspection data (派員訪查併聯函)
+  const [selectedContractNo, setSelectedContractNo] = useState<string>('');
+  const [selectedMeterNumber, setSelectedMeterNumber] = useState<string>('');
+  const [selectedCapacity, setSelectedCapacity] = useState<string>('');
+  const [selectedVoltage, setSelectedVoltage] = useState<string>('');
+  const [selectedGridType, setSelectedGridType] = useState<string>('');
+  const [selectedModuleModel, setSelectedModuleModel] = useState<string>('');
+  const [selectedInverterModel, setSelectedInverterModel] = useState<string>('');
+  const [selectedPanelWattage, setSelectedPanelWattage] = useState<string>('');
+  const [selectedPanelCount, setSelectedPanelCount] = useState<string>('');
 
   // State for unknown dates field selection (default to 'none' meaning not applied)
   const [unknownDateSelections, setUnknownDateSelections] = useState<Record<number, string>>({});
@@ -184,10 +235,24 @@ export function OcrResultDialog({
         setSelectedEnergyPermitId(energyPermitId);
       }
       
+      // Auto-fill inspection data
+      if (taipowerContractNo) setSelectedContractNo(taipowerContractNo);
+      if (meterNumber) setSelectedMeterNumber(meterNumber);
+      if (actualInstalledCapacity) setSelectedCapacity(actualInstalledCapacity.toString());
+      if (powerVoltage) setSelectedVoltage(powerVoltage);
+      if (gridConnectionType) setSelectedGridType(gridConnectionType);
+      if (pvModuleModel) setSelectedModuleModel(pvModuleModel);
+      if (inverterModel) setSelectedInverterModel(inverterModel);
+      if (panelWattage) setSelectedPanelWattage(panelWattage.toString());
+      if (panelCount) setSelectedPanelCount(panelCount.toString());
+      
       // Reset unknown date selections
       setUnknownDateSelections({});
     }
-  }, [open, extractedDates, suggestedSubmission?.date, suggestedIssue?.date, suggestedMeterDate?.date, currentSubmittedAt, currentIssuedAt, pvId, energyPermitId]);
+  }, [open, extractedDates, suggestedSubmission?.date, suggestedIssue?.date, suggestedMeterDate?.date, 
+      currentSubmittedAt, currentIssuedAt, pvId, energyPermitId,
+      taipowerContractNo, meterNumber, actualInstalledCapacity, powerVoltage, gridConnectionType,
+      pvModuleModel, inverterModel, panelWattage, panelCount]);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -197,6 +262,15 @@ export function OcrResultDialog({
       setSelectedMeterDate('');
       setSelectedPvId('');
       setSelectedEnergyPermitId('');
+      setSelectedContractNo('');
+      setSelectedMeterNumber('');
+      setSelectedCapacity('');
+      setSelectedVoltage('');
+      setSelectedGridType('');
+      setSelectedModuleModel('');
+      setSelectedInverterModel('');
+      setSelectedPanelWattage('');
+      setSelectedPanelCount('');
       setUnknownDateSelections({});
     }
   }, [open]);
@@ -217,12 +291,25 @@ export function OcrResultDialog({
   };
 
   const handleConfirm = () => {
+    const inspectionData = {
+      taipowerContractNo: selectedContractNo || null,
+      meterNumber: selectedMeterNumber || null,
+      actualInstalledCapacity: selectedCapacity ? parseFloat(selectedCapacity) : null,
+      powerVoltage: selectedVoltage || null,
+      gridConnectionType: selectedGridType || null,
+      pvModuleModel: selectedModuleModel || null,
+      inverterModel: selectedInverterModel || null,
+      panelWattage: selectedPanelWattage ? parseFloat(selectedPanelWattage) : null,
+      panelCount: selectedPanelCount ? parseInt(selectedPanelCount) : null,
+    };
+    
     onConfirm(
       selectedSubmittedAt || null,
       selectedIssuedAt || null,
       selectedMeterDate || null,
       selectedPvId || null,
-      selectedEnergyPermitId || null
+      selectedEnergyPermitId || null,
+      inspectionData
     );
   };
 
