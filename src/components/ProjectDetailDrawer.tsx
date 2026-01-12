@@ -395,6 +395,7 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                   {/* 里程碑 - 不再重複顯示進度條 */}
                   <ProjectMilestones 
                     projectId={projectId!} 
+                    installationType={(project as any).installation_type}
                     adminProgress={(project as any).admin_progress || 0}
                     engineeringProgress={(project as any).engineering_progress || 0}
                     overallProgress={(project as any).overall_progress || 0}

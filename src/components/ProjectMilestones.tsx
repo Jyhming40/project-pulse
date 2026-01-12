@@ -9,6 +9,7 @@ import { useProgressMilestones, useProjectMilestones, useToggleProjectMilestone 
 
 interface ProjectMilestonesProps {
   projectId: string;
+  installationType?: string | null; // 案場類型，用於過濾里程碑
   adminProgress?: number;
   engineeringProgress?: number;
   overallProgress?: number;
@@ -19,6 +20,7 @@ interface ProjectMilestonesProps {
 
 export function ProjectMilestones({
   projectId,
+  installationType,
   adminProgress = 0,
   engineeringProgress = 0,
   overallProgress = 0,
@@ -34,8 +36,26 @@ export function ProjectMilestones({
 
   const isLoading = milestonesLoading || projectMilestonesLoading;
 
-  const adminMilestones = milestones?.filter(m => m.milestone_type === 'admin' && m.is_active) || [];
-  const engMilestones = milestones?.filter(m => m.milestone_type === 'engineering' && m.is_active) || [];
+  // 過濾里程碑：根據案場類型過濾出適用的里程碑
+  const filterByInstallationType = (milestone: { applicable_installation_types?: string[] | null }) => {
+    // 如果沒有設定適用類型（null 或空陣列），表示適用所有案場
+    if (!milestone.applicable_installation_types || milestone.applicable_installation_types.length === 0) {
+      return true;
+    }
+    // 如果案場類型未知，顯示所有里程碑
+    if (!installationType) {
+      return true;
+    }
+    // 檢查案場類型是否在適用列表中
+    return milestone.applicable_installation_types.includes(installationType);
+  };
+
+  const adminMilestones = milestones
+    ?.filter(m => m.milestone_type === 'admin' && m.is_active)
+    ?.filter(filterByInstallationType) || [];
+  const engMilestones = milestones
+    ?.filter(m => m.milestone_type === 'engineering' && m.is_active)
+    ?.filter(filterByInstallationType) || [];
 
   const isMilestoneCompleted = (code: string) => {
     return projectMilestones?.some(pm => pm.milestone_code === code && pm.is_completed) || false;
