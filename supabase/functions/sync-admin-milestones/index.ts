@@ -100,7 +100,15 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
     check_field: 'issued_at',
     prerequisites: ['ADMIN_08_METER_INSTALLED'],
   },
-  // 頁次 10: 行政結案 - 頁次 1~9 全部完成
+  // 頁次 9B: 取得正式躉售函文 - 正式躉售 issued_at 有值
+  {
+    milestone_code: 'ADMIN_09B_FIT_OFFICIAL',
+    doc_type_code: 'TPC_FIT_OFFICIAL',
+    doc_type_label: '正式躉售',
+    check_field: 'issued_at',
+    prerequisites: ['ADMIN_08_METER_INSTALLED'],
+  },
+  // 頁次 10: 行政結案 - 頁次 1~9 全部完成（不含 9B，因為是可選）
   {
     milestone_code: 'ADMIN_10_CLOSED',
     doc_type_code: null,

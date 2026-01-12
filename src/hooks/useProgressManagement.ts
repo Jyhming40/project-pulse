@@ -13,6 +13,7 @@ export interface ProgressMilestone {
   is_active: boolean;
   description: string | null;
   stage_label: string | null;
+  applicable_installation_types: string[] | null; // 適用案場類型，null 表示適用所有
   created_at: string;
   updated_at: string;
 }
