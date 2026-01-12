@@ -69,16 +69,34 @@ export function inferDocTypeCodeFromFilename(filename: string): string | null {
 }
 
 export function parseDateFromFilename(filename: string): string | null {
-  // Match YYYYMMDD pattern
-  const match = filename.match(/(\d{4})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])/);
-  if (match) {
-    return match[0]; // Return YYYYMMDD
+  // 1. Match YYYY.MM.DD pattern (e.g., 2021.05.18)
+  const dotMatch = filename.match(/(\d{4})\.(0[1-9]|1[0-2])\.(0[1-9]|[12]\d|3[01])/);
+  if (dotMatch) {
+    return dotMatch[0].replace(/\./g, '');
   }
   
-  // Match YYYY-MM-DD pattern
+  // 2. Match YYYY-MM-DD pattern (e.g., 2021-05-18)
   const dashMatch = filename.match(/(\d{4})-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])/);
   if (dashMatch) {
     return dashMatch[0].replace(/-/g, '');
+  }
+  
+  // 3. Match YYYYMMDD pattern (e.g., 20210518) - must be 4-digit year (2xxx or 1xxx)
+  const yearMatch = filename.match(/((?:19|20)\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])/);
+  if (yearMatch) {
+    return yearMatch[0];
+  }
+  
+  // 4. Match Taiwan ROC year format: YYYMMDD (7 digits, year 100-120 = 2011-2031)
+  // e.g., 1100106 = 民國110年01月06日 = 2021-01-06
+  const rocMatch = filename.match(/(1[0-2]\d)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])/);
+  if (rocMatch) {
+    const rocYear = parseInt(rocMatch[1], 10);
+    // Validate ROC year range (roughly 100-130 = 2011-2041)
+    if (rocYear >= 100 && rocYear <= 130) {
+      const westYear = rocYear + 1911;
+      return `${westYear}${rocMatch[2]}${rocMatch[3]}`;
+    }
   }
   
   return null;
