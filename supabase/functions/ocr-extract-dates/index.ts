@@ -1152,22 +1152,31 @@ serve(async (req) => {
     
     // ============================================================
     // Step 3: 根據文件類型過濾辨識結果
-    // 【核心規則】
-    // - PV編號(taipower_pv_id)：只從「審查意見書」(TAIPOWER_REVIEW) 提取
-    // - 能源署備案編號(energy_permit_id)：只從「同意備案」(ENERGY_PERMIT) 提取
-    // - 契約編號、購售電號、設備資料：只從「派員訪查併聯函」(INSPECTION) 提取
+    // 【核心規則】使用正確的 doc_type_code 值
+    // - PV編號(taipower_pv_id)：只從「審查意見書」(TPC_REVIEW) 提取
+    // - 能源署備案編號(energy_permit_id)：只從「同意備案」(MOEA_CONSENT) 提取
+    // - 契約編號、購售電號、設備資料：只從「派員訪查併聯函」(TPC_INSPECTION) 提取
+    // 注意：日期（送件日、核發日、掛表日）不做文件類型限制，因為各類文件都可能包含這些日期
     // ============================================================
     
-    const isReviewDoc = docTypeCode === 'TAIPOWER_REVIEW' || 
+    // 使用正確的 doc_type_code 值（TPC_REVIEW, MOEA_CONSENT, TPC_INSPECTION）
+    const isReviewDoc = docTypeCode === 'TPC_REVIEW' || 
+                        docTypeCode === 'TAIPOWER_REVIEW' ||  // 舊值兼容
                         docTitle?.includes('審查意見書') || 
-                        docTitle?.includes('審查');
-    const isPermitDoc = docTypeCode === 'ENERGY_PERMIT' || 
-                        docTitle?.includes('同意備案') || 
-                        docTitle?.includes('能源署');
-    const isInspectionDoc = docTypeCode === 'INSPECTION' || 
+                        docTitle?.includes('審查意見');
+    const isPermitDoc = docTypeCode === 'MOEA_CONSENT' || 
+                        docTypeCode === 'ENERGY_PERMIT' ||  // 舊值兼容
+                        docTitle?.includes('同意備案');
+    const isInspectionDoc = docTypeCode === 'TPC_INSPECTION' || 
+                            docTypeCode === 'INSPECTION' ||  // 舊值兼容
                             docTitle?.includes('派員訪查') || 
                             docTitle?.includes('併聯函') ||
                             docTitle?.includes('購售電');
+    
+    console.log(`[OCR] Document classification: isReviewDoc=${isReviewDoc}, isPermitDoc=${isPermitDoc}, isInspectionDoc=${isInspectionDoc}, docTypeCode=${docTypeCode}, title=${docTitle}`);
+    
+    // 【重要】日期不做過濾，所有文件都可以提取送件日、核發日、掛表日
+    // 只過濾非日期的專用欄位
     
     // 過濾 PV 編號：只有審查意見書可以提取
     if (!isReviewDoc && extractedData.pvId) {
