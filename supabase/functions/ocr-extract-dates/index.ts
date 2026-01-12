@@ -21,6 +21,8 @@ interface ExtractedData {
   dates: ExtractedDate[];
   pvId?: string;
   pvIdContext?: string;
+  energyPermitId?: string; // 能源署備案編號（如 YUN-114PV0349）
+  energyPermitIdContext?: string;
 }
 
 interface AIExtractedResult {
@@ -32,6 +34,8 @@ interface AIExtractedResult {
   meter_date_context?: string;
   pv_id?: string;
   pv_id_context?: string;
+  energy_permit_id?: string; // 能源署備案編號
+  energy_permit_id_context?: string;
   raw_text?: string;
 }
 
@@ -69,6 +73,13 @@ const PV_ID_PATTERNS = [
   /(?:本公司編號|受理號碼|契約編號)[：:\s]*(\d{6}PV\d{4})/i,
   /(?:公司編號[：:\s]*)(\d{6}PV\d{4})/i,
   /\b(\d{6}PV\d{4})\b/,  // 純數字開頭的 PV 編號
+];
+
+// 能源署備案編號 patterns - 格式：縣市代碼-年份PV流水號
+// 例如：YUN-114PV0349, TPE-113PV0123, CHA-114PV0456
+const ENERGY_PERMIT_ID_PATTERNS = [
+  /(?:備案編號|案件編號|同意備案)[：:\s]*([A-Z]{2,3}-\d{3}PV\d{4})/i,
+  /\b([A-Z]{2,3}-\d{3}PV\d{4})\b/,  // 英文開頭的備案編號
 ];
 
 // ROC year to Western year conversion
@@ -282,10 +293,29 @@ function extractWithRegexFallback(text: string, aiResult: AIExtractedResult): Ex
     }
   }
   
+  // 4. Extract Energy Permit ID (AI first, then regex fallback)
+  let energyPermitId = aiResult.energy_permit_id;
+  let energyPermitIdContext = aiResult.energy_permit_id_context;
+  
+  if (!energyPermitId && text) {
+    for (const pattern of ENERGY_PERMIT_ID_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        energyPermitId = match[1];
+        const idx = text.indexOf(match[0]);
+        energyPermitIdContext = text.slice(Math.max(0, idx - 20), idx + match[0].length + 20);
+        console.log(`[OCR] Regex fallback found Energy Permit ID: ${energyPermitId}`);
+        break;
+      }
+    }
+  }
+  
   return {
     dates: results,
     pvId,
     pvIdContext,
+    energyPermitId,
+    energyPermitIdContext,
   };
 }
 
@@ -420,8 +450,10 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
   - 常見位置：「本公司編號：」、「受理號碼：」、「公司編號：」
 
 ■ 同意備案（能源署發文）：
-  - 可提取：送件日、核發日
-  - ⚠️ 不要提取 PV 編號！同意備案中的「XXX-114PV0349」是能源署備案編號，不是台電 PV 編號
+  - 可提取：送件日、核發日、能源署備案編號
+  - 能源署備案編號格式：縣市代碼-年份PV流水號（如「YUN-114PV0349」、「CHA-114PV0456」）
+  - 常見位置：「備案編號：」、「案件編號：」、主旨中的編號
+  - ⚠️ 這不是台電 PV 編號！
 
 ■ 派員訪查函/購售電通知：
   - 可提取：送件日、核發日、掛表日
@@ -457,6 +489,12 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
      * 正確範例：「120114PV0442」、「108114PV0784」
    - 常見位置：「本公司編號：」、「受理號碼：」、「公司編號：」
    - ⚠️ 不要提取能源署備案編號（如「YUN-114PV0349」有英文開頭）
+
+5. **能源署備案編號（energy_permit_id）**：只從「同意備案」公文提取
+   - 格式固定為：縣市代碼 + 年份 + PV + 流水號（英文開頭）
+     * 正確範例：「YUN-114PV0349」、「CHA-114PV0456」、「TPE-113PV0123」
+   - 縣市代碼對照：YUN=雲林、CHA=彰化、TPE=台北、TPH=新北、TYC=桃園...
+   - ⚠️ 這不是台電 PV 編號！
 
 【重要規則】
 - 請只分析「第一頁」的內容
@@ -508,6 +546,14 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
             pv_id_context: {
               type: "string",
               description: "PV編號的上下文"
+            },
+            energy_permit_id: {
+              type: "string",
+              description: "能源署備案編號（英文開頭），格式為 縣市代碼-年份PV流水號，如「YUN-114PV0349」、「CHA-114PV0456」。只從同意備案公文提取"
+            },
+            energy_permit_id_context: {
+              type: "string",
+              description: "能源署備案編號的上下文"
             },
             raw_text: {
               type: "string",
@@ -862,6 +908,24 @@ serve(async (req) => {
             .from('projects')
             .update({ taipower_pv_id: extractedData.pvId })
             .eq('id', docData.project_id);
+          console.log('[OCR] Auto-updated project with PV ID:', extractedData.pvId);
+        }
+      }
+      
+      // Auto-update energy permit ID
+      if (extractedData.energyPermitId) {
+        const { data: docData } = await supabase
+          .from('documents')
+          .select('project_id')
+          .eq('id', documentId)
+          .single();
+        
+        if (docData?.project_id) {
+          await supabase
+            .from('projects')
+            .update({ energy_permit_id: extractedData.energyPermitId })
+            .eq('id', docData.project_id);
+          console.log('[OCR] Auto-updated project with Energy Permit ID:', extractedData.energyPermitId);
         }
       }
     }
@@ -872,6 +936,8 @@ serve(async (req) => {
         extractedDates: extractedData.dates,
         pvId: extractedData.pvId,
         pvIdContext: extractedData.pvIdContext,
+        energyPermitId: extractedData.energyPermitId,
+        energyPermitIdContext: extractedData.energyPermitIdContext,
         fullText: fullText,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
