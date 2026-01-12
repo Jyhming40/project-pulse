@@ -23,6 +23,18 @@ interface ExtractedData {
   pvIdContext?: string;
   energyPermitId?: string; // 能源署備案編號（如 YUN-114PV0349）
   energyPermitIdContext?: string;
+  // 派員訪查併聯函資料
+  taipowerContractNo?: string; // 契約編號（如 08-PV-110-0205）
+  taipowerContractNoContext?: string;
+  meterNumber?: string; // 購售電號（如 08-01-0200-16-9）
+  meterNumberContext?: string;
+  pvModuleModel?: string; // 太陽光電模組型號
+  inverterModel?: string; // 變流器型號
+  panelWattage?: number; // 單片瓦數 (kW)
+  panelCount?: number; // 模組片數
+  actualInstalledCapacity?: number; // 實際裝置容量 (kWp)
+  gridConnectionType?: string; // 併接方式/供電模式
+  powerVoltage?: string; // 供電電壓
 }
 
 interface AIExtractedResult {
@@ -36,6 +48,18 @@ interface AIExtractedResult {
   pv_id_context?: string;
   energy_permit_id?: string; // 能源署備案編號
   energy_permit_id_context?: string;
+  // 派員訪查併聯函資料
+  taipower_contract_no?: string;
+  taipower_contract_no_context?: string;
+  meter_number?: string;
+  meter_number_context?: string;
+  pv_module_model?: string;
+  inverter_model?: string;
+  panel_wattage?: number;
+  panel_count?: number;
+  actual_installed_capacity?: number;
+  grid_connection_type?: string;
+  power_voltage?: string;
   raw_text?: string;
 }
 
@@ -80,6 +104,56 @@ const PV_ID_PATTERNS = [
 const ENERGY_PERMIT_ID_PATTERNS = [
   /(?:備案編號|案件編號|同意備案)[：:\s]*([A-Z]{2,3}-\d{3}PV\d{4})/i,
   /\b([A-Z]{2,3}-\d{3}PV\d{4})\b/,  // 英文開頭的備案編號
+];
+
+// 契約編號 patterns - 格式：區處代碼-PV-年份-流水號
+// 例如：08-PV-110-0205, 09-PV-112-0134
+const CONTRACT_NO_PATTERNS = [
+  /契約編號[：:\s]*(\d{2}-PV-\d{3}-\d{4})/i,
+  /\b(\d{2}-PV-\d{3}-\d{4})\b/,
+];
+
+// 購售電號 patterns - 格式：區處代碼-年-流水號-表序
+// 例如：08-01-0200-16-9, 09-02-0345-12-5
+const METER_NUMBER_PATTERNS = [
+  /購售電號[：:\s]*(\d{2}-\d{2}-\d{4}-\d{1,2}-\d)/i,
+  /\b(\d{2}-\d{2}-\d{4}-\d{1,2}-\d)\b/,
+];
+
+// 實際裝置容量 patterns - 提取數值（kWp）
+const INSTALLED_CAPACITY_PATTERNS = [
+  /(?:發電設備總裝置容量|總裝置容量|裝置容量)[：:\s]*([0-9,.]+)\s*(?:峰瓩|kWp|kW)/i,
+  /([0-9,.]+)\s*(?:峰瓩|kWp)\s*[,，]\s*(?:全額躉售|餘電躉售)/i,
+];
+
+// 模組型號 patterns
+const PV_MODULE_PATTERNS = [
+  /太陽光電模組[：:\s]*([A-Z0-9\-]+)/i,
+  /光電模組[：:\s]*([A-Z0-9\-]+)/i,
+];
+
+// 變流器型號 patterns
+const INVERTER_PATTERNS = [
+  /變流器[：:\s]*([A-Z0-9\-.]+)/i,
+];
+
+// 發電設備機組序號 patterns - 提取瓦數和片數
+// 例如：(#01) 0.345瓩*564片
+const PANEL_SPEC_PATTERNS = [
+  /(?:\(#\d+\)|#\d+)?\s*([0-9,.]+)\s*瓩\s*[*×x]\s*(\d+)\s*片/i,
+  /([0-9,.]+)\s*(?:瓦|W|kW|瓩)\s*[*×x]\s*(\d+)\s*片/i,
+];
+
+// 供電電壓 patterns
+const POWER_VOLTAGE_PATTERNS = [
+  /(?:三相四線|三相三線|單相二線|單相三線)\s*(\d+\/\d+V|\d+V)/i,
+  /(?:併接方式|供電電壓)[：:\s]*(三相四線\s*\d+\/\d+V|三相三線\s*\d+V|單相\s*\d+V)/i,
+];
+
+// 供電模式 patterns
+const GRID_CONNECTION_PATTERNS = [
+  /(全額躉售|餘電躉售|自發自用)/,
+  /(外線併聯|內線併聯)/,
 ];
 
 // ROC year to Western year conversion
@@ -310,12 +384,146 @@ function extractWithRegexFallback(text: string, aiResult: AIExtractedResult): Ex
     }
   }
   
+  // 5. Extract 契約編號 (AI first, then regex fallback)
+  let taipowerContractNo = aiResult.taipower_contract_no;
+  let taipowerContractNoContext = aiResult.taipower_contract_no_context;
+  
+  if (!taipowerContractNo && text) {
+    for (const pattern of CONTRACT_NO_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        taipowerContractNo = match[1];
+        const idx = text.indexOf(match[0]);
+        taipowerContractNoContext = text.slice(Math.max(0, idx - 20), idx + match[0].length + 20);
+        console.log(`[OCR] Regex fallback found Contract No: ${taipowerContractNo}`);
+        break;
+      }
+    }
+  }
+  
+  // 6. Extract 購售電號 (AI first, then regex fallback)
+  let meterNumber = aiResult.meter_number;
+  let meterNumberContext = aiResult.meter_number_context;
+  
+  if (!meterNumber && text) {
+    for (const pattern of METER_NUMBER_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        meterNumber = match[1];
+        const idx = text.indexOf(match[0]);
+        meterNumberContext = text.slice(Math.max(0, idx - 20), idx + match[0].length + 20);
+        console.log(`[OCR] Regex fallback found Meter Number: ${meterNumber}`);
+        break;
+      }
+    }
+  }
+  
+  // 7. Extract 實際裝置容量 (AI first, then regex fallback)
+  let actualInstalledCapacity = aiResult.actual_installed_capacity;
+  
+  if (!actualInstalledCapacity && text) {
+    for (const pattern of INSTALLED_CAPACITY_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        actualInstalledCapacity = parseFloat(match[1].replace(',', ''));
+        console.log(`[OCR] Regex fallback found Installed Capacity: ${actualInstalledCapacity}`);
+        break;
+      }
+    }
+  }
+  
+  // 8. Extract 模組型號 (AI first, then regex fallback)
+  let pvModuleModel = aiResult.pv_module_model;
+  
+  if (!pvModuleModel && text) {
+    for (const pattern of PV_MODULE_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        pvModuleModel = match[1];
+        console.log(`[OCR] Regex fallback found PV Module Model: ${pvModuleModel}`);
+        break;
+      }
+    }
+  }
+  
+  // 9. Extract 變流器型號 (AI first, then regex fallback)
+  let inverterModel = aiResult.inverter_model;
+  
+  if (!inverterModel && text) {
+    for (const pattern of INVERTER_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        inverterModel = match[1];
+        console.log(`[OCR] Regex fallback found Inverter Model: ${inverterModel}`);
+        break;
+      }
+    }
+  }
+  
+  // 10. Extract 單片瓦數和模組片數 (AI first, then regex fallback)
+  let panelWattage = aiResult.panel_wattage;
+  let panelCount = aiResult.panel_count;
+  
+  if ((!panelWattage || !panelCount) && text) {
+    for (const pattern of PANEL_SPEC_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        if (!panelWattage) panelWattage = parseFloat(match[1].replace(',', ''));
+        if (!panelCount) panelCount = parseInt(match[2]);
+        console.log(`[OCR] Regex fallback found Panel Spec: ${panelWattage}kW x ${panelCount}`);
+        break;
+      }
+    }
+  }
+  
+  // 11. Extract 供電電壓 (AI first, then regex fallback)
+  let powerVoltage = aiResult.power_voltage;
+  
+  if (!powerVoltage && text) {
+    for (const pattern of POWER_VOLTAGE_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        powerVoltage = match[1] || match[0];
+        console.log(`[OCR] Regex fallback found Power Voltage: ${powerVoltage}`);
+        break;
+      }
+    }
+  }
+  
+  // 12. Extract 供電模式 (AI first, then regex fallback)
+  let gridConnectionType = aiResult.grid_connection_type;
+  
+  if (!gridConnectionType && text) {
+    const modes: string[] = [];
+    for (const pattern of GRID_CONNECTION_PATTERNS) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        modes.push(match[1]);
+      }
+    }
+    if (modes.length > 0) {
+      gridConnectionType = modes.join('，');
+      console.log(`[OCR] Regex fallback found Grid Connection Type: ${gridConnectionType}`);
+    }
+  }
+  
   return {
     dates: results,
     pvId,
     pvIdContext,
     energyPermitId,
     energyPermitIdContext,
+    taipowerContractNo,
+    taipowerContractNoContext,
+    meterNumber,
+    meterNumberContext,
+    pvModuleModel,
+    inverterModel,
+    panelWattage,
+    panelCount,
+    actualInstalledCapacity,
+    gridConnectionType,
+    powerVoltage,
   };
 }
 
@@ -455,8 +663,12 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
   - 常見位置：「備案編號：」、「案件編號：」、主旨中的編號
   - ⚠️ 這不是台電 PV 編號！
 
-■ 派員訪查函/購售電通知：
+■ 派員訪查函/購售電通知（台電發文）：
   - 可提取：送件日、核發日、掛表日
+  - 可提取：契約編號、購售電號、實際裝置容量
+  - 可提取：太陽光電模組型號、變流器型號
+  - 可提取：單片瓦數、模組片數
+  - 可提取：供電電壓、供電模式（全額躉售/餘電躉售）
 
 ■ 其他公文：
   - 提取所有可辨識的日期
@@ -496,6 +708,37 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
    - 縣市代碼對照：YUN=雲林、CHA=彰化、TPE=台北、TPH=新北、TYC=桃園...
    - ⚠️ 這不是台電 PV 編號！
 
+【派員訪查函/購售電通知專用欄位】
+
+6. **契約編號（taipower_contract_no）**：台電簽約編號
+   - 格式：區處代碼-PV-年份-流水號（如「08-PV-110-0205」）
+   - 常見位置：主旨中「契約編號：」
+
+7. **購售電號（meter_number）**：電錶購售電編號
+   - 格式：區處代碼-年-流水號-表序（如「08-01-0200-16-9」）
+   - 常見位置：「購售電號：」
+
+8. **實際裝置容量（actual_installed_capacity）**：發電設備總裝置容量
+   - 格式：數字 + 峰瓩/kWp（如「194.58峰瓩」）
+   - 常見位置：「發電設備總裝置容量：」
+
+9. **供電電壓（power_voltage）**：併接電壓
+   - 常見值：「三相四線220/380V」、「三相三線11.4kV」
+   - 常見位置：「併接方式：」
+
+10. **供電模式（grid_connection_type）**：售電方式
+    - 常見值：「全額躉售」、「餘電躉售」、「外線併聯」、「內線併聯」
+
+11. **太陽光電模組型號（pv_module_model）**：模組品牌型號
+    - 常見位置：「太陽光電模組：」
+
+12. **變流器型號（inverter_model）**：變流器品牌型號
+    - 常見位置：「變流器：」
+
+13. **單片瓦數（panel_wattage）**與 **模組片數（panel_count）**
+    - 常見格式：「0.345瓩*564片」
+    - 常見位置：「發電設備機組序號：」
+
 【重要規則】
 - 請只分析「第一頁」的內容
 - 日期可能是民國年份（如「114年11月21日」）或西元年份（如「2025-11-21」）
@@ -503,8 +746,8 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
 - 請在 context 欄位說明是從什麼語句或位置提取的`;
 
   const userPrompt = docTitle 
-    ? `請分析這份公文圖片「${docTitle}」，提取送件日、核發日、掛表日和PV編號。`
-    : `請分析這份公文圖片，提取送件日、核發日、掛表日和PV編號。`;
+    ? `請分析這份公文圖片「${docTitle}」，提取所有可辨識的日期和設備資訊。`
+    : `請分析這份公文圖片，提取所有可辨識的日期和設備資訊。`;
 
   const tools = [
     {
@@ -554,6 +797,50 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
             energy_permit_id_context: {
               type: "string",
               description: "能源署備案編號的上下文"
+            },
+            taipower_contract_no: {
+              type: "string",
+              description: "契約編號，格式為 區處代碼-PV-年份-流水號，如「08-PV-110-0205」"
+            },
+            taipower_contract_no_context: {
+              type: "string",
+              description: "契約編號的上下文"
+            },
+            meter_number: {
+              type: "string",
+              description: "購售電號，格式為 區處代碼-年-流水號-表序，如「08-01-0200-16-9」"
+            },
+            meter_number_context: {
+              type: "string",
+              description: "購售電號的上下文"
+            },
+            actual_installed_capacity: {
+              type: "number",
+              description: "實際裝置容量（kWp），如 194.58"
+            },
+            power_voltage: {
+              type: "string",
+              description: "供電電壓，如「三相四線220/380V」"
+            },
+            grid_connection_type: {
+              type: "string",
+              description: "供電模式/併接方式，如「全額躉售」、「外線併聯」"
+            },
+            pv_module_model: {
+              type: "string",
+              description: "太陽光電模組型號，如「URE D2K345H7A」"
+            },
+            inverter_model: {
+              type: "string",
+              description: "變流器型號，如「Solaredge SE33.3K」"
+            },
+            panel_wattage: {
+              type: "number",
+              description: "單片瓦數（kW），如 0.345"
+            },
+            panel_count: {
+              type: "integer",
+              description: "模組片數，如 564"
             },
             raw_text: {
               type: "string",
@@ -938,6 +1225,17 @@ serve(async (req) => {
         pvIdContext: extractedData.pvIdContext,
         energyPermitId: extractedData.energyPermitId,
         energyPermitIdContext: extractedData.energyPermitIdContext,
+        taipowerContractNo: extractedData.taipowerContractNo,
+        taipowerContractNoContext: extractedData.taipowerContractNoContext,
+        meterNumber: extractedData.meterNumber,
+        meterNumberContext: extractedData.meterNumberContext,
+        actualInstalledCapacity: extractedData.actualInstalledCapacity,
+        powerVoltage: extractedData.powerVoltage,
+        gridConnectionType: extractedData.gridConnectionType,
+        pvModuleModel: extractedData.pvModuleModel,
+        inverterModel: extractedData.inverterModel,
+        panelWattage: extractedData.panelWattage,
+        panelCount: extractedData.panelCount,
         fullText: fullText,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
