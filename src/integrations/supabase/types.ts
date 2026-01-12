@@ -1770,6 +1770,7 @@ export type Database = {
           district: string | null
           drive_folder_id: string | null
           drive_folder_url: string | null
+          energy_permit_id: string | null
           engineering_progress: number | null
           engineering_stage: string | null
           feeder_code: string | null
@@ -1823,6 +1824,7 @@ export type Database = {
           district?: string | null
           drive_folder_id?: string | null
           drive_folder_url?: string | null
+          energy_permit_id?: string | null
           engineering_progress?: number | null
           engineering_stage?: string | null
           feeder_code?: string | null
@@ -1876,6 +1878,7 @@ export type Database = {
           district?: string | null
           drive_folder_id?: string | null
           drive_folder_url?: string | null
+          energy_permit_id?: string | null
           engineering_progress?: number | null
           engineering_stage?: string | null
           feeder_code?: string | null

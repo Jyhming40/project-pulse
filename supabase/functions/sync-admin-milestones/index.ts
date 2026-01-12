@@ -446,20 +446,42 @@ async function recalculateProgress(supabase: any, projectId: string): Promise<{
   admin_stage: string | null;
   engineering_stage: string | null;
 }> {
-  // Fetch all active progress milestones
+  // Fetch project's installation_type
+  const { data: projectData } = await supabase
+    .from('projects')
+    .select('installation_type')
+    .eq('id', projectId)
+    .single();
+
+  const installationType = projectData?.installation_type || null;
+
+  // Fetch all active progress milestones with applicable_installation_types
   const { data: milestonesRaw } = await supabase
     .from('progress_milestones')
-    .select('milestone_code, milestone_type, weight, is_active, milestone_name, sort_order')
+    .select('milestone_code, milestone_type, weight, is_active, milestone_name, sort_order, applicable_installation_types')
     .eq('is_active', true);
 
-  const milestones = (milestonesRaw || []) as {
+  const allMilestones = (milestonesRaw || []) as {
     milestone_code: string;
     milestone_type: string;
     weight: number;
     is_active: boolean;
     milestone_name: string;
     sort_order: number;
+    applicable_installation_types: string[] | null;
   }[];
+
+  // Filter milestones based on installation_type
+  // A milestone is applicable if:
+  // 1. applicable_installation_types is null/empty (applicable to all), OR
+  // 2. installationType is null (unknown type, include all milestones), OR
+  // 3. installationType is in the applicable_installation_types array
+  const milestones = allMilestones.filter(m => {
+    const types = m.applicable_installation_types;
+    if (!types || types.length === 0) return true; // Applicable to all
+    if (!installationType) return true; // Unknown type, include all
+    return types.includes(installationType);
+  });
 
   // Fetch project's completed milestones
   const { data: projectMilestonesRaw } = await supabase
@@ -484,7 +506,7 @@ async function recalculateProgress(supabase: any, projectId: string): Promise<{
     engineering_weight: settingsRaw?.setting_value?.engineering_weight ?? 50,
   };
 
-  // Calculate admin progress
+  // Calculate admin progress (only applicable milestones)
   const adminMilestones = milestones.filter(m => m.milestone_type === 'admin');
   const adminTotalWeight = adminMilestones.reduce((sum, m) => sum + m.weight, 0);
   const adminCompletedWeight = adminMilestones
@@ -494,7 +516,7 @@ async function recalculateProgress(supabase: any, projectId: string): Promise<{
     ? (adminCompletedWeight / adminTotalWeight) * 100
     : 0;
 
-  // Calculate engineering progress
+  // Calculate engineering progress (only applicable milestones)
   const engMilestones = milestones.filter(m => m.milestone_type === 'engineering');
   const engTotalWeight = engMilestones.reduce((sum, m) => sum + m.weight, 0);
   const engCompletedWeight = engMilestones
@@ -509,7 +531,7 @@ async function recalculateProgress(supabase: any, projectId: string): Promise<{
     (adminProgress * weights.admin_weight / 100) +
     (engineeringProgress * weights.engineering_weight / 100);
 
-  // Find current stage
+  // Find current stage (only from applicable milestones)
   const adminStage = (() => {
     const sorted = milestones
       .filter(m => m.milestone_code.startsWith('ADMIN'))
@@ -525,6 +547,14 @@ async function recalculateProgress(supabase: any, projectId: string): Promise<{
     const next = sorted.find(m => !completedCodes.has(m.milestone_code));
     return next?.milestone_name || (sorted.length > 0 ? '已完成' : null);
   })();
+
+  console.log('Progress calculation for installation_type:', installationType, {
+    applicableMilestones: milestones.length,
+    allMilestones: allMilestones.length,
+    adminProgress,
+    engineeringProgress,
+    overallProgress,
+  });
 
   return {
     admin_progress: Math.round(adminProgress * 100) / 100,
