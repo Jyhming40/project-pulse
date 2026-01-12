@@ -1227,6 +1227,7 @@ export type Database = {
       }
       progress_milestones: {
         Row: {
+          applicable_installation_types: string[] | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -1245,6 +1246,7 @@ export type Database = {
           weight: number
         }
         Insert: {
+          applicable_installation_types?: string[] | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -1263,6 +1265,7 @@ export type Database = {
           weight?: number
         }
         Update: {
+          applicable_installation_types?: string[] | null
           created_at?: string
           created_by?: string | null
           description?: string | null
