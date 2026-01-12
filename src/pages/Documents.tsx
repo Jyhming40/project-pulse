@@ -108,6 +108,19 @@ export default function Documents() {
   const [isBatchUploadOpen, setIsBatchUploadOpen] = useState(false);
   const [isSendingReminders, setIsSendingReminders] = useState(false);
   const [isBatchOcrOpen, setIsBatchOcrOpen] = useState(false);
+  const [batchOcrHasStarted, setBatchOcrHasStarted] = useState(false);
+  const [batchOcrDocs, setBatchOcrDocs] = useState<Array<{
+    id: string;
+    title: string;
+    projectCode: string;
+    projectId: string;
+    hasDriveFile: boolean;
+    hasSubmittedAt: boolean;
+    hasIssuedAt: boolean;
+    submittedAt?: string | null;
+    issuedAt?: string | null;
+    pvId?: string | null;
+  }>>([]);
 
   // Batch OCR hook
   const batchOcr = useBatchOcr({ maxConcurrent: 3, maxBatchSize: 50, autoUpdate: true });
@@ -778,7 +791,12 @@ export default function Documents() {
               key: 'ocr',
               label: '批次 OCR 辨識',
               icon: <ScanText className="w-4 h-4" />,
-              onClick: async () => {
+              onClick: () => {
+                // Reset states and prepare documents
+                batchOcr.reset();
+                batchOcr.setForceReprocess(false);
+                setBatchOcrHasStarted(false);
+                
                 // Prepare documents for batch OCR with existing data info
                 const docsForOcr = batchSelect.selectedItems.map(doc => ({
                   id: doc.id,
@@ -793,16 +811,8 @@ export default function Documents() {
                   pvId: (doc as any).taipower_pv_id || null,
                 }));
                 
+                setBatchOcrDocs(docsForOcr);
                 setIsBatchOcrOpen(true);
-                const result = await batchOcr.startBatchOcr(docsForOcr);
-                
-                if (!result.started) {
-                  toast.error('批次 OCR 無法開始', { description: result.message });
-                  setIsBatchOcrOpen(false);
-                } else {
-                  // Refresh data after OCR completes
-                  queryClient.invalidateQueries({ queryKey: ['all-documents'] });
-                }
               },
             },
             {
@@ -901,7 +911,25 @@ export default function Documents() {
         onCancel={batchOcr.cancelBatchOcr}
         onClose={() => {
           batchOcr.reset();
+          setBatchOcrHasStarted(false);
           batchSelect.deselectAll();
+        }}
+        forceReprocess={batchOcr.forceReprocess}
+        onForceReprocessChange={batchOcr.setForceReprocess}
+        showForceOption={batchOcrDocs.some(d => d.hasSubmittedAt || d.hasIssuedAt || d.pvId)}
+        hasStarted={batchOcrHasStarted}
+        onStart={async () => {
+          setBatchOcrHasStarted(true);
+          const result = await batchOcr.startBatchOcr(batchOcrDocs, batchOcr.forceReprocess);
+          
+          if (!result.started) {
+            toast.error('批次 OCR 無法開始', { description: result.message });
+            setIsBatchOcrOpen(false);
+            setBatchOcrHasStarted(false);
+          } else {
+            // Refresh data after OCR completes
+            queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+          }
         }}
       />
     </div>

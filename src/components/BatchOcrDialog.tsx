@@ -15,6 +15,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '@/components/ui/collapsible';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
 import {
   FileText,
   CheckCircle2,
@@ -26,6 +28,7 @@ import {
   ChevronDown,
   ChevronRight,
   CheckCheck,
+  ScanText,
 } from 'lucide-react';
 import { useState } from 'react';
 import type { OcrTask, BatchOcrProgress } from '@/hooks/useBatchOcr';
@@ -38,6 +41,11 @@ interface BatchOcrDialogProps {
   isRunning: boolean;
   onCancel: () => void;
   onClose: () => void;
+  forceReprocess?: boolean;
+  onForceReprocessChange?: (value: boolean) => void;
+  showForceOption?: boolean;
+  onStart?: () => void;
+  hasStarted?: boolean;
 }
 
 export function BatchOcrDialog({
@@ -48,6 +56,11 @@ export function BatchOcrDialog({
   isRunning,
   onCancel,
   onClose,
+  forceReprocess = false,
+  onForceReprocessChange,
+  showForceOption = false,
+  onStart,
+  hasStarted = false,
 }: BatchOcrDialogProps) {
   const [showAlreadyProcessed, setShowAlreadyProcessed] = useState(false);
   
@@ -170,96 +183,148 @@ export function BatchOcrDialog({
             批次 OCR 辨識
           </DialogTitle>
           <DialogDescription>
-            {isRunning 
-              ? '正在處理文件，請稍候...' 
-              : progress.completed > 0 
-                ? '處理完成' 
-                : alreadyProcessedTasks.length > 0 && pendingTasks.length === 0
-                  ? '所有文件已經辨識過'
+            {!hasStarted && !isRunning
+              ? showForceOption 
+                ? '選取的文件中有部分已辨識過，可開啟「強制重新辨識」來重新處理'
+                : '準備開始處理選取的文件'
+              : isRunning 
+                ? '正在處理文件，請稍候...' 
+                : progress.completed > 0 
+                  ? '處理完成' 
                   : '準備開始處理'}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Progress Section */}
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span>進度: {progress.completed} / {progress.total}</span>
-              <span className="font-medium">{progressPercent}%</span>
+        {/* Force Reprocess Option */}
+        {showForceOption && !hasStarted && !isRunning && (
+          <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+            <div className="flex-1">
+              <Label htmlFor="force-reprocess" className="font-medium cursor-pointer flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600" />
+                強制重新辨識
+              </Label>
+              <p className="text-xs text-muted-foreground mt-0.5 ml-6">
+                啟用後將重新處理所有文件，包含已辨識過的文件（適用於 OCR 邏輯更新後重新辨識）
+              </p>
             </div>
-            <Progress value={progressPercent} className="h-2" />
+            <Switch
+              id="force-reprocess"
+              checked={forceReprocess}
+              onCheckedChange={onForceReprocessChange}
+            />
           </div>
+        )}
 
-          {/* Stats */}
-          <div className="grid grid-cols-5 gap-2 text-center text-sm">
-            <div className="p-2 rounded-lg bg-muted">
-              <p className="text-lg font-bold">{progress.total}</p>
-              <p className="text-xs text-muted-foreground">待處理</p>
+        {/* Progress Section - Only show after started */}
+        {hasStarted && (
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span>進度: {progress.completed} / {progress.total}</span>
+                <span className="font-medium">{progressPercent}%</span>
+              </div>
+              <Progress value={progressPercent} className="h-2" />
             </div>
-            <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
-              <p className="text-lg font-bold text-green-600 dark:text-green-400">{progress.success}</p>
-              <p className="text-xs text-green-600 dark:text-green-400">成功</p>
-            </div>
-            <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
-              <p className="text-lg font-bold text-orange-600 dark:text-orange-400">{progress.review}</p>
-              <p className="text-xs text-orange-600 dark:text-orange-400">需確認</p>
-            </div>
-            <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
-              <p className="text-lg font-bold text-red-600 dark:text-red-400">{progress.error}</p>
-              <p className="text-xs text-red-600 dark:text-red-400">失敗</p>
-            </div>
-            <div className="p-2 rounded-lg bg-muted/50">
-              <p className="text-lg font-bold text-muted-foreground">{alreadyProcessedTasks.length}</p>
-              <p className="text-xs text-muted-foreground">已辨識</p>
+
+            {/* Stats */}
+            <div className="grid grid-cols-5 gap-2 text-center text-sm">
+              <div className="p-2 rounded-lg bg-muted">
+                <p className="text-lg font-bold">{progress.total}</p>
+                <p className="text-xs text-muted-foreground">待處理</p>
+              </div>
+              <div className="p-2 rounded-lg bg-green-100 dark:bg-green-900/30">
+                <p className="text-lg font-bold text-green-600 dark:text-green-400">{progress.success}</p>
+                <p className="text-xs text-green-600 dark:text-green-400">成功</p>
+              </div>
+              <div className="p-2 rounded-lg bg-orange-100 dark:bg-orange-900/30">
+                <p className="text-lg font-bold text-orange-600 dark:text-orange-400">{progress.review}</p>
+                <p className="text-xs text-orange-600 dark:text-orange-400">需確認</p>
+              </div>
+              <div className="p-2 rounded-lg bg-red-100 dark:bg-red-900/30">
+                <p className="text-lg font-bold text-red-600 dark:text-red-400">{progress.error}</p>
+                <p className="text-xs text-red-600 dark:text-red-400">失敗</p>
+              </div>
+              <div className="p-2 rounded-lg bg-muted/50">
+                <p className="text-lg font-bold text-muted-foreground">{alreadyProcessedTasks.length}</p>
+                <p className="text-xs text-muted-foreground">已辨識</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
-        {/* Task List - Fixed height with scrollbar */}
-        <div className="flex-1 min-h-0 border rounded-lg overflow-hidden">
-          <ScrollArea className="h-[280px]">
-            <div className="p-2 space-y-1">
-              {/* Pending/Processing Tasks */}
-              {pendingTasks.length > 0 && (
-                <div className="space-y-1">
-                  {pendingTasks.map(renderTaskItem)}
-                </div>
+        {/* Task List - Fixed height with scrollbar - Only show after started */}
+        {hasStarted && (
+          <div className="flex-1 min-h-0 border rounded-lg overflow-hidden">
+            <ScrollArea className="h-[280px]">
+              <div className="p-2 space-y-1">
+                {/* Pending/Processing Tasks */}
+                {pendingTasks.length > 0 && (
+                  <div className="space-y-1">
+                    {pendingTasks.map(renderTaskItem)}
+                  </div>
+                )}
+                
+                {/* Already Processed Tasks - Collapsible */}
+                {alreadyProcessedTasks.length > 0 && (
+                  <Collapsible open={showAlreadyProcessed} onOpenChange={setShowAlreadyProcessed}>
+                    <CollapsibleTrigger asChild>
+                      <button className="flex items-center gap-2 w-full p-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors">
+                        {showAlreadyProcessed ? (
+                          <ChevronDown className="w-4 h-4" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4" />
+                        )}
+                        <CheckCheck className="w-4 h-4" />
+                        <span>已辨識的文件 ({alreadyProcessedTasks.length})</span>
+                        <span className="text-xs ml-auto">已跳過處理</span>
+                      </button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent className="space-y-1 mt-1">
+                      {alreadyProcessedTasks.map(renderTaskItem)}
+                    </CollapsibleContent>
+                  </Collapsible>
+                )}
+                
+                {/* Empty state */}
+                {tasks.length === 0 && (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                    <p>沒有可處理的文件</p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+        
+        {/* Pre-start info */}
+        {!hasStarted && !isRunning && (
+          <div className="flex-1 min-h-0 flex items-center justify-center p-8">
+            <div className="text-center text-muted-foreground">
+              <ScanText className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="font-medium">點擊「開始辨識」開始處理</p>
+              {showForceOption && !forceReprocess && (
+                <p className="text-sm mt-1">部分文件已辨識過，將自動跳過</p>
               )}
-              
-              {/* Already Processed Tasks - Collapsible */}
-              {alreadyProcessedTasks.length > 0 && (
-                <Collapsible open={showAlreadyProcessed} onOpenChange={setShowAlreadyProcessed}>
-                  <CollapsibleTrigger asChild>
-                    <button className="flex items-center gap-2 w-full p-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors">
-                      {showAlreadyProcessed ? (
-                        <ChevronDown className="w-4 h-4" />
-                      ) : (
-                        <ChevronRight className="w-4 h-4" />
-                      )}
-                      <CheckCheck className="w-4 h-4" />
-                      <span>已辨識的文件 ({alreadyProcessedTasks.length})</span>
-                      <span className="text-xs ml-auto">已跳過處理</span>
-                    </button>
-                  </CollapsibleTrigger>
-                  <CollapsibleContent className="space-y-1 mt-1">
-                    {alreadyProcessedTasks.map(renderTaskItem)}
-                  </CollapsibleContent>
-                </Collapsible>
-              )}
-              
-              {/* Empty state */}
-              {tasks.length === 0 && (
-                <div className="text-center py-8 text-muted-foreground">
-                  <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                  <p>沒有可處理的文件</p>
-                </div>
+              {forceReprocess && (
+                <p className="text-sm mt-1 text-amber-600">已開啟強制重新辨識，所有文件都會重新處理</p>
               )}
             </div>
-          </ScrollArea>
-        </div>
+          </div>
+        )}
 
         <DialogFooter className="flex-shrink-0 gap-2 sm:gap-0">
-          {isRunning ? (
+          {!hasStarted && !isRunning ? (
+            <>
+              <Button variant="outline" onClick={handleClose}>
+                取消
+              </Button>
+              <Button onClick={onStart}>
+                <ScanText className="w-4 h-4 mr-2" />
+                開始辨識
+              </Button>
+            </>
+          ) : isRunning ? (
             <Button variant="destructive" onClick={onCancel}>
               取消處理
             </Button>

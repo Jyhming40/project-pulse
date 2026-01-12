@@ -1781,22 +1781,28 @@ export type Database = {
           id: string
           installation_type: string | null
           intake_year: number | null
+          inverter_model: string | null
           investor_drive_folder_id: string | null
           investor_id: string | null
           is_archived: boolean | null
           is_deleted: boolean | null
           land_owner: string | null
           land_owner_contact: string | null
+          meter_number: string | null
           note: string | null
           overall_progress: number | null
+          panel_count: number | null
+          panel_wattage: number | null
           pole_status: string | null
           power_phase_type: string | null
           power_voltage: string | null
           project_code: string
           project_name: string
+          pv_module_model: string | null
           seq: number | null
           site_code_display: string | null
           status: string
+          taipower_contract_no: string | null
           taipower_pv_id: string | null
           updated_at: string
         }
@@ -1835,22 +1841,28 @@ export type Database = {
           id?: string
           installation_type?: string | null
           intake_year?: number | null
+          inverter_model?: string | null
           investor_drive_folder_id?: string | null
           investor_id?: string | null
           is_archived?: boolean | null
           is_deleted?: boolean | null
           land_owner?: string | null
           land_owner_contact?: string | null
+          meter_number?: string | null
           note?: string | null
           overall_progress?: number | null
+          panel_count?: number | null
+          panel_wattage?: number | null
           pole_status?: string | null
           power_phase_type?: string | null
           power_voltage?: string | null
           project_code: string
           project_name: string
+          pv_module_model?: string | null
           seq?: number | null
           site_code_display?: string | null
           status?: string
+          taipower_contract_no?: string | null
           taipower_pv_id?: string | null
           updated_at?: string
         }
@@ -1889,22 +1901,28 @@ export type Database = {
           id?: string
           installation_type?: string | null
           intake_year?: number | null
+          inverter_model?: string | null
           investor_drive_folder_id?: string | null
           investor_id?: string | null
           is_archived?: boolean | null
           is_deleted?: boolean | null
           land_owner?: string | null
           land_owner_contact?: string | null
+          meter_number?: string | null
           note?: string | null
           overall_progress?: number | null
+          panel_count?: number | null
+          panel_wattage?: number | null
           pole_status?: string | null
           power_phase_type?: string | null
           power_voltage?: string | null
           project_code?: string
           project_name?: string
+          pv_module_model?: string | null
           seq?: number | null
           site_code_display?: string | null
           status?: string
+          taipower_contract_no?: string | null
           taipower_pv_id?: string | null
           updated_at?: string
         }
