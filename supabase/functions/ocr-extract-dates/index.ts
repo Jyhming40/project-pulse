@@ -979,11 +979,13 @@ serve(async (req) => {
     let documentId: string | null = null;
     let mimeType = 'application/pdf';
     let autoUpdate = false;
+    let docTypeCode: string | null = null; // 文件類型代碼，用於過濾辨識結果
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
       documentId = formData.get('documentId') as string | null;
       autoUpdate = formData.get('autoUpdate') === 'true';
+      docTypeCode = formData.get('docTypeCode') as string | null;
       const file = formData.get('file') as File | null;
       
       if (file) {
@@ -1017,6 +1019,7 @@ serve(async (req) => {
       imageBase64 = body.imageBase64;
       mimeType = body.mimeType || 'application/pdf';
       autoUpdate = body.autoUpdate === true;
+      docTypeCode = body.docTypeCode || null;
     }
 
     let docTitle: string | null = null;
@@ -1024,13 +1027,13 @@ serve(async (req) => {
     if (!imageBase64 && documentId) {
       console.log(`[OCR] No file provided, attempting to fetch from Drive for document: ${documentId}`);
       
-      let docData: { drive_file_id: string | null; title: string | null } | null = null;
+      let docData: { drive_file_id: string | null; title: string | null; doc_type_code: string | null } | null = null;
       let docError: Error | null = null;
       
       for (let attempt = 0; attempt < 3; attempt++) {
         const { data, error } = await supabase
           .from('documents')
-          .select('drive_file_id, title')
+          .select('drive_file_id, title, doc_type_code')
           .eq('id', documentId)
           .single();
         
@@ -1055,7 +1058,11 @@ serve(async (req) => {
       }
       
       docTitle = docData.title;
-      console.log(`[OCR] Document title: ${docTitle}`);
+      // 如果沒有傳入 docTypeCode，從資料庫取得
+      if (!docTypeCode) {
+        docTypeCode = docData.doc_type_code;
+      }
+      console.log(`[OCR] Document title: ${docTitle}, doc_type_code: ${docTypeCode}`);
       
       if (!docData.drive_file_id) {
         return new Response(
@@ -1143,14 +1150,66 @@ serve(async (req) => {
     const fullText = aiResult.raw_text || '';
     const extractedData = extractWithRegexFallback(fullText, aiResult);
     
-    console.log(`[OCR] Final result: ${extractedData.dates.length} dates, PV ID: ${extractedData.pvId || 'none'}`);
+    // ============================================================
+    // Step 3: 根據文件類型過濾辨識結果
+    // 【核心規則】
+    // - PV編號(taipower_pv_id)：只從「審查意見書」(TAIPOWER_REVIEW) 提取
+    // - 能源署備案編號(energy_permit_id)：只從「同意備案」(ENERGY_PERMIT) 提取
+    // - 契約編號、購售電號、設備資料：只從「派員訪查併聯函」(INSPECTION) 提取
+    // ============================================================
+    
+    const isReviewDoc = docTypeCode === 'TAIPOWER_REVIEW' || 
+                        docTitle?.includes('審查意見書') || 
+                        docTitle?.includes('審查');
+    const isPermitDoc = docTypeCode === 'ENERGY_PERMIT' || 
+                        docTitle?.includes('同意備案') || 
+                        docTitle?.includes('能源署');
+    const isInspectionDoc = docTypeCode === 'INSPECTION' || 
+                            docTitle?.includes('派員訪查') || 
+                            docTitle?.includes('併聯函') ||
+                            docTitle?.includes('購售電');
+    
+    // 過濾 PV 編號：只有審查意見書可以提取
+    if (!isReviewDoc && extractedData.pvId) {
+      console.log(`[OCR] Filtering out PV ID "${extractedData.pvId}" - not from 審查意見書 (docType: ${docTypeCode})`);
+      extractedData.pvId = undefined;
+      extractedData.pvIdContext = undefined;
+    }
+    
+    // 過濾能源署備案編號：只有同意備案可以提取
+    if (!isPermitDoc && extractedData.energyPermitId) {
+      console.log(`[OCR] Filtering out Energy Permit ID "${extractedData.energyPermitId}" - not from 同意備案 (docType: ${docTypeCode})`);
+      extractedData.energyPermitId = undefined;
+      extractedData.energyPermitIdContext = undefined;
+    }
+    
+    // 過濾派員訪查函專用欄位：只有派員訪查函可以提取
+    if (!isInspectionDoc) {
+      if (extractedData.taipowerContractNo || extractedData.meterNumber) {
+        console.log(`[OCR] Filtering out inspection fields - not from 派員訪查函 (docType: ${docTypeCode})`);
+      }
+      extractedData.taipowerContractNo = undefined;
+      extractedData.taipowerContractNoContext = undefined;
+      extractedData.meterNumber = undefined;
+      extractedData.meterNumberContext = undefined;
+      extractedData.actualInstalledCapacity = undefined;
+      extractedData.pvModuleModel = undefined;
+      extractedData.inverterModel = undefined;
+      extractedData.panelWattage = undefined;
+      extractedData.panelCount = undefined;
+      extractedData.powerVoltage = undefined;
+      extractedData.gridConnectionType = undefined;
+    }
+    
+    console.log(`[OCR] Final result after filtering: ${extractedData.dates.length} dates, PV ID: ${extractedData.pvId || 'none'}, Energy Permit: ${extractedData.energyPermitId || 'none'}, Contract: ${extractedData.taipowerContractNo || 'none'}`);
 
     // Auto-update if requested
-    if (autoUpdate && documentId && extractedData.dates.length > 0) {
+    if (autoUpdate && documentId) {
       const submissionDate = extractedData.dates.find(d => d.type === 'submission')?.date;
       const issueDate = extractedData.dates.find(d => d.type === 'issue')?.date;
       const meterDate = extractedData.dates.find(d => d.type === 'meter_date')?.date;
       
+      // Update document dates
       const updateData: Record<string, string> = {};
       if (submissionDate) updateData.submitted_at = submissionDate;
       if (issueDate) updateData.issued_at = issueDate;
@@ -1168,51 +1227,71 @@ serve(async (req) => {
         }
       }
       
-      if (meterDate) {
-        const { data: docData } = await supabase
-          .from('documents')
-          .select('project_id')
-          .eq('id', documentId)
-          .single();
-        
-        if (docData?.project_id) {
-          await supabase
-            .from('projects')
-            .update({ actual_meter_date: meterDate })
-            .eq('id', docData.project_id);
-        }
-      }
+      // Get project_id once for all project updates
+      const { data: docData } = await supabase
+        .from('documents')
+        .select('project_id')
+        .eq('id', documentId)
+        .single();
       
-      if (extractedData.pvId) {
-        const { data: docData } = await supabase
-          .from('documents')
-          .select('project_id')
-          .eq('id', documentId)
-          .single();
+      if (docData?.project_id) {
+        const projectUpdates: Record<string, unknown> = {};
         
-        if (docData?.project_id) {
-          await supabase
-            .from('projects')
-            .update({ taipower_pv_id: extractedData.pvId })
-            .eq('id', docData.project_id);
-          console.log('[OCR] Auto-updated project with PV ID:', extractedData.pvId);
+        // 掛表日
+        if (meterDate) {
+          projectUpdates.actual_meter_date = meterDate;
         }
-      }
-      
-      // Auto-update energy permit ID
-      if (extractedData.energyPermitId) {
-        const { data: docData } = await supabase
-          .from('documents')
-          .select('project_id')
-          .eq('id', documentId)
-          .single();
         
-        if (docData?.project_id) {
-          await supabase
+        // PV編號（已經過文件類型過濾）
+        if (extractedData.pvId) {
+          projectUpdates.taipower_pv_id = extractedData.pvId;
+        }
+        
+        // 能源署備案編號（已經過文件類型過濾）
+        if (extractedData.energyPermitId) {
+          projectUpdates.energy_permit_id = extractedData.energyPermitId;
+        }
+        
+        // 派員訪查函專用欄位（已經過文件類型過濾）
+        if (extractedData.taipowerContractNo) {
+          projectUpdates.taipower_contract_no = extractedData.taipowerContractNo;
+        }
+        if (extractedData.meterNumber) {
+          projectUpdates.meter_number = extractedData.meterNumber;
+        }
+        if (extractedData.actualInstalledCapacity) {
+          projectUpdates.actual_installed_capacity = extractedData.actualInstalledCapacity;
+        }
+        if (extractedData.pvModuleModel) {
+          projectUpdates.pv_module_model = extractedData.pvModuleModel;
+        }
+        if (extractedData.inverterModel) {
+          projectUpdates.inverter_model = extractedData.inverterModel;
+        }
+        if (extractedData.panelWattage) {
+          projectUpdates.panel_wattage = extractedData.panelWattage;
+        }
+        if (extractedData.panelCount) {
+          projectUpdates.panel_count = extractedData.panelCount;
+        }
+        if (extractedData.powerVoltage) {
+          projectUpdates.power_voltage = extractedData.powerVoltage;
+        }
+        if (extractedData.gridConnectionType) {
+          projectUpdates.grid_connection_type = extractedData.gridConnectionType;
+        }
+        
+        if (Object.keys(projectUpdates).length > 0) {
+          const { error: projectError } = await supabase
             .from('projects')
-            .update({ energy_permit_id: extractedData.energyPermitId })
+            .update(projectUpdates)
             .eq('id', docData.project_id);
-          console.log('[OCR] Auto-updated project with Energy Permit ID:', extractedData.energyPermitId);
+          
+          if (projectError) {
+            console.error('[OCR] Failed to auto-update project:', projectError);
+          } else {
+            console.log('[OCR] Auto-updated project with fields:', Object.keys(projectUpdates).join(', '));
+          }
         }
       }
     }

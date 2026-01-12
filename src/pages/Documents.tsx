@@ -120,6 +120,7 @@ export default function Documents() {
     submittedAt?: string | null;
     issuedAt?: string | null;
     pvId?: string | null;
+    docTypeCode?: string | null;
   }>>([]);
 
   // Batch OCR hook
@@ -809,6 +810,7 @@ export default function Documents() {
                   submittedAt: doc.submitted_at,
                   issuedAt: doc.issued_at,
                   pvId: (doc as any).taipower_pv_id || null,
+                  docTypeCode: doc.doc_type_code || null, // 傳遞文件類型代碼用於過濾辨識結果
                 }));
                 
                 setBatchOcrDocs(docsForOcr);
