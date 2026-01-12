@@ -101,8 +101,11 @@ export function generateDocumentDisplayName(params: {
     extension = 'pdf',
   } = params;
   
-  // 格式化日期為 YYYYMMDD
-  const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+  // 格式化日期為 YYYYMMDD（使用本地時間，避免 UTC 時區偏移）
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  const dateStr = `${year}${month}${day}`;
   
   // 格式化版本號 v01, v02 等
   const versionStr = `v${version.toString().padStart(2, '0')}`;
