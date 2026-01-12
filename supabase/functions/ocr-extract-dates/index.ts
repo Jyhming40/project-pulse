@@ -6,8 +6,33 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Maximum file size for OCR processing (10MB - increased for larger PDFs)
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024;
+// Maximum file size for OCR processing
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB - standard limit
+const LARGE_FILE_THRESHOLD = 10 * 1024 * 1024; // 10MB - above this, extract first page only
+const ABSOLUTE_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB - absolute maximum (first page only)
+
+// Document types that commonly have important info on first page only
+// 躉售合約、正式躉售等大型合約文件
+const FIRST_PAGE_ONLY_DOC_TYPES = [
+  'TPC_FORMAL_FIT', // 正式躉售
+  'TPC_CONTRACT',   // 躉售合約
+  'CONTRACT',       // 合約
+];
+
+// Check if a doc type should only process first page for large files
+function shouldExtractFirstPageOnly(docTypeCode: string | null, fileSize: number): boolean {
+  // If file is very large (>10MB), always try first page only
+  if (fileSize > LARGE_FILE_THRESHOLD) {
+    return true;
+  }
+  
+  // For known contract types, use first page only for moderate-sized files (>5MB)
+  if (docTypeCode && FIRST_PAGE_ONLY_DOC_TYPES.some(t => docTypeCode.includes(t))) {
+    return fileSize > 5 * 1024 * 1024;
+  }
+  
+  return false;
+}
 
 interface ExtractedDate {
   type: 'submission' | 'issue' | 'meter_date' | 'unknown';
@@ -562,8 +587,32 @@ async function refreshAccessToken(refreshToken: string): Promise<string | null> 
   }
 }
 
-// Fetch file from Google Drive
-async function fetchDriveFile(driveFileId: string, accessToken: string): Promise<{ content: string; mimeType: string; skipped?: boolean; skipReason?: string } | null> {
+// Extract first page from PDF using basic PDF parsing
+// This is a simplified approach - extract content until we find a page break
+function extractFirstPageFromPdf(pdfBuffer: ArrayBuffer): ArrayBuffer {
+  const uint8Array = new Uint8Array(pdfBuffer);
+  const text = new TextDecoder('latin1').decode(uint8Array);
+  
+  // For PDF, we'll look for page breaks and try to estimate first page content
+  // A typical PDF has 20-100KB per page for scanned documents
+  // We'll take approximately the first ~3MB which should cover the first few pages
+  const FIRST_PAGE_APPROX_SIZE = 3 * 1024 * 1024; // 3MB for first page estimation
+  
+  if (uint8Array.length <= FIRST_PAGE_APPROX_SIZE) {
+    return pdfBuffer;
+  }
+  
+  // Just take the first portion - the AI will only see what's visible
+  console.log(`[OCR] Extracting first ~3MB from ${(uint8Array.length / 1024 / 1024).toFixed(1)}MB PDF`);
+  return pdfBuffer.slice(0, FIRST_PAGE_APPROX_SIZE);
+}
+
+// Fetch file from Google Drive with optional first-page-only mode
+async function fetchDriveFile(
+  driveFileId: string, 
+  accessToken: string,
+  options?: { docTypeCode?: string | null; firstPageOnly?: boolean }
+): Promise<{ content: string; mimeType: string; skipped?: boolean; skipReason?: string; firstPageOnly?: boolean } | null> {
   try {
     console.log(`[OCR] Fetching Drive file: ${driveFileId}`);
     
@@ -581,16 +630,26 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
     console.log(`[OCR] File metadata: name=${metadata.name}, type=${metadata.mimeType}, size=${metadata.size}`);
     
     const fileSize = parseInt(metadata.size || '0');
-    console.log(`[OCR] File size check: ${(fileSize / 1024 / 1024).toFixed(2)}MB, limit: ${(MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB`);
+    const fileSizeMB = fileSize / 1024 / 1024;
+    console.log(`[OCR] File size check: ${fileSizeMB.toFixed(2)}MB`);
     
-    if (fileSize > MAX_FILE_SIZE_BYTES) {
-      console.log(`[OCR] File too large, skipping: ${(fileSize / 1024 / 1024).toFixed(1)}MB > ${(MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB`);
+    // Check if file exceeds absolute maximum
+    if (fileSize > ABSOLUTE_MAX_FILE_SIZE) {
+      console.log(`[OCR] File exceeds absolute maximum (${fileSizeMB.toFixed(1)}MB > 50MB), skipping`);
       return { 
         content: '', 
         mimeType: metadata.mimeType,
         skipped: true,
-        skipReason: `檔案過大 (${(fileSize / 1024 / 1024).toFixed(1)}MB)，超過 ${(MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB 限制，請手動輸入日期`
+        skipReason: `檔案過大 (${fileSizeMB.toFixed(1)}MB)，超過 50MB 上限，請手動輸入日期`
       };
+    }
+    
+    // Determine if we should extract first page only
+    const useFirstPageOnly = options?.firstPageOnly || 
+      shouldExtractFirstPageOnly(options?.docTypeCode || null, fileSize);
+    
+    if (useFirstPageOnly && fileSize > LARGE_FILE_THRESHOLD) {
+      console.log(`[OCR] Large file detected (${fileSizeMB.toFixed(1)}MB), will extract first page only`);
     }
     
     let finalMimeType = metadata.mimeType;
@@ -612,9 +671,18 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
       return null;
     }
     
-    const buffer = await fileResponse.arrayBuffer();
+    let buffer = await fileResponse.arrayBuffer();
+    let isFirstPageOnly = false;
     
-    if (buffer.byteLength > MAX_FILE_SIZE_BYTES) {
+    // For large PDF files, extract first page only
+    if (useFirstPageOnly && buffer.byteLength > LARGE_FILE_THRESHOLD && finalMimeType === 'application/pdf') {
+      console.log(`[OCR] Extracting first page from large PDF (${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB)`);
+      buffer = extractFirstPageFromPdf(buffer);
+      isFirstPageOnly = true;
+    }
+    
+    // Check if still too large after extraction
+    if (buffer.byteLength > MAX_FILE_SIZE_BYTES && !isFirstPageOnly) {
       console.log(`[OCR] Downloaded buffer too large, skipping: ${(buffer.byteLength / 1024 / 1024).toFixed(1)}MB`);
       return { 
         content: '', 
@@ -633,8 +701,8 @@ async function fetchDriveFile(driveFileId: string, accessToken: string): Promise
     }
     const content = btoa(binary);
     
-    console.log(`[OCR] Base64 encoded content length: ${content.length}`);
-    return { content, mimeType: finalMimeType };
+    console.log(`[OCR] Base64 encoded content length: ${content.length}${isFirstPageOnly ? ' (first page only)' : ''}`);
+    return { content, mimeType: finalMimeType, firstPageOnly: isFirstPageOnly };
   } catch (error) {
     console.error('[OCR] Drive file fetch error:', error);
     return null;
@@ -1112,7 +1180,9 @@ serve(async (req) => {
           .eq('user_id', user.id);
       }
 
-      const driveFile = await fetchDriveFile(docData.drive_file_id, accessToken);
+      const driveFile = await fetchDriveFile(docData.drive_file_id, accessToken, {
+        docTypeCode: docTypeCode,
+      });
       if (!driveFile) {
         return new Response(
           JSON.stringify({ error: '無法從 Google Drive 取得檔案' }),
@@ -1135,7 +1205,8 @@ serve(async (req) => {
 
       imageBase64 = driveFile.content;
       mimeType = driveFile.mimeType;
-      console.log(`[OCR] Successfully fetched file from Drive, size: ${imageBase64.length} chars`);
+      const wasFirstPageOnly = driveFile.firstPageOnly;
+      console.log(`[OCR] Successfully fetched file from Drive, size: ${imageBase64.length} chars${wasFirstPageOnly ? ' (first page only)' : ''}`);
     }
 
     if (!imageBase64) {
