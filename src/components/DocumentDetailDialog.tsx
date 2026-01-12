@@ -58,7 +58,7 @@ import {
   Loader2,
 } from 'lucide-react';
 import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
-import { DOC_TYPE_CODE_TO_SHORT, SHORT_TO_DOC_TYPE_CODE } from '@/lib/docTypeMapping';
+import { DOC_TYPE_CODE_TO_SHORT, SHORT_TO_DOC_TYPE_CODE, getAgencyCodeByDocTypeCode } from '@/lib/docTypeMapping';
 import { toast } from 'sonner';
 import { DocumentVersionCompare } from './DocumentVersionCompare';
 import { DocumentTagSelector } from './DocumentTagSelector';
@@ -110,7 +110,10 @@ export function DocumentDetailDialog({
     issued_at: '',
     due_at: '',
     note: '',
+    title: '',
   });
+  const [shouldRenameFile, setShouldRenameFile] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
   
   // Get doc_type options from useDocTypeLabel (unified source: document_type_config)
   const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions } = useDocTypeLabel();
@@ -203,20 +206,28 @@ export function DocumentDetailDialog({
 
   // Update mutation
   const updateMutation = useMutation({
-    mutationFn: async (data: typeof editData) => {
+    mutationFn: async (data: typeof editData & { renameFile?: boolean }) => {
       if (!documentId) throw new Error('No document ID');
 
       // Convert doc_type_code to short value for database storage
       const docTypeValue = data.doc_type 
         ? (DOC_TYPE_CODE_TO_SHORT[data.doc_type] || data.doc_type)
         : document?.doc_type || null;
+      
+      // Get agency code from doc_type_code
+      const agencyCode = data.doc_type 
+        ? getAgencyCodeByDocTypeCode(data.doc_type)
+        : document?.agency_code || null;
 
       const updatePayload: Record<string, string | null> = {
         doc_type: docTypeValue,
+        doc_type_code: data.doc_type || null,
+        agency_code: agencyCode,
         submitted_at: data.submitted_at || null,
         issued_at: data.issued_at || null,
         due_at: data.due_at || null,
         note: data.note || null,
+        title: data.title || null,
         updated_at: new Date().toISOString(),
       };
 
@@ -234,6 +245,9 @@ export function DocumentDetailDialog({
         p_action: 'UPDATE',
         p_old_data: {
           doc_type: document?.doc_type,
+          doc_type_code: document?.doc_type_code,
+          agency_code: document?.agency_code,
+          title: document?.title,
           submitted_at: document?.submitted_at,
           issued_at: document?.issued_at,
           due_at: document?.due_at,
@@ -242,6 +256,35 @@ export function DocumentDetailDialog({
         p_new_data: updatePayload,
         p_reason: '編輯文件資訊',
       });
+
+      // Rename Drive file if requested
+      if (data.renameFile && document?.drive_file_id && data.title && data.title !== document?.title) {
+        try {
+          setIsRenaming(true);
+          const { data: renameResult, error: renameError } = await supabase.functions.invoke('drive-rename-file', {
+            body: {
+              driveFileId: document.drive_file_id,
+              newName: data.title,
+            },
+          });
+
+          if (renameError) {
+            console.error('Drive rename error:', renameError);
+            toast.warning('文件已更新，但 Drive 檔案重新命名失敗', {
+              description: renameError.message,
+            });
+          } else if (renameResult?.success) {
+            toast.success('Drive 檔案已重新命名', {
+              description: `新檔名: ${renameResult.newName}`,
+            });
+          }
+        } catch (renameErr) {
+          console.error('Drive rename error:', renameErr);
+          toast.warning('文件已更新，但 Drive 檔案重新命名失敗');
+        } finally {
+          setIsRenaming(false);
+        }
+      }
 
       // Return project_id for milestone sync
       return document?.project_id;
@@ -276,12 +319,14 @@ export function DocumentDetailDialog({
       issued_at: document?.issued_at?.split('T')[0] || '',
       due_at: document?.due_at?.split('T')[0] || '',
       note: document?.note || '',
+      title: document?.title || '',
     });
+    setShouldRenameFile(false);
     setIsEditing(true);
   };
 
   const handleSave = () => {
-    updateMutation.mutate(editData);
+    updateMutation.mutate({ ...editData, renameFile: shouldRenameFile });
   };
 
   const handleCancel = () => {
@@ -585,6 +630,39 @@ export function DocumentDetailDialog({
 
                 {isEditing ? (
                   <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                    {/* Document Title */}
+                    <div className="space-y-2">
+                      <Label htmlFor="title">文件標題 / 檔案名稱</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          id="title"
+                          value={editData.title}
+                          onChange={e => setEditData(prev => ({ ...prev, title: e.target.value }))}
+                          placeholder="輸入文件標題..."
+                          className="flex-1"
+                        />
+                        {document?.drive_file_id && editData.title !== document?.title && (
+                          <Button
+                            type="button"
+                            variant={shouldRenameFile ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setShouldRenameFile(!shouldRenameFile)}
+                            className="shrink-0"
+                          >
+                            <Cloud className="w-4 h-4 mr-1" />
+                            {shouldRenameFile ? '將同步 Drive' : '同步 Drive 檔名'}
+                          </Button>
+                        )}
+                      </div>
+                      {document?.drive_file_id && editData.title !== document?.title && (
+                        <p className="text-xs text-muted-foreground">
+                          {shouldRenameFile 
+                            ? '✓ 儲存時將同步更新 Google Drive 中的檔案名稱' 
+                            : '點擊「同步 Drive 檔名」按鈕可一併更新雲端檔案名稱'}
+                        </p>
+                      )}
+                    </div>
+                    
                     {/* Document Type */}
                     <div className="space-y-2">
                       <Label htmlFor="doc_type">文件類型</Label>
