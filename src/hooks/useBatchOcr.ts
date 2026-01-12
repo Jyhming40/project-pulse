@@ -15,6 +15,18 @@ export interface OcrTask {
     meterDate?: string;
   };
   extractedPvId?: string;
+  // Additional inspection data
+  extractedInspectionData?: {
+    taipowerContractNo?: string;
+    meterNumber?: string;
+    actualInstalledCapacity?: number;
+    pvModuleModel?: string;
+    inverterModel?: string;
+    panelWattage?: number;
+    panelCount?: number;
+    powerVoltage?: string;
+    gridConnectionType?: string;
+  };
   // Flag for documents that already have OCR data
   alreadyProcessed?: boolean;
   // Existing data from previous OCR
@@ -76,7 +88,23 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
     documentId: string,
     docTypeCode: string | null | undefined,
     signal: AbortSignal
-  ): Promise<{ success: boolean; error?: string; dates?: { submittedAt?: string; issuedAt?: string; meterDate?: string }; pvId?: string }> => {
+  ): Promise<{ 
+    success: boolean; 
+    error?: string; 
+    dates?: { submittedAt?: string; issuedAt?: string; meterDate?: string }; 
+    pvId?: string;
+    inspectionData?: {
+      taipowerContractNo?: string;
+      meterNumber?: string;
+      actualInstalledCapacity?: number;
+      pvModuleModel?: string;
+      inverterModel?: string;
+      panelWattage?: number;
+      panelCount?: number;
+      powerVoltage?: string;
+      gridConnectionType?: string;
+    };
+  }> => {
     const maxRetries = 3;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -124,7 +152,11 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
         const result = await response.json();
         
         // Check if any dates were found
-        if ((!result.extractedDates || result.extractedDates.length === 0) && !result.pvId) {
+        const hasAnyData = (result.extractedDates && result.extractedDates.length > 0) 
+          || result.pvId 
+          || result.inspectionData;
+          
+        if (!hasAnyData) {
           return { success: true, dates: {}, pvId: undefined };
         }
 
@@ -142,6 +174,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
             meterDate,
           },
           pvId: result.pvId,
+          inspectionData: result.inspectionData,
         };
       } catch (error: any) {
         if (error.name === 'AbortError') {
@@ -287,6 +320,7 @@ export function useBatchOcr(options: UseBatchOcrOptions = {}) {
             error: result.error,
             extractedDates: result.dates,
             extractedPvId: result.pvId,
+            extractedInspectionData: result.inspectionData,
           };
         }));
 

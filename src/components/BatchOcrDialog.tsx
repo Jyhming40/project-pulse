@@ -144,18 +144,31 @@ export function BatchOcrDialog({
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {/* Show extracted data for successful tasks */}
-        {task.extractedDates && (task.extractedDates.submittedAt || task.extractedDates.issuedAt || task.extractedDates.meterDate) && (
-          <span className="text-xs text-green-600">
-            {task.extractedDates.submittedAt && '送件日 '}
-            {task.extractedDates.issuedAt && '核發日 '}
-            {task.extractedDates.meterDate && '掛表日'}
-          </span>
-        )}
-        {task.extractedPvId && (
-          <span className="text-xs text-blue-600">
-            PV編號
-          </span>
-        )}
+        <div className="flex flex-wrap items-center gap-1">
+          {task.extractedDates && (task.extractedDates.submittedAt || task.extractedDates.issuedAt || task.extractedDates.meterDate) && (
+            <span className="text-xs text-green-600">
+              {task.extractedDates.submittedAt && '送件日 '}
+              {task.extractedDates.issuedAt && '核發日 '}
+              {task.extractedDates.meterDate && '掛表日'}
+            </span>
+          )}
+          {task.extractedPvId && (
+            <span className="text-xs text-blue-600">
+              PV編號
+            </span>
+          )}
+          {/* Show inspection data for successful inspection documents */}
+          {task.extractedInspectionData && (
+            <span className="text-xs text-purple-600">
+              {task.extractedInspectionData.taipowerContractNo && '契約編號 '}
+              {task.extractedInspectionData.meterNumber && '購售電號 '}
+              {task.extractedInspectionData.actualInstalledCapacity && '裝置容量 '}
+              {task.extractedInspectionData.pvModuleModel && '模組 '}
+              {task.extractedInspectionData.inverterModel && '變流器 '}
+              {(task.extractedInspectionData.panelWattage || task.extractedInspectionData.panelCount) && '面板規格'}
+            </span>
+          )}
+        </div>
         {/* Show existing data for already processed tasks */}
         {task.status === 'already_processed' && task.existingData && (
           <span className="text-xs text-muted-foreground">
