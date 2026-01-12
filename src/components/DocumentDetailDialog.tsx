@@ -308,10 +308,9 @@ export function DocumentDetailDialog({
   });
 
   const handleEdit = () => {
-    // Convert doc_type short value back to code for the select
-    const docTypeCode = document?.doc_type 
-      ? (SHORT_TO_DOC_TYPE_CODE[document.doc_type] || document.doc_type)
-      : '';
+    // Use doc_type_code directly if available, otherwise convert from doc_type
+    const docTypeCode = document?.doc_type_code 
+      || (document?.doc_type ? (SHORT_TO_DOC_TYPE_CODE[document.doc_type] || document.doc_type) : '');
     
     setEditData({
       doc_type: docTypeCode,
