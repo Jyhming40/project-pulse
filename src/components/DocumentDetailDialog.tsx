@@ -100,6 +100,8 @@ export function DocumentDetailDialog({
     fullText: string;
     pvId?: string;
     pvIdContext?: string;
+    energyPermitId?: string;
+    energyPermitIdContext?: string;
   }>({ extractedDates: [], fullText: '' });
   const [isUpdatingFromOcr, setIsUpdatingFromOcr] = useState(false);
   const [editData, setEditData] = useState({
@@ -364,7 +366,7 @@ export function DocumentDetailDialog({
   };
 
   // Handle OCR result confirmation
-  const handleOcrConfirm = async (submittedAt: string | null, issuedAt: string | null, meterDate?: string | null, pvId?: string | null) => {
+  const handleOcrConfirm = async (submittedAt: string | null, issuedAt: string | null, meterDate?: string | null, pvId?: string | null, energyPermitId?: string | null) => {
     if (!documentId) return;
 
     setIsUpdatingFromOcr(true);
@@ -402,8 +404,8 @@ export function DocumentDetailDialog({
         p_reason: 'OCR 日期擷取確認',
       });
 
-      // Update project if meterDate or pvId is provided
-      if ((meterDate || pvId) && document?.project_id) {
+      // Update project if meterDate, pvId, or energyPermitId is provided
+      if ((meterDate || pvId || energyPermitId) && document?.project_id) {
         const projectUpdateData: Record<string, string | null> = {};
         
         if (meterDate) {
@@ -421,6 +423,10 @@ export function DocumentDetailDialog({
         
         if (pvId) {
           projectUpdateData.taipower_pv_id = pvId;
+        }
+        
+        if (energyPermitId) {
+          projectUpdateData.energy_permit_id = energyPermitId;
         }
         
         const { error: projectError } = await supabase
@@ -465,6 +471,7 @@ export function DocumentDetailDialog({
       if (issuedAt) updates.push(`核發日: ${issuedAt}`);
       if (meterDate) updates.push(`實際掛表日: ${meterDate}`);
       if (pvId) updates.push(`PV編號: ${pvId}`);
+      if (energyPermitId) updates.push(`能源署備案編號: ${energyPermitId}`);
       
       toast.success('資料已更新', {
         description: updates.join('、'),
@@ -926,6 +933,8 @@ export function DocumentDetailDialog({
       currentIssuedAt={document?.issued_at || null}
       pvId={ocrResults.pvId}
       pvIdContext={ocrResults.pvIdContext}
+      energyPermitId={ocrResults.energyPermitId}
+      energyPermitIdContext={ocrResults.energyPermitIdContext}
       onConfirm={handleOcrConfirm}
       isUpdating={isUpdatingFromOcr}
     />

@@ -46,7 +46,9 @@ interface OcrResultDialogProps {
   currentIssuedAt: string | null;
   pvId?: string;
   pvIdContext?: string;
-  onConfirm: (submittedAt: string | null, issuedAt: string | null, meterDate?: string | null, pvId?: string | null) => void;
+  energyPermitId?: string; // 能源署備案編號
+  energyPermitIdContext?: string;
+  onConfirm: (submittedAt: string | null, issuedAt: string | null, meterDate?: string | null, pvId?: string | null, energyPermitId?: string | null) => void;
   isUpdating: boolean;
 }
 
@@ -130,6 +132,8 @@ export function OcrResultDialog({
   currentIssuedAt,
   pvId,
   pvIdContext,
+  energyPermitId,
+  energyPermitIdContext,
   onConfirm,
   isUpdating,
 }: OcrResultDialogProps) {
@@ -144,6 +148,7 @@ export function OcrResultDialog({
   const [selectedIssuedAt, setSelectedIssuedAt] = useState<string>('');
   const [selectedMeterDate, setSelectedMeterDate] = useState<string>('');
   const [selectedPvId, setSelectedPvId] = useState<string>('');
+  const [selectedEnergyPermitId, setSelectedEnergyPermitId] = useState<string>('');
 
   // State for unknown dates field selection (default to 'none' meaning not applied)
   const [unknownDateSelections, setUnknownDateSelections] = useState<Record<number, string>>({});
@@ -174,10 +179,15 @@ export function OcrResultDialog({
         setSelectedPvId(pvId);
       }
       
+      // Auto-fill Energy Permit ID if detected
+      if (energyPermitId) {
+        setSelectedEnergyPermitId(energyPermitId);
+      }
+      
       // Reset unknown date selections
       setUnknownDateSelections({});
     }
-  }, [open, extractedDates, suggestedSubmission?.date, suggestedIssue?.date, suggestedMeterDate?.date, currentSubmittedAt, currentIssuedAt, pvId]);
+  }, [open, extractedDates, suggestedSubmission?.date, suggestedIssue?.date, suggestedMeterDate?.date, currentSubmittedAt, currentIssuedAt, pvId, energyPermitId]);
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -186,6 +196,7 @@ export function OcrResultDialog({
       setSelectedIssuedAt('');
       setSelectedMeterDate('');
       setSelectedPvId('');
+      setSelectedEnergyPermitId('');
       setUnknownDateSelections({});
     }
   }, [open]);
@@ -210,7 +221,8 @@ export function OcrResultDialog({
       selectedSubmittedAt || null,
       selectedIssuedAt || null,
       selectedMeterDate || null,
-      selectedPvId || null
+      selectedPvId || null,
+      selectedEnergyPermitId || null
     );
   };
 
@@ -358,14 +370,32 @@ export function OcrResultDialog({
               <div className="p-3 border rounded-lg bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800 space-y-2">
                 <div className="flex items-center gap-2">
                   <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
-                    PV 編號
+                    台電 PV 編號
                   </Badge>
                   <span className="font-mono font-medium">{pvId}</span>
-                  <span className="text-xs text-purple-600">→ 將更新至專案「台電 PV 編號」</span>
+                  <span className="text-xs text-purple-600">→ 將更新至專案</span>
                 </div>
                 {pvIdContext && (
                   <div className="text-xs text-muted-foreground bg-background p-2 rounded">
                     ...{pvIdContext}...
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Energy Permit ID Detection */}
+            {energyPermitId && (
+              <div className="p-3 border rounded-lg bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+                    能源署備案編號
+                  </Badge>
+                  <span className="font-mono font-medium">{energyPermitId}</span>
+                  <span className="text-xs text-amber-600">→ 將更新至專案</span>
+                </div>
+                {energyPermitIdContext && (
+                  <div className="text-xs text-muted-foreground bg-background p-2 rounded">
+                    ...{energyPermitIdContext}...
                   </div>
                 )}
               </div>
@@ -426,8 +456,8 @@ export function OcrResultDialog({
                 </div>
               </div>
 
-              {/* Meter Date and PV ID - only show if detected */}
-              {(suggestedMeterDate || pvId) && (
+              {/* Meter Date, PV ID, and Energy Permit ID - only show if detected */}
+              {(suggestedMeterDate || pvId || energyPermitId) && (
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   {suggestedMeterDate && (
                     <div className="space-y-2">
@@ -458,6 +488,22 @@ export function OcrResultDialog({
                         type="text"
                         value={selectedPvId}
                         onChange={(e) => setSelectedPvId(e.target.value)}
+                      />
+                    </div>
+                  )}
+                  {energyPermitId && (
+                    <div className="space-y-2">
+                      <Label htmlFor="ocr-energy-permit-id">
+                        能源署備案編號
+                        <span className="ml-2 text-xs text-amber-600">
+                          (將更新至專案)
+                        </span>
+                      </Label>
+                      <Input
+                        id="ocr-energy-permit-id"
+                        type="text"
+                        value={selectedEnergyPermitId}
+                        onChange={(e) => setSelectedEnergyPermitId(e.target.value)}
                       />
                     </div>
                   )}
@@ -495,7 +541,7 @@ export function OcrResultDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={isUpdating || (!selectedSubmittedAt && !selectedIssuedAt && !selectedMeterDate && !selectedPvId)}
+            disabled={isUpdating || (!selectedSubmittedAt && !selectedIssuedAt && !selectedMeterDate && !selectedPvId && !selectedEnergyPermitId)}
           >
             {isUpdating ? '更新中...' : '確認套用'}
           </Button>
