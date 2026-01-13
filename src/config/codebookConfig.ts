@@ -19,10 +19,9 @@ import {
 } from 'lucide-react';
 
 // All categories that can be managed in the Codebook
-// doc_type removed - use doc_type_code as single source of truth
+// doc_type_code removed - managed in dedicated DocumentTypeConfig page (/document-type-config)
 export type CodebookCategory = 
   | 'project_status'
-  | 'doc_type_code'
   | 'doc_status'
   | 'agency'
   | 'subfolder_code'
@@ -61,17 +60,6 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
     usageMapping: [
       { table: 'projects', column: 'status' },
     ],
-  },
-  // doc_type_code is the single source of truth for document types
-  doc_type_code: {
-    label: '文件類型代碼',
-    icon: FileText,
-    description: '文件分類代碼（唯一權威來源，透過程式轉換為中文短值）',
-    usageMapping: [
-      { table: 'documents', column: 'doc_type' },
-    ],
-    // Mark as system-controlled: cannot add or delete, only edit labels
-    isSystemControlled: true,
   },
   doc_status: {
     label: '文件狀態',
@@ -216,22 +204,7 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
     { value: '暫停', label: '暫停' },
     { value: '取消', label: '取消' },
   ],
-  // doc_type_code is the single source of truth (synced with docTypeMapping.ts)
-  doc_type_code: [
-    { value: 'TPC_REVIEW', label: '台電審查意見書' },
-    { value: 'MOEA_CONSENT', label: '同意備案' },
-    { value: 'STRUCT_CERT', label: '結構簽證' },
-    { value: 'TPC_CONTRACT', label: '躉售合約' },
-    { value: 'TPC_METER', label: '報竣掛表' },
-    { value: 'MOEA_REGISTER', label: '設備登記' },
-    { value: 'LINE_COMP_NOTICE', label: '線補費通知單' },
-    { value: 'TPC', label: '台電相關' },
-    { value: 'ENERGY_BUREAU', label: '能源署相關' },
-    { value: 'RELATED', label: '其他相關文件' },
-    { value: 'BUILDING_AUTH', label: '建管處相關' },
-    { value: 'GREEN_PERMISSION', label: '綠能設施' },
-    { value: 'OTHER', label: '其他' },
-  ],
+  // doc_type_code removed - managed in dedicated DocumentTypeConfig page
   doc_status: [
     { value: '未開始', label: '未開始' },
     { value: '進行中', label: '進行中' },
