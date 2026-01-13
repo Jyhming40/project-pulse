@@ -13,6 +13,7 @@ export interface DocumentTypeConfig {
   sort_order: number;
   is_active: boolean;
   is_system: boolean;
+  is_required: boolean;
   created_at: string;
   created_by: string | null;
   updated_at: string;
@@ -26,6 +27,7 @@ export interface DocumentTypeConfigInput {
   description?: string;
   sort_order?: number;
   is_active?: boolean;
+  is_required?: boolean;
 }
 
 export function useDocumentTypeConfig() {
@@ -147,9 +149,13 @@ export function useDocumentTypeConfig() {
   // Get active types only
   const activeTypes = documentTypes.filter(dt => dt.is_active);
 
+  // Get required types only (for document progress calculation)
+  const requiredTypes = documentTypes.filter(dt => dt.is_active && dt.is_required);
+
   return {
     documentTypes,
     activeTypes,
+    requiredTypes,
     isLoading,
     error,
     groupedByAgency,
