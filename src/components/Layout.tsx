@@ -82,6 +82,7 @@ const systemSettingsItems = [
   // 系統設定
   { to: '/progress-settings', icon: TrendingUp, label: '進度設定', adminOnly: true },
   { to: '/system-options', icon: Settings2, label: 'Codebook', adminOnly: true },
+  { to: '/document-types', icon: FileText, label: '文件類型管理', adminOnly: true },
   { to: '/branding', icon: Palette, label: '公司設定', adminOnly: true },
   // 外部整合
   { to: '/integrations', icon: Link2, label: '外部整合', adminOnly: true },
