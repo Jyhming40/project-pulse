@@ -7,6 +7,7 @@ import { deleteDriveFile } from '@/hooks/useDriveSync';
 import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
+import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { CreateDocumentDialog } from '@/components/CreateDocumentDialog';
@@ -161,10 +162,43 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   // Get only current versions for main display
   const currentDocuments = documents.filter(doc => doc.is_current !== false);
 
-  // Calculate missing required documents
+  // Fetch file counts for each document to determine status
+  const { data: documentFileCounts = [] } = useQuery({
+    queryKey: ['project-document-file-counts', projectId],
+    queryFn: async () => {
+      const docIds = documents.map(d => d.id);
+      if (docIds.length === 0) return [];
+      const { data, error } = await supabase
+        .from('document_files')
+        .select('document_id')
+        .in('document_id', docIds)
+        .eq('is_deleted', false);
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: documents.length > 0,
+  });
+
+  // Build file count map
+  const fileCountMap = documentFileCounts.reduce((acc, fc) => {
+    acc[fc.document_id] = (acc[fc.document_id] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  // Calculate missing required documents - only count as obtained if status is "已取得"
   const obtainedDocTypeCodes = new Set(
     currentDocuments
-      .filter(doc => doc.doc_type_code)
+      .filter(doc => {
+        if (!doc.doc_type_code) return false;
+        // Import getDerivedDocStatus at the top of file
+        const status = getDerivedDocStatus({
+          submitted_at: (doc as any).submitted_at,
+          issued_at: (doc as any).issued_at,
+          file_count: fileCountMap[doc.id] || 0,
+          drive_file_id: doc.drive_file_id,
+        });
+        return status === '已取得';
+      })
       .map(doc => doc.doc_type_code!)
   );
   
