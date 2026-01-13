@@ -52,6 +52,8 @@ const DOC_TYPE_KEYWORDS: Record<string, string[]> = {
   MOEA_REGISTER: ['設備登記', '登記'],
   STRUCT_CERT: ['結構', '結構簽證', '結構技師'],
   LAND_CONTRACT: ['土地', '租約', '土地契約'],
+  MISC_EXEMPT_COMPLETION: ['工程完竣', '免雜項竣工'],
+  TPC_METER_LEASE: ['電度表租', '電鍍表租', '電表租約'],
 };
 
 export function inferDocTypeCodeFromFilename(filename: string): string | null {
