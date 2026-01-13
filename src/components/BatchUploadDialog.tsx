@@ -817,7 +817,7 @@ export function BatchUploadDialog({
 
         </div>
 
-        <DialogFooter className="mt-4">
+        <DialogFooter className="mt-4 pt-4 border-t bg-background shrink-0">
           <Button 
             variant="outline" 
             onClick={() => onOpenChange(false)}
