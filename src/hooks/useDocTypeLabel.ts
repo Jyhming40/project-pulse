@@ -27,6 +27,7 @@ interface DocTypeConfigRecord {
   label: string;
   agency_code: string;
   is_active: boolean;
+  is_required: boolean;
 }
 
 /**
@@ -40,7 +41,7 @@ export function useDocTypeLabel() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('document_type_config' as any)
-        .select('code, label, agency_code, is_active')
+        .select('code, label, agency_code, is_active, is_required')
         .eq('is_active', true);
 
       if (error) {
@@ -143,10 +144,10 @@ export function useDocTypeLabel() {
 
   /**
    * 取得用於下拉選單的選項（全部使用中文標籤）
-   * 格式: { value: code, label: 中文標籤 }
+   * 格式: { value: code, label: 中文標籤, isRequired: boolean }
    */
   const dropdownOptions = useMemo(() => {
-    const options: { value: string; label: string; agencyCode: string }[] = [];
+    const options: { value: string; label: string; agencyCode: string; isRequired: boolean }[] = [];
     const seenCodes = new Set<string>();
     
     // 優先使用資料庫的設定
@@ -156,6 +157,7 @@ export function useDocTypeLabel() {
           value: dt.code,
           label: dt.label,
           agencyCode: dt.agency_code,
+          isRequired: dt.is_required,
         });
         seenCodes.add(dt.code);
       }
@@ -168,6 +170,7 @@ export function useDocTypeLabel() {
           value: def.code,
           label: def.label,
           agencyCode: def.agencyCode,
+          isRequired: false, // 靜態定義的預設為非必要
         });
         seenCodes.add(def.code);
       }
@@ -175,6 +178,22 @@ export function useDocTypeLabel() {
     
     return options;
   }, [dbDocTypes]);
+
+  /**
+   * 取得必要文件類型列表
+   */
+  const requiredDocTypes = useMemo(() => {
+    return dropdownOptions.filter(opt => opt.isRequired);
+  }, [dropdownOptions]);
+
+  /**
+   * 檢查文件類型代碼是否為必要文件
+   */
+  const isRequired = (docTypeCode: string | null | undefined): boolean => {
+    if (!docTypeCode) return false;
+    const found = dropdownOptions.find(opt => opt.value === docTypeCode);
+    return found?.isRequired ?? false;
+  };
 
   /**
    * 按機關分組的下拉選項
@@ -199,5 +218,7 @@ export function useDocTypeLabel() {
     groupedOptions,
     codeLabelMap,
     labelCodeMap,
+    requiredDocTypes,
+    isRequired,
   };
 }
