@@ -11,6 +11,7 @@ import { usePagination } from '@/hooks/usePagination';
 import { useBatchSelect } from '@/hooks/useBatchSelect';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { useProjectFilters } from '@/hooks/useProjectFilters';
+import { useProjectDocumentProgress } from '@/hooks/useProjectDocumentProgress';
 
 import { CodebookSelect } from '@/components/CodebookSelect';
 import { ProjectFilterBar } from '@/components/projects/ProjectFilterBar';
@@ -217,6 +218,10 @@ export default function Projects() {
       return data;
     },
   });
+
+  // 取得所有案場 ID 以計算文件完成度
+  const projectIds = useMemo(() => projects.map(p => p.id), [projects]);
+  const { data: docProgressMap = {} } = useProjectDocumentProgress(projectIds);
 
   // Fetch risk project IDs from analytics view (for risk filtering)
   const { data: riskProjectIds = [] } = useQuery({
@@ -702,6 +707,7 @@ export default function Projects() {
               <SortableTableHead sortKey="project_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('project_name').direction} sortIndex={getSortInfo('project_name').index} onSort={handleSort}>案場名稱</SortableTableHead>
               <SortableTableHead sortKey="investors.company_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investors.company_name').direction} sortIndex={getSortInfo('investors.company_name').index} onSort={handleSort}>投資方</SortableTableHead>
               <SortableTableHead sortKey="status" currentSortKey={sortConfig.key} currentDirection={getSortInfo('status').direction} sortIndex={getSortInfo('status').index} onSort={handleSort}>狀態</SortableTableHead>
+              <TableHead className="text-center">文件</TableHead>
               <SortableTableHead sortKey="overall_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('overall_progress').direction} sortIndex={getSortInfo('overall_progress').index} onSort={handleSort}>總進度</SortableTableHead>
               <SortableTableHead sortKey="admin_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('admin_progress').direction} sortIndex={getSortInfo('admin_progress').index} onSort={handleSort}>行政</SortableTableHead>
               <SortableTableHead sortKey="engineering_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('engineering_progress').direction} sortIndex={getSortInfo('engineering_progress').index} onSort={handleSort}>工程</SortableTableHead>
@@ -715,7 +721,7 @@ export default function Projects() {
           <TableBody>
             {sortedProjects.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={(canEditProjects || isEnrichmentMode) ? 13 : 12} className="text-center py-12 text-muted-foreground">
+                <TableCell colSpan={(canEditProjects || isEnrichmentMode) ? 14 : 13} className="text-center py-12 text-muted-foreground">
                   {isLoading ? '載入中...' : '暫無資料'}
                 </TableCell>
               </TableRow>
@@ -758,6 +764,23 @@ export default function Projects() {
                       <Badge className={getStatusColor(project.status)} variant="secondary">
                         {project.status}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-center">
+                      {(() => {
+                        const progress = docProgressMap[project.id];
+                        if (!progress) return <span className="text-xs text-muted-foreground">-</span>;
+                        const { percentage, obtainedCount, requiredCount } = progress;
+                        const colorClass = percentage >= 80 
+                          ? 'text-success' 
+                          : percentage >= 50 
+                            ? 'text-warning' 
+                            : 'text-muted-foreground';
+                        return (
+                          <span className={`text-xs font-medium ${colorClass}`} title={`${obtainedCount}/${requiredCount} 文件類型已取得`}>
+                            {percentage}%
+                          </span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
