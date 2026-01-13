@@ -129,7 +129,7 @@ const FILENAME_DOC_TYPE_PATTERNS: { keywords: string[]; docTypeCode: string }[] 
   { keywords: ['派員訪查', '訪查併聯', '併聯函'], docTypeCode: 'TPC_INSPECTION' },
   { keywords: ['細部協商'], docTypeCode: 'TPC_NEGOTIATION' },
   { keywords: ['審訖圖', '審迄圖'], docTypeCode: 'TPC_APPROVED_DRAWING' },
-  { keywords: ['電表租約', '電錶租約', '電度表租', '電鍍表租'], docTypeCode: 'TPC_METER_LEASE' },
+  { keywords: ['電表租約', '電錶租約', '電度表租', '電鍍表租', '電度錶租'], docTypeCode: 'TPC_METER_LEASE' },
   { keywords: ['線補費', '線路補助費'], docTypeCode: 'TPC_LINE_COMP' },
   { keywords: ['躉售合約', '躉購合約'], docTypeCode: 'TPC_CONTRACT' },
   { keywords: ['躉購電費', '電費單'], docTypeCode: 'TPC_POWER_BILL' },
