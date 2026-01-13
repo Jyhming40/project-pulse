@@ -18,6 +18,7 @@ import {
   Plug,
   Wrench,
   HardHat,
+  AlertTriangle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -83,7 +84,7 @@ const getConstructionStatusColor = (status: string) => {
 
 export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDetailDrawerProps) {
   const navigate = useNavigate();
-  const { getLabel: getDocTypeLabel } = useDocTypeLabel();
+  const { getLabel: getDocTypeLabel, requiredDocTypes, isRequired: isDocTypeRequired } = useDocTypeLabel();
 
   // Fetch project
   const { data: project, isLoading } = useQuery({
@@ -501,11 +502,64 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
 
                 {/* 關聯文件 Tab */}
                 <TabsContent value="documents" className="p-6 space-y-4 mt-0">
+                  {/* Missing Required Documents Alert */}
+                  {(() => {
+                    // Calculate missing required docs
+                    const obtainedCodes = new Set(
+                      documents
+                        .filter((doc: any) => {
+                          if (!doc.doc_type_code) return false;
+                          const status = getDerivedDocStatus({
+                            submitted_at: doc.submitted_at,
+                            issued_at: doc.issued_at,
+                            file_count: doc.file_count || 0,
+                            drive_file_id: doc.drive_file_id,
+                          });
+                          return status === '已取得';
+                        })
+                        .map((doc: any) => doc.doc_type_code)
+                    );
+                    
+                    const missingDocs = requiredDocTypes.filter(
+                      req => !obtainedCodes.has(req.value)
+                    );
+                    
+                    if (missingDocs.length === 0) return null;
+                    
+                    return (
+                      <Card className="border-warning/50 bg-warning/5">
+                        <CardHeader className="py-3">
+                          <CardTitle className="text-sm flex items-center gap-2 text-warning">
+                            <AlertTriangle className="w-4 h-4" />
+                            必要文件缺漏提醒 ({missingDocs.length})
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="flex flex-wrap gap-1">
+                            {missingDocs.slice(0, 5).map(doc => (
+                              <Badge key={doc.value} variant="outline" className="text-xs">
+                                {doc.label}
+                              </Badge>
+                            ))}
+                            {missingDocs.length > 5 && (
+                              <Badge variant="outline" className="text-xs">
+                                +{missingDocs.length - 5} 項
+                              </Badge>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })()}
+                  
                   <Card>
                     <CardHeader className="py-3">
                       <CardTitle className="text-sm flex items-center gap-2">
                         <FileText className="w-4 h-4 text-primary" />
                         案場文件 ({documents.length})
+                        <span className="text-xs text-muted-foreground font-normal ml-1">
+                          ⭐ 必要文件
+                        </span>
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
@@ -514,7 +568,13 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                       ) : (
                         <div className="space-y-2">
                           {documents.map((doc: any) => {
-                            const derivedStatus = getDerivedDocStatus(doc);
+                            const derivedStatus = getDerivedDocStatus({
+                              submitted_at: doc.submitted_at,
+                              issued_at: doc.issued_at,
+                              file_count: doc.file_count || 0,
+                              drive_file_id: doc.drive_file_id,
+                            });
+                            
                             return (
                             <div 
                               key={doc.id} 
@@ -522,7 +582,10 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                             >
                               <div className="flex items-center gap-2 min-w-0">
                                 <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-                                <span className="text-sm truncate">{getDocTypeLabel(doc.doc_type_code, doc.doc_type)}</span>
+                                <span className="text-sm truncate">
+                                  {isDocTypeRequired(doc.doc_type_code) && <span className="text-warning mr-1">⭐</span>}
+                                  {getDocTypeLabel(doc.doc_type_code, doc.doc_type)}
+                                </span>
                               </div>
                               <Badge className={`${getDerivedDocStatusColor(derivedStatus)} text-xs flex-shrink-0`} variant="secondary">
                                 {derivedStatus}
