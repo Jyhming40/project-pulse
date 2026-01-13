@@ -5,6 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
+import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
 import { CodebookSelect } from '@/components/CodebookSelect';
 import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
 import { DOC_TYPE_CODE_TO_SHORT } from '@/lib/docTypeMapping';
@@ -127,9 +128,9 @@ export default function ProjectDetail() {
   const { isAuthorized: isDriveAuthorized, isLoading: isDriveLoading, authorize: authorizeDrive, isAuthorizing } = useDriveAuth();
   const queryClient = useQueryClient();
 
-  // Fetch dynamic options (doc_type_code is single source of truth for document types)
+  // Fetch dynamic options
   const { options: statusOptions } = useOptionsForCategory('project_status');
-  const { options: docTypeOptions } = useOptionsForCategory('doc_type_code');
+  const { dropdownOptions: docTypeOptions } = useDocTypeLabel();
   const { options: docStatusOptions } = useOptionsForCategory('doc_status');
 
   const [isAddDocOpen, setIsAddDocOpen] = useState(false);
