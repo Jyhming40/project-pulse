@@ -342,6 +342,7 @@ export type Database = {
           description: string | null
           id: string
           is_active: boolean | null
+          is_required: boolean | null
           is_system: boolean | null
           label: string
           sort_order: number | null
@@ -356,6 +357,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_required?: boolean | null
           is_system?: boolean | null
           label: string
           sort_order?: number | null
@@ -370,6 +372,7 @@ export type Database = {
           description?: string | null
           id?: string
           is_active?: boolean | null
+          is_required?: boolean | null
           is_system?: boolean | null
           label?: string
           sort_order?: number | null
