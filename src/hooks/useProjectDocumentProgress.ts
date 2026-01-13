@@ -11,7 +11,7 @@ interface ProjectDocProgress {
 
 /**
  * 計算每個案場的文件完成度
- * 公式：已取得的不重複文件類型數 / 必要文件類型總數
+ * 公式：已取得的必要文件類型數 / 必要文件類型總數（is_required = true）
  */
 export function useProjectDocumentProgress(projectIds: string[]) {
   return useQuery({
@@ -19,14 +19,17 @@ export function useProjectDocumentProgress(projectIds: string[]) {
     queryFn: async () => {
       if (!projectIds.length) return {};
 
-      // 1. 取得所有啟用中的文件類型總數
-      const { data: activeDocTypes, error: docTypeError } = await supabase
+      // 1. 取得所有「必要」的文件類型（is_required = true）
+      const { data: requiredDocTypes, error: docTypeError } = await supabase
         .from('document_type_config' as any)
         .select('code')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .eq('is_required', true);
 
       if (docTypeError) throw docTypeError;
-      const requiredCount = activeDocTypes?.length || 0;
+      
+      const requiredCodes = new Set((requiredDocTypes || []).map((dt: any) => dt.code));
+      const requiredCount = requiredCodes.size;
 
       // 2. 取得所有案場的文件資料，包含檔案數量
       const { data: documents, error: docError } = await supabase
@@ -71,11 +74,15 @@ export function useProjectDocumentProgress(projectIds: string[]) {
       projectIds.forEach(projectId => {
         const projectDocs = documents?.filter(d => d.project_id === projectId) || [];
         
-        // 使用 Set 記錄已取得的不重複文件類型
+        // 使用 Set 記錄已取得的必要文件類型
         const obtainedDocTypes = new Set<string>();
         
         projectDocs.forEach(doc => {
           const docTypeKey = doc.doc_type_code || doc.doc_type;
+          
+          // 只計算必要文件
+          if (!requiredCodes.has(docTypeKey)) return;
+          
           const status = getDerivedDocStatus({
             submitted_at: doc.submitted_at,
             issued_at: doc.issued_at,

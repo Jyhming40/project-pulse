@@ -45,6 +45,7 @@ import {
   Building2,
   Lock,
   Loader2,
+  Star,
 } from 'lucide-react';
 
 export default function DocumentTypeConfig() {
@@ -144,7 +145,7 @@ export default function DocumentTypeConfig() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-2xl font-bold">{documentTypes.length}</p>
@@ -157,6 +158,14 @@ export default function DocumentTypeConfig() {
               {documentTypes.filter(d => d.is_active).length}
             </p>
             <p className="text-sm text-muted-foreground">啟用中</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-2xl font-bold text-primary">
+              {documentTypes.filter(d => d.is_required && d.is_active).length}
+            </p>
+            <p className="text-sm text-muted-foreground">必要文件</p>
           </CardContent>
         </Card>
         <Card>
@@ -217,6 +226,7 @@ export default function DocumentTypeConfig() {
                           <TableRow>
                             <TableHead className="w-[120px]">代碼</TableHead>
                             <TableHead>名稱</TableHead>
+                            <TableHead className="w-[60px] text-center">必要</TableHead>
                             <TableHead className="w-[80px]">排序</TableHead>
                             <TableHead className="w-[80px]">狀態</TableHead>
                             <TableHead className="w-[80px]">操作</TableHead>
@@ -241,6 +251,11 @@ export default function DocumentTypeConfig() {
                                   <p className="text-xs text-muted-foreground mt-0.5">
                                     {item.description}
                                   </p>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {item.is_required && (
+                                  <Star className="w-4 h-4 text-amber-500 fill-amber-500 mx-auto" />
                                 )}
                               </TableCell>
                               <TableCell className="text-center">
