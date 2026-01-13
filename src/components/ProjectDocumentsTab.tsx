@@ -30,6 +30,8 @@ import {
   Plus,
   Trash2,
   Files,
+  AlertTriangle,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -105,7 +107,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   const [singleDeleteDoc, setSingleDeleteDoc] = useState<{ id: string; title: string } | null>(null);
 
   // Use unified doc type options from useDocTypeLabel (document_type_config)
-  const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions } = useDocTypeLabel();
+  const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions, requiredDocTypes, isRequired: isDocTypeRequired } = useDocTypeLabel();
 
   // Extended document type with new columns
   type ExtendedDocument = {
@@ -158,6 +160,17 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
 
   // Get only current versions for main display
   const currentDocuments = documents.filter(doc => doc.is_current !== false);
+
+  // Calculate missing required documents
+  const obtainedDocTypeCodes = new Set(
+    currentDocuments
+      .filter(doc => doc.doc_type_code)
+      .map(doc => doc.doc_type_code!)
+  );
+  
+  const missingRequiredDocs = requiredDocTypes.filter(
+    reqDoc => !obtainedDocTypeCodes.has(reqDoc.value)
+  );
 
   // Create folder structure
   const handleCreateFolderStructure = async () => {
@@ -478,6 +491,34 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
         </CardContent>
       </Card>
 
+      {/* Missing Required Documents Alert */}
+      {hasDriveFolder && missingRequiredDocs.length > 0 && (
+        <Card className="border-warning/50 bg-warning/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2 text-warning">
+              <AlertTriangle className="w-5 h-5" />
+              必要文件缺漏提醒
+            </CardTitle>
+            <CardDescription>
+              以下 {missingRequiredDocs.length} 項必要文件尚未取得
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {missingRequiredDocs.map(doc => (
+                <Badge
+                  key={doc.value}
+                  variant="outline"
+                  className="text-warning border-warning/50"
+                >
+                  {doc.label}
+                </Badge>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Documents List */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
@@ -487,7 +528,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
               文件清單
             </CardTitle>
             <CardDescription>
-              顯示目前版本，可展開查看歷史版本
+              顯示目前版本，可展開查看歷史版本。<Star className="w-3 h-3 inline mx-1 text-warning" />標記為必要文件
             </CardDescription>
           </div>
           {canEdit && (
@@ -586,7 +627,12 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                           )}
                         </TableCell>
                         <TableCell className="whitespace-nowrap">
-                          <Badge variant="outline">{getDocTypeLabel(current.doc_type_code, current.doc_type)}</Badge>
+                          <div className="flex items-center gap-1">
+                            {isDocTypeRequired(current.doc_type_code) && (
+                              <Star className="w-3.5 h-3.5 text-warning fill-warning" />
+                            )}
+                            <Badge variant="outline">{getDocTypeLabel(current.doc_type_code, current.doc_type)}</Badge>
+                          </div>
                         </TableCell>
                         <TableCell className="font-medium whitespace-nowrap">
                           {current.title || '-'}
