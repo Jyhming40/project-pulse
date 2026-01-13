@@ -221,7 +221,17 @@ export default function Projects() {
 
   // 取得所有案場 ID 以計算文件完成度
   const projectIds = useMemo(() => projects.map(p => p.id), [projects]);
-  const { data: docProgressMap = {} } = useProjectDocumentProgress(projectIds);
+  const { data: docProgressMapRaw = {} } = useProjectDocumentProgress(projectIds);
+
+  // 將文件進度合併到專案物件中，以便排序使用
+  const projectsWithDocProgress = useMemo(() => {
+    return projects.map(p => ({
+      ...p,
+      doc_progress: docProgressMapRaw[p.id]?.percentage ?? 0,
+      doc_obtained: docProgressMapRaw[p.id]?.obtainedCount ?? 0,
+      doc_required: docProgressMapRaw[p.id]?.requiredCount ?? 0,
+    }));
+  }, [projects, docProgressMapRaw]);
 
   // Fetch risk project IDs from analytics view (for risk filtering)
   const { data: riskProjectIds = [] } = useQuery({
@@ -358,11 +368,11 @@ export default function Projects() {
     setDeletingProject(null);
   };
 
-  // Filter projects using the new filter hook
+  // Filter projects using the new filter hook (使用包含文件進度的專案資料)
   const filteredProjects = useMemo(() => {
     const searchLower = filters.search.toLowerCase();
     
-    return projects.filter(project => {
+    return projectsWithDocProgress.filter(project => {
       // 搜尋匹配
       const matchesSearch = !searchLower || 
         project.project_name.toLowerCase().includes(searchLower) ||
@@ -399,7 +409,7 @@ export default function Projects() {
       
       return matchesFilters;
     });
-  }, [projects, filters.search, filters.filterStates, riskProjectIds]);
+  }, [projectsWithDocProgress, filters.search, filters.filterStates, riskProjectIds]);
 
   // Sorting (multi-column support)
   const { sortedData: sortedProjects, sortConfig, handleSort, getSortInfo } = useTableSort(filteredProjects, {
@@ -707,7 +717,7 @@ export default function Projects() {
               <SortableTableHead sortKey="project_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('project_name').direction} sortIndex={getSortInfo('project_name').index} onSort={handleSort}>案場名稱</SortableTableHead>
               <SortableTableHead sortKey="investors.company_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investors.company_name').direction} sortIndex={getSortInfo('investors.company_name').index} onSort={handleSort}>投資方</SortableTableHead>
               <SortableTableHead sortKey="status" currentSortKey={sortConfig.key} currentDirection={getSortInfo('status').direction} sortIndex={getSortInfo('status').index} onSort={handleSort}>狀態</SortableTableHead>
-              <TableHead className="text-center">文件</TableHead>
+              <SortableTableHead sortKey="doc_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('doc_progress').direction} sortIndex={getSortInfo('doc_progress').index} onSort={handleSort}>文件</SortableTableHead>
               <SortableTableHead sortKey="overall_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('overall_progress').direction} sortIndex={getSortInfo('overall_progress').index} onSort={handleSort}>總進度</SortableTableHead>
               <SortableTableHead sortKey="admin_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('admin_progress').direction} sortIndex={getSortInfo('admin_progress').index} onSort={handleSort}>行政</SortableTableHead>
               <SortableTableHead sortKey="engineering_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('engineering_progress').direction} sortIndex={getSortInfo('engineering_progress').index} onSort={handleSort}>工程</SortableTableHead>
@@ -767,9 +777,9 @@ export default function Projects() {
                     </TableCell>
                     <TableCell className="text-center">
                       {(() => {
-                        const progress = docProgressMap[project.id];
-                        if (!progress) return <span className="text-xs text-muted-foreground">-</span>;
-                        const { percentage, obtainedCount, requiredCount } = progress;
+                        const percentage = (project as any).doc_progress ?? 0;
+                        const obtainedCount = (project as any).doc_obtained ?? 0;
+                        const requiredCount = (project as any).doc_required ?? 0;
                         const colorClass = percentage >= 80 
                           ? 'text-success' 
                           : percentage >= 50 
