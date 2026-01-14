@@ -10,6 +10,34 @@ interface ProjectDocProgress {
 }
 
 /**
+ * 同步取得規則：
+ * 當某些文件取得時，可視為同步取得其他相關必要文件
+ * key: 觸發文件的 code
+ * value: 可同步視為取得的文件 codes
+ */
+const SYNC_OBTAINED_RULES: Record<string, string[]> = {
+  // 取得「免雜項竣工」或「結構計算書」→ 視為取得「結構技師簽證」
+  'BUILD_EXEMPT_COMP': ['ENG_STRUCTURAL'],
+  // 結構計算書目前沒有專門 code，暫時用標籤方式處理
+  
+  // 取得「審訖圖」或「細部協商」→ 視為取得「電機技師簽證」、「承裝業簽證」
+  'TPC_APPROVED_DRAWING': ['ENG_ELECTRICAL', 'ENG_CONTRACTOR'],
+  'TPC_NEGOTIATION': ['ENG_ELECTRICAL', 'ENG_CONTRACTOR'],
+  
+  // 取得「正式躉售」→ 視為取得「設備登記」
+  'TPC_FORMAL_FIT': ['MOEA_REGISTER'],
+};
+
+// 用標籤對應的同步規則（處理舊資料只有 label 沒有 code 的情況）
+const SYNC_OBTAINED_RULES_BY_LABEL: Record<string, string[]> = {
+  '免雜項竣工': ['ENG_STRUCTURAL'],
+  '結構計算書': ['ENG_STRUCTURAL'],
+  '審訖圖': ['ENG_ELECTRICAL', 'ENG_CONTRACTOR'],
+  '細部協商': ['ENG_ELECTRICAL', 'ENG_CONTRACTOR'],
+  '正式躉售': ['MOEA_REGISTER'],
+};
+
+/**
  * 計算每個案場的文件完成度
  * 公式：已取得的必要文件類型數 / 必要文件類型總數（is_required = true）
  */
@@ -76,17 +104,15 @@ export function useProjectDocumentProgress(projectIds: string[]) {
       projectIds.forEach(projectId => {
         const projectDocs = documents?.filter(d => d.project_id === projectId) || [];
         
-        // 使用 Set 記錄已取得的必要文件類型
-        const obtainedDocTypes = new Set<string>();
+        // 使用 Set 記錄已取得的必要文件類型（用 code）
+        const obtainedDocCodes = new Set<string>();
+        // 記錄所有已取得的文件（包含非必要），用於同步規則檢查
+        const allObtainedCodes = new Set<string>();
+        const allObtainedLabels = new Set<string>();
         
         projectDocs.forEach(doc => {
           const docCode = doc.doc_type_code;
           const docLabel = doc.doc_type;
-          
-          // 檢查是否為必要文件（支援 code 或 label 兩種格式）
-          const isRequiredDoc = (docCode && requiredCodes.has(docCode)) || 
-                                (docLabel && requiredLabels.has(docLabel));
-          if (!isRequiredDoc) return;
           
           const status = getDerivedDocStatus({
             submitted_at: doc.submitted_at,
@@ -96,13 +122,54 @@ export function useProjectDocumentProgress(projectIds: string[]) {
           });
           
           if (status === '已取得') {
-            // 使用 code 或 label 作為 key（優先用 code，以便去重）
-            const key = docCode || docLabel;
-            if (key) obtainedDocTypes.add(key);
+            // 記錄已取得的文件（用於同步規則）
+            if (docCode) allObtainedCodes.add(docCode);
+            if (docLabel) allObtainedLabels.add(docLabel);
+            
+            // 檢查是否為必要文件
+            const isRequiredDoc = (docCode && requiredCodes.has(docCode)) || 
+                                  (docLabel && requiredLabels.has(docLabel));
+            if (isRequiredDoc) {
+              // 優先用 code
+              if (docCode && requiredCodes.has(docCode)) {
+                obtainedDocCodes.add(docCode);
+              } else if (docLabel) {
+                // 找到對應的 code
+                const matchedType = (requiredDocTypes || []).find((dt: any) => dt.label === docLabel);
+                if (matchedType) {
+                  obtainedDocCodes.add((matchedType as any).code);
+                }
+              }
+            }
           }
         });
         
-        const obtainedCount = obtainedDocTypes.size;
+        // 5. 套用同步取得規則
+        // 檢查 code-based 規則
+        allObtainedCodes.forEach(code => {
+          const syncCodes = SYNC_OBTAINED_RULES[code];
+          if (syncCodes) {
+            syncCodes.forEach(syncCode => {
+              if (requiredCodes.has(syncCode)) {
+                obtainedDocCodes.add(syncCode);
+              }
+            });
+          }
+        });
+        
+        // 檢查 label-based 規則（處理舊資料）
+        allObtainedLabels.forEach(label => {
+          const syncCodes = SYNC_OBTAINED_RULES_BY_LABEL[label];
+          if (syncCodes) {
+            syncCodes.forEach(syncCode => {
+              if (requiredCodes.has(syncCode)) {
+                obtainedDocCodes.add(syncCode);
+              }
+            });
+          }
+        });
+        
+        const obtainedCount = obtainedDocCodes.size;
         const percentage = requiredCount > 0 
           ? Math.round((obtainedCount / requiredCount) * 100) 
           : 0;
