@@ -84,7 +84,7 @@ const getConstructionStatusColor = (status: string) => {
 
 export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDetailDrawerProps) {
   const navigate = useNavigate();
-  const { getLabel: getDocTypeLabel, requiredDocTypes, isRequired: isDocTypeRequired } = useDocTypeLabel();
+  const { getLabel: getDocTypeLabel, requiredDocTypes, isRequired: isDocTypeRequired, labelCodeMap } = useDocTypeLabel();
 
   // Fetch project
   const { data: project, isLoading } = useQuery({
@@ -504,11 +504,14 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                 <TabsContent value="documents" className="p-6 space-y-4 mt-0">
                   {/* Missing Required Documents Alert */}
                   {(() => {
-                    // Calculate missing required docs
+                    // Calculate missing required docs - support both doc_type_code and doc_type (label)
                     const obtainedCodes = new Set(
                       documents
                         .filter((doc: any) => {
-                          if (!doc.doc_type_code) return false;
+                          // Check if document has a type code or label
+                          const hasTypeIdentifier = doc.doc_type_code || doc.doc_type;
+                          if (!hasTypeIdentifier) return false;
+                          
                           const status = getDerivedDocStatus({
                             submitted_at: doc.submitted_at,
                             issued_at: doc.issued_at,
@@ -517,7 +520,11 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                           });
                           return status === '已取得';
                         })
-                        .map((doc: any) => doc.doc_type_code)
+                        .map((doc: any) => {
+                          // Return code if available, otherwise lookup code by label
+                          if (doc.doc_type_code) return doc.doc_type_code;
+                          return labelCodeMap.get(doc.doc_type) || doc.doc_type;
+                        })
                     );
                     
                     const missingDocs = requiredDocTypes.filter(

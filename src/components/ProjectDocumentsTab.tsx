@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -106,9 +106,10 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [singleDeleteDoc, setSingleDeleteDoc] = useState<{ id: string; title: string } | null>(null);
+  const [isDriveIntegrationOpen, setIsDriveIntegrationOpen] = useState(false);
 
   // Use unified doc type options from useDocTypeLabel (document_type_config)
-  const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions, requiredDocTypes, isRequired: isDocTypeRequired } = useDocTypeLabel();
+  const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions, requiredDocTypes, isRequired: isDocTypeRequired, labelCodeMap } = useDocTypeLabel();
 
   // Extended document type with new columns
   type ExtendedDocument = {
@@ -186,11 +187,15 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   }, {} as Record<string, number>);
 
   // Calculate missing required documents - only count as obtained if status is "已取得"
+  // Support both doc_type_code and doc_type (label) for matching
   const obtainedDocTypeCodes = new Set(
     currentDocuments
       .filter(doc => {
-        if (!doc.doc_type_code) return false;
-        // Import getDerivedDocStatus at the top of file
+        // Check if document has a type code or label
+        const hasTypeIdentifier = doc.doc_type_code || doc.doc_type;
+        if (!hasTypeIdentifier) return false;
+        
+        // Check status is "已取得"
         const status = getDerivedDocStatus({
           submitted_at: (doc as any).submitted_at,
           issued_at: (doc as any).issued_at,
@@ -199,7 +204,12 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
         });
         return status === '已取得';
       })
-      .map(doc => doc.doc_type_code!)
+      .map(doc => {
+        // Return code if available, otherwise lookup code by label
+        if (doc.doc_type_code) return doc.doc_type_code;
+        // Use labelCodeMap to convert label to code
+        return labelCodeMap.get(doc.doc_type) || doc.doc_type;
+      })
   );
   
   const missingRequiredDocs = requiredDocTypes.filter(
@@ -426,103 +436,125 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
 
   return (
     <div className="space-y-6">
-      {/* Drive Connection Status */}
+      {/* Drive Connection Status - Collapsible */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg flex items-center gap-2">
-            <FolderOpen className="w-5 h-5 text-primary" />
-            Google Drive 整合
-          </CardTitle>
-          <CardDescription>
-            文件檔案儲存於 Google Drive，系統負責文件治理與版本管理
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Drive Auth Status */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-muted-foreground">Drive 連線狀態：</span>
-            {isDriveLoading ? (
-              <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />
-            ) : isDriveAuthorized ? (
-              <Badge variant="secondary" className="bg-success/15 text-success">
-                <CheckCircle2 className="w-3 h-3 mr-1" />
-                已連線
-              </Badge>
-            ) : (
-              <>
-                <Badge variant="secondary" className="bg-warning/15 text-warning">
-                  <AlertCircle className="w-3 h-3 mr-1" />
-                  未連線
+        <CardHeader 
+          className="cursor-pointer select-none"
+          onClick={() => setIsDriveIntegrationOpen(!isDriveIntegrationOpen)}
+        >
+          <CardTitle className="text-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FolderOpen className="w-5 h-5 text-primary" />
+              Google Drive 整合
+              {isDriveAuthorized && hasDriveFolder && (
+                <Badge variant="secondary" className="bg-success/15 text-success ml-2">
+                  <CheckCircle2 className="w-3 h-3 mr-1" />
+                  已連線
                 </Badge>
-                <Button size="sm" variant="outline" onClick={() => authorizeDrive()} disabled={isAuthorizing}>
-                  {isAuthorizing ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
-                  授權 Google Drive
-                </Button>
-              </>
-            )}
-          </div>
-
-          {/* Folder Status */}
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="text-sm text-muted-foreground">資料夾狀態：</span>
-            {hasDriveFolder ? (
-              <>
+              )}
+            </div>
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+              {isDriveIntegrationOpen ? (
+                <ChevronDown className="w-4 h-4" />
+              ) : (
+                <ChevronRight className="w-4 h-4" />
+              )}
+            </Button>
+          </CardTitle>
+          {!isDriveIntegrationOpen && (
+            <CardDescription className="text-xs">
+              點擊展開查看連線狀態與資料夾設定
+            </CardDescription>
+          )}
+        </CardHeader>
+        {isDriveIntegrationOpen && (
+          <CardContent className="space-y-4">
+            {/* Drive Auth Status */}
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">Drive 連線狀態：</span>
+              {isDriveLoading ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />
+              ) : isDriveAuthorized ? (
                 <Badge variant="secondary" className="bg-success/15 text-success">
                   <CheckCircle2 className="w-3 h-3 mr-1" />
-                  已建立
+                  已連線
                 </Badge>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => window.open(project.drive_folder_url!, '_blank')}
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  開啟資料夾
-                </Button>
-              </>
-            ) : (
-              <>
-                <Badge variant="secondary" className="bg-muted text-muted-foreground">
-                  尚未建立
-                </Badge>
-                {!hasInvestor && (
-                  <Alert className="mt-2">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>
-                      請先設定投資方，才能建立 Drive 資料夾結構
-                    </AlertDescription>
-                  </Alert>
-                )}
-              </>
-            )}
-          </div>
-
-          {/* Folder Error */}
-          {project.folder_error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{project.folder_error}</AlertDescription>
-            </Alert>
-          )}
-
-          {/* Actions */}
-          {canEdit && isDriveAuthorized && hasInvestor && (
-            <div className="flex gap-2 pt-2">
-              <Button
-                onClick={handleCreateFolderStructure}
-                disabled={isCreatingFolder}
-                variant={hasDriveFolder ? "outline" : "default"}
-              >
-                {isCreatingFolder ? (
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                ) : (
-                  <FolderOpen className="w-4 h-4 mr-2" />
-                )}
-                {hasDriveFolder ? '重新檢查資料夾結構' : '建立案場資料夾結構'}
-              </Button>
+              ) : (
+                <>
+                  <Badge variant="secondary" className="bg-warning/15 text-warning">
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    未連線
+                  </Badge>
+                  <Button size="sm" variant="outline" onClick={(e) => { e.stopPropagation(); authorizeDrive(); }} disabled={isAuthorizing}>
+                    {isAuthorizing ? <RefreshCw className="w-4 h-4 animate-spin mr-2" /> : null}
+                    授權 Google Drive
+                  </Button>
+                </>
+              )}
             </div>
-          )}
-        </CardContent>
+
+            {/* Folder Status */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <span className="text-sm text-muted-foreground">資料夾狀態：</span>
+              {hasDriveFolder ? (
+                <>
+                  <Badge variant="secondary" className="bg-success/15 text-success">
+                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                    已建立
+                  </Badge>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => { e.stopPropagation(); window.open(project.drive_folder_url!, '_blank'); }}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    開啟資料夾
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Badge variant="secondary" className="bg-muted text-muted-foreground">
+                    尚未建立
+                  </Badge>
+                  {!hasInvestor && (
+                    <Alert className="mt-2">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        請先設定投資方，才能建立 Drive 資料夾結構
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Folder Error */}
+            {project.folder_error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{project.folder_error}</AlertDescription>
+              </Alert>
+            )}
+
+            {/* Actions */}
+            {canEdit && isDriveAuthorized && hasInvestor && (
+              <div className="flex gap-2 pt-2">
+                <Button
+                  onClick={(e) => { e.stopPropagation(); handleCreateFolderStructure(); }}
+                  disabled={isCreatingFolder}
+                  variant={hasDriveFolder ? "outline" : "default"}
+                >
+                  {isCreatingFolder ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <FolderOpen className="w-4 h-4 mr-2" />
+                  )}
+                  {hasDriveFolder ? '重新檢查資料夾結構' : '建立案場資料夾結構'}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        )}
       </Card>
 
       {/* Missing Required Documents Alert */}
