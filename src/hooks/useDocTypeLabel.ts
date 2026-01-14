@@ -187,12 +187,26 @@ export function useDocTypeLabel() {
   }, [dropdownOptions]);
 
   /**
-   * 檢查文件類型代碼是否為必要文件
+   * 檢查文件類型代碼或標籤是否為必要文件
+   * 支援 doc_type_code (code) 或 doc_type (label) 兩種格式
    */
-  const isRequired = (docTypeCode: string | null | undefined): boolean => {
-    if (!docTypeCode) return false;
-    const found = dropdownOptions.find(opt => opt.value === docTypeCode);
-    return found?.isRequired ?? false;
+  const isRequired = (docTypeCode: string | null | undefined, docTypeLabel?: string | null): boolean => {
+    // 優先用 code 檢查
+    if (docTypeCode) {
+      const found = dropdownOptions.find(opt => opt.value === docTypeCode);
+      if (found?.isRequired) return true;
+    }
+    
+    // 若 code 無法匹配，用 label 轉換成 code 再檢查
+    if (docTypeLabel) {
+      const codeFromLabel = labelCodeMap.get(docTypeLabel);
+      if (codeFromLabel) {
+        const found = dropdownOptions.find(opt => opt.value === codeFromLabel);
+        if (found?.isRequired) return true;
+      }
+    }
+    
+    return false;
   };
 
   /**
