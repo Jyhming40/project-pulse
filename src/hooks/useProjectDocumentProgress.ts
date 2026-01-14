@@ -22,13 +22,15 @@ export function useProjectDocumentProgress(projectIds: string[]) {
       // 1. 取得所有「必要」的文件類型（is_required = true）
       const { data: requiredDocTypes, error: docTypeError } = await supabase
         .from('document_type_config' as any)
-        .select('code')
+        .select('code, label')
         .eq('is_active', true)
         .eq('is_required', true);
 
       if (docTypeError) throw docTypeError;
       
+      // 建立 code 和 label 的 Set，支援兩種格式比對
       const requiredCodes = new Set((requiredDocTypes || []).map((dt: any) => dt.code));
+      const requiredLabels = new Set((requiredDocTypes || []).map((dt: any) => dt.label));
       const requiredCount = requiredCodes.size;
 
       // 2. 取得所有案場的文件資料，包含檔案數量
@@ -78,10 +80,13 @@ export function useProjectDocumentProgress(projectIds: string[]) {
         const obtainedDocTypes = new Set<string>();
         
         projectDocs.forEach(doc => {
-          const docTypeKey = doc.doc_type_code || doc.doc_type;
+          const docCode = doc.doc_type_code;
+          const docLabel = doc.doc_type;
           
-          // 只計算必要文件
-          if (!requiredCodes.has(docTypeKey)) return;
+          // 檢查是否為必要文件（支援 code 或 label 兩種格式）
+          const isRequiredDoc = (docCode && requiredCodes.has(docCode)) || 
+                                (docLabel && requiredLabels.has(docLabel));
+          if (!isRequiredDoc) return;
           
           const status = getDerivedDocStatus({
             submitted_at: doc.submitted_at,
@@ -91,7 +96,9 @@ export function useProjectDocumentProgress(projectIds: string[]) {
           });
           
           if (status === '已取得') {
-            obtainedDocTypes.add(docTypeKey);
+            // 使用 code 或 label 作為 key（優先用 code，以便去重）
+            const key = docCode || docLabel;
+            if (key) obtainedDocTypes.add(key);
           }
         });
         

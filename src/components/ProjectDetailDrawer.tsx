@@ -590,7 +590,7 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                               <div className="flex items-center gap-2 min-w-0">
                                 <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                                 <span className="text-sm truncate">
-                                  {isDocTypeRequired(doc.doc_type_code) && <span className="text-warning mr-1">⭐</span>}
+                                  {isDocTypeRequired(doc.doc_type_code, doc.doc_type) && <span className="text-warning mr-1">⭐</span>}
                                   {getDocTypeLabel(doc.doc_type_code, doc.doc_type)}
                                 </span>
                               </div>

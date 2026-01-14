@@ -694,7 +694,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                         </TableCell>
                         <TableCell className="whitespace-nowrap">
                           <div className="flex items-center gap-1">
-                            {isDocTypeRequired(current.doc_type_code) && (
+                            {isDocTypeRequired(current.doc_type_code, current.doc_type) && (
                               <Star className="w-3.5 h-3.5 text-warning fill-warning" />
                             )}
                             <Badge variant="outline">{getDocTypeLabel(current.doc_type_code, current.doc_type)}</Badge>
