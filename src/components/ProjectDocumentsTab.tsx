@@ -81,8 +81,23 @@ interface ProjectDocumentsTabProps {
     folder_error?: string | null;
     investor_id?: string | null;
     installation_type?: string | null;
+    revenue_model?: string | null;
   };
 }
+
+// FIT-only document types that REC projects don't need
+const FIT_ONLY_DOC_TYPES = [
+  'TPC_PPA',           // 躉售合約
+  'TPC_FORMAL_FIT',    // 正式躉售
+  'FIT_BILL',          // 躉購電費單
+];
+
+// Legacy labels for FIT-only docs (for backward compatibility)
+const FIT_ONLY_DOC_LABELS = [
+  '躉售合約',
+  '正式躉售',
+  '躉購電費單',
+];
 
 export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabProps) {
   const { canEdit, user } = useAuth();
@@ -114,8 +129,16 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   // Use unified doc type options from useDocTypeLabel (document_type_config)
   const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions, getRequiredDocTypesForInstallationType, isRequired: isDocTypeRequired, labelCodeMap } = useDocTypeLabel();
   
-  // Get required doc types filtered by installation type
-  const requiredDocTypes = getRequiredDocTypesForInstallationType(project.installation_type);
+  // Get required doc types filtered by installation type and revenue model
+  const requiredDocTypesBase = getRequiredDocTypesForInstallationType(project.installation_type);
+  
+  // Filter out FIT-only docs for REC projects
+  const requiredDocTypes = project.revenue_model === 'REC'
+    ? requiredDocTypesBase.filter(doc => 
+        !FIT_ONLY_DOC_TYPES.includes(doc.value) && 
+        !FIT_ONLY_DOC_LABELS.includes(doc.label)
+      )
+    : requiredDocTypesBase;
 
   // Extended document type with new columns
   type ExtendedDocument = {

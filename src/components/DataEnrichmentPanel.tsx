@@ -249,9 +249,20 @@ export function DataEnrichmentPanel({
     },
   });
 
+  // FIT-only milestones that should not be applied to REC projects
+  const FIT_ONLY_MILESTONES = ['ADMIN_07_PPA_SIGNED', 'ADMIN_09B_FIT_OFFICIAL', 'ADMIN_10_CLOSED'];
+  // REC-only milestones (REC prefix)
+  const isRecMilestone = (code: string) => code.startsWith('REC_');
+  
   // Group milestones by type
   const adminMilestones = useMemo(() => 
-    milestones.filter(m => m.milestone_type === 'admin'), [milestones]);
+    milestones.filter(m => m.milestone_type === 'admin' && !isRecMilestone(m.milestone_code)), 
+    [milestones]
+  );
+  const recMilestones = useMemo(() => 
+    milestones.filter(m => isRecMilestone(m.milestone_code)), 
+    [milestones]
+  );
   const engineeringMilestones = useMemo(() => 
     milestones.filter(m => m.milestone_type === 'engineering'), [milestones]);
 
@@ -728,6 +739,59 @@ export function DataEnrichmentPanel({
                       ))}
                     </div>
                   </div>
+                  {/* REC Milestones (only show if there are any) */}
+                  {recMilestones.length > 0 && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs text-muted-foreground">REC 里程碑</p>
+                        <button
+                          type="button"
+                          className="text-xs text-primary hover:underline"
+                          onClick={() => {
+                            const recCodes = recMilestones.map(m => m.milestone_code);
+                            const allRecSelected = recCodes.every(code => selectedMilestones.has(code));
+                            if (allRecSelected) {
+                              // Deselect all REC
+                              setSelectedMilestones(prev => {
+                                const next = new Set(prev);
+                                recCodes.forEach(code => next.delete(code));
+                                return next;
+                              });
+                            } else {
+                              // Select all REC
+                              setSelectedMilestones(prev => {
+                                const next = new Set(prev);
+                                recCodes.forEach(code => next.add(code));
+                                return next;
+                              });
+                            }
+                          }}
+                        >
+                          {recMilestones.every(m => selectedMilestones.has(m.milestone_code)) 
+                            ? '取消全選' 
+                            : '全選'
+                          }
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {recMilestones.map(m => (
+                          <div key={m.id} className="flex items-center gap-2">
+                            <Checkbox
+                              id={`milestone-${m.milestone_code}`}
+                              checked={selectedMilestones.has(m.milestone_code)}
+                              onCheckedChange={() => toggleMilestone(m.milestone_code)}
+                            />
+                            <Label 
+                              htmlFor={`milestone-${m.milestone_code}`}
+                              className="text-sm cursor-pointer"
+                            >
+                              {m.milestone_name}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

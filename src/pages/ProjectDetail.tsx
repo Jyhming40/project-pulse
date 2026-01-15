@@ -1085,6 +1085,7 @@ export default function ProjectDetail() {
               folder_error: (project as any).folder_error,
               investor_id: project.investor_id,
               installation_type: (project as any).installation_type,
+              revenue_model: (project as any).revenue_model,
             }}
           />
         </TabsContent>
