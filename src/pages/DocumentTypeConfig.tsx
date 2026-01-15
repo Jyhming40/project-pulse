@@ -278,7 +278,6 @@ export default function DocumentTypeConfig() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => openEditDialog(item)}
-                                  disabled={item.is_system}
                                 >
                                   <Pencil className="w-4 h-4" />
                                 </Button>
@@ -321,7 +320,9 @@ export default function DocumentTypeConfig() {
                 disabled={!!editingType}
               />
               <p className="text-xs text-muted-foreground">
-                建議格式：機關代碼_文件名稱（全大寫）
+                {editingType 
+                  ? '代碼建立後無法修改' 
+                  : '建議格式：機關代碼_文件名稱（全大寫）'}
               </p>
             </div>
 
