@@ -7,6 +7,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useUILabels } from '@/hooks/useUILabels';
 
 interface HealthKPICardsProps {
   totalProjects: number;
@@ -24,6 +25,7 @@ export function HealthKPICards({
   isLoading = false,
 }: HealthKPICardsProps) {
   const navigate = useNavigate();
+  const { getLabel } = useUILabels();
 
   if (isLoading) {
     return (
@@ -42,7 +44,7 @@ export function HealthKPICards({
 
   const cards = [
     {
-      title: '總案場數',
+      title: getLabel('total_projects'),
       value: totalProjects,
       icon: Building2,
       iconColor: 'text-primary',
@@ -50,7 +52,7 @@ export function HealthKPICards({
       onClick: () => navigate('/projects'),
     },
     {
-      title: '風險案場',
+      title: getLabel('risk_projects'),
       value: atRiskCount,
       icon: AlertTriangle,
       iconColor: 'text-destructive',
@@ -59,7 +61,7 @@ export function HealthKPICards({
       onClick: () => navigate('/projects?risk=high'),
     },
     {
-      title: '待補件',
+      title: getLabel('pending_documents'),
       value: pendingFixCount,
       icon: AlertTriangle,
       iconColor: 'text-warning',
@@ -68,7 +70,7 @@ export function HealthKPICards({
       onClick: () => navigate('/projects?status=台電審查'),
     },
     {
-      title: '平均進度',
+      title: getLabel('average_progress'),
       value: `${averageProgress}%`,
       icon: TrendingUp,
       iconColor: 'text-success',
