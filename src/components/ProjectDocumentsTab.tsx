@@ -80,6 +80,7 @@ interface ProjectDocumentsTabProps {
     folder_status?: string | null;
     folder_error?: string | null;
     investor_id?: string | null;
+    installation_type?: string | null;
   };
 }
 
@@ -111,7 +112,10 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   const [isMissingDocsOpen, setIsMissingDocsOpen] = useState(true);
 
   // Use unified doc type options from useDocTypeLabel (document_type_config)
-  const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions, requiredDocTypes, isRequired: isDocTypeRequired, labelCodeMap } = useDocTypeLabel();
+  const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions, getRequiredDocTypesForInstallationType, isRequired: isDocTypeRequired, labelCodeMap } = useDocTypeLabel();
+  
+  // Get required doc types filtered by installation type
+  const requiredDocTypes = getRequiredDocTypesForInstallationType(project.installation_type);
 
   // Extended document type with new columns
   type ExtendedDocument = {

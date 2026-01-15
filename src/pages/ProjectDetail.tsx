@@ -1083,6 +1083,7 @@ export default function ProjectDetail() {
               folder_status: (project as any).folder_status,
               folder_error: (project as any).folder_error,
               investor_id: project.investor_id,
+              installation_type: (project as any).installation_type,
             }}
           />
         </TabsContent>

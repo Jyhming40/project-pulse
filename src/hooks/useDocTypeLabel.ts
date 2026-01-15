@@ -28,6 +28,7 @@ interface DocTypeConfigRecord {
   agency_code: string;
   is_active: boolean;
   is_required: boolean;
+  applicable_installation_types: string[] | null;
 }
 
 /**
@@ -41,7 +42,7 @@ export function useDocTypeLabel() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('document_type_config' as any)
-        .select('code, label, agency_code, is_active, is_required')
+        .select('code, label, agency_code, is_active, is_required, applicable_installation_types')
         .eq('is_active', true);
 
       if (error) {
@@ -144,10 +145,16 @@ export function useDocTypeLabel() {
 
   /**
    * 取得用於下拉選單的選項（全部使用中文標籤）
-   * 格式: { value: code, label: 中文標籤, isRequired: boolean }
+   * 格式: { value: code, label: 中文標籤, isRequired: boolean, applicableInstallationTypes: string[] | null }
    */
   const dropdownOptions = useMemo(() => {
-    const options: { value: string; label: string; agencyCode: string; isRequired: boolean }[] = [];
+    const options: { 
+      value: string; 
+      label: string; 
+      agencyCode: string; 
+      isRequired: boolean;
+      applicableInstallationTypes: string[] | null;
+    }[] = [];
     const seenCodes = new Set<string>();
     
     // 優先使用資料庫的設定
@@ -158,6 +165,7 @@ export function useDocTypeLabel() {
           label: dt.label,
           agencyCode: dt.agency_code,
           isRequired: dt.is_required,
+          applicableInstallationTypes: dt.applicable_installation_types,
         });
         seenCodes.add(dt.code);
       }
@@ -171,6 +179,7 @@ export function useDocTypeLabel() {
           label: def.label,
           agencyCode: def.agencyCode,
           isRequired: false, // 靜態定義的預設為非必要
+          applicableInstallationTypes: null, // 適用所有
         });
         seenCodes.add(def.code);
       }
@@ -180,11 +189,34 @@ export function useDocTypeLabel() {
   }, [dbDocTypes]);
 
   /**
-   * 取得必要文件類型列表
+   * 取得必要文件類型列表（不過濾案場類型）
    */
   const requiredDocTypes = useMemo(() => {
     return dropdownOptions.filter(opt => opt.isRequired);
   }, [dropdownOptions]);
+
+  /**
+   * 根據案場類型取得適用的必要文件類型列表
+   * @param installationType - 案場的裝置類型
+   */
+  const getRequiredDocTypesForInstallationType = (installationType: string | null | undefined) => {
+    return dropdownOptions.filter(opt => {
+      if (!opt.isRequired) return false;
+      
+      // 如果沒有設定適用類型（null 或空陣列），表示適用所有案場
+      if (!opt.applicableInstallationTypes || opt.applicableInstallationTypes.length === 0) {
+        return true;
+      }
+      
+      // 如果案場沒有設定類型，預設顯示所有必要文件
+      if (!installationType) {
+        return true;
+      }
+      
+      // 檢查案場類型是否在適用列表中
+      return opt.applicableInstallationTypes.includes(installationType);
+    });
+  };
 
   /**
    * 檢查文件類型代碼或標籤是否為必要文件
@@ -233,6 +265,7 @@ export function useDocTypeLabel() {
     codeLabelMap,
     labelCodeMap,
     requiredDocTypes,
+    getRequiredDocTypesForInstallationType,
     isRequired,
   };
 }

@@ -14,6 +14,7 @@ export interface DocumentTypeConfig {
   is_active: boolean;
   is_system: boolean;
   is_required: boolean;
+  applicable_installation_types: string[] | null;
   created_at: string;
   created_by: string | null;
   updated_at: string;
@@ -28,6 +29,7 @@ export interface DocumentTypeConfigInput {
   sort_order?: number;
   is_active?: boolean;
   is_required?: boolean;
+  applicable_installation_types?: string[] | null;
 }
 
 export function useDocumentTypeConfig() {
