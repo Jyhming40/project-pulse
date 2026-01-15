@@ -9,6 +9,14 @@ interface ProjectDocProgress {
   percentage: number;         // 完成百分比
 }
 
+interface ProjectInfo {
+  id: string;
+  revenue_model?: string | null;
+}
+
+// FIT 專屬文件代碼（REC 案件不需要這些文件）
+const FIT_ONLY_DOC_CODES = new Set(['TPC_PPA', 'TPC_FORMAL_FIT', 'FIT_BILL']);
+
 /**
  * 同步取得規則：
  * 當某些文件取得時，可視為同步取得其他相關必要文件
@@ -40,13 +48,25 @@ const SYNC_OBTAINED_RULES_BY_LABEL: Record<string, string[]> = {
 /**
  * 計算每個案場的文件完成度
  * 公式：已取得的必要文件類型數 / 必要文件類型總數（is_required = true）
+ * 
+ * @param projects - 案場物件陣列，包含 id 和 revenue_model
  */
-export function useProjectDocumentProgress(projectIds: string[]) {
+export function useProjectDocumentProgress(projects: ProjectInfo[]) {
+  const projectIds = projects.map(p => p.id);
+  
+  // 建立 projectId -> revenue_model 的映射
+  const revenueModelMap = new Map<string, string | null | undefined>();
+  projects.forEach(p => {
+    revenueModelMap.set(p.id, p.revenue_model);
+  });
+  
   // 建立穩定的 queryKey - 使用 JSON 序列化前 10 個 ID 加長度
   // 這確保當 projectIds 改變時，query 會重新執行
   const stableKey = JSON.stringify({
     count: projectIds.length,
     sample: projectIds.slice(0, 10),
+    // 加入 revenue_model 變化的檢測
+    recCount: projects.filter(p => p.revenue_model === 'REC').length,
   });
   
   return useQuery({
@@ -68,17 +88,11 @@ export function useProjectDocumentProgress(projectIds: string[]) {
       }
       
       // 建立 code 和 label 的 Set 與 Map
-      const requiredCodes = new Set((requiredDocTypes || []).map((dt: any) => dt.code));
+      const allRequiredCodes = new Set((requiredDocTypes || []).map((dt: any) => dt.code));
       const labelToCodeMap = new Map<string, string>();
       (requiredDocTypes || []).forEach((dt: any) => {
         labelToCodeMap.set(dt.label, dt.code);
       });
-      const requiredCount = requiredCodes.size;
-
-      if (requiredCount === 0) {
-        console.warn('No required document types found');
-        return {};
-      }
 
       // 2. 取得所有非刪除的文件資料 (使用分頁來避免 1000 筆限制)
       // 使用 projectIds Set 來做 client-side 過濾
@@ -152,6 +166,19 @@ export function useProjectDocumentProgress(projectIds: string[]) {
       
       projectIds.forEach(projectId => {
         const projectDocs = documents?.filter(d => d.project_id === projectId) || [];
+        const projectRevenueModel = revenueModelMap.get(projectId);
+        
+        // 根據 revenue_model 過濾必要文件
+        // REC 案件不需要 FIT 專屬文件
+        const requiredCodes = new Set<string>();
+        allRequiredCodes.forEach(code => {
+          if (projectRevenueModel === 'REC' && FIT_ONLY_DOC_CODES.has(code)) {
+            return; // 跳過 FIT 專屬文件
+          }
+          requiredCodes.add(code);
+        });
+        
+        const projectRequiredCount = requiredCodes.size;
         
         // 使用 Set 記錄已取得的必要文件類型（用 code）
         const obtainedDocCodes = new Set<string>();
@@ -181,7 +208,7 @@ export function useProjectDocumentProgress(projectIds: string[]) {
             } else if (docLabel) {
               // 用 label 找對應的 code
               const matchedCode = labelToCodeMap.get(docLabel);
-              if (matchedCode) {
+              if (matchedCode && requiredCodes.has(matchedCode)) {
                 obtainedDocCodes.add(matchedCode);
               }
             }
@@ -214,14 +241,14 @@ export function useProjectDocumentProgress(projectIds: string[]) {
         });
         
         const obtainedCount = obtainedDocCodes.size;
-        const percentage = requiredCount > 0 
-          ? Math.round((obtainedCount / requiredCount) * 100) 
+        const percentage = projectRequiredCount > 0 
+          ? Math.round((obtainedCount / projectRequiredCount) * 100) 
           : 0;
         
         progressMap[projectId] = {
           projectId,
           obtainedCount,
-          requiredCount,
+          requiredCount: projectRequiredCount,
           percentage,
         };
       });
