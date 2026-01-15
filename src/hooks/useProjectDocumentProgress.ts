@@ -42,10 +42,15 @@ const SYNC_OBTAINED_RULES_BY_LABEL: Record<string, string[]> = {
  * 公式：已取得的必要文件類型數 / 必要文件類型總數（is_required = true）
  */
 export function useProjectDocumentProgress(projectIds: string[]) {
+  // 使用簡單的哈希來識別 projectIds 是否改變
+  const projectIdsHash = projectIds.length > 0 ? projectIds.slice(0, 5).join(',') + '_' + projectIds.length : '';
+  
   return useQuery({
-    queryKey: ['project-document-progress', projectIds.length > 0],
+    queryKey: ['project-document-progress', projectIdsHash],
     queryFn: async () => {
-      if (!projectIds.length) return {};
+      // 複製 projectIds 以避免閉包問題
+      const currentProjectIds = [...projectIds];
+      if (!currentProjectIds.length) return {};
 
       // 1. 取得所有「必要」的文件類型（is_required = true）
       const { data: requiredDocTypes, error: docTypeError } = await supabase
@@ -74,7 +79,7 @@ export function useProjectDocumentProgress(projectIds: string[]) {
 
       // 2. 取得所有非刪除的文件資料 (不用 .in() 以避免 URL 過長問題)
       // 使用 projectIds Set 來做 client-side 過濾
-      const projectIdSet = new Set(projectIds);
+      const projectIdSet = new Set(currentProjectIds);
       
       const { data: allDocuments, error: docError } = await supabase
         .from('documents')
@@ -124,7 +129,8 @@ export function useProjectDocumentProgress(projectIds: string[]) {
       // 4. 計算每個案場的完成度
       const progressMap: Record<string, ProjectDocProgress> = {};
       
-      projectIds.forEach(projectId => {
+      // 使用 currentProjectIds 而不是閉包中的 projectIds
+      currentProjectIds.forEach(projectId => {
         const projectDocs = documents?.filter(d => d.project_id === projectId) || [];
         
         // 使用 Set 記錄已取得的必要文件類型（用 code）
@@ -199,10 +205,10 @@ export function useProjectDocumentProgress(projectIds: string[]) {
           percentage,
         };
       });
-
+      
       return progressMap;
     },
     enabled: projectIds.length > 0,
-    staleTime: 60 * 1000, // 60 秒內不重新請求
+    staleTime: 30 * 1000, // 30 秒內不重新請求
   });
 }
