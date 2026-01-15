@@ -225,9 +225,12 @@ export default function Projects() {
     },
   });
 
-  // 取得所有案場 ID 以計算文件完成度
-  const projectIds = useMemo(() => projects.map(p => p.id), [projects]);
-  const { data: docProgressMapRaw = {} } = useProjectDocumentProgress(projectIds);
+  // 取得所有案場 ID 及 revenue_model 以計算文件完成度
+  const projectInfos = useMemo(() => projects.map(p => ({ 
+    id: p.id, 
+    revenue_model: (p as any).revenue_model 
+  })), [projects]);
+  const { data: docProgressMapRaw = {} } = useProjectDocumentProgress(projectInfos);
 
   // 將文件進度合併到專案物件中，以便排序使用
   const projectsWithDocProgress = useMemo(() => {

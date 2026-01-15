@@ -195,6 +195,9 @@ export function useDocTypeLabel() {
     return dropdownOptions.filter(opt => opt.isRequired);
   }, [dropdownOptions]);
 
+  // FIT 專屬文件代碼（REC 案件不需要這些文件）
+  const FIT_ONLY_DOC_CODES = ['TPC_PPA', 'TPC_FORMAL_FIT', 'FIT_BILL'];
+
   /**
    * 根據案場類型取得適用的必要文件類型列表
    * @param installationType - 案場的裝置類型
@@ -202,6 +205,38 @@ export function useDocTypeLabel() {
   const getRequiredDocTypesForInstallationType = (installationType: string | null | undefined) => {
     return dropdownOptions.filter(opt => {
       if (!opt.isRequired) return false;
+      
+      // 如果沒有設定適用類型（null 或空陣列），表示適用所有案場
+      if (!opt.applicableInstallationTypes || opt.applicableInstallationTypes.length === 0) {
+        return true;
+      }
+      
+      // 如果案場沒有設定類型，預設顯示所有必要文件
+      if (!installationType) {
+        return true;
+      }
+      
+      // 檢查案場類型是否在適用列表中
+      return opt.applicableInstallationTypes.includes(installationType);
+    });
+  };
+
+  /**
+   * 根據案場類型及收益模式取得適用的必要文件類型列表
+   * @param installationType - 案場的裝置類型
+   * @param revenueModel - 案場的收益模式 ('FIT' | 'REC' | 'SELF_USE')
+   */
+  const getRequiredDocTypesForProject = (
+    installationType: string | null | undefined,
+    revenueModel: string | null | undefined
+  ) => {
+    return dropdownOptions.filter(opt => {
+      if (!opt.isRequired) return false;
+      
+      // REC 案件過濾掉 FIT 專屬文件
+      if (revenueModel === 'REC' && FIT_ONLY_DOC_CODES.includes(opt.value)) {
+        return false;
+      }
       
       // 如果沒有設定適用類型（null 或空陣列），表示適用所有案場
       if (!opt.applicableInstallationTypes || opt.applicableInstallationTypes.length === 0) {
@@ -266,6 +301,8 @@ export function useDocTypeLabel() {
     labelCodeMap,
     requiredDocTypes,
     getRequiredDocTypesForInstallationType,
+    getRequiredDocTypesForProject,
+    FIT_ONLY_DOC_CODES,
     isRequired,
   };
 }
