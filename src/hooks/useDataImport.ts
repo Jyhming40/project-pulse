@@ -535,7 +535,9 @@ export function useDataImport() {
       const rawData = await parseFile(file);
       if (rawData.length === 0) throw new Error('檔案中沒有資料');
 
-      const validMethodTypes = ['銀行轉帳', '支票', '現金', '信用卡', '其他'];
+      // Fetch valid method types from codebook (system_options)
+      const { data: methodTypeOptions } = await supabase.from('system_options').select('value').eq('category', 'payment_method_type').eq('is_active', true);
+      const validMethodTypes = methodTypeOptions?.map(opt => opt.value) || [];
 
       const { data: investors } = await supabase.from('investors').select('id, investor_code');
       const investorMap = new Map(investors?.map(inv => [inv.investor_code, inv.id]) || []);
