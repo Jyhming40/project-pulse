@@ -36,6 +36,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -107,6 +108,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [singleDeleteDoc, setSingleDeleteDoc] = useState<{ id: string; title: string } | null>(null);
   const [isDriveIntegrationOpen, setIsDriveIntegrationOpen] = useState(false);
+  const [isMissingDocsOpen, setIsMissingDocsOpen] = useState(true);
 
   // Use unified doc type options from useDocTypeLabel (document_type_config)
   const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions, requiredDocTypes, isRequired: isDocTypeRequired, labelCodeMap } = useDocTypeLabel();
@@ -186,35 +188,82 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
     return acc;
   }, {} as Record<string, number>);
 
+  // Sync obtained rules - when certain documents are obtained, 
+  // they can be considered as obtaining other related required documents
+  const SYNC_OBTAINED_RULES: Record<string, string[]> = {
+    'BUILD_EXEMPT_COMP': ['ENG_STRUCTURAL'],
+    'TPC_APPROVED_DRAWING': ['ENG_ELECTRICAL', 'ENG_CONTRACTOR'],
+    'TPC_NEGOTIATION': ['ENG_ELECTRICAL', 'ENG_CONTRACTOR'],
+    'TPC_FORMAL_FIT': ['MOEA_REGISTER'],
+  };
+  const SYNC_OBTAINED_RULES_BY_LABEL: Record<string, string[]> = {
+    '免雜項竣工': ['ENG_STRUCTURAL'],
+    '結構計算書': ['ENG_STRUCTURAL'],
+    '審訖圖': ['ENG_ELECTRICAL', 'ENG_CONTRACTOR'],
+    '細部協商': ['ENG_ELECTRICAL', 'ENG_CONTRACTOR'],
+    '正式躉售': ['MOEA_REGISTER'],
+  };
+
   // Calculate missing required documents - only count as obtained if status is "已取得"
   // Support both doc_type_code and doc_type (label) for matching
-  const obtainedDocTypeCodes = new Set(
-    currentDocuments
-      .filter(doc => {
-        // Check if document has a type code or label
-        const hasTypeIdentifier = doc.doc_type_code || doc.doc_type;
-        if (!hasTypeIdentifier) return false;
-        
-        // Check status is "已取得"
-        const status = getDerivedDocStatus({
-          submitted_at: (doc as any).submitted_at,
-          issued_at: (doc as any).issued_at,
-          file_count: fileCountMap[doc.id] || 0,
-          drive_file_id: doc.drive_file_id,
-        });
-        return status === '已取得';
-      })
-      .map(doc => {
-        // Return code if available, otherwise lookup code by label
-        if (doc.doc_type_code) return doc.doc_type_code;
-        // Use labelCodeMap to convert label to code
-        return labelCodeMap.get(doc.doc_type) || doc.doc_type;
-      })
-  );
+  const allObtainedCodes = new Set<string>();
+  const allObtainedLabels = new Set<string>();
+  
+  currentDocuments.forEach(doc => {
+    // Check if document has a type code or label
+    const hasTypeIdentifier = doc.doc_type_code || doc.doc_type;
+    if (!hasTypeIdentifier) return;
+    
+    // Check status is "已取得"
+    const status = getDerivedDocStatus({
+      submitted_at: (doc as any).submitted_at,
+      issued_at: (doc as any).issued_at,
+      file_count: fileCountMap[doc.id] || 0,
+      drive_file_id: doc.drive_file_id,
+    });
+    
+    if (status === '已取得') {
+      if (doc.doc_type_code) allObtainedCodes.add(doc.doc_type_code);
+      if (doc.doc_type) allObtainedLabels.add(doc.doc_type);
+    }
+  });
+
+  // Build obtained doc type codes with sync rules applied
+  const obtainedDocTypeCodes = new Set<string>();
+  
+  // Direct matches
+  allObtainedCodes.forEach(code => {
+    obtainedDocTypeCodes.add(code);
+  });
+  allObtainedLabels.forEach(label => {
+    const mappedCode = labelCodeMap.get(label);
+    if (mappedCode) obtainedDocTypeCodes.add(mappedCode);
+  });
+  
+  // Apply sync rules (code-based)
+  allObtainedCodes.forEach(code => {
+    const syncCodes = SYNC_OBTAINED_RULES[code];
+    if (syncCodes) {
+      syncCodes.forEach(syncCode => obtainedDocTypeCodes.add(syncCode));
+    }
+  });
+  
+  // Apply sync rules (label-based for old data)
+  allObtainedLabels.forEach(label => {
+    const syncCodes = SYNC_OBTAINED_RULES_BY_LABEL[label];
+    if (syncCodes) {
+      syncCodes.forEach(syncCode => obtainedDocTypeCodes.add(syncCode));
+    }
+  });
   
   const missingRequiredDocs = requiredDocTypes.filter(
     reqDoc => !obtainedDocTypeCodes.has(reqDoc.value)
   );
+  
+  // Calculate document completion percentage
+  const totalRequired = requiredDocTypes.length;
+  const obtainedRequired = totalRequired - missingRequiredDocs.length;
+  const completionPercentage = totalRequired > 0 ? Math.round((obtainedRequired / totalRequired) * 100) : 0;
 
   // Create folder structure
   const handleCreateFolderStructure = async () => {
@@ -557,32 +606,69 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
         )}
       </Card>
 
-      {/* Missing Required Documents Alert */}
-      {hasDriveFolder && missingRequiredDocs.length > 0 && (
-        <Card className="border-warning/50 bg-warning/5">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2 text-warning">
-              <AlertTriangle className="w-5 h-5" />
-              必要文件缺漏提醒
-            </CardTitle>
-            <CardDescription>
-              以下 {missingRequiredDocs.length} 項必要文件尚未取得
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {missingRequiredDocs.map(doc => (
-                <Badge
-                  key={doc.value}
-                  variant="outline"
-                  className="text-warning border-warning/50"
-                >
-                  {doc.label}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Missing Required Documents Alert - Collapsible */}
+      {hasDriveFolder && (
+        <Collapsible open={isMissingDocsOpen} onOpenChange={setIsMissingDocsOpen}>
+          <Card className={missingRequiredDocs.length > 0 ? "border-warning/50 bg-warning/5" : "border-success/50 bg-success/5"}>
+            <CollapsibleTrigger asChild>
+              <CardHeader className="pb-2 cursor-pointer hover:bg-muted/20 transition-colors">
+                <div className="flex items-center justify-between">
+                  <CardTitle className={`text-base flex items-center gap-2 ${missingRequiredDocs.length > 0 ? 'text-warning' : 'text-success'}`}>
+                    {missingRequiredDocs.length > 0 ? (
+                      <AlertTriangle className="w-5 h-5" />
+                    ) : (
+                      <CheckCircle2 className="w-5 h-5" />
+                    )}
+                    必要文件進度
+                    <Badge variant="secondary" className={missingRequiredDocs.length > 0 ? "bg-warning/20 text-warning" : "bg-success/20 text-success"}>
+                      {completionPercentage}%
+                    </Badge>
+                  </CardTitle>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      {obtainedRequired}/{totalRequired} 項已取得
+                    </span>
+                    {isMissingDocsOpen ? (
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </div>
+                <Progress 
+                  value={completionPercentage} 
+                  className={`h-2 mt-2 ${missingRequiredDocs.length > 0 ? '[&>div]:bg-warning' : '[&>div]:bg-success'}`}
+                />
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="pt-0">
+                {missingRequiredDocs.length > 0 ? (
+                  <>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      以下 {missingRequiredDocs.length} 項必要文件尚未取得：
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {missingRequiredDocs.map(doc => (
+                        <Badge
+                          key={doc.value}
+                          variant="outline"
+                          className="text-warning border-warning/50"
+                        >
+                          {doc.label}
+                        </Badge>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-success">
+                    🎉 所有必要文件已取得完成！
+                  </p>
+                )}
+              </CardContent>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
       )}
 
       {/* Documents List */}

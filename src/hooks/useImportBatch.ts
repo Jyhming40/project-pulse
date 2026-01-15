@@ -401,21 +401,29 @@ export function useImportBatch() {
       
       // Stage 2: Insert new document with is_current=FALSE first (safe insert)
       // Smart issued_at logic:
+      // - If filename date is in the future (e.g., 2026+ when current year is 2025) → skip, use null for OCR
       // - If filename date is > 7 days ago, it's likely the actual issue date → use it
       // - If filename date is within 7 days, it's likely just the upload date → leave null for OCR
       let issuedAtValue: string | null = null;
       if (item.dateStr) {
-        const fileDate = new Date(
-          `${item.dateStr.slice(0, 4)}-${item.dateStr.slice(4, 6)}-${item.dateStr.slice(6, 8)}`
-        );
-        const today = new Date();
-        const daysDiff = Math.floor((today.getTime() - fileDate.getTime()) / (1000 * 60 * 60 * 24));
+        const fileYear = parseInt(item.dateStr.slice(0, 4), 10);
+        const currentYear = new Date().getFullYear();
         
-        if (daysDiff > 7) {
-          // Date is more than 7 days ago - likely the actual issue date
-          issuedAtValue = `${item.dateStr.slice(0, 4)}-${item.dateStr.slice(4, 6)}-${item.dateStr.slice(6, 8)}`;
+        // Skip future dates (likely invalid or upload date placeholder)
+        if (fileYear <= currentYear) {
+          const fileDate = new Date(
+            `${item.dateStr.slice(0, 4)}-${item.dateStr.slice(4, 6)}-${item.dateStr.slice(6, 8)}`
+          );
+          const today = new Date();
+          const daysDiff = Math.floor((today.getTime() - fileDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          if (daysDiff > 7) {
+            // Date is more than 7 days ago - likely the actual issue date
+            issuedAtValue = `${item.dateStr.slice(0, 4)}-${item.dateStr.slice(4, 6)}-${item.dateStr.slice(6, 8)}`;
+          }
+          // else: Date is recent (within 7 days) - skip, let OCR detect actual date
         }
-        // else: Date is recent (within 7 days) - skip, let OCR detect actual date
+        // else: Date is in the future - skip, let OCR detect actual date
       }
       
       const { data: docData, error: insertError } = await supabase
