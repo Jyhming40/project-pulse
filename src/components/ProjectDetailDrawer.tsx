@@ -84,7 +84,7 @@ const getConstructionStatusColor = (status: string) => {
 
 export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDetailDrawerProps) {
   const navigate = useNavigate();
-  const { getLabel: getDocTypeLabel, requiredDocTypes, isRequired: isDocTypeRequired, labelCodeMap } = useDocTypeLabel();
+  const { getLabel: getDocTypeLabel, getRequiredDocTypesForInstallationType, isRequired: isDocTypeRequired, labelCodeMap } = useDocTypeLabel();
 
   // Fetch project
   const { data: project, isLoading } = useQuery({
@@ -504,6 +504,9 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                 <TabsContent value="documents" className="p-6 space-y-4 mt-0">
                   {/* Missing Required Documents Alert */}
                   {(() => {
+                    // Get required doc types filtered by installation type
+                    const requiredDocTypes = getRequiredDocTypesForInstallationType((project as any)?.installation_type);
+                    
                     // Calculate missing required docs - support both doc_type_code and doc_type (label)
                     const obtainedCodes = new Set(
                       documents
