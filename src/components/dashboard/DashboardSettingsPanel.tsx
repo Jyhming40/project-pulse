@@ -116,9 +116,7 @@ export function DashboardSettingsPanel({
     settings,
     isLoading,
     isSaving,
-    toggleSectionVisibility,
-    reorderSections,
-    updateDefaultFilters,
+    saveAllSettings,
     resetToDefaults,
   } = useDashboardSettings();
 
@@ -175,8 +173,7 @@ export function DashboardSettingsPanel({
   };
 
   const handleSave = () => {
-    reorderSections(localSections);
-    updateDefaultFilters(localFilters);
+    saveAllSettings(localSections, localFilters);
     setHasChanges(false);
     setOpen(false);
   };
