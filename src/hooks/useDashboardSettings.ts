@@ -169,6 +169,18 @@ export function useDashboardSettings() {
     });
   }, [settings, saveMutation]);
 
+  // 一次儲存所有設定（區塊 + 篩選條件）
+  const saveAllSettings = useCallback((newSections: DashboardSection[], newFilters: DashboardFilters) => {
+    const reorderedSections = newSections.map((section, index) => ({
+      ...section,
+      order: index,
+    }));
+    saveMutation.mutate({
+      sections: reorderedSections,
+      defaultFilters: newFilters,
+    });
+  }, [saveMutation]);
+
   // 重設為預設值
   const resetToDefaults = useCallback(() => {
     saveMutation.mutate(DEFAULT_SETTINGS);
@@ -181,6 +193,7 @@ export function useDashboardSettings() {
     toggleSectionVisibility,
     reorderSections,
     updateDefaultFilters,
+    saveAllSettings,
     resetToDefaults,
   };
 }

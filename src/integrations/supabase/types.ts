@@ -2014,6 +2014,7 @@ export type Database = {
       user_preferences: {
         Row: {
           created_at: string
+          dashboard_settings: Json | null
           id: string
           theme_color: string
           theme_mode: string
@@ -2022,6 +2023,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          dashboard_settings?: Json | null
           id?: string
           theme_color?: string
           theme_mode?: string
@@ -2030,6 +2032,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          dashboard_settings?: Json | null
           id?: string
           theme_color?: string
           theme_mode?: string
