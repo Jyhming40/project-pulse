@@ -15,6 +15,7 @@ import {
   HardHat,
   MapPin,
   FolderOpen,
+  UserCheck,
   LucideIcon
 } from 'lucide-react';
 
@@ -36,7 +37,8 @@ export type CodebookCategory =
   | 'construction_work_type'
   | 'construction_assignment_status'
   | 'partner_type'
-  | 'city';
+  | 'city'
+  | 'contact_role_tag';
 
 export interface CategoryConfig {
   label: string;
@@ -180,6 +182,14 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
     description: '台灣縣市選項',
     usageMapping: [
       { table: 'projects', column: 'city' },
+    ],
+  },
+  contact_role_tag: {
+    label: '聯絡人角色',
+    icon: UserCheck,
+    description: '投資方聯絡人角色標籤',
+    usageMapping: [
+      { table: 'investor_contacts', column: 'role_tags' },
     ],
   },
 };
@@ -338,5 +348,14 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
     { value: '澎湖縣', label: '澎湖縣' },
     { value: '金門縣', label: '金門縣' },
     { value: '連江縣', label: '連江縣' },
+  ],
+  contact_role_tag: [
+    { value: '主要聯絡人', label: '主要聯絡人' },
+    { value: '財務', label: '財務' },
+    { value: '工程', label: '工程' },
+    { value: '法務', label: '法務' },
+    { value: '行政', label: '行政' },
+    { value: '業務', label: '業務' },
+    { value: '其他', label: '其他' },
   ],
 };
