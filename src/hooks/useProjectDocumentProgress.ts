@@ -80,30 +80,49 @@ export function useProjectDocumentProgress(projectIds: string[]) {
         return {};
       }
 
-      // 2. 取得所有非刪除的文件資料 (不用 .in() 以避免 URL 過長問題)
+      // 2. 取得所有非刪除的文件資料 (使用分頁來避免 1000 筆限制)
       // 使用 projectIds Set 來做 client-side 過濾
       const projectIdSet = new Set(projectIds);
-      const { data: allDocuments, error: docError } = await supabase
-        .from('documents')
-        .select(`
-          id,
-          project_id,
-          doc_type_code,
-          doc_type,
-          submitted_at,
-          issued_at,
-          drive_file_id,
-          is_deleted
-        `)
-        .eq('is_deleted', false);
+      
+      // 分頁取得所有文件（Supabase 預設限制 1000 筆）
+      const pageSize = 1000;
+      let allDocuments: any[] = [];
+      let page = 0;
+      let hasMore = true;
+      
+      while (hasMore) {
+        const { data: pageDocs, error: docError } = await supabase
+          .from('documents')
+          .select(`
+            id,
+            project_id,
+            doc_type_code,
+            doc_type,
+            submitted_at,
+            issued_at,
+            drive_file_id,
+            is_deleted
+          `)
+          .eq('is_deleted', false)
+          .range(page * pageSize, (page + 1) * pageSize - 1)
+          .order('id');
 
-      if (docError) {
-        console.error('Error fetching documents:', docError);
-        throw docError;
+        if (docError) {
+          console.error('Error fetching documents:', docError);
+          throw docError;
+        }
+        
+        if (pageDocs && pageDocs.length > 0) {
+          allDocuments = [...allDocuments, ...pageDocs];
+          page++;
+          hasMore = pageDocs.length === pageSize;
+        } else {
+          hasMore = false;
+        }
       }
 
       // Client-side 過濾出需要的案場文件
-      const documents = (allDocuments || []).filter(d => projectIdSet.has(d.project_id));
+      const documents = allDocuments.filter(d => projectIdSet.has(d.project_id));
 
       // 3. 取得所有文件的檔案數量
       const documentIds = documents?.map(d => d.id) || [];
