@@ -1,6 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// Declare EdgeRuntime for background tasks
+declare const EdgeRuntime: {
+  waitUntil: (promise: Promise<unknown>) => void;
+};
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -690,119 +695,117 @@ serve(async (req) => {
       throw new Error('文件上傳成功，但記錄建立失敗');
     }
 
-    // Log audit
-    await supabase.from('audit_logs').insert({
-      action: 'CREATE' as const,
-      record_id: newDoc.id,
-      table_name: 'documents',
-      actor_user_id: user.id,
-      new_data: {
-        action_type: newVersion > 1 ? 'DOCUMENT_VERSION' : 'DOCUMENT_UPLOAD',
-        version: newVersion,
-        drive_file_id: uploadResult.id,
-        title: title,
-        document_type: documentType,
-      },
-    });
-
-    // Sync admin milestones based on document status (SSOT approach)
-    // This replaces the old "upload = complete milestone" logic
-    // Now milestones are completed based on document issued_at/submitted_at fields
-    try {
-      console.log(`Calling sync-admin-milestones for project ${projectId}`);
-      const syncResponse = await fetch(
-        `${supabaseUrl}/functions/v1/sync-admin-milestones`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
-          },
-          body: JSON.stringify({ projectId }),
-        }
-      );
-
-      if (syncResponse.ok) {
-        const syncResult = await syncResponse.json();
-        console.log('Milestone sync result:', syncResult);
-      } else {
-        console.warn('Milestone sync failed:', await syncResponse.text());
-      }
-    } catch (syncErr) {
-      console.error('Failed to sync milestones:', syncErr);
-      // Don't fail the upload just because milestone sync failed
-    }
-
-    // Auto-update project status based on document type (suggest new status if applicable)
-    const suggestedStatus = DOC_TYPE_TO_PROJECT_STATUS[documentType];
-    if (suggestedStatus) {
+    // Log audit (fire and forget - non-critical)
+    (async () => {
       try {
-        // Get current project status
-        const { data: currentProject } = await supabase
-          .from('projects')
-          .select('status')
-          .eq('id', projectId)
-          .single();
-        
-        // Only auto-update if not already at a "later" status 
-        // Define status progression order
-        const statusOrder = [
-          '開發中', '台電送件', '台電審查', '能源署送件', '同意備案', 
-          '結構簽證', '工程施工', '報竣掛表', '設備登記', '運維中'
-        ];
-        
-        const currentIndex = statusOrder.indexOf(currentProject?.status || '');
-        const suggestedIndex = statusOrder.indexOf(suggestedStatus);
-        
-        // Auto-update if suggested status is later in the progression
-        if (suggestedIndex > currentIndex) {
-          await supabase
-            .from('projects')
-            .update({ status: suggestedStatus })
-            .eq('id', projectId);
-          
-          console.log(`Project status auto-updated from "${currentProject?.status}" to "${suggestedStatus}"`);
-        } else {
-          console.log(`Project status "${currentProject?.status}" is already at or beyond suggested "${suggestedStatus}", skipping`);
-        }
-      } catch (statusErr) {
-        console.error('Failed to auto-update project status:', statusErr);
-        // Don't fail the upload just because status update failed
+        await supabase.from('audit_logs').insert({
+          action: 'CREATE' as const,
+          record_id: newDoc.id,
+          table_name: 'documents',
+          actor_user_id: user.id,
+          new_data: {
+            action_type: newVersion > 1 ? 'DOCUMENT_VERSION' : 'DOCUMENT_UPLOAD',
+            version: newVersion,
+            drive_file_id: uploadResult.id,
+            title: title,
+            document_type: documentType,
+          },
+        });
+        console.log('Audit log inserted');
+      } catch (err) {
+        console.error('Audit log failed:', err);
       }
-    }
+    })();
 
-    // Title format example: 2024YF003-2024_MOEA_同意備案_20241210_v01_FINAL
-    if (documentType === '同意備案' || documentType === '能源署同意備案' || documentType === '能源局同意備案') {
-      // Try to extract date from title (format: YYYYMMDD)
-      const dateMatch = title.match(/_(\d{8})_/);
-      if (dateMatch) {
-        const dateStr = dateMatch[1]; // e.g., "20241210"
-        const year = dateStr.substring(0, 4);
-        const month = dateStr.substring(4, 6);
-        const day = dateStr.substring(6, 8);
-        const approvalDate = `${year}-${month}-${day}`; // Convert to ISO format
-        
-        console.log(`Auto-setting approval_date: ${approvalDate} for project ${projectId}`);
-        
-        // Only update if approval_date is not already set
-        const { data: projectData } = await supabase
-          .from('projects')
-          .select('approval_date')
-          .eq('id', projectId)
-          .single();
-        
-        if (!projectData?.approval_date) {
-          await supabase
-            .from('projects')
-            .update({ approval_date: approvalDate })
-            .eq('id', projectId);
-          
-          console.log(`Approval date set to ${approvalDate}`);
+    // Background tasks - run after response is sent to avoid CPU timeout
+    const backgroundTasks = async () => {
+      try {
+        // Sync admin milestones
+        console.log(`[Background] Calling sync-admin-milestones for project ${projectId}`);
+        const syncResponse = await fetch(
+          `${supabaseUrl}/functions/v1/sync-admin-milestones`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+            },
+            body: JSON.stringify({ projectId }),
+          }
+        );
+
+        if (syncResponse.ok) {
+          console.log('[Background] Milestone sync completed');
         } else {
-          console.log(`Approval date already set: ${projectData.approval_date}, skipping auto-update`);
+          console.warn('[Background] Milestone sync failed:', await syncResponse.text());
+        }
+      } catch (syncErr) {
+        console.error('[Background] Failed to sync milestones:', syncErr);
+      }
+
+      // Auto-update project status based on document type
+      const suggestedStatus = DOC_TYPE_TO_PROJECT_STATUS[documentType];
+      if (suggestedStatus) {
+        try {
+          const { data: currentProject } = await supabase
+            .from('projects')
+            .select('status')
+            .eq('id', projectId)
+            .single();
+          
+          const statusOrder = [
+            '開發中', '台電送件', '台電審查', '能源署送件', '同意備案', 
+            '結構簽證', '工程施工', '報竣掛表', '設備登記', '運維中'
+          ];
+          
+          const currentIndex = statusOrder.indexOf(currentProject?.status || '');
+          const suggestedIndex = statusOrder.indexOf(suggestedStatus);
+          
+          if (suggestedIndex > currentIndex) {
+            await supabase
+              .from('projects')
+              .update({ status: suggestedStatus })
+              .eq('id', projectId);
+            console.log(`[Background] Project status updated to "${suggestedStatus}"`);
+          }
+        } catch (statusErr) {
+          console.error('[Background] Failed to update project status:', statusErr);
         }
       }
-    }
+
+      // Auto-set approval_date for 同意備案 documents
+      if (documentType === '同意備案' || documentType === '能源署同意備案' || documentType === '能源局同意備案') {
+        const dateMatch = title.match(/_(\d{8})_/);
+        if (dateMatch) {
+          const dateStr = dateMatch[1];
+          const year = dateStr.substring(0, 4);
+          const month = dateStr.substring(4, 6);
+          const day = dateStr.substring(6, 8);
+          const approvalDate = `${year}-${month}-${day}`;
+          
+          try {
+            const { data: projectData } = await supabase
+              .from('projects')
+              .select('approval_date')
+              .eq('id', projectId)
+              .single();
+            
+            if (!projectData?.approval_date) {
+              await supabase
+                .from('projects')
+                .update({ approval_date: approvalDate })
+                .eq('id', projectId);
+              console.log(`[Background] Approval date set to ${approvalDate}`);
+            }
+          } catch (dateErr) {
+            console.error('[Background] Failed to set approval date:', dateErr);
+          }
+        }
+      }
+    };
+
+    // Run background tasks without blocking response
+    EdgeRuntime.waitUntil(backgroundTasks());
 
     return new Response(
       JSON.stringify({
