@@ -33,6 +33,7 @@ import {
   Zap,
   MoreHorizontal,
   Eye,
+  EyeOff,
   Edit,
   Trash2,
   FileDown,
@@ -192,6 +193,9 @@ export default function Projects() {
   
   // Data Enrichment Mode (Admin only)
   const [isEnrichmentMode, setIsEnrichmentMode] = useState(false);
+  
+  // Show cancelled projects toggle
+  const [showCancelled, setShowCancelled] = useState(false);
   
   // Batch Drive Folder Dialog
   const [isBatchDriveFolderOpen, setIsBatchDriveFolderOpen] = useState(false);
@@ -373,6 +377,11 @@ export default function Projects() {
     const searchLower = filters.search.toLowerCase();
     
     return projectsWithDocProgress.filter(project => {
+      // Filter out cancelled projects unless showCancelled is true
+      if (!showCancelled && project.status === '取消') {
+        return false;
+      }
+      
       // 搜尋匹配
       const matchesSearch = !searchLower || 
         project.project_name.toLowerCase().includes(searchLower) ||
@@ -409,7 +418,13 @@ export default function Projects() {
       
       return matchesFilters;
     });
-  }, [projectsWithDocProgress, filters.search, filters.filterStates, riskProjectIds]);
+  }, [projectsWithDocProgress, filters.search, filters.filterStates, riskProjectIds, showCancelled]);
+
+  // Count cancelled projects for toggle display
+  const cancelledCount = useMemo(() => 
+    projectsWithDocProgress.filter(p => p.status === '取消').length,
+    [projectsWithDocProgress]
+  );
 
   // Sorting (multi-column support)
   const { sortedData: sortedProjects, sortConfig, handleSort, getSortInfo } = useTableSort(filteredProjects, {
@@ -699,6 +714,25 @@ export default function Projects() {
         riskProjectCount={riskProjectIds.length}
       />
 
+      {/* Show Cancelled Toggle */}
+      {cancelledCount > 0 && (
+        <div className="flex items-center gap-2">
+          <Button
+            variant={showCancelled ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setShowCancelled(!showCancelled)}
+            className="text-xs"
+          >
+            {showCancelled ? (
+              <EyeOff className="w-3.5 h-3.5 mr-1.5" />
+            ) : (
+              <Eye className="w-3.5 h-3.5 mr-1.5" />
+            )}
+            {showCancelled ? '隱藏' : '顯示'}已取消 ({cancelledCount})
+          </Button>
+        </div>
+      )}
+
       {/* Table */}
       <div className="border rounded-lg bg-card overflow-hidden">
         <Table>
@@ -748,13 +782,17 @@ export default function Projects() {
                   }
                 };
                 
+                const isCancelled = project.status === '取消';
+                
                 return (
                   <TableRow 
                     key={project.id} 
                     className={`cursor-pointer hover:bg-muted/50 ${
                       isEnrichmentMode && batchSelect.isSelected(project.id) 
                         ? 'bg-warning/10 hover:bg-warning/15' 
-                        : ''
+                        : isCancelled
+                          ? 'bg-muted/30 opacity-60'
+                          : ''
                     }`}
                     onClick={handleRowClick}
                   >
