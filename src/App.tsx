@@ -31,6 +31,7 @@ import Integrations from "./pages/Integrations";
 import PendingApproval from "./pages/PendingApproval";
 import DuplicateScanner from "./pages/DuplicateScanner";
 import DocumentTypeConfig from "./pages/DocumentTypeConfig";
+import DashboardAudit from "./pages/DashboardAudit";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -75,6 +76,9 @@ const App = () => (
             <Route path="/recycle-bin" element={<ProtectedRoute adminOnly><Layout><RecycleBin /></Layout></ProtectedRoute>} />
             <Route path="/audit-logs" element={<ProtectedRoute adminOnly><Layout><AuditLogs /></Layout></ProtectedRoute>} />
             <Route path="/duplicate-scanner" element={<ProtectedRoute adminOnly><Layout><DuplicateScanner /></Layout></ProtectedRoute>} />
+            
+            {/* Dev Tools (開發環境) */}
+            <Route path="/dev/dashboard-audit" element={<ProtectedRoute><Layout><DashboardAudit /></Layout></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
           </Routes>
