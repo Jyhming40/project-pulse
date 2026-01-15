@@ -196,7 +196,8 @@ export function useDocTypeLabel() {
   }, [dropdownOptions]);
 
   // FIT 專屬文件代碼（REC 案件不需要這些文件）
-  const FIT_ONLY_DOC_CODES = ['TPC_PPA', 'TPC_FORMAL_FIT', 'FIT_BILL'];
+  // TPC_CONTRACT = 躉售合約, TPC_FORMAL_FIT = 正式躉售
+  const FIT_ONLY_DOC_CODES = ['TPC_CONTRACT', 'TPC_FORMAL_FIT', 'TPC_PPA', 'FIT_BILL'];
 
   /**
    * 根據案場類型取得適用的必要文件類型列表

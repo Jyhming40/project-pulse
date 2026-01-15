@@ -15,7 +15,8 @@ interface ProjectInfo {
 }
 
 // FIT 專屬文件代碼（REC 案件不需要這些文件）
-const FIT_ONLY_DOC_CODES = new Set(['TPC_PPA', 'TPC_FORMAL_FIT', 'FIT_BILL']);
+// TPC_CONTRACT = 躉售合約, TPC_FORMAL_FIT = 正式躉售
+const FIT_ONLY_DOC_CODES = new Set(['TPC_CONTRACT', 'TPC_FORMAL_FIT', 'TPC_PPA', 'FIT_BILL']);
 
 /**
  * 同步取得規則：

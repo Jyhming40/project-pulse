@@ -86,10 +86,12 @@ interface ProjectDocumentsTabProps {
 }
 
 // FIT-only document types that REC projects don't need
+// TPC_CONTRACT = 躉售合約, TPC_FORMAL_FIT = 正式躉售
 const FIT_ONLY_DOC_TYPES = [
-  'TPC_PPA',           // 躉售合約
-  'TPC_FORMAL_FIT',    // 正式躉售
-  'FIT_BILL',          // 躉購電費單
+  'TPC_CONTRACT',        // 躉售合約
+  'TPC_FORMAL_FIT',      // 正式躉售
+  'TPC_PPA',             // 躉售合約 (legacy)
+  'FIT_BILL',            // 躉購電費單
 ];
 
 // Legacy labels for FIT-only docs (for backward compatibility)
