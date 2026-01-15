@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -28,15 +28,29 @@ import {
   PhaseOverviewSection,
   Phase2TracksSection,
 } from '@/components/dashboard';
+import { DashboardSettingsPanel } from '@/components/dashboard/DashboardSettingsPanel';
 import { useAnalyticsSummary, useRiskProjects } from '@/hooks/useProjectAnalytics';
+import { useDashboardSettings, DashboardSection } from '@/hooks/useDashboardSettings';
 
 export default function Dashboard() {
   const { isAdmin } = useAuth();
+  const { settings, isLoading: settingsLoading } = useDashboardSettings();
   
-  // Filter states
+  // Filter states - 初始化為預設篩選條件
   const [selectedInvestor, setSelectedInvestor] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>('all');
   const [selectedConstructionStatus, setSelectedConstructionStatus] = useState<string>('all');
+  const [filtersInitialized, setFiltersInitialized] = useState(false);
+
+  // 當設定載入完成時，套用預設篩選條件
+  useEffect(() => {
+    if (!settingsLoading && !filtersInitialized && settings.defaultFilters) {
+      setSelectedInvestor(settings.defaultFilters.investor || 'all');
+      setSelectedStatus(settings.defaultFilters.status || 'all');
+      setSelectedConstructionStatus(settings.defaultFilters.constructionStatus || 'all');
+      setFiltersInitialized(true);
+    }
+  }, [settings.defaultFilters, settingsLoading, filtersInitialized]);
 
   // Analytics data
   const { data: summary, isLoading: summaryLoading } = useAnalyticsSummary();
@@ -109,6 +123,160 @@ export default function Dashboard() {
 
   const hasActiveFilters = selectedInvestor !== 'all' || selectedStatus !== 'all' || selectedConstructionStatus !== 'all';
 
+  // 依據設定的順序和可見性渲染區塊
+  const visibleSections = settings.sections
+    .filter(s => s.visible)
+    .sort((a, b) => a.order - b.order);
+
+  // 區塊渲染映射
+  const renderSection = (section: DashboardSection) => {
+    switch (section.id) {
+      case 'phase-overview':
+        return <PhaseOverviewSection key={section.id} projects={projects as any} />;
+      case 'phase2-tracks':
+        return (
+          <Phase2TracksSection 
+            key={section.id}
+            projects={projects as any} 
+            isLoading={summaryLoading} 
+          />
+        );
+      case 'health-kpis':
+        return (
+          <HealthKPICards
+            key={section.id}
+            totalProjects={summary?.total_projects ?? 0}
+            atRiskCount={summary?.at_risk_count ?? 0}
+            averageProgress={summary?.average_progress ?? 0}
+            pendingFixCount={pendingFixCount}
+            isLoading={summaryLoading}
+          />
+        );
+      case 'action-required':
+        return (
+          <ActionRequiredSection
+            key={section.id}
+            riskProjects={riskProjects}
+            allProjects={projects as any}
+            isLoading={riskLoading}
+            maxDisplayCount={5}
+          />
+        );
+      case 'advanced-analysis':
+        return (
+          <Card key={section.id}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base font-medium flex items-center gap-2">
+                  <Filter className="w-4 h-4" />
+                  進階分析
+                </CardTitle>
+                {hasActiveFilters && (
+                  <Button variant="ghost" size="sm" onClick={resetFilters}>
+                    清除篩選
+                  </Button>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Filters */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">投資方</Label>
+                  <Select value={selectedInvestor} onValueChange={setSelectedInvestor}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="全部" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部投資方</SelectItem>
+                      {investors.map(inv => (
+                        <SelectItem key={inv.id} value={inv.id}>
+                          [{inv.investor_code}] {inv.company_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">案場狀態</Label>
+                  <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="全部" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部狀態</SelectItem>
+                      {filterOptions.statuses.map(status => (
+                        <SelectItem key={status} value={status}>{status}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">施工狀態</Label>
+                  <Select value={selectedConstructionStatus} onValueChange={setSelectedConstructionStatus}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="全部" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">全部狀態</SelectItem>
+                      {filterOptions.constructionStatuses.map(status => (
+                        <SelectItem key={status} value={status}>{status}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Tabs */}
+              <Tabs defaultValue="admin" className="space-y-4">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="admin">行政</TabsTrigger>
+                  <TabsTrigger value="engineering">工程</TabsTrigger>
+                  <TabsTrigger value="risk">風險</TabsTrigger>
+                  <TabsTrigger value="charts" className="flex items-center gap-1">
+                    <BarChart3 className="w-3 h-3" />
+                    分佈圖
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="admin">
+                  <AdministrativeSection projects={filteredProjects as any} />
+                </TabsContent>
+
+                <TabsContent value="engineering">
+                  <EngineeringSection projects={filteredProjects as any} />
+                </TabsContent>
+
+                <TabsContent value="risk">
+                  <RiskSection projects={filteredProjects as any} />
+                </TabsContent>
+
+                {/* Charts moved to a separate tab */}
+                <TabsContent value="charts">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <StatusDistributionChart
+                      title="案場狀態分佈"
+                      distribution={summary?.status_distribution ?? {}}
+                      isLoading={summaryLoading}
+                    />
+                    <StatusDistributionChart
+                      title="施工狀態分佈"
+                      distribution={summary?.construction_status_distribution ?? {}}
+                      isLoading={summaryLoading}
+                    />
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header with Quick Access */}
@@ -117,143 +285,18 @@ export default function Dashboard() {
           <h1 className="text-2xl font-display font-bold text-foreground">儀表板</h1>
           <p className="text-muted-foreground text-sm mt-0.5">一眼掌握今日待處理事項</p>
         </div>
-        <QuickAccessCompact />
+        <div className="flex items-center gap-2">
+          <DashboardSettingsPanel
+            investors={investors}
+            statuses={filterOptions.statuses}
+            constructionStatuses={filterOptions.constructionStatuses}
+          />
+          <QuickAccessCompact />
+        </div>
       </div>
 
-      {/* Section 1: Phase Overview - 兩階段流程概覽 */}
-      <PhaseOverviewSection projects={projects as any} />
-
-      {/* Section 2: Phase 2 多軌並行追蹤 */}
-      <Phase2TracksSection 
-        projects={projects as any} 
-        isLoading={summaryLoading} 
-      />
-
-      {/* Section 3: Health KPIs */}
-      <HealthKPICards
-        totalProjects={summary?.total_projects ?? 0}
-        atRiskCount={summary?.at_risk_count ?? 0}
-        averageProgress={summary?.average_progress ?? 0}
-        pendingFixCount={pendingFixCount}
-        isLoading={summaryLoading}
-      />
-
-      {/* Section 4: Action Required - 需要立即處理的事項 */}
-      <ActionRequiredSection
-        riskProjects={riskProjects}
-        allProjects={projects as any}
-        isLoading={riskLoading}
-        maxDisplayCount={5}
-      />
-
-      {/* Section 3: Filters + Detailed Tabs */}
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base font-medium flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              進階分析
-            </CardTitle>
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={resetFilters}>
-                清除篩選
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Filters */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">投資方</Label>
-              <Select value={selectedInvestor} onValueChange={setSelectedInvestor}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="全部" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部投資方</SelectItem>
-                  {investors.map(inv => (
-                    <SelectItem key={inv.id} value={inv.id}>
-                      [{inv.investor_code}] {inv.company_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">案場狀態</Label>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="全部" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部狀態</SelectItem>
-                  {filterOptions.statuses.map(status => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-1">
-              <Label className="text-xs text-muted-foreground">施工狀態</Label>
-              <Select value={selectedConstructionStatus} onValueChange={setSelectedConstructionStatus}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder="全部" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">全部狀態</SelectItem>
-                  {filterOptions.constructionStatuses.map(status => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <Tabs defaultValue="admin" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="admin">行政</TabsTrigger>
-              <TabsTrigger value="engineering">工程</TabsTrigger>
-              <TabsTrigger value="risk">風險</TabsTrigger>
-              <TabsTrigger value="charts" className="flex items-center gap-1">
-                <BarChart3 className="w-3 h-3" />
-                分佈圖
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="admin">
-              <AdministrativeSection projects={filteredProjects as any} />
-            </TabsContent>
-
-            <TabsContent value="engineering">
-              <EngineeringSection projects={filteredProjects as any} />
-            </TabsContent>
-
-            <TabsContent value="risk">
-              <RiskSection projects={filteredProjects as any} />
-            </TabsContent>
-
-            {/* Charts moved to a separate tab */}
-            <TabsContent value="charts">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <StatusDistributionChart
-                  title="案場狀態分佈"
-                  distribution={summary?.status_distribution ?? {}}
-                  isLoading={summaryLoading}
-                />
-                <StatusDistributionChart
-                  title="施工狀態分佈"
-                  distribution={summary?.construction_status_distribution ?? {}}
-                  isLoading={summaryLoading}
-                />
-              </div>
-            </TabsContent>
-          </Tabs>
-        </CardContent>
-      </Card>
+      {/* 依據使用者設定渲染區塊 */}
+      {visibleSections.map(section => renderSection(section))}
     </div>
   );
 }
