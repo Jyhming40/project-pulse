@@ -1805,6 +1805,7 @@ export type Database = {
           project_code: string
           project_name: string
           pv_module_model: string | null
+          revenue_model: string | null
           seq: number | null
           site_code_display: string | null
           status: string
@@ -1865,6 +1866,7 @@ export type Database = {
           project_code: string
           project_name: string
           pv_module_model?: string | null
+          revenue_model?: string | null
           seq?: number | null
           site_code_display?: string | null
           status?: string
@@ -1925,6 +1927,7 @@ export type Database = {
           project_code?: string
           project_name?: string
           pv_module_model?: string | null
+          revenue_model?: string | null
           seq?: number | null
           site_code_display?: string | null
           status?: string
