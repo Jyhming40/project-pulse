@@ -42,15 +42,18 @@ const SYNC_OBTAINED_RULES_BY_LABEL: Record<string, string[]> = {
  * 公式：已取得的必要文件類型數 / 必要文件類型總數（is_required = true）
  */
 export function useProjectDocumentProgress(projectIds: string[]) {
-  // 使用簡單的哈希來識別 projectIds 是否改變
-  const projectIdsHash = projectIds.length > 0 ? projectIds.slice(0, 5).join(',') + '_' + projectIds.length : '';
+  // 建立穩定的 queryKey - 使用 JSON 序列化前 10 個 ID 加長度
+  // 這確保當 projectIds 改變時，query 會重新執行
+  const stableKey = JSON.stringify({
+    count: projectIds.length,
+    sample: projectIds.slice(0, 10),
+  });
   
   return useQuery({
-    queryKey: ['project-document-progress', projectIdsHash],
+    queryKey: ['project-document-progress', stableKey],
     queryFn: async () => {
-      // 複製 projectIds 以避免閉包問題
-      const currentProjectIds = [...projectIds];
-      if (!currentProjectIds.length) return {};
+      // 在 queryFn 內部直接使用傳入的 projectIds（已經在閉包中捕獲）
+      if (!projectIds.length) return {};
 
       // 1. 取得所有「必要」的文件類型（is_required = true）
       const { data: requiredDocTypes, error: docTypeError } = await supabase
@@ -79,8 +82,7 @@ export function useProjectDocumentProgress(projectIds: string[]) {
 
       // 2. 取得所有非刪除的文件資料 (不用 .in() 以避免 URL 過長問題)
       // 使用 projectIds Set 來做 client-side 過濾
-      const projectIdSet = new Set(currentProjectIds);
-      
+      const projectIdSet = new Set(projectIds);
       const { data: allDocuments, error: docError } = await supabase
         .from('documents')
         .select(`
@@ -129,8 +131,7 @@ export function useProjectDocumentProgress(projectIds: string[]) {
       // 4. 計算每個案場的完成度
       const progressMap: Record<string, ProjectDocProgress> = {};
       
-      // 使用 currentProjectIds 而不是閉包中的 projectIds
-      currentProjectIds.forEach(projectId => {
+      projectIds.forEach(projectId => {
         const projectDocs = documents?.filter(d => d.project_id === projectId) || [];
         
         // 使用 Set 記錄已取得的必要文件類型（用 code）
@@ -209,6 +210,7 @@ export function useProjectDocumentProgress(projectIds: string[]) {
       return progressMap;
     },
     enabled: projectIds.length > 0,
-    staleTime: 30 * 1000, // 30 秒內不重新請求
+    staleTime: 10 * 1000, // 10 秒內不重新請求
+    refetchOnMount: 'always', // 每次掛載時都重新請求
   });
 }
