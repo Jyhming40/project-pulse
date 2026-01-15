@@ -6,6 +6,7 @@ import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { useTableSort } from '@/hooks/useTableSort';
 import { usePagination } from '@/hooks/usePagination';
 import { useBatchSelect } from '@/hooks/useBatchSelect';
+import { useCodebookOptions } from '@/hooks/useCodebook';
 import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
@@ -70,18 +71,17 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CodebookSelect, CodebookValue } from '@/components/CodebookSelect';
 import type { Database } from '@/integrations/supabase/types';
 
 type Investor = Database['public']['Tables']['investors']['Row'];
 type InvestorInsert = Database['public']['Tables']['investors']['Insert'];
-type InvestorType = Database['public']['Enums']['investor_type'];
-
-const INVESTOR_TYPE_OPTIONS: InvestorType[] = ['自有投資', '租賃投資', 'SPC', '個人', '其他'];
 
 export default function Investors() {
   const { canEdit, isAdmin, user } = useAuth();
   const queryClient = useQueryClient();
   const { exportInvestorContacts, exportInvestorPaymentMethods } = useDataExport();
+  const { options: investorTypeOptions } = useCodebookOptions('investor_type');
   
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -634,21 +634,12 @@ export default function Investors() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="investor_type">投資方類型</Label>
-                <Select
-                  value={formData.investor_type || ''}
-                  onValueChange={(value) => setFormData({ ...formData, investor_type: value as InvestorType })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="選擇類型" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {INVESTOR_TYPE_OPTIONS.map(type => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CodebookSelect
+                  category="investor_type"
+                  value={formData.investor_type || undefined}
+                  onValueChange={(value) => setFormData({ ...formData, investor_type: value })}
+                  placeholder="選擇類型"
+                />
               </div>
             </div>
 
@@ -802,7 +793,7 @@ export default function Investors() {
             key: 'investor_type',
             label: '投資方類型',
             type: 'select',
-            options: INVESTOR_TYPE_OPTIONS.map((t) => ({ value: t, label: t })),
+            options: investorTypeOptions,
           },
         ]}
         onSubmit={async (values) => {

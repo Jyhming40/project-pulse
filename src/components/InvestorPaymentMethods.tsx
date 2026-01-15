@@ -20,31 +20,17 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { CodebookSelect } from '@/components/CodebookSelect';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvestorPaymentMethod = Database['public']['Tables']['investor_payment_methods']['Row'];
 type InvestorPaymentMethodInsert = Database['public']['Tables']['investor_payment_methods']['Insert'];
-type PaymentMethodType = Database['public']['Enums']['payment_method_type'];
-
-const METHOD_TYPE_OPTIONS: { value: PaymentMethodType; label: string }[] = [
-  { value: '銀行轉帳', label: '銀行轉帳' },
-  { value: '支票', label: '支票' },
-  { value: '現金', label: '現金' },
-  { value: '其他', label: '其他' },
-];
 
 interface InvestorPaymentMethodsProps {
   investorId: string;
@@ -323,21 +309,12 @@ export function InvestorPaymentMethods({ investorId, investorCode, onExport }: I
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="method_type">支付方式類型 *</Label>
-              <Select
-                value={formData.method_type || ''}
-                onValueChange={(value) => setFormData({ ...formData, method_type: value as PaymentMethodType })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="選擇支付方式" />
-                </SelectTrigger>
-                <SelectContent>
-                  {METHOD_TYPE_OPTIONS.map(option => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CodebookSelect
+                category="payment_method_type"
+                value={formData.method_type || undefined}
+                onValueChange={(value) => setFormData({ ...formData, method_type: value })}
+                placeholder="選擇支付方式"
+              />
             </div>
 
             {formData.method_type === '銀行轉帳' && (
