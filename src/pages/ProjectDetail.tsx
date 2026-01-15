@@ -80,6 +80,8 @@ import type { Database } from '@/integrations/supabase/types';
 import ProjectConstructionAssignments from '@/components/ProjectConstructionAssignments';
 import { ProjectMilestones } from '@/components/ProjectMilestones';
 import { ProjectDocumentsTab } from '@/components/ProjectDocumentsTab';
+import { useCancellationCheck } from '@/hooks/useCancellationCheck';
+import { CancellationWarningDialog } from '@/components/CancellationWarningDialog';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 type DocType = Database['public']['Enums']['doc_type'];
@@ -154,6 +156,10 @@ export default function ProjectDetail() {
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [isVerifyingFolder, setIsVerifyingFolder] = useState(false);
   const [isResettingFolder, setIsResettingFolder] = useState(false);
+  const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+
+  // Cancellation check hook
+  const cancellationCheck = useCancellationCheck(id);
 
   // Fetch project
   const { data: project, isLoading } = useQuery({
@@ -1094,7 +1100,9 @@ export default function ProjectDetail() {
               <Label>新狀態</Label>
               <Select
                 value={statusForm.status}
-                onValueChange={(value) => setStatusForm({ ...statusForm, status: value as ProjectStatus })}
+                onValueChange={(value) => {
+                  setStatusForm({ ...statusForm, status: value as ProjectStatus });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="選擇狀態" />
@@ -1118,7 +1126,15 @@ export default function ProjectDetail() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddStatusOpen(false)}>取消</Button>
             <Button
-              onClick={() => statusForm.status && addStatusHistoryMutation.mutate(statusForm as { status: ProjectStatus; note?: string })}
+              onClick={() => {
+                if (statusForm.status === '取消') {
+                  // Open cancellation warning dialog
+                  setIsAddStatusOpen(false);
+                  setIsCancelDialogOpen(true);
+                } else {
+                  statusForm.status && addStatusHistoryMutation.mutate(statusForm as { status: ProjectStatus; note?: string });
+                }
+              }}
               disabled={!statusForm.status || addStatusHistoryMutation.isPending}
             >
               確認變更
@@ -1126,6 +1142,33 @@ export default function ProjectDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cancellation Warning Dialog */}
+      <CancellationWarningDialog
+        open={isCancelDialogOpen}
+        onOpenChange={setIsCancelDialogOpen}
+        onConfirm={(reason) => {
+          // Update both project status and construction status to cancelled
+          const updateData = {
+            status: '取消' as ProjectStatus,
+            note: reason || statusForm.note,
+          };
+          addStatusHistoryMutation.mutate(updateData, {
+            onSuccess: () => {
+              // Also update construction status
+              updateConstructionMutation.mutate('取消');
+              setIsCancelDialogOpen(false);
+              setStatusForm({});
+            },
+          });
+        }}
+        hasAdminCost={cancellationCheck.hasAdminCost}
+        hasEngineeringCost={cancellationCheck.hasEngineeringCost}
+        adminMilestone={cancellationCheck.adminMilestone}
+        engineeringMilestones={cancellationCheck.engineeringMilestones}
+        projectName={project?.project_name}
+        isCostFree={cancellationCheck.canCancelFreely}
+      />
 
       {/* Edit Construction Status Dialog */}
       <Dialog open={isEditConstructionOpen} onOpenChange={setIsEditConstructionOpen}>
