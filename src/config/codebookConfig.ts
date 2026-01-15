@@ -38,7 +38,8 @@ export type CodebookCategory =
   | 'construction_assignment_status'
   | 'partner_type'
   | 'city'
-  | 'contact_role_tag';
+  | 'contact_role_tag'
+  | 'ui_labels';
 
 export interface CategoryConfig {
   label: string;
@@ -191,6 +192,12 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
     usageMapping: [
       { table: 'investor_contacts', column: 'role_tags' },
     ],
+  },
+  ui_labels: {
+    label: 'UI 術語設定',
+    icon: FileText,
+    description: '自訂介面上顯示的術語標籤',
+    usageMapping: [],
   },
 };
 
@@ -357,5 +364,17 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
     { value: '行政', label: '行政' },
     { value: '業務', label: '業務' },
     { value: '其他', label: '其他' },
+  ],
+  ui_labels: [
+    { value: 'pending_documents', label: '送審中' },
+    { value: 'risk_projects', label: '風險案場' },
+    { value: 'total_projects', label: '總案場數' },
+    { value: 'average_progress', label: '平均進度' },
+    { value: 'average_overall_progress', label: '平均整體進度' },
+    { value: 'average_admin_progress', label: '平均行政進度' },
+    { value: 'average_engineering_progress', label: '平均工程進度' },
+    { value: 'in_review', label: '審查中' },
+    { value: 'show_canceled', label: '顯示已取消' },
+    { value: 'canceled', label: '已取消' },
   ],
 };
