@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
+import { useCodebookOptions } from '@/hooks/useCodebook';
 import { Plus, Edit, Phone, Mail, MessageCircle, Star, UserX, UserCheck, Download, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,17 +31,6 @@ import type { Database } from '@/integrations/supabase/types';
 
 type InvestorContact = Database['public']['Tables']['investor_contacts']['Row'];
 type InvestorContactInsert = Database['public']['Tables']['investor_contacts']['Insert'];
-type ContactRoleTag = Database['public']['Enums']['contact_role_tag'];
-
-const ROLE_TAG_OPTIONS: { value: ContactRoleTag; label: string }[] = [
-  { value: '主要聯絡人', label: '主要聯絡人' },
-  { value: '財務', label: '財務' },
-  { value: '工程', label: '工程' },
-  { value: '法務', label: '法務' },
-  { value: '行政', label: '行政' },
-  { value: '業務', label: '業務' },
-  { value: '其他', label: '其他' },
-];
 
 interface InvestorContactsProps {
   investorId: string;
@@ -51,6 +41,7 @@ interface InvestorContactsProps {
 export function InvestorContacts({ investorId, investorCode, onExport }: InvestorContactsProps) {
   const { canEdit, user } = useAuth();
   const queryClient = useQueryClient();
+  const { options: roleTagOptions } = useCodebookOptions('contact_role_tag');
   
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingContact, setEditingContact] = useState<InvestorContact | null>(null);
@@ -214,7 +205,7 @@ export function InvestorContacts({ investorId, investorCode, onExport }: Investo
     }
   };
 
-  const toggleRoleTag = (tag: ContactRoleTag) => {
+  const toggleRoleTag = (tag: string) => {
     const current = formData.role_tags || [];
     const updated = current.includes(tag)
       ? current.filter(t => t !== tag)
@@ -460,7 +451,7 @@ export function InvestorContacts({ investorId, investorCode, onExport }: Investo
             <div className="space-y-2">
               <Label>角色標籤</Label>
               <div className="flex flex-wrap gap-2">
-                {ROLE_TAG_OPTIONS.map(option => (
+                {roleTagOptions.map(option => (
                   <Badge
                     key={option.value}
                     variant={(formData.role_tags || []).includes(option.value) ? 'default' : 'outline'}
