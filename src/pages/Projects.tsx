@@ -148,6 +148,7 @@ export default function Projects() {
   const { options: gridConnectionTypeOptions } = useOptionsForCategory('grid_connection_type');
   const { options: powerVoltageOptions } = useOptionsForCategory('power_voltage');
   const { options: poleStatusOptions } = useOptionsForCategory('pole_status');
+  const { options: revenueModelOptions } = useOptionsForCategory('revenue_model');
   
   // 使用統一的篩選 hook
   const filters = useProjectFilters();
@@ -166,6 +167,7 @@ export default function Projects() {
     pole_status?: string;
     construction_status?: string;
     intake_year?: number;
+    revenue_model?: string;
   }>({});
   
   // Selected investor code (for display)
@@ -322,6 +324,7 @@ export default function Projects() {
           power_voltage: formData.power_voltage,
           pole_status: formData.pole_status,
           construction_status: formData.construction_status,
+          revenue_model: formData.revenue_model || 'FIT',
         },
       });
       
@@ -615,6 +618,7 @@ export default function Projects() {
       power_voltage: (project as any).power_voltage,
       pole_status: (project as any).pole_status,
       construction_status: (project as any).construction_status,
+      revenue_model: (project as any).revenue_model,
     });
   };
 
@@ -1158,7 +1162,7 @@ export default function Projects() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="installation_type">裝置類型</Label>
                 <CodebookSelect
@@ -1166,6 +1170,15 @@ export default function Projects() {
                   value={formData.installation_type}
                   onValueChange={(value) => setFormData({ ...formData, installation_type: value })}
                   placeholder="選擇裝置類型"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="revenue_model">收益模式</Label>
+                <CodebookSelect
+                  category="revenue_model"
+                  value={formData.revenue_model || 'FIT'}
+                  onValueChange={(value) => setFormData({ ...formData, revenue_model: value })}
+                  placeholder="選擇收益模式"
                 />
               </div>
               <div className="space-y-2">

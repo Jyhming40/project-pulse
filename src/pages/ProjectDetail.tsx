@@ -952,6 +952,7 @@ export default function ProjectDetail() {
           <ProjectMilestones 
             projectId={id!}
             installationType={(project as any).installation_type}
+            revenueModel={(project as any).revenue_model}
             adminProgress={(project as any).admin_progress || 0}
             engineeringProgress={(project as any).engineering_progress || 0}
             overallProgress={(project as any).overall_progress || 0}

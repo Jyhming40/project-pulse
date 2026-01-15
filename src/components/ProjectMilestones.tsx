@@ -10,6 +10,7 @@ import { useProgressMilestones, useProjectMilestones, useToggleProjectMilestone 
 interface ProjectMilestonesProps {
   projectId: string;
   installationType?: string | null; // 案場類型，用於過濾里程碑
+  revenueModel?: string | null; // 收益模式（FIT/REC/SELF_USE），用於過濾里程碑
   adminProgress?: number;
   engineeringProgress?: number;
   overallProgress?: number;
@@ -18,9 +19,27 @@ interface ProjectMilestonesProps {
   readOnly?: boolean;
 }
 
+// FIT 專屬里程碑（REC 案件不顯示）
+const FIT_ONLY_MILESTONES = [
+  'ADMIN_07_PPA_SIGNED',  // 躉售合約完成
+  'ADMIN_09B_FIT_OFFICIAL', // 取得正式躉售函文
+  'ADMIN_10_CLOSED', // 行政結案（FIT 版）
+];
+
+// REC 專屬里程碑（FIT 案件不顯示）
+const REC_ONLY_MILESTONES = [
+  'REC_01_APPLY',
+  'REC_02_DOC_REVIEW',
+  'REC_03_SITE_AUDIT',
+  'REC_04_REGISTRATION',
+  'REC_05_CERT_ISSUED',
+  'REC_06_CLOSED',
+];
+
 export function ProjectMilestones({
   projectId,
   installationType,
+  revenueModel,
   adminProgress = 0,
   engineeringProgress = 0,
   overallProgress = 0,
@@ -50,12 +69,28 @@ export function ProjectMilestones({
     return milestone.applicable_installation_types.includes(installationType);
   };
 
+  // 過濾里程碑：根據收益模式（revenue_model）過濾
+  const filterByRevenueModel = (milestone: { milestone_code: string }) => {
+    const code = milestone.milestone_code;
+    const model = revenueModel || 'FIT'; // 預設為 FIT
+
+    // REC 案件：隱藏 FIT 專屬里程碑
+    if (model === 'REC') {
+      return !FIT_ONLY_MILESTONES.includes(code);
+    }
+    
+    // FIT 或其他案件：隱藏 REC 專屬里程碑
+    return !REC_ONLY_MILESTONES.includes(code);
+  };
+
   const adminMilestones = milestones
     ?.filter(m => m.milestone_type === 'admin' && m.is_active)
-    ?.filter(filterByInstallationType) || [];
+    ?.filter(filterByInstallationType)
+    ?.filter(filterByRevenueModel) || [];
   const engMilestones = milestones
     ?.filter(m => m.milestone_type === 'engineering' && m.is_active)
-    ?.filter(filterByInstallationType) || [];
+    ?.filter(filterByInstallationType)
+    ?.filter(filterByRevenueModel) || [];
 
   const isMilestoneCompleted = (code: string) => {
     return projectMilestones?.some(pm => pm.milestone_code === code && pm.is_completed) || false;

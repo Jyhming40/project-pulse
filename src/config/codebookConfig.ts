@@ -39,7 +39,8 @@ export type CodebookCategory =
   | 'partner_type'
   | 'city'
   | 'contact_role_tag'
-  | 'ui_labels';
+  | 'ui_labels'
+  | 'revenue_model';
 
 export interface CategoryConfig {
   label: string;
@@ -198,6 +199,14 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
     icon: FileText,
     description: '自訂介面上顯示的術語標籤',
     usageMapping: [],
+  },
+  revenue_model: {
+    label: '售電/收益模式',
+    icon: Zap,
+    description: '案場收益模式（FIT 躉售、REC 綠能憑證、自發自用）',
+    usageMapping: [
+      { table: 'projects', column: 'revenue_model' },
+    ],
   },
 };
 
@@ -376,5 +385,10 @@ export const defaultEnumValues: Record<CodebookCategory, { value: string; label:
     { value: 'in_review', label: '審查中' },
     { value: 'show_canceled', label: '顯示已取消' },
     { value: 'canceled', label: '已取消' },
+  ],
+  revenue_model: [
+    { value: 'FIT', label: '躉售 (FIT)' },
+    { value: 'REC', label: '綠能憑證 (REC)' },
+    { value: 'SELF_USE', label: '自發自用' },
   ],
 };
