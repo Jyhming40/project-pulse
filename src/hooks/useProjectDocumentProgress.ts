@@ -56,9 +56,12 @@ export function useProjectDocumentProgress(projectIds: string[]) {
 
       if (docTypeError) throw docTypeError;
       
-      // 建立 code 和 label 的 Set，支援兩種格式比對
+      // 建立 code 和 label 的 Set 與 Map
       const requiredCodes = new Set((requiredDocTypes || []).map((dt: any) => dt.code));
-      const requiredLabels = new Set((requiredDocTypes || []).map((dt: any) => dt.label));
+      const labelToCodeMap = new Map<string, string>();
+      (requiredDocTypes || []).forEach((dt: any) => {
+        labelToCodeMap.set(dt.label, dt.code);
+      });
       const requiredCount = requiredCodes.size;
 
       // 2. 取得所有案場的文件資料，包含檔案數量
@@ -126,19 +129,14 @@ export function useProjectDocumentProgress(projectIds: string[]) {
             if (docCode) allObtainedCodes.add(docCode);
             if (docLabel) allObtainedLabels.add(docLabel);
             
-            // 檢查是否為必要文件
-            const isRequiredDoc = (docCode && requiredCodes.has(docCode)) || 
-                                  (docLabel && requiredLabels.has(docLabel));
-            if (isRequiredDoc) {
-              // 優先用 code
-              if (docCode && requiredCodes.has(docCode)) {
-                obtainedDocCodes.add(docCode);
-              } else if (docLabel) {
-                // 找到對應的 code
-                const matchedType = (requiredDocTypes || []).find((dt: any) => dt.label === docLabel);
-                if (matchedType) {
-                  obtainedDocCodes.add((matchedType as any).code);
-                }
+            // 檢查是否為必要文件（優先用 code 比對）
+            if (docCode && requiredCodes.has(docCode)) {
+              obtainedDocCodes.add(docCode);
+            } else if (docLabel) {
+              // 用 label 找對應的 code
+              const matchedCode = labelToCodeMap.get(docLabel);
+              if (matchedCode) {
+                obtainedDocCodes.add(matchedCode);
               }
             }
           }
