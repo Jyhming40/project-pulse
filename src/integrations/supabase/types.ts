@@ -336,6 +336,7 @@ export type Database = {
       document_type_config: {
         Row: {
           agency_code: string
+          applicable_installation_types: string[] | null
           code: string
           created_at: string | null
           created_by: string | null
@@ -351,6 +352,7 @@ export type Database = {
         }
         Insert: {
           agency_code: string
+          applicable_installation_types?: string[] | null
           code: string
           created_at?: string | null
           created_by?: string | null
@@ -366,6 +368,7 @@ export type Database = {
         }
         Update: {
           agency_code?: string
+          applicable_installation_types?: string[] | null
           code?: string
           created_at?: string | null
           created_by?: string | null
