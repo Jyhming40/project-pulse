@@ -43,18 +43,21 @@ const SYNC_OBTAINED_RULES_BY_LABEL: Record<string, string[]> = {
  */
 export function useProjectDocumentProgress(projectIds: string[]) {
   return useQuery({
-    queryKey: ['project-document-progress', projectIds],
+    queryKey: ['project-document-progress', projectIds.length > 0],
     queryFn: async () => {
       if (!projectIds.length) return {};
 
       // 1. 取得所有「必要」的文件類型（is_required = true）
       const { data: requiredDocTypes, error: docTypeError } = await supabase
-        .from('document_type_config' as any)
+        .from('document_type_config')
         .select('code, label')
         .eq('is_active', true)
         .eq('is_required', true);
 
-      if (docTypeError) throw docTypeError;
+      if (docTypeError) {
+        console.error('Error fetching document_type_config:', docTypeError);
+        throw docTypeError;
+      }
       
       // 建立 code 和 label 的 Set 與 Map
       const requiredCodes = new Set((requiredDocTypes || []).map((dt: any) => dt.code));
@@ -64,8 +67,16 @@ export function useProjectDocumentProgress(projectIds: string[]) {
       });
       const requiredCount = requiredCodes.size;
 
-      // 2. 取得所有案場的文件資料，包含檔案數量
-      const { data: documents, error: docError } = await supabase
+      if (requiredCount === 0) {
+        console.warn('No required document types found');
+        return {};
+      }
+
+      // 2. 取得所有非刪除的文件資料 (不用 .in() 以避免 URL 過長問題)
+      // 使用 projectIds Set 來做 client-side 過濾
+      const projectIdSet = new Set(projectIds);
+      
+      const { data: allDocuments, error: docError } = await supabase
         .from('documents')
         .select(`
           id,
@@ -77,27 +88,36 @@ export function useProjectDocumentProgress(projectIds: string[]) {
           drive_file_id,
           is_deleted
         `)
-        .in('project_id', projectIds)
         .eq('is_deleted', false);
 
-      if (docError) throw docError;
+      if (docError) {
+        console.error('Error fetching documents:', docError);
+        throw docError;
+      }
+
+      // Client-side 過濾出需要的案場文件
+      const documents = (allDocuments || []).filter(d => projectIdSet.has(d.project_id));
 
       // 3. 取得所有文件的檔案數量
       const documentIds = documents?.map(d => d.id) || [];
       let fileCountMap: Record<string, number> = {};
       
       if (documentIds.length > 0) {
-        const { data: fileCounts, error: fileError } = await supabase
-          .from('document_files')
-          .select('document_id')
-          .in('document_id', documentIds)
-          .eq('is_deleted', false);
+        // 分批查詢以避免 URL 過長
+        const batchSize = 100;
+        for (let i = 0; i < documentIds.length; i += batchSize) {
+          const batch = documentIds.slice(i, i + batchSize);
+          const { data: fileCounts, error: fileError } = await supabase
+            .from('document_files')
+            .select('document_id')
+            .in('document_id', batch)
+            .eq('is_deleted', false);
 
-        if (!fileError && fileCounts) {
-          // 計算每個文件的檔案數
-          fileCounts.forEach(fc => {
-            fileCountMap[fc.document_id] = (fileCountMap[fc.document_id] || 0) + 1;
-          });
+          if (!fileError && fileCounts) {
+            fileCounts.forEach(fc => {
+              fileCountMap[fc.document_id] = (fileCountMap[fc.document_id] || 0) + 1;
+            });
+          }
         }
       }
 
@@ -183,6 +203,6 @@ export function useProjectDocumentProgress(projectIds: string[]) {
       return progressMap;
     },
     enabled: projectIds.length > 0,
-    staleTime: 30 * 1000, // 30 秒內不重新請求
+    staleTime: 60 * 1000, // 60 秒內不重新請求
   });
 }
