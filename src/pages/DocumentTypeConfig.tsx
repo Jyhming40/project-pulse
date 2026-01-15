@@ -99,18 +99,24 @@ export default function DocumentTypeConfig() {
   const handleSubmit = async () => {
     if (!form.code || !form.label || !form.agency_code) return;
 
-    if (editingType) {
-      await updateDocumentType({
-        id: editingType.id,
-        label: form.label,
-        agency_code: form.agency_code,
-        description: form.description,
-        sort_order: form.sort_order,
-      });
-    } else {
-      await createDocumentType(form);
+    try {
+      if (editingType) {
+        await updateDocumentType({
+          id: editingType.id,
+          label: form.label,
+          agency_code: form.agency_code,
+          description: form.description,
+          sort_order: form.sort_order,
+        });
+      } else {
+        await createDocumentType(form);
+      }
+      // 只有成功時才關閉 Dialog
+      setDialogOpen(false);
+    } catch (error) {
+      // 錯誤已在 hook 中處理（toast），這裡只需保持 Dialog 開啟
+      console.error('Failed to save document type:', error);
     }
-    setDialogOpen(false);
   };
 
   const handleToggleActive = async (id: string, currentActive: boolean) => {
