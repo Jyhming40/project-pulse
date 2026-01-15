@@ -118,7 +118,7 @@ export function GroupedDocTypeSelect({
               className="flex h-10 w-full bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground"
             />
           </div>
-          <CommandList className="max-h-[300px] overflow-y-auto">
+          <CommandList className="max-h-[300px] overflow-y-auto overscroll-contain" style={{ scrollbarGutter: 'stable' }}>
             {!hasResults && (
               <CommandEmpty>找不到符合的文件類型</CommandEmpty>
             )}

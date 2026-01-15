@@ -41,6 +41,7 @@ export const DOC_TYPE_DEFINITIONS: DocTypeDefinition[] = [
   { code: 'TPC_INSPECTION', label: '派員訪查併聯函', agencyCode: 'TPC' },
   { code: 'TPC_METER_LEASE', label: '電表租約', agencyCode: 'TPC' },
   { code: 'TPC_LINE_COMP', label: '線補費通知單/收據', agencyCode: 'TPC' },
+  { code: 'TPC_FEEDER_SHORTAGE', label: '饋線不足通知單', agencyCode: 'TPC' },
   { code: 'TPC_CONTRACT', label: '躉售合約', agencyCode: 'TPC' },
   { code: 'TPC_FORMAL_FIT', label: '正式躉售', agencyCode: 'TPC' },
   { code: 'TPC_POWER_BILL', label: '躉購電費單', agencyCode: 'TPC' },
