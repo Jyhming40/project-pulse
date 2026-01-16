@@ -8,9 +8,10 @@ import {
   AlertTriangle,
   Info,
   LineChart,
-  Table2,
   BarChart3,
   Calendar,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,7 @@ import { ProjectMultiSelect } from "@/components/projects/ProjectMultiSelect";
 import { ProgressLineChart } from "@/components/projects/ProgressLineChart";
 import { StageAnalysisTable } from "@/components/projects/StageAnalysisTable";
 import { MilestoneDatesTable } from "@/components/projects/MilestoneDatesTable";
+import { useBatchSyncMilestones } from "@/hooks/useBatchSyncMilestones";
 
 export default function ProjectComparison() {
   const [baselineProjectId, setBaselineProjectId] = useState<string | null>(null);
@@ -51,11 +53,20 @@ export default function ProjectComparison() {
   const [legalDialogOpen, setLegalDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("chart");
 
-  const { data: projects, isLoading: projectsLoading } = useProjectsForComparison();
-  const { data: comparisonData, isLoading: comparisonLoading } = useComparisonDataManual(
+  const { data: projects, isLoading: projectsLoading, refetch: refetchProjects } = useProjectsForComparison();
+  const { data: comparisonData, isLoading: comparisonLoading, refetch: refetchComparison } = useComparisonDataManual(
     baselineProjectId,
     comparisonProjectIds
   );
+  const batchSyncMutation = useBatchSyncMilestones();
+
+  const handleBatchSync = async () => {
+    const result = await batchSyncMutation.mutateAsync();
+    if (result.success) {
+      // Refetch data after sync
+      await Promise.all([refetchProjects(), refetchComparison()]);
+    }
+  };
 
   // Removed dev-only missing milestone code warning - 
   // It's expected that projects may not have all milestones completed
@@ -134,6 +145,18 @@ export default function ProjectComparison() {
         </div>
         {comparisonData && comparisonData.results.length > 1 && (
           <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={handleBatchSync}
+              disabled={batchSyncMutation.isPending}
+            >
+              {batchSyncMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="mr-2 h-4 w-4" />
+              )}
+              同步所有里程碑
+            </Button>
             <Button variant="outline" onClick={handleExportCSV}>
               <Download className="mr-2 h-4 w-4" />
               匯出 CSV
@@ -428,6 +451,19 @@ export default function ProjectComparison() {
               <p className="text-sm mt-1">
                 選擇一個卡關案件作為基準，再選擇同期正常案件進行比較
               </p>
+              <Button
+                variant="outline"
+                className="mt-4"
+                onClick={handleBatchSync}
+                disabled={batchSyncMutation.isPending}
+              >
+                {batchSyncMutation.isPending ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                {batchSyncMutation.isPending ? '同步中...' : '初始化所有專案里程碑'}
+              </Button>
             </div>
           </CardContent>
         </Card>
