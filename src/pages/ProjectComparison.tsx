@@ -80,8 +80,9 @@ export default function ProjectComparison() {
     for (const result of comparisonData.results) {
       Object.keys(result.milestones).forEach(code => allCodes.add(code));
     }
-    const requiredCodes = COMPARISON_PAIRS.flatMap(p => [p.from, p.to]);
-    return requiredCodes.filter(code => !allCodes.has(code));
+    // Use Set to avoid duplicate code warnings
+    const requiredCodesSet = new Set(COMPARISON_PAIRS.flatMap(p => [p.from, p.to]));
+    return Array.from(requiredCodesSet).filter(code => !allCodes.has(code));
   }, [comparisonData]);
 
   // Sort results: baseline first, then by construction days descending
