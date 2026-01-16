@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Check, ChevronsUpDown, X } from "lucide-react";
+import { Check, ChevronsUpDown, X, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -16,6 +16,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useFrequentProjects } from "@/hooks/useFrequentProjects";
 
 export interface ProjectOption {
   id: string;
@@ -47,23 +48,30 @@ export function ProjectMultiSelect({
 }: ProjectMultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const { sortByComparisonFrequency, recordComparisonSelection, getComparisonFrequency } = useFrequentProjects();
 
   const availableProjects = useMemo(() => {
     return projects.filter((p) => !excludeIds.includes(p.id));
   }, [projects, excludeIds]);
 
+  // Sort by frequency, then filter by search query
   const filteredProjects = useMemo(() => {
-    if (!searchQuery) return availableProjects.slice(0, 50);
+    const sorted = sortByComparisonFrequency(availableProjects);
+    if (!searchQuery) return sorted.slice(0, 50);
     const query = searchQuery.toLowerCase();
-    return availableProjects
+    return sorted
       .filter(
         (p) =>
           p.project_name.toLowerCase().includes(query) ||
           p.project_code.toLowerCase().includes(query)
       )
       .slice(0, 50);
-  }, [availableProjects, searchQuery]);
+  }, [availableProjects, searchQuery, sortByComparisonFrequency]);
 
+  // Check if a project is frequently used
+  const isFrequent = (projectId: string) => {
+    return getComparisonFrequency(projectId) > 0;
+  };
   const selectedProjects = useMemo(() => {
     return projects.filter((p) => selectedIds.includes(p.id));
   }, [projects, selectedIds]);
@@ -72,6 +80,7 @@ export function ProjectMultiSelect({
     if (selectedIds.includes(projectId)) {
       onSelectionChange(selectedIds.filter((id) => id !== projectId));
     } else if (selectedIds.length < maxSelection) {
+      recordComparisonSelection(projectId);
       onSelectionChange([...selectedIds, projectId]);
     }
   };
@@ -125,7 +134,12 @@ export function ProjectMultiSelect({
                         )}
                       />
                       <div className="flex flex-col flex-1">
-                        <span className="font-medium">{project.project_name}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium">{project.project_name}</span>
+                          {isFrequent(project.id) && (
+                            <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
+                          )}
+                        </div>
                         <span className="text-xs text-muted-foreground">
                           {project.project_code} · {project.created_at.split("T")[0]}
                         </span>

@@ -1,5 +1,5 @@
-import { useState, useMemo } from "react";
-import { Check, ChevronsUpDown, Search } from "lucide-react";
+import { useState, useMemo, useEffect } from "react";
+import { Check, ChevronsUpDown, Star } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useFrequentProjects } from "@/hooks/useFrequentProjects";
 
 export interface ProjectOption {
   id: string;
@@ -42,23 +43,39 @@ export function ProjectSearchCombobox({
 }: ProjectSearchComboboxProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const { sortByBaselineFrequency, recordBaselineSelection, getBaselineFrequency } = useFrequentProjects();
 
   const selectedProject = useMemo(() => {
     return projects.find((p) => p.id === value);
   }, [projects, value]);
 
+  // Sort projects by frequency, then filter by search query
   const filteredProjects = useMemo(() => {
-    if (!searchQuery) return projects.slice(0, 50); // Limit initial display
+    const sorted = sortByBaselineFrequency(projects);
+    if (!searchQuery) return sorted.slice(0, 50);
     const query = searchQuery.toLowerCase();
-    return projects
+    return sorted
       .filter(
         (p) =>
           p.project_name.toLowerCase().includes(query) ||
           p.project_code.toLowerCase().includes(query)
       )
       .slice(0, 50);
-  }, [projects, searchQuery]);
+  }, [projects, searchQuery, sortByBaselineFrequency]);
 
+  // Check if a project is frequently used (top 5)
+  const isFrequent = (projectId: string) => {
+    return getBaselineFrequency(projectId) > 0;
+  };
+
+  const handleSelect = (projectId: string) => {
+    if (projectId !== value) {
+      recordBaselineSelection(projectId);
+    }
+    onValueChange(projectId === value ? null : projectId);
+    setOpen(false);
+    setSearchQuery("");
+  };
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -93,11 +110,7 @@ export function ProjectSearchCombobox({
                 <CommandItem
                   key={project.id}
                   value={project.id}
-                  onSelect={() => {
-                    onValueChange(project.id === value ? null : project.id);
-                    setOpen(false);
-                    setSearchQuery("");
-                  }}
+                  onSelect={() => handleSelect(project.id)}
                 >
                   <Check
                     className={cn(
@@ -105,8 +118,13 @@ export function ProjectSearchCombobox({
                       value === project.id ? "opacity-100" : "opacity-0"
                     )}
                   />
-                  <div className="flex flex-col">
-                    <span className="font-medium">{project.project_name}</span>
+                  <div className="flex flex-col flex-1">
+                    <div className="flex items-center gap-1">
+                      <span className="font-medium">{project.project_name}</span>
+                      {isFrequent(project.id) && (
+                        <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
+                      )}
+                    </div>
                     <span className="text-xs text-muted-foreground">
                       {project.project_code} · {project.created_at.split("T")[0]}
                     </span>
