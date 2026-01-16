@@ -68,8 +68,8 @@ export const TIMELINE_DOC_MAPPING = [
     step: 6, 
     label: '免雜項執照同意函', 
     short: '免雜同意',
-    doc_type_codes: ['BUILD_EXEMPT'],
-    doc_type_labels: ['免雜項執照同意函', '免雜項同意', '免雜同意', '免雜項執照'],
+    doc_type_codes: ['BUILD_EXEMPT_APP'], // 免雜項申請
+    doc_type_labels: ['免雜項執照同意函', '免雜項同意', '免雜同意', '免雜項執照', '免雜項申請'],
     date_field: 'issued_at' as const,
     color: '#06b6d4',
   },
@@ -77,7 +77,7 @@ export const TIMELINE_DOC_MAPPING = [
     step: 7, 
     label: '免雜項執照竣工函', 
     short: '免雜竣工',
-    doc_type_codes: ['BUILD_EXEMPT_COMP'],
+    doc_type_codes: ['BUILD_EXEMPT_COMP'], // 免雜項竣工
     doc_type_labels: ['免雜項執照竣工函', '免雜項竣工', '免雜竣工', '免雜項執照竣工'],
     date_field: 'issued_at' as const,
     color: '#ef4444',
@@ -86,7 +86,7 @@ export const TIMELINE_DOC_MAPPING = [
     step: 8, 
     label: '台電驗收掛表作業', 
     short: '報竣掛表',
-    doc_type_codes: ['TPC_METER'],
+    doc_type_codes: ['TPC_METER'], // 報竣掛表
     doc_type_labels: ['報竣掛表', '台電驗收掛表', '台電驗收掛表作業', '電表掛表', '掛表'],
     date_field: 'issued_at' as const,
     color: '#ec4899',
@@ -95,7 +95,7 @@ export const TIMELINE_DOC_MAPPING = [
     step: 9, 
     label: '台電派員併聯函', 
     short: '派員併聯',
-    doc_type_codes: ['TPC_CONNECTION'],
+    doc_type_codes: ['TPC_INSPECTION'], // 派員訪查併聯函
     doc_type_labels: ['派員訪查併聯函', '台電派員併聯函', '派員併聯', '併聯函'],
     date_field: 'issued_at' as const,
     color: '#6366f1',
@@ -113,7 +113,7 @@ export const TIMELINE_DOC_MAPPING = [
     step: 11, 
     label: '台電正式躉售', 
     short: '正式躉售',
-    doc_type_codes: ['TPC_FIT_OFFICIAL'],
+    doc_type_codes: ['TPC_FORMAL_FIT'], // 正式躉售
     doc_type_labels: ['正式躉售', '台電正式躉售', '躉售函'],
     date_field: 'issued_at' as const,
     color: '#a855f7',
