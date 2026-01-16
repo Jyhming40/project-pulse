@@ -252,52 +252,60 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
 
   for (const rule of ADMIN_MILESTONE_RULES) {
     let shouldComplete = false;
+    // 用於記錄完成時間（使用文件的實際日期）
+    let completionDate: string | null = null;
+    let matchedDoc: DocumentRecord | null = null;
 
     // 檢查前置條件
     const prereqsMet = rule.prerequisites.every(prereq => completedCodes.has(prereq));
 
-    if (prereqsMet) {
-      // 查找匹配的文件：
-      // 1. 先用 doc_type_code（新系統）
-      // 2. 若無則用 doc_type_labels（多標籤匹配）
-      // 3. 最後用 doc_type_label（單標籤匹配，向後兼容）
-      const findMatchingDoc = (): DocumentRecord | null => {
-        // 優先用 doc_type_code 匹配
-        if (rule.doc_type_code && docByCode[rule.doc_type_code]) {
-          return docByCode[rule.doc_type_code];
-        }
-        // 多標籤匹配：任一標籤匹配即可
-        if (rule.doc_type_labels && rule.doc_type_labels.length > 0) {
-          for (const label of rule.doc_type_labels) {
-            if (docByLabel[label]) {
-              console.log(`[${rule.milestone_code}] Matched via multi-label: ${label}`);
-              return docByLabel[label];
-            }
+    // 查找匹配的文件：
+    // 1. 先用 doc_type_code（新系統）
+    // 2. 若無則用 doc_type_labels（多標籤匹配）
+    // 3. 最後用 doc_type_label（單標籤匹配，向後兼容）
+    const findMatchingDoc = (): DocumentRecord | null => {
+      // 優先用 doc_type_code 匹配
+      if (rule.doc_type_code && docByCode[rule.doc_type_code]) {
+        return docByCode[rule.doc_type_code];
+      }
+      // 多標籤匹配：任一標籤匹配即可
+      if (rule.doc_type_labels && rule.doc_type_labels.length > 0) {
+        for (const label of rule.doc_type_labels) {
+          if (docByLabel[label]) {
+            console.log(`[${rule.milestone_code}] Matched via multi-label: ${label}`);
+            return docByLabel[label];
           }
         }
-        // 單標籤匹配（向後兼容）
-        if (rule.doc_type_label && docByLabel[rule.doc_type_label]) {
-          return docByLabel[rule.doc_type_label];
-        }
-        return null;
-      };
+      }
+      // 單標籤匹配（向後兼容）
+      if (rule.doc_type_label && docByLabel[rule.doc_type_label]) {
+        return docByLabel[rule.doc_type_label];
+      }
+      return null;
+    };
 
+    if (prereqsMet) {
       switch (rule.check_field) {
         case 'project_exists':
-          // 專案存在即完成
+          // 專案存在即完成 - 使用專案建立時間（需另外獲取，暫用 now）
           shouldComplete = true;
+          // 專案建立日期稍後處理
           break;
 
         case 'submitted_at': {
           // 檢查對應文件的 submitted_at 是否有值
           // 注意：如果文件已取得（issued_at 有值或有上傳檔案），則 submitted_at 也視為完成
-          const doc = findMatchingDoc();
-          if (doc) {
-            const hasFile = (doc.file_count !== undefined && doc.file_count > 0) || !!doc.drive_file_id;
-            const isIssued = !!doc.issued_at || hasFile;
+          matchedDoc = findMatchingDoc();
+          if (matchedDoc) {
+            const hasFile = (matchedDoc.file_count !== undefined && matchedDoc.file_count > 0) || !!matchedDoc.drive_file_id;
+            const isIssued = !!matchedDoc.issued_at || hasFile;
             // 如果已送件或已取得，都算完成
-            shouldComplete = !!doc.submitted_at || isIssued;
-            console.log(`[${rule.milestone_code}] submitted_at check: doc found (type: ${doc.doc_type || doc.doc_type_code}), submitted_at=${doc.submitted_at}, isIssued=${isIssued}, result=${shouldComplete}`);
+            shouldComplete = !!matchedDoc.submitted_at || isIssued;
+            // 使用文件的實際日期作為完成時間
+            if (shouldComplete) {
+              completionDate = matchedDoc.submitted_at || matchedDoc.issued_at || null;
+            }
+            console.log(`[${rule.milestone_code}] submitted_at check: doc found (type: ${matchedDoc.doc_type || matchedDoc.doc_type_code}), submitted_at=${matchedDoc.submitted_at}, isIssued=${isIssued}, completionDate=${completionDate}, result=${shouldComplete}`);
           } else {
             console.log(`[${rule.milestone_code}] submitted_at check: no matching doc for code=${rule.doc_type_code} or label=${rule.doc_type_label}`);
           }
@@ -306,12 +314,16 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
 
         case 'issued_at': {
           // 檢查對應文件的 issued_at 是否有值，或是否有上傳檔案（document_files 或 Google Drive）
-          const doc = findMatchingDoc();
-          if (doc) {
+          matchedDoc = findMatchingDoc();
+          if (matchedDoc) {
             // 有 issued_at 或有上傳檔案（document_files 或 drive_file_id）都算「已取得」
-            const hasFile = (doc.file_count !== undefined && doc.file_count > 0) || !!doc.drive_file_id;
-            shouldComplete = !!doc.issued_at || hasFile;
-            console.log(`[${rule.milestone_code}] issued_at check: doc found (type: ${doc.doc_type || doc.doc_type_code}), issued_at=${doc.issued_at}, file_count=${doc.file_count}, drive_file_id=${doc.drive_file_id}, hasFile=${hasFile}, result=${shouldComplete}`);
+            const hasFile = (matchedDoc.file_count !== undefined && matchedDoc.file_count > 0) || !!matchedDoc.drive_file_id;
+            shouldComplete = !!matchedDoc.issued_at || hasFile;
+            // 使用文件的 issued_at 作為完成時間
+            if (shouldComplete) {
+              completionDate = matchedDoc.issued_at || null;
+            }
+            console.log(`[${rule.milestone_code}] issued_at check: doc found (type: ${matchedDoc.doc_type || matchedDoc.doc_type_code}), issued_at=${matchedDoc.issued_at}, file_count=${matchedDoc.file_count}, drive_file_id=${matchedDoc.drive_file_id}, hasFile=${hasFile}, completionDate=${completionDate}, result=${shouldComplete}`);
           } else {
             console.log(`[${rule.milestone_code}] issued_at check: no matching doc for code=${rule.doc_type_code} or label=${rule.doc_type_label}`);
           }
@@ -358,15 +370,20 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
         to: true,
       });
 
+      // 使用文件的實際日期，若無則使用當前時間
+      const actualCompletionDate = completionDate || new Date().toISOString();
+      
       if (existing) {
         // 更新現有記錄為完成
         await supabase
           .from('project_milestones')
           .update({
             is_completed: true,
-            completed_at: new Date().toISOString(),
+            completed_at: actualCompletionDate,
             completed_by: userId,
-            note: '依據文件狀態自動完成 (SSOT)',
+            note: completionDate 
+              ? `依據文件 ${matchedDoc?.doc_type || matchedDoc?.doc_type_code || ''} 日期自動完成 (SSOT)` 
+              : '依據文件狀態自動完成 (SSOT)',
             updated_at: new Date().toISOString(),
           })
           .eq('id', existing.id);
@@ -378,9 +395,11 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
             project_id: projectId,
             milestone_code: rule.milestone_code,
             is_completed: true,
-            completed_at: new Date().toISOString(),
+            completed_at: actualCompletionDate,
             completed_by: userId,
-            note: '依據文件狀態自動完成 (SSOT)',
+            note: completionDate 
+              ? `依據文件 ${matchedDoc?.doc_type || matchedDoc?.doc_type_code || ''} 日期自動完成 (SSOT)` 
+              : '依據文件狀態自動完成 (SSOT)',
           });
       }
     }
