@@ -1,35 +1,20 @@
 import { useState, useMemo } from "react";
-import { Link } from "react-router-dom";
 import { format } from "date-fns";
-import { zhTW } from "date-fns/locale";
 import {
   Download,
   FileText,
   Copy,
   Check,
-  ExternalLink,
   AlertTriangle,
   Info,
+  LineChart,
+  Table2,
   BarChart3,
+  Calendar,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import {
   Dialog,
   DialogContent,
@@ -47,27 +32,26 @@ import { toast } from "sonner";
 import {
   useProjectsForComparison,
   useComparisonDataManual,
-  useProjectYears,
   COMPARISON_PAIRS,
   TIMELINE_MILESTONES,
   generateComparisonCSV,
   generateLegalSummary,
   generateLegalTable,
-  ComparisonResult,
 } from "@/hooks/useProjectComparison";
 import { ProjectSearchCombobox } from "@/components/projects/ProjectSearchCombobox";
 import { ProjectMultiSelect } from "@/components/projects/ProjectMultiSelect";
-import { MilestoneTimelineChart } from "@/components/projects/MilestoneTimelineChart";
+import { ProgressLineChart } from "@/components/projects/ProgressLineChart";
+import { StageAnalysisTable } from "@/components/projects/StageAnalysisTable";
+import { MilestoneDatesTable } from "@/components/projects/MilestoneDatesTable";
 
 export default function ProjectComparison() {
   const [baselineProjectId, setBaselineProjectId] = useState<string | null>(null);
   const [comparisonProjectIds, setComparisonProjectIds] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [legalDialogOpen, setLegalDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState("table");
+  const [activeTab, setActiveTab] = useState("chart");
 
   const { data: projects, isLoading: projectsLoading } = useProjectsForComparison();
-  const { data: years } = useProjectYears();
   const { data: comparisonData, isLoading: comparisonLoading } = useComparisonDataManual(
     baselineProjectId,
     comparisonProjectIds
@@ -85,35 +69,26 @@ export default function ProjectComparison() {
     return Array.from(requiredCodesSet).filter(code => !allCodes.has(code));
   }, [comparisonData]);
 
-  // Sort results: baseline first, then by construction days descending
+  // Sort results: baseline first, then by total days descending
   const sortedResults = useMemo(() => {
     if (!comparisonData) return [];
     const baseline = comparisonData.results.find(r => r.isBaseline);
     const others = comparisonData.results
       .filter(r => !r.isBaseline)
       .sort((a, b) => {
-        const aDays = a.intervals.construction?.days ?? -Infinity;
-        const bDays = b.intervals.construction?.days ?? -Infinity;
-        return bDays - aDays;
+        // Calculate total days for sorting
+        const getTotalDays = (r: typeof a) => {
+          return COMPARISON_PAIRS.reduce((sum, pair) => {
+            const interval = r.intervals[pair.id];
+            if (interval?.status === 'complete' && interval.days !== null) {
+              return sum + interval.days;
+            }
+            return sum;
+          }, 0);
+        };
+        return getTotalDays(b) - getTotalDays(a);
       });
     return baseline ? [baseline, ...others] : others;
-  }, [comparisonData]);
-
-  // Prepare timeline data
-  const timelineData = useMemo(() => {
-    if (!comparisonData) return [];
-    
-    return comparisonData.results.map(result => ({
-      projectId: result.project.id,
-      projectName: result.project.project_name,
-      projectCode: result.project.project_code,
-      isBaseline: result.isBaseline,
-      milestones: TIMELINE_MILESTONES.map(def => ({
-        code: def.code,
-        label: def.label,
-        completedAt: result.milestones[def.code] || null,
-      })),
-    }));
   }, [comparisonData]);
 
   const handleExportCSV = () => {
@@ -136,7 +111,7 @@ export default function ProjectComparison() {
       comparisonData.baseline,
       sortedResults,
       comparisonData.stats,
-      0 // Not using range anymore
+      0
     );
 
     const tables = COMPARISON_PAIRS
@@ -153,44 +128,16 @@ export default function ProjectComparison() {
     });
   };
 
-  const renderIntervalCell = (result: ComparisonResult, pairId: string) => {
-    const interval = result.intervals[pairId];
-    
-    if (interval.status === 'na') {
-      return <span className="text-muted-foreground text-sm">N/A</span>;
-    }
-
-    if (interval.status === 'incomplete') {
-      return <span className="text-muted-foreground text-sm">未完成</span>;
-    }
-
-    return (
-      <div className="space-y-1">
-        <div className="font-medium">{interval.days} 天</div>
-        {result.isBaseline ? (
-          <Badge variant="outline" className="text-xs">基準</Badge>
-        ) : interval.delta !== null ? (
-          <Badge
-            variant={interval.delta > 0 ? "destructive" : interval.delta < 0 ? "secondary" : "outline"}
-            className="text-xs"
-          >
-            {interval.delta >= 0 ? '+' : ''}{interval.delta}
-          </Badge>
-        ) : (
-          <span className="text-muted-foreground text-xs">Δ N/A</span>
-        )}
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">案件進度比較</h1>
+          <h1 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+            ⚖️ 案件時程分析系統
+          </h1>
           <p className="text-muted-foreground">
-            比較基準案件與選定案件的行政/工程進度速度差異
+            含階段耗時差異分析表 | Y軸由下而上 (1→10) | 違約責任明確化
           </p>
         </div>
         {comparisonData && comparisonData.results.length > 1 && (
@@ -256,15 +203,27 @@ export default function ProjectComparison() {
 
       {/* Controls */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">比較設定</CardTitle>
-          <CardDescription>選擇基準案件與要比較的案件（最多 10 件）</CardDescription>
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">案件選擇</CardTitle>
+              <CardDescription>
+                選擇基準案件（卡關案件）與要比較的正常案件
+              </CardDescription>
+            </div>
+            <Badge variant="outline" className="text-sm">
+              {comparisonProjectIds.length + (baselineProjectId ? 1 : 0)}/11
+            </Badge>
+          </div>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             {/* Baseline Project */}
             <div className="space-y-2">
-              <Label>基準案件（必填）</Label>
+              <Label className="flex items-center gap-2">
+                基準案件（卡關案件）
+                <Badge variant="destructive" className="text-xs">必填</Badge>
+              </Label>
               {projectsLoading ? (
                 <Skeleton className="h-10 w-full" />
               ) : (
@@ -273,7 +232,6 @@ export default function ProjectComparison() {
                   value={baselineProjectId}
                   onValueChange={(value) => {
                     setBaselineProjectId(value);
-                    // Remove from comparison if selected as baseline
                     if (value) {
                       setComparisonProjectIds(prev => prev.filter(id => id !== value));
                     }
@@ -283,7 +241,7 @@ export default function ProjectComparison() {
               )}
             </div>
 
-            {/* Comparison Year Info */}
+            {/* Baseline Year Info */}
             <div className="space-y-2">
               <Label>基準年度</Label>
               <div className="h-10 flex items-center px-3 border rounded-md bg-muted/50">
@@ -300,7 +258,10 @@ export default function ProjectComparison() {
 
           {/* Comparison Projects Multi-Select */}
           <div className="space-y-2">
-            <Label>比較案件（可多選，最多 10 件）</Label>
+            <Label className="flex items-center gap-2">
+              比較案件（同期正常案件）
+              <span className="text-muted-foreground text-sm">最多 10 件</span>
+            </Label>
             {projectsLoading ? (
               <Skeleton className="h-10 w-full" />
             ) : (
@@ -313,27 +274,6 @@ export default function ProjectComparison() {
                 placeholder="選擇要比較的案件..."
               />
             )}
-          </div>
-
-          {/* Comparison Pairs Info */}
-          <div className="p-4 bg-muted/50 rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <Info className="h-4 w-4 text-muted-foreground" />
-              <span className="text-sm font-medium">比較區間（固定）</span>
-            </div>
-            <div className="grid gap-2 md:grid-cols-2">
-              {COMPARISON_PAIRS.map(pair => (
-                <div key={pair.id} className="text-sm">
-                  <span className="font-medium">{pair.label}</span>
-                  <span className="text-muted-foreground ml-2">
-                    {pair.description}
-                    {pair.fitOnly && (
-                      <Badge variant="outline" className="ml-2 text-xs">FIT 專用</Badge>
-                    )}
-                  </span>
-                </div>
-              ))}
-            </div>
           </div>
         </CardContent>
       </Card>
@@ -351,7 +291,7 @@ export default function ProjectComparison() {
         </Card>
       )}
 
-      {/* Results */}
+      {/* Loading State */}
       {comparisonLoading && baselineProjectId && (
         <Card>
           <CardContent className="py-8">
@@ -364,10 +304,11 @@ export default function ProjectComparison() {
         </Card>
       )}
 
+      {/* Results */}
       {comparisonData && comparisonData.results.length > 0 && (
         <>
           {/* Summary Stats */}
-          <div className="grid gap-4 md:grid-cols-4">
+          <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
             <Card>
               <CardContent className="pt-6">
                 <div className="text-2xl font-bold">{comparisonData.baselineYear}</div>
@@ -376,137 +317,125 @@ export default function ProjectComparison() {
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <div className="text-2xl font-bold">{comparisonData.totalCompared}</div>
-                <p className="text-sm text-muted-foreground">比較案件數</p>
+                <div className="text-2xl font-bold">{comparisonData.totalCompared + 1}</div>
+                <p className="text-sm text-muted-foreground">案件總數</p>
               </CardContent>
             </Card>
-            {comparisonData.stats.find(s => s.pairId === 'construction') && (
-              <>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold">
-                      {comparisonData.stats.find(s => s.pairId === 'construction')?.median ?? '-'}
-                    </div>
-                    <p className="text-sm text-muted-foreground">施工期中位數（天）</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-6">
-                    <div className="text-2xl font-bold">
-                      {comparisonData.stats.find(s => s.pairId === 'construction')?.average ?? '-'}
-                    </div>
-                    <p className="text-sm text-muted-foreground">施工期平均（天）</p>
-                  </CardContent>
-                </Card>
-              </>
-            )}
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{COMPARISON_PAIRS.length}</div>
+                <p className="text-sm text-muted-foreground">比較階段數</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-2xl font-bold">{TIMELINE_MILESTONES.length}</div>
+                <p className="text-sm text-muted-foreground">里程碑總數</p>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Tabs for Table and Timeline views */}
+          {/* Main Tabs */}
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
+            <CardHeader className="pb-2">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                   <CardTitle className="text-lg">比較結果</CardTitle>
                   <CardDescription>
                     基準案件：{comparisonData.baseline.project_name}（{comparisonData.baseline.project_code}）
                   </CardDescription>
                 </div>
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList>
-                    <TabsTrigger value="table">表格檢視</TabsTrigger>
-                    <TabsTrigger value="timeline">
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      時間軸
-                    </TabsTrigger>
-                  </TabsList>
-                </Tabs>
+                {/* Legend */}
+                <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-1 bg-red-500 rounded" />
+                    <span>{comparisonData.baseline.project_name.length > 8 
+                      ? comparisonData.baseline.project_name.substring(0, 8) + '...'
+                      : comparisonData.baseline.project_name} (卡關)</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-1 bg-green-500 rounded border-dashed" style={{ borderTop: '2px dashed' }} />
+                    <span>同期正常案件</span>
+                  </div>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
-              {activeTab === "table" ? (
-                <div className="rounded-md border overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="min-w-[200px]">案場名稱</TableHead>
-                        <TableHead className="min-w-[100px]">建立日期</TableHead>
-                        <TableHead className="min-w-[80px]">收益模式</TableHead>
-                        {COMPARISON_PAIRS.map(pair => (
-                          <TableHead key={pair.id} className="min-w-[100px] text-center">
-                            {pair.label}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sortedResults.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                            請選擇基準案件和比較案件
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        sortedResults.map(result => (
-                          <TableRow
-                            key={result.project.id}
-                            className={result.isBaseline ? "bg-primary/5 font-medium" : ""}
-                          >
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                {result.isBaseline && (
-                                  <Badge variant="default" className="text-xs">基準</Badge>
-                                )}
-                                <Link
-                                  to={`/projects/${result.project.id}`}
-                                  className="hover:underline flex items-center gap-1"
-                                >
-                                  {result.project.project_name}
-                                  <ExternalLink className="h-3 w-3" />
-                                </Link>
-                              </div>
-                              <div className="text-xs text-muted-foreground">
-                                {result.project.project_code}
-                              </div>
-                            </TableCell>
-                            <TableCell className="text-sm">
-                              {format(new Date(result.project.created_at), 'yyyy/MM/dd', { locale: zhTW })}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="outline" className="text-xs">
-                                {result.project.revenue_model || '-'}
-                              </Badge>
-                            </TableCell>
-                            {COMPARISON_PAIRS.map(pair => (
-                              <TableCell key={pair.id} className="text-center">
-                                {renderIntervalCell(result, pair.id)}
-                              </TableCell>
-                            ))}
-                          </TableRow>
-                        ))
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="chart" className="flex items-center gap-2">
+                    <LineChart className="h-4 w-4" />
+                    爬升歷程圖
+                  </TabsTrigger>
+                  <TabsTrigger value="analysis" className="flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4" />
+                    <span className="hidden sm:inline">階段耗時差異分析</span>
+                    <span className="sm:hidden">差異分析</span>
+                  </TabsTrigger>
+                  <TabsTrigger value="dates" className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    原始日期列表
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="chart" className="mt-4">
+                  <ProgressLineChart results={sortedResults} />
+                </TabsContent>
+
+                <TabsContent value="analysis" className="mt-4">
+                  <StageAnalysisTable 
+                    results={sortedResults} 
+                    stats={comparisonData.stats}
+                  />
+                </TabsContent>
+
+                <TabsContent value="dates" className="mt-4">
+                  <MilestoneDatesTable results={sortedResults} />
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
+
+          {/* Comparison Pairs Info */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Info className="h-4 w-4" />
+                比較區間說明
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+                {COMPARISON_PAIRS.map((pair, idx) => (
+                  <div key={pair.id} className="text-sm p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-xs text-muted-foreground">{idx + 1}.</span>
+                      <span className="font-medium">{pair.label}</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1 ml-5">
+                      {pair.description}
+                      {pair.fitOnly && (
+                        <Badge variant="outline" className="ml-2 text-xs">FIT</Badge>
                       )}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <MilestoneTimelineChart
-                  projects={timelineData}
-                  milestoneDefinitions={TIMELINE_MILESTONES}
-                />
-              )}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </CardContent>
           </Card>
         </>
       )}
 
-      {/* Empty state when no baseline selected */}
+      {/* Empty State */}
       {!baselineProjectId && !comparisonLoading && (
         <Card>
-          <CardContent className="py-16">
-            <div className="text-center text-muted-foreground">
-              <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <h3 className="text-lg font-medium mb-2">開始比較案件進度</h3>
-              <p>請先選擇一個基準案件，再選擇要比較的案件</p>
+          <CardContent className="py-12 text-center">
+            <div className="text-muted-foreground">
+              <LineChart className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p className="text-lg font-medium">請選擇基準案件開始比較</p>
+              <p className="text-sm mt-1">
+                選擇一個卡關案件作為基準，再選擇同期正常案件進行比較
+              </p>
             </div>
           </CardContent>
         </Card>
