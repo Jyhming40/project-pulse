@@ -7,11 +7,11 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
+  ReferenceLine,
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
 import { TIMELINE_MILESTONES, ComparisonResult } from "@/hooks/useProjectComparison";
-import { format } from "date-fns";
+import { format, differenceInDays } from "date-fns";
 
 interface ProgressLineChartProps {
   results: ComparisonResult[];
@@ -32,93 +32,125 @@ const LINE_COLORS = [
 ];
 
 export function ProgressLineChart({ results }: ProgressLineChartProps) {
-  // Transform data for recharts - Y axis is milestone step (1-10), X axis is date
-  const chartData = useMemo(() => {
-    // Get all unique dates across all projects
-    const allDates = new Set<string>();
-    const projectMilestoneData: Record<string, { step: number; date: Date }[]> = {};
+  // Transform data for recharts
+  // Each data point represents a milestone completion event
+  const { chartData, series, minDate, maxDate } = useMemo(() => {
+    if (results.length === 0) {
+      return { chartData: [], series: [], minDate: null, maxDate: null };
+    }
 
-    results.forEach((r) => {
-      projectMilestoneData[r.project.id] = [];
+    // Collect all milestone events with their dates and step numbers
+    interface MilestoneEvent {
+      projectIdx: number;
+      date: Date;
+      step: number;
+      projectName: string;
+      milestoneName: string;
+    }
 
-      TIMELINE_MILESTONES.forEach((milestone, stepIndex) => {
+    const allEvents: MilestoneEvent[] = [];
+    let globalMinDate: Date | null = null;
+    let globalMaxDate: Date | null = null;
+
+    results.forEach((r, projectIdx) => {
+      TIMELINE_MILESTONES.forEach((milestone, stepIdx) => {
         const completedAt = r.milestones[milestone.code];
         if (completedAt) {
-          const dateStr = completedAt.split('T')[0];
-          allDates.add(dateStr);
-          projectMilestoneData[r.project.id].push({
-            step: stepIndex + 1,
-            date: new Date(completedAt),
+          const date = new Date(completedAt);
+          allEvents.push({
+            projectIdx,
+            date,
+            step: stepIdx + 1,
+            projectName: r.project.project_name,
+            milestoneName: milestone.label,
           });
+
+          if (!globalMinDate || date < globalMinDate) globalMinDate = date;
+          if (!globalMaxDate || date > globalMaxDate) globalMaxDate = date;
         }
       });
-
-      // Sort by date
-      projectMilestoneData[r.project.id].sort(
-        (a, b) => a.date.getTime() - b.date.getTime()
-      );
     });
 
-    // Create timeline data points
-    const sortedDates = Array.from(allDates).sort();
-    
-    if (sortedDates.length === 0) return [];
+    if (!globalMinDate || !globalMaxDate || allEvents.length === 0) {
+      return { chartData: [], series: [], minDate: null, maxDate: null };
+    }
 
-    // Generate data points for each project's progress over time
+    // Create data points for each project's progression
+    // Each project starts at step 0 on its first milestone date and climbs up
+    const projectTimelines: { projectIdx: number; events: { date: Date; step: number }[] }[] = 
+      results.map((_, idx) => ({ projectIdx: idx, events: [] }));
+
+    allEvents.forEach(event => {
+      projectTimelines[event.projectIdx].events.push({
+        date: event.date,
+        step: event.step,
+      });
+    });
+
+    // Sort each project's events by date
+    projectTimelines.forEach(pt => {
+      pt.events.sort((a, b) => a.date.getTime() - b.date.getTime());
+    });
+
+    // Create unified timeline with all dates
+    const allDates = new Set<number>();
+    allEvents.forEach(e => {
+      allDates.add(e.date.getTime());
+    });
+
+    const sortedDates = Array.from(allDates).sort((a, b) => a - b);
+
+    // Build chart data - each row is a date point
     const data: any[] = [];
 
-    // For each project, create a series of points showing progress
-    results.forEach((r, rIdx) => {
-      const projectData = projectMilestoneData[r.project.id];
-      
-      projectData.forEach((point, idx) => {
-        const existingPoint = data.find(
-          d => d.dateStr === format(point.date, 'yyyy-MM-dd')
-        );
-        
-        const key = `project_${rIdx}`;
-        
-        if (existingPoint) {
-          existingPoint[key] = point.step;
-        } else {
-          const newPoint: any = {
-            dateStr: format(point.date, 'yyyy-MM-dd'),
-            dateMs: point.date.getTime(),
-            [key]: point.step,
-          };
-          data.push(newPoint);
+    sortedDates.forEach(dateMs => {
+      const dateStr = format(new Date(dateMs), 'yyyy-MM-dd');
+      const point: any = {
+        dateStr,
+        dateMs,
+      };
+
+      // For each project, get the highest step achieved by this date
+      projectTimelines.forEach((pt, idx) => {
+        let maxStep = 0;
+        pt.events.forEach(e => {
+          if (e.date.getTime() <= dateMs && e.step > maxStep) {
+            maxStep = e.step;
+          }
+        });
+        if (maxStep > 0) {
+          point[`project_${idx}`] = maxStep;
         }
       });
+
+      data.push(point);
     });
 
-    // Sort by date
-    data.sort((a, b) => a.dateMs - b.dateMs);
-
-    // Forward fill values for continuous lines
-    results.forEach((_, rIdx) => {
-      const key = `project_${rIdx}`;
-      let lastValue: number | undefined;
-      
-      data.forEach((d) => {
-        if (d[key] !== undefined) {
-          lastValue = d[key];
-        } else if (lastValue !== undefined) {
-          d[key] = lastValue;
+    // Forward fill: for dates where a project has no new milestone,
+    // carry forward the last known step
+    for (let i = 1; i < data.length; i++) {
+      results.forEach((_, idx) => {
+        const key = `project_${idx}`;
+        if (data[i][key] === undefined && data[i - 1][key] !== undefined) {
+          data[i][key] = data[i - 1][key];
         }
       });
-    });
+    }
 
-    return data;
-  }, [results]);
-
-  // Create series for each project
-  const series = useMemo(() => {
-    return results.map((r, idx) => ({
+    // Create series
+    const seriesData = results.map((r, idx) => ({
       dataKey: `project_${idx}`,
       name: r.project.project_name,
       color: LINE_COLORS[idx % LINE_COLORS.length],
       isBaseline: r.isBaseline,
     }));
+
+    return {
+      chartData: data,
+      series: seriesData,
+      minDate: globalMinDate,
+      maxDate: globalMaxDate,
+    };
   }, [results]);
 
   if (results.length === 0) {
@@ -148,7 +180,7 @@ export function ProgressLineChart({ results }: ProgressLineChartProps) {
               style={{ backgroundColor: s.color }}
             />
             <span className="text-sm">
-              {s.name}
+              {s.name.length > 20 ? s.name.substring(0, 20) + '...' : s.name}
               {s.isBaseline && (
                 <Badge variant="destructive" className="ml-2 text-xs">
                   卡關
@@ -160,55 +192,62 @@ export function ProgressLineChart({ results }: ProgressLineChartProps) {
       </div>
 
       {/* Chart */}
-      <div className="h-[400px] w-full">
+      <div className="h-[450px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
-            margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+            margin={{ top: 20, right: 30, left: 80, bottom: 60 }}
           >
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis
               dataKey="dateStr"
-              tick={{ fontSize: 12 }}
+              tick={{ fontSize: 11 }}
               angle={-45}
               textAnchor="end"
-              height={60}
+              height={70}
               interval="preserveStartEnd"
             />
             <YAxis
-              domain={[0, 10]}
-              ticks={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
-              tick={{ fontSize: 12 }}
-              label={{
-                value: "里程碑階段 (1→10)",
-                angle: -90,
-                position: "insideLeft",
-                style: { textAnchor: "middle" },
-              }}
+              domain={[0, TIMELINE_MILESTONES.length + 1]}
+              ticks={TIMELINE_MILESTONES.map((_, i) => i + 1)}
+              tick={{ fontSize: 11 }}
+              width={75}
               tickFormatter={(value) => {
                 const milestone = TIMELINE_MILESTONES[value - 1];
                 return milestone ? `${value}.${milestone.label}` : String(value);
               }}
             />
+            {/* Horizontal reference lines for each milestone */}
+            {TIMELINE_MILESTONES.map((m, idx) => (
+              <ReferenceLine
+                key={m.code}
+                y={idx + 1}
+                stroke="#e5e7eb"
+                strokeDasharray="2 2"
+              />
+            ))}
             <Tooltip
               content={({ active, payload, label }) => {
                 if (!active || !payload?.length) return null;
                 return (
-                  <div className="bg-popover border rounded-lg shadow-lg p-3">
-                    <p className="font-medium mb-2">{label}</p>
+                  <div className="bg-popover border rounded-lg shadow-lg p-3 max-w-xs">
+                    <p className="font-medium mb-2 text-sm">{label}</p>
                     {payload.map((p: any, idx: number) => {
                       const milestone = TIMELINE_MILESTONES[p.value - 1];
+                      const seriesInfo = series.find(s => s.dataKey === p.dataKey);
                       return (
                         <div
                           key={idx}
-                          className="flex items-center gap-2 text-sm"
+                          className="flex items-center gap-2 text-xs mb-1"
                         >
                           <div
-                            className="w-2 h-2 rounded-full"
+                            className="w-2 h-2 rounded-full flex-shrink-0"
                             style={{ backgroundColor: p.stroke }}
                           />
-                          <span>{p.name}:</span>
-                          <span className="font-medium">
+                          <span className="truncate max-w-[120px]">
+                            {seriesInfo?.name}:
+                          </span>
+                          <span className="font-medium whitespace-nowrap">
                             第{p.value}步 {milestone?.label}
                           </span>
                         </div>
@@ -227,9 +266,9 @@ export function ProgressLineChart({ results }: ProgressLineChartProps) {
                 stroke={s.color}
                 strokeWidth={s.isBaseline ? 3 : 2}
                 strokeDasharray={s.isBaseline ? undefined : "5 5"}
-                dot={{ r: 4, fill: s.color }}
-                activeDot={{ r: 6 }}
-                connectNulls
+                dot={{ r: 4, fill: s.color, strokeWidth: 0 }}
+                activeDot={{ r: 6, strokeWidth: 2, stroke: "#fff" }}
+                connectNulls={false}
               />
             ))}
           </LineChart>
