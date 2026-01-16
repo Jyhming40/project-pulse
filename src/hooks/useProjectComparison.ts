@@ -590,6 +590,10 @@ export function generateComparisonCSV(
 
     for (const pair of COMPARISON_PAIRS) {
       const interval = r.intervals[pair.id];
+      if (!interval) {
+        row.push('', '', 'N/A', 'N/A');
+        continue;
+      }
       row.push(interval.fromDate?.split('T')[0] || '');
       row.push(interval.toDate?.split('T')[0] || '');
       row.push(interval.days !== null ? String(interval.days) : 'N/A');
@@ -656,6 +660,13 @@ export function generateLegalSummary(
     const stat = stats.find(s => s.pairId === pair.id);
     const baselineInterval = baselineResult.intervals[pair.id];
 
+    // Handle case where interval doesn't exist
+    if (!baselineInterval) {
+      summary += `\n#### ${pair.label}（${pair.description}）\n`;
+      summary += `- 資料不完整\n`;
+      continue;
+    }
+
     if (baselineInterval.status === 'na') {
       summary += `\n#### ${pair.label}（${pair.description}）\n`;
       summary += `- 不適用（非 FIT 案件）\n`;
@@ -709,9 +720,15 @@ export function generateLegalTable(
   const separator = headers.map(() => '---');
 
   const rows = results
-    .filter(r => r.intervals[pairId].status !== 'na')
+    .filter(r => {
+      const interval = r.intervals[pairId];
+      return interval && interval.status !== 'na';
+    })
     .map(r => {
       const interval = r.intervals[pairId];
+      if (!interval) {
+        return [r.project.project_name, '-', '-', '-', 'N/A', '資料不完整'];
+      }
       return [
         r.project.project_name,
         interval.fromDate?.split('T')[0] || '-',
