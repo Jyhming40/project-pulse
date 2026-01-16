@@ -57,17 +57,9 @@ export default function ProjectComparison() {
     comparisonProjectIds
   );
 
-  // Check for missing milestone codes (dev only)
-  const missingCodes = useMemo(() => {
-    if (!comparisonData) return [];
-    const allCodes = new Set<string>();
-    for (const result of comparisonData.results) {
-      Object.keys(result.milestones).forEach(code => allCodes.add(code));
-    }
-    // Use Set to avoid duplicate code warnings
-    const requiredCodesSet = new Set(COMPARISON_PAIRS.flatMap(p => [p.from, p.to]));
-    return Array.from(requiredCodesSet).filter(code => !allCodes.has(code));
-  }, [comparisonData]);
+  // Removed dev-only missing milestone code warning - 
+  // It's expected that projects may not have all milestones completed
+  const missingCodes: string[] = [];
 
   // Sort results: baseline first, then by total days descending
   const sortedResults = useMemo(() => {
