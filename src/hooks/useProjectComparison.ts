@@ -41,8 +41,8 @@ export const TIMELINE_DOC_MAPPING = [
     step: 3, 
     label: '台電躉購合約申請', 
     short: '躉購申請',
-    doc_type_codes: ['PPA_APPLY', 'TPC_CONTRACT'],
-    doc_type_labels: ['躉購合約申請', '台電躉購合約申請', '躉售合約'],
+    doc_type_codes: ['TPC_CONTRACT'], // 躉售合約的submitted_at = 申請日
+    doc_type_labels: ['躉售合約', '躉購合約申請', '台電躉購合約申請'],
     date_field: 'submitted_at' as const, // Uses submitted_at for application
     color: '#8b5cf6',
   },
@@ -86,9 +86,10 @@ export const TIMELINE_DOC_MAPPING = [
     step: 8, 
     label: '台電驗收掛表作業', 
     short: '報竣掛表',
-    doc_type_codes: ['TPC_METER'], // 報竣掛表
+    doc_type_codes: ['__USE_ACTUAL_METER_DATE__'], // 使用 projects.actual_meter_date
     doc_type_labels: ['報竣掛表', '台電驗收掛表', '台電驗收掛表作業', '電表掛表', '掛表'],
-    date_field: 'issued_at' as const,
+    date_field: 'issued_at' as const, // ignored, uses actual_meter_date
+    use_project_field: 'actual_meter_date' as const, // special flag
     color: '#ec4899',
   },
   { 
@@ -353,20 +354,20 @@ export function useComparisonDataManual(
     queryFn: async () => {
       if (!baselineProjectId) return null;
 
-      // 1. Get baseline project
+      // 1. Get baseline project (include actual_meter_date)
       const { data: baselineProject, error: baselineError } = await supabase
         .from('projects')
-        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year')
+        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year, actual_meter_date')
         .eq('id', baselineProjectId)
         .single();
 
       if (baselineError) throw baselineError;
 
-      // 2. Get all comparison projects
+      // 2. Get all comparison projects (include actual_meter_date)
       const allProjectIds = [baselineProjectId, ...comparisonProjectIds];
       const { data: allProjectsData, error: projectsError } = await supabase
         .from('projects')
-        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year')
+        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year, actual_meter_date')
         .in('id', allProjectIds);
 
       if (projectsError) throw projectsError;
@@ -375,7 +376,7 @@ export function useComparisonDataManual(
       const allProjects = [
         baselineProject,
         ...comparisonProjectIds.map(id => projectsMap.get(id)).filter(Boolean),
-      ] as ProjectForComparison[];
+      ] as (ProjectForComparison & { actual_meter_date?: string | null })[];
 
       const baselineYear = extractProjectYear(baselineProject as ProjectForComparison);
 
@@ -395,9 +396,21 @@ export function useComparisonDataManual(
       for (const projectId of allProjectIds) {
         docDatesMap[projectId] = {};
         const projectDocs = (allDocuments || []).filter(d => d.project_id === projectId);
+        const projectData = projectsMap.get(projectId);
         
         // For each step, find matching document and extract date
         for (const mapping of TIMELINE_DOC_MAPPING) {
+          // Special case: use project field instead of document
+          if ('use_project_field' in mapping && mapping.use_project_field) {
+            const fieldValue = (projectData as any)?.[mapping.use_project_field];
+            docDatesMap[projectId][mapping.step] = {
+              step: mapping.step,
+              date: fieldValue || null,
+              doc_type: mapping.label,
+            };
+            continue;
+          }
+          
           let matchedDoc = null;
           
           // Search by doc_type_code first
