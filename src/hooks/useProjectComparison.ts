@@ -606,7 +606,7 @@ export function generateComparisonCSV(results: ComparisonResult[]): string {
   return csv;
 }
 
-// Generate legal summary
+// Generate legal summary with charts and analysis
 export function generateLegalSummary(results: ComparisonResult[]): string {
   const baseline = results.find(r => r.isBaseline);
   if (!baseline) return '';
@@ -618,32 +618,147 @@ export function generateLegalSummary(results: ComparisonResult[]): string {
     ? Math.round(others.reduce((sum, r) => sum + (r.intervals['interval_total']?.days || 0), 0) / others.length)
     : null;
   
-  let summary = `## 案件進度比較分析\n\n`;
-  summary += `### 基準案件：${baseline.project.project_name}\n\n`;
-  summary += `完整流程耗時：${baselineTotal !== null ? `${baselineTotal} 天` : '未完成'}\n`;
-  summary += `同期案件平均：${avgTotal !== null ? `${avgTotal} 天` : 'N/A'}\n`;
+  let summary = `## 案件進度比較分析報告\n\n`;
+  summary += `### 一、基準案件資訊\n\n`;
+  summary += `- **案件名稱：** ${baseline.project.project_name}\n`;
+  summary += `- **案件編號：** ${baseline.project.project_code}\n`;
+  summary += `- **完整流程耗時：** ${baselineTotal !== null ? `${baselineTotal} 天` : '未完成'}\n`;
+  summary += `- **同期案件平均：** ${avgTotal !== null ? `${avgTotal} 天` : 'N/A'}\n`;
   
   if (baselineTotal !== null && avgTotal !== null) {
     const diff = baselineTotal - avgTotal;
     summary += `\n**差異分析：** 基準案件${diff > 0 ? `落後同期平均 ${diff} 天` : diff < 0 ? `領先同期平均 ${Math.abs(diff)} 天` : '與同期平均相當'}\n`;
   }
   
+  // Add comparison projects list
+  summary += `\n### 二、比較案件清單\n\n`;
+  for (const r of results) {
+    if (r.isBaseline) continue;
+    const total = r.intervals['interval_total']?.days;
+    summary += `- ${r.project.project_name} (${r.project.project_code}): ${total !== null ? `${total} 天` : '未完成'}\n`;
+  }
+  
+  // Add stage duration analysis (text-based bar chart)
+  summary += `\n### 三、階段耗時差異分析圖（長條圖）\n\n`;
+  summary += `以下為各案件完整流程耗時的視覺化比較：\n\n`;
+  summary += `\`\`\`\n`;
+  
+  // Find max days for scaling
+  const allTotals = results
+    .map(r => r.intervals['interval_total']?.days)
+    .filter((d): d is number => d !== null);
+  const maxDays = Math.max(...allTotals, 1);
+  const barWidth = 40;
+  
+  for (const r of results) {
+    const total = r.intervals['interval_total']?.days;
+    const nameWidth = 20;
+    const name = r.project.project_name.length > nameWidth 
+      ? r.project.project_name.substring(0, nameWidth - 2) + '..'
+      : r.project.project_name.padEnd(nameWidth);
+    
+    if (total !== null) {
+      const barLength = Math.round((total / maxDays) * barWidth);
+      const bar = '█'.repeat(barLength);
+      const isBaseline = r.isBaseline ? ' [基準]' : '';
+      summary += `${name} │${bar} ${total}天${isBaseline}\n`;
+    } else {
+      summary += `${name} │ (未完成)\n`;
+    }
+  }
+  summary += `\`\`\`\n`;
+  
+  // Add stage-by-step analysis table
+  summary += `\n### 四、階段耗時差異表\n\n`;
+  summary += `此表計算各階段的「耗費天數」，日期來源為文件的發文日或送件日。\n`;
+  summary += `紅色(+)代表落後基準案件，綠色(-)代表領先基準案件。\n\n`;
+  
+  // Table header
+  summary += `| 步驟 | 比較階段 | `;
+  for (const r of results) {
+    const label = r.isBaseline ? `${r.project.project_name} (基準)` : r.project.project_name;
+    summary += `${label} | `;
+  }
+  summary += `同期平均 |\n`;
+  
+  summary += `| --- | --- | ${results.map(() => '---').join(' | ')} | --- |\n`;
+  
+  // Get step pairs for analysis
+  const stepPairs = COMPARISON_PAIRS.slice(0, 10);
+  
+  for (const pair of stepPairs) {
+    const stepNum = parseInt(pair.id.split('_')[1]) + 1;
+    summary += `| ${stepNum} | ${pair.label} | `;
+    
+    // Get baseline days for this pair
+    const baselineInterval = baseline.intervals[pair.id];
+    const baselineDays = baselineInterval?.status === 'complete' ? baselineInterval.days : null;
+    
+    // Calculate average
+    const validDays = results
+      .filter(r => !r.isBaseline && r.intervals[pair.id]?.status === 'complete')
+      .map(r => r.intervals[pair.id].days!)
+      .filter(d => d !== null);
+    const average = validDays.length > 0 
+      ? Math.round(validDays.reduce((a, b) => a + b, 0) / validDays.length)
+      : null;
+    
+    for (const r of results) {
+      const interval = r.intervals[pair.id];
+      if (!interval || interval.status !== 'complete') {
+        summary += `- | `;
+      } else {
+        const days = interval.days;
+        if (r.isBaseline) {
+          summary += `${days}天 (基準) | `;
+        } else {
+          const delta = baselineDays !== null ? days! - baselineDays : null;
+          if (delta !== null && delta !== 0) {
+            const sign = delta > 0 ? '+' : '';
+            summary += `${days}天 (${sign}${delta}) | `;
+          } else {
+            summary += `${days}天 | `;
+          }
+        }
+      }
+    }
+    
+    summary += `${average !== null ? `${average}天` : '-'} |\n`;
+  }
+  
+  // Add summary intervals
+  summary += `\n### 五、總結區間\n\n`;
+  const summaryPairs = COMPARISON_PAIRS.slice(10);
+  
+  for (const pair of summaryPairs) {
+    summary += `**${pair.label}** (${pair.description})：\n`;
+    for (const r of results) {
+      const interval = r.intervals[pair.id];
+      const days = interval?.status === 'complete' ? interval.days : null;
+      const label = r.isBaseline ? `[基準] ${r.project.project_name}` : r.project.project_name;
+      summary += `  - ${label}: ${days !== null ? `${days} 天` : '未完成'}\n`;
+    }
+    summary += '\n';
+  }
+  
   return summary;
 }
 
-// Generate legal table
+// Generate legal table (milestone dates)
 export function generateLegalTable(results: ComparisonResult[]): string {
-  let table = `| 項次 | 里程碑 | `;
+  let table = `### 六、里程碑日期詳細對照表\n\n`;
+  table += `| 項次 | 里程碑 | `;
   
   for (const r of results) {
-    table += `${r.project.project_name.substring(0, 10)} | `;
+    const label = r.isBaseline ? `${r.project.project_name} (基準)` : r.project.project_name;
+    table += `${label} | `;
   }
   table += '\n';
   
   table += `| --- | --- | ${results.map(() => '---').join(' | ')} |\n`;
   
   for (const mapping of TIMELINE_DOC_MAPPING) {
-    table += `| ${mapping.step} | ${mapping.short} | `;
+    table += `| ${mapping.step} | ${mapping.label} | `;
     for (const r of results) {
       const date = r.documentDates[mapping.step]?.date;
       table += `${date ? date.split('T')[0] : '-'} | `;

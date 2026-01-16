@@ -157,13 +157,19 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
                 <TableHead className="w-[60px] text-center">步驟</TableHead>
                 <TableHead className="min-w-[180px]">比較階段</TableHead>
                 {results.map(r => (
-                  <TableHead key={r.project.id} className="min-w-[100px] text-center">
+                  <TableHead key={r.project.id} className="min-w-[140px] text-center">
                     <div className="flex flex-col items-center gap-1">
-                      <span className="truncate max-w-[120px]" title={r.project.project_name}>
-                        {r.project.project_name.length > 10 
-                          ? r.project.project_name.substring(0, 10) + '...'
-                          : r.project.project_name}
-                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="max-w-[180px] text-wrap leading-tight cursor-help" title={r.project.project_name}>
+                            {r.project.project_name}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{r.project.project_name}</p>
+                          <p className="text-xs text-muted-foreground">{r.project.project_code}</p>
+                        </TooltipContent>
+                      </Tooltip>
                       {r.isBaseline && (
                         <Badge variant="default" className="text-xs">基準</Badge>
                       )}
