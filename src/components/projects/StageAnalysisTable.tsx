@@ -10,7 +10,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertTriangle, TrendingDown, TrendingUp, Minus } from "lucide-react";
-import { COMPARISON_PAIRS, ComparisonResult, ComparisonStats } from "@/hooks/useProjectComparison";
+import { COMPARISON_PAIRS, TIMELINE_DOC_MAPPING, ComparisonResult, ComparisonStats } from "@/hooks/useProjectComparison";
 import { cn } from "@/lib/utils";
 
 interface StageAnalysisTableProps {
@@ -24,9 +24,15 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
     return results.find(r => r.isBaseline);
   }, [results]);
 
+  // Get first 10 pairs (step-by-step intervals) for detailed analysis
+  const stepPairs = COMPARISON_PAIRS.slice(0, 10);
+  
+  // Get summary pairs (total, 同備到掛表, etc.)
+  const summaryPairs = COMPARISON_PAIRS.slice(10);
+
   // Calculate comparison data for each stage
   const stageData = useMemo(() => {
-    return COMPARISON_PAIRS.map((pair, index) => {
+    return stepPairs.map((pair, index) => {
       const stat = stats.find(s => s.pairId === pair.id);
       
       // Get baseline days
@@ -74,7 +80,44 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
         projectData,
       };
     });
-  }, [results, stats, baselineResult]);
+  }, [results, stats, baselineResult, stepPairs]);
+
+  // Calculate summary rows
+  const summaryData = useMemo(() => {
+    return summaryPairs.map(pair => {
+      const projectData = results.map(r => {
+        const interval = r.intervals[pair.id];
+        if (!interval || interval.status !== 'complete') {
+          return { 
+            projectName: r.project.project_name, 
+            days: null, 
+            delta: null, 
+            status: 'incomplete' as const,
+            isBaseline: r.isBaseline
+          };
+        }
+        return {
+          projectName: r.project.project_name,
+          days: interval.days,
+          delta: r.isBaseline ? null : interval.delta,
+          status: 'complete' as const,
+          isBaseline: r.isBaseline
+        };
+      });
+      
+      // Calculate average for non-baseline projects
+      const validDays = results
+        .filter(r => !r.isBaseline && r.intervals[pair.id]?.status === 'complete')
+        .map(r => r.intervals[pair.id].days!)
+        .filter(d => d !== null);
+      
+      const average = validDays.length > 0 
+        ? Math.round(validDays.reduce((a, b) => a + b, 0) / validDays.length)
+        : null;
+      
+      return { pair, projectData, average };
+    });
+  }, [results, summaryPairs]);
 
   if (results.length === 0) {
     return (
@@ -93,10 +136,10 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
             <AlertTriangle className="h-5 w-5 text-amber-500 mt-0.5 flex-shrink-0" />
             <div className="text-sm">
               <p className="font-medium text-amber-700 dark:text-amber-400">
-                階段耗時差異分析說明
+                階段耗時差異分析說明（以文件日期為準）
               </p>
               <p className="text-muted-foreground mt-1">
-                此表計算各關鍵節點的「耗費天數」。
+                此表計算各階段的「耗費天數」，日期來源為文件的發文日或送件日。
                 <span className="text-red-500 font-medium">紅色數字</span>
                 代表落後基準案件，
                 <span className="text-green-500 font-medium">綠色數字</span>
@@ -106,7 +149,7 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
           </div>
         </div>
 
-        {/* Main analysis table */}
+        {/* Step-by-step analysis table */}
         <div className="border rounded-lg overflow-x-auto">
           <Table>
             <TableHeader>
@@ -172,50 +215,53 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
                 </TableRow>
               ))}
               
-              {/* Total row */}
-              <TableRow className="bg-muted/50 font-semibold border-t-2">
-                <TableCell className="text-center">∑</TableCell>
-                <TableCell>總流程耗時</TableCell>
-                {results.map(r => {
-                  const totalDays = COMPARISON_PAIRS.reduce((sum, pair) => {
-                    const interval = r.intervals[pair.id];
-                    if (interval?.status === 'complete' && interval.days !== null) {
-                      return sum + interval.days;
-                    }
-                    return sum;
-                  }, 0);
-                  
-                  const baselineTotal = baselineResult 
-                    ? COMPARISON_PAIRS.reduce((sum, pair) => {
-                        const interval = baselineResult.intervals[pair.id];
-                        if (interval?.status === 'complete' && interval.days !== null) {
-                          return sum + interval.days;
-                        }
-                        return sum;
-                      }, 0)
-                    : 0;
-                  
-                  const delta = r.isBaseline ? null : totalDays - baselineTotal;
-                  
-                  return (
-                    <TableCell key={r.project.id} className="text-center">
+              {/* Summary rows */}
+              <TableRow className="bg-muted/30 border-t-2">
+                <TableCell colSpan={2 + results.length + 1} className="py-2">
+                  <span className="font-semibold text-sm">總結區間</span>
+                </TableCell>
+              </TableRow>
+              
+              {summaryData.map((summary) => (
+                <TableRow key={summary.pair.id} className="bg-primary/5 hover:bg-primary/10">
+                  <TableCell className="text-center font-medium text-muted-foreground">
+                    ∑
+                  </TableCell>
+                  <TableCell>
+                    <div className="font-medium">{summary.pair.label}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {summary.pair.description}
+                    </div>
+                  </TableCell>
+                  {summary.projectData.map((pd, idx) => (
+                    <TableCell key={idx} className="text-center">
                       <div className="flex flex-col items-center gap-1">
-                        <span className="text-lg font-bold">{totalDays} 天</span>
-                        {delta !== null && delta !== 0 && (
-                          <DeltaBadge delta={delta} size="sm" />
+                        <span className={cn(
+                          "font-bold text-lg",
+                          pd.status === 'incomplete' && "text-muted-foreground"
+                        )}>
+                          {pd.status === 'complete' && pd.days !== null 
+                            ? `${pd.days} 天` 
+                            : '未完成'}
+                        </span>
+                        {!pd.isBaseline && pd.delta !== null && pd.delta !== 0 && (
+                          <DeltaBadge delta={pd.delta} size="sm" />
+                        )}
+                        {pd.isBaseline && pd.status === 'complete' && (
+                          <Badge variant="outline" className="text-xs">基準</Badge>
                         )}
                       </div>
                     </TableCell>
-                  );
-                })}
-                <TableCell className="text-center bg-muted/30">
-                  {stats.length > 0 && (
-                    <span className="text-muted-foreground">
-                      {stats.reduce((sum, s) => sum + (s.average ?? 0), 0)} 天
-                    </span>
-                  )}
-                </TableCell>
-              </TableRow>
+                  ))}
+                  <TableCell className="text-center bg-muted/30 font-medium">
+                    {summary.average !== null ? (
+                      <span>{summary.average} 天</span>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </div>
@@ -238,7 +284,7 @@ function StageCell({ days, delta, status, isBaseline, average }: StageCellProps)
   }
   
   if (status === 'incomplete' || days === null) {
-    return <span className="text-muted-foreground text-sm">未完成</span>;
+    return <span className="text-muted-foreground text-sm">-</span>;
   }
 
   // For baseline, compare with average
