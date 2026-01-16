@@ -10,8 +10,8 @@ import {
   ReferenceLine,
 } from "recharts";
 import { Badge } from "@/components/ui/badge";
-import { TIMELINE_MILESTONES, ComparisonResult } from "@/hooks/useProjectComparison";
-import { format, differenceInDays } from "date-fns";
+import { TIMELINE_DOC_MAPPING, ComparisonResult } from "@/hooks/useProjectComparison";
+import { format } from "date-fns";
 
 interface ProgressLineChartProps {
   results: ComparisonResult[];
@@ -32,8 +32,7 @@ const LINE_COLORS = [
 ];
 
 export function ProgressLineChart({ results }: ProgressLineChartProps) {
-  // Transform data for recharts
-  // Each data point represents a milestone completion event
+  // Transform data for recharts using document dates
   const { chartData, series, minDate, maxDate } = useMemo(() => {
     if (results.length === 0) {
       return { chartData: [], series: [], minDate: null, maxDate: null };
@@ -53,16 +52,16 @@ export function ProgressLineChart({ results }: ProgressLineChartProps) {
     let globalMaxDate: Date | null = null;
 
     results.forEach((r, projectIdx) => {
-      TIMELINE_MILESTONES.forEach((milestone, stepIdx) => {
-        const completedAt = r.milestones[milestone.code];
-        if (completedAt) {
-          const date = new Date(completedAt);
+      TIMELINE_DOC_MAPPING.forEach((mapping) => {
+        const docDate = r.documentDates[mapping.step]?.date;
+        if (docDate) {
+          const date = new Date(docDate);
           allEvents.push({
             projectIdx,
             date,
-            step: stepIdx + 1,
+            step: mapping.step,
             projectName: r.project.project_name,
-            milestoneName: milestone.label,
+            milestoneName: mapping.short,
           });
 
           if (!globalMinDate || date < globalMinDate) globalMinDate = date;
@@ -76,7 +75,6 @@ export function ProgressLineChart({ results }: ProgressLineChartProps) {
     }
 
     // Create data points for each project's progression
-    // Each project starts at step 0 on its first milestone date and climbs up
     const projectTimelines: { projectIdx: number; events: { date: Date; step: number }[] }[] = 
       results.map((_, idx) => ({ projectIdx: idx, events: [] }));
 
@@ -164,7 +162,7 @@ export function ProgressLineChart({ results }: ProgressLineChartProps) {
   if (chartData.length === 0) {
     return (
       <div className="flex items-center justify-center h-[400px] text-muted-foreground">
-        所選案件沒有里程碑資料
+        所選案件沒有文件日期資料
       </div>
     );
   }
@@ -196,7 +194,7 @@ export function ProgressLineChart({ results }: ProgressLineChartProps) {
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={chartData}
-            margin={{ top: 20, right: 30, left: 80, bottom: 60 }}
+            margin={{ top: 20, right: 30, left: 100, bottom: 60 }}
           >
             <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
             <XAxis
@@ -208,20 +206,20 @@ export function ProgressLineChart({ results }: ProgressLineChartProps) {
               interval="preserveStartEnd"
             />
             <YAxis
-              domain={[0, TIMELINE_MILESTONES.length + 1]}
-              ticks={TIMELINE_MILESTONES.map((_, i) => i + 1)}
-              tick={{ fontSize: 11 }}
-              width={75}
+              domain={[0, TIMELINE_DOC_MAPPING.length + 1]}
+              ticks={TIMELINE_DOC_MAPPING.map(m => m.step)}
+              tick={{ fontSize: 10 }}
+              width={95}
               tickFormatter={(value) => {
-                const milestone = TIMELINE_MILESTONES[value - 1];
-                return milestone ? `${value}.${milestone.label}` : String(value);
+                const mapping = TIMELINE_DOC_MAPPING.find(m => m.step === value);
+                return mapping ? `${value}.${mapping.short}` : String(value);
               }}
             />
             {/* Horizontal reference lines for each milestone */}
-            {TIMELINE_MILESTONES.map((m, idx) => (
+            {TIMELINE_DOC_MAPPING.map((m) => (
               <ReferenceLine
-                key={m.code}
-                y={idx + 1}
+                key={m.step}
+                y={m.step}
                 stroke="#e5e7eb"
                 strokeDasharray="2 2"
               />
@@ -233,7 +231,7 @@ export function ProgressLineChart({ results }: ProgressLineChartProps) {
                   <div className="bg-popover border rounded-lg shadow-lg p-3 max-w-xs">
                     <p className="font-medium mb-2 text-sm">{label}</p>
                     {payload.map((p: any, idx: number) => {
-                      const milestone = TIMELINE_MILESTONES[p.value - 1];
+                      const mapping = TIMELINE_DOC_MAPPING.find(m => m.step === p.value);
                       const seriesInfo = series.find(s => s.dataKey === p.dataKey);
                       return (
                         <div
@@ -248,7 +246,7 @@ export function ProgressLineChart({ results }: ProgressLineChartProps) {
                             {seriesInfo?.name}:
                           </span>
                           <span className="font-medium whitespace-nowrap">
-                            第{p.value}步 {milestone?.label}
+                            第{p.value}步 {mapping?.short}
                           </span>
                         </div>
                       );
@@ -276,11 +274,11 @@ export function ProgressLineChart({ results }: ProgressLineChartProps) {
       </div>
 
       {/* Y-axis milestone legend */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-xs">
-        {TIMELINE_MILESTONES.map((m, idx) => (
-          <div key={m.code} className="flex items-center gap-1 text-muted-foreground">
-            <span className="font-medium">{idx + 1}.</span>
-            <span>{m.label}</span>
+      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 text-xs">
+        {TIMELINE_DOC_MAPPING.map((m) => (
+          <div key={m.step} className="flex items-center gap-1 text-muted-foreground">
+            <span className="font-medium">{m.step}.</span>
+            <span>{m.short}</span>
           </div>
         ))}
       </div>
