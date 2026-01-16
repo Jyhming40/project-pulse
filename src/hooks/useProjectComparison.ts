@@ -1,52 +1,86 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-// Milestone comparison pairs - hardcoded for MVP
+// Milestone comparison pairs - each adjacent step comparison
 // Uses actual milestone_code from progress_milestones table
 export const COMPARISON_PAIRS = [
   {
-    id: 'construction',
-    label: '施工期',
-    description: '能源署同意備案 → 報竣掛表',
+    id: 'step_01_02',
+    label: '建檔→台電送件',
+    description: '建檔完成 → 台電申請送件',
+    from: 'ADMIN_01_CREATED',
+    to: 'ADMIN_02_TAIPOWER_SUBMIT',
+    fitOnly: false,
+  },
+  {
+    id: 'step_02_03',
+    label: '台電送件→審查意見',
+    description: '台電申請送件 → 取得台電審查意見書',
+    from: 'ADMIN_02_TAIPOWER_SUBMIT',
+    to: 'ADMIN_03_TAIPOWER_OPINION',
+    fitOnly: false,
+  },
+  {
+    id: 'step_03_04',
+    label: '審查意見→同意備案',
+    description: '取得台電審查意見書 → 能源署同意備案',
+    from: 'ADMIN_03_TAIPOWER_OPINION',
+    to: 'ADMIN_04_ENERGY_APPROVAL',
+    fitOnly: false,
+  },
+  {
+    id: 'step_04_06',
+    label: '同意備案→細部協商',
+    description: '能源署同意備案 → 台電細部協商完成',
     from: 'ADMIN_04_ENERGY_APPROVAL',
+    to: 'ADMIN_06_TAIPOWER_DETAIL',
+    fitOnly: false,
+  },
+  {
+    id: 'step_06_07',
+    label: '細部協商→躉售合約',
+    description: '台電細部協商完成 → 躉售合約完成',
+    from: 'ADMIN_06_TAIPOWER_DETAIL',
+    to: 'ADMIN_07_PPA_SIGNED',
+    fitOnly: false,
+  },
+  {
+    id: 'step_07_08',
+    label: '躉售合約→報竣掛表',
+    description: '躉售合約完成 → 報竣掛表完成',
+    from: 'ADMIN_07_PPA_SIGNED',
     to: 'ADMIN_08_METER_INSTALLED',
     fitOnly: false,
   },
   {
-    id: 'closing',
-    label: '收尾期',
-    description: '報竣掛表 → 設備登記完成',
+    id: 'step_08_09',
+    label: '報竣掛表→設備登記',
+    description: '報竣掛表完成 → 能源署設備登記完成',
     from: 'ADMIN_08_METER_INSTALLED',
     to: 'ADMIN_09_EQUIPMENT_REG',
     fitOnly: false,
   },
   {
-    id: 'fit_final',
-    label: 'FIT 後段',
-    description: '設備登記完成 → 正式躉售函',
+    id: 'step_09_10',
+    label: '設備登記→行政結案',
+    description: '能源署設備登記完成 → 行政結案',
     from: 'ADMIN_09_EQUIPMENT_REG',
-    to: 'ADMIN_09B_FIT_OFFICIAL',
-    fitOnly: true,
-  },
-  {
-    id: 'full_process',
-    label: '完整流程',
-    description: '台電審查意見書 → 正式躉售函',
-    from: 'ADMIN_03_TAIPOWER_OPINION',
-    to: 'ADMIN_09B_FIT_OFFICIAL',
-    fitOnly: true,
+    to: 'ADMIN_10_CLOSED',
+    fitOnly: false,
   },
 ] as const;
 
-// Milestone definitions for timeline chart
+// Milestone definitions for timeline chart - using actual milestone codes
 export const TIMELINE_MILESTONES = [
-  { code: 'ADMIN_01_LAND_CONFIRMED', label: '土地確認', color: 'yellow' },
-  { code: 'ADMIN_02_STRUCTURE_SIGNED', label: '結構簽證', color: 'green' },
-  { code: 'ADMIN_03_TAIPOWER_OPINION', label: '台電審查意見書', color: 'green' },
-  { code: 'ADMIN_04_ENERGY_APPROVAL', label: '能源署同意備案', color: 'blue' },
-  { code: 'ADMIN_08_METER_INSTALLED', label: '報竣掛表', color: 'purple' },
-  { code: 'ADMIN_09_EQUIPMENT_REG', label: '設備登記完成', color: 'orange' },
-  { code: 'ADMIN_09B_FIT_OFFICIAL', label: '正式躉售函', color: 'red' },
+  { code: 'ADMIN_01_CREATED', label: '建檔', color: '#3b82f6' },
+  { code: 'ADMIN_02_TAIPOWER_SUBMIT', label: '台電送件', color: '#8b5cf6' },
+  { code: 'ADMIN_03_TAIPOWER_OPINION', label: '審查意見', color: '#06b6d4' },
+  { code: 'ADMIN_04_ENERGY_APPROVAL', label: '同意備案', color: '#10b981' },
+  { code: 'ADMIN_06_TAIPOWER_DETAIL', label: '細部協商', color: '#14b8a6' },
+  { code: 'ADMIN_07_PPA_SIGNED', label: '躉售合約', color: '#f59e0b' },
+  { code: 'ADMIN_08_METER_INSTALLED', label: '報竣掛表', color: '#ef4444' },
+  { code: 'ADMIN_09_EQUIPMENT_REG', label: '設備登記', color: '#ec4899' },
+  { code: 'ADMIN_10_CLOSED', label: '行政結案', color: '#6366f1' },
 ];
 
 export type ComparisonPair = typeof COMPARISON_PAIRS[number];
