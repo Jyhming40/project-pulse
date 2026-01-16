@@ -267,8 +267,6 @@ serve(async (req) => {
     console.log(`Batch sync completed: ${changesCount} milestones changed`);
 
     return new Response(
-
-    return new Response(
       JSON.stringify({
         success: true,
         results: {
