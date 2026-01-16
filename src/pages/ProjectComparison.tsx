@@ -96,7 +96,7 @@ export default function ProjectComparison() {
 
   const handleExportCSV = () => {
     if (!comparisonData) return;
-    const csv = generateComparisonCSV(sortedResults, comparisonData.baseline);
+    const csv = generateComparisonCSV(sortedResults);
     const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -110,19 +110,11 @@ export default function ProjectComparison() {
   const handleCopyLegal = () => {
     if (!comparisonData) return;
     
-    const summary = generateLegalSummary(
-      comparisonData.baseline,
-      sortedResults,
-      comparisonData.stats,
-      0
-    );
+    const summary = generateLegalSummary(sortedResults);
 
-    const tables = COMPARISON_PAIRS
-      .filter(p => !p.fitOnly || comparisonData.baseline.revenue_model === 'FIT')
-      .map(p => generateLegalTable(sortedResults, p.id))
-      .join('\n\n');
+    const table = generateLegalTable(sortedResults);
 
-    const fullContent = `${summary}\n\n---\n\n## 詳細比較表格\n\n${tables}`;
+    const fullContent = `${summary}\n\n---\n\n## 詳細日期比較表格\n\n${table}`;
 
     navigator.clipboard.writeText(fullContent).then(() => {
       setCopied(true);
@@ -179,25 +171,14 @@ export default function ProjectComparison() {
                   <div className="space-y-4">
                     <div className="prose prose-sm dark:prose-invert max-w-none">
                       <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg overflow-x-auto">
-                        {generateLegalSummary(
-                          comparisonData.baseline,
-                          sortedResults,
-                          comparisonData.stats,
-                          0
-                        )}
+                        {generateLegalSummary(sortedResults)}
                       </pre>
                     </div>
                     <Separator />
-                    <div className="space-y-4">
-                      {COMPARISON_PAIRS
-                        .filter(p => !p.fitOnly || comparisonData.baseline.revenue_model === 'FIT')
-                        .map(pair => (
-                          <div key={pair.id}>
-                            <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg overflow-x-auto">
-                              {generateLegalTable(sortedResults, pair.id)}
-                            </pre>
-                          </div>
-                        ))}
+                    <div>
+                      <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg overflow-x-auto">
+                        {generateLegalTable(sortedResults)}
+                      </pre>
                     </div>
                   </div>
                 </ScrollArea>

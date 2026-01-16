@@ -1,5 +1,3 @@
-import { format } from "date-fns";
-import { zhTW } from "date-fns/locale";
 import {
   Table,
   TableBody,
@@ -9,8 +7,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { TIMELINE_MILESTONES, ComparisonResult } from "@/hooks/useProjectComparison";
-import { CheckCircle2, Circle } from "lucide-react";
+import { TIMELINE_DOC_MAPPING, ComparisonResult } from "@/hooks/useProjectComparison";
+import { format } from "date-fns";
+import { zhTW } from "date-fns/locale";
+import { Check, X } from "lucide-react";
 
 interface MilestoneDatesTableProps {
   results: ComparisonResult[];
@@ -25,26 +25,32 @@ export function MilestoneDatesTable({ results }: MilestoneDatesTableProps) {
     );
   }
 
-  // Reverse milestones for display (10→1 becomes visible as 1→10 from bottom)
-  const reversedMilestones = [...TIMELINE_MILESTONES].reverse();
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return null;
+    try {
+      return format(new Date(dateStr), 'yyyy-MM-dd', { locale: zhTW });
+    } catch {
+      return dateStr.split('T')[0];
+    }
+  };
 
   return (
     <div className="border rounded-lg overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="bg-muted/50">
-            <TableHead className="w-[60px] text-center">步驟</TableHead>
-            <TableHead className="min-w-[120px]">里程碑 (由下而上)</TableHead>
+            <TableHead className="w-[60px] text-center">項次</TableHead>
+            <TableHead className="min-w-[150px]">里程碑/文件</TableHead>
             {results.map(r => (
-              <TableHead key={r.project.id} className="min-w-[120px] text-center">
+              <TableHead key={r.project.id} className="min-w-[110px] text-center">
                 <div className="flex flex-col items-center gap-1">
-                  <span className="truncate max-w-[120px]" title={r.project.project_name}>
-                    {r.project.project_name.length > 10 
-                      ? r.project.project_name.substring(0, 10) + '...'
+                  <span className="truncate max-w-[100px]" title={r.project.project_name}>
+                    {r.project.project_name.length > 8 
+                      ? r.project.project_name.substring(0, 8) + '...'
                       : r.project.project_name}
                   </span>
                   {r.isBaseline && (
-                    <Badge variant="destructive" className="text-xs">卡關案件</Badge>
+                    <Badge variant="destructive" className="text-xs">卡關</Badge>
                   )}
                 </div>
               </TableHead>
@@ -52,48 +58,47 @@ export function MilestoneDatesTable({ results }: MilestoneDatesTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {reversedMilestones.map((milestone, idx) => {
-            const stepNumber = TIMELINE_MILESTONES.length - idx;
-            
-            return (
-              <TableRow key={milestone.code} className="hover:bg-muted/30">
-                <TableCell className="text-center font-mono font-medium text-muted-foreground">
-                  {stepNumber}
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="w-3 h-3 rounded-full flex-shrink-0"
-                      style={{ backgroundColor: milestone.color }}
-                    />
-                    <span className="font-medium">{milestone.label}</span>
-                  </div>
-                </TableCell>
-                {results.map(r => {
-                  const completedAt = r.milestones[milestone.code];
-                  const isCompleted = !!completedAt;
-                  
-                  return (
-                    <TableCell key={r.project.id} className="text-center">
-                      {isCompleted ? (
-                        <div className="flex flex-col items-center gap-1">
-                          <CheckCircle2 className="h-4 w-4 text-green-500" />
-                          <span className="text-sm">
-                            {format(new Date(completedAt), "yyyy/MM/dd", { locale: zhTW })}
+          {TIMELINE_DOC_MAPPING.map((mapping) => (
+            <TableRow key={mapping.step} className="hover:bg-muted/30">
+              <TableCell className="text-center font-medium text-muted-foreground">
+                {mapping.step}
+              </TableCell>
+              <TableCell>
+                <div className="font-medium">{mapping.short}</div>
+                <div className="text-xs text-muted-foreground truncate max-w-[140px]" title={mapping.label}>
+                  {mapping.label}
+                </div>
+              </TableCell>
+              {results.map(r => {
+                const docDate = r.documentDates?.[mapping.step];
+                const date = docDate?.date;
+                const formattedDate = formatDate(date);
+                
+                return (
+                  <TableCell key={r.project.id} className="text-center">
+                    {formattedDate ? (
+                      <div className="flex flex-col items-center gap-0.5">
+                        <div className="flex items-center gap-1">
+                          <Check className="h-3 w-3 text-green-500" />
+                          <span className="text-sm font-medium">{formattedDate}</span>
+                        </div>
+                        {docDate?.doc_type && (
+                          <span className="text-xs text-muted-foreground truncate max-w-[100px]" title={docDate.doc_type}>
+                            {docDate.doc_type.length > 8 ? docDate.doc_type.substring(0, 8) + '...' : docDate.doc_type}
                           </span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center gap-1">
-                          <Circle className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">-</span>
-                        </div>
-                      )}
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
-            );
-          })}
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center gap-1 text-muted-foreground">
+                        <X className="h-3 w-3" />
+                        <span className="text-sm">-</span>
+                      </div>
+                    )}
+                  </TableCell>
+                );
+              })}
+            </TableRow>
+          ))}
         </TableBody>
       </Table>
     </div>
