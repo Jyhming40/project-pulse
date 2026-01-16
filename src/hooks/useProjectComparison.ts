@@ -68,6 +68,28 @@ export interface ProjectMilestoneData {
   is_completed: boolean;
 }
 
+// Extract year from project_code (e.g., "2023YP007-2023" -> 2023)
+export function extractProjectYear(project: ProjectForComparison): number {
+  // Try to get year from end of project_code (e.g., "2023YP007-2023")
+  const codeMatch = project.project_code.match(/-(\d{4})$/);
+  if (codeMatch) {
+    return parseInt(codeMatch[1], 10);
+  }
+  
+  // Try to get year from start of project_code (e.g., "2023YP007")
+  const startMatch = project.project_code.match(/^(\d{4})/);
+  if (startMatch) {
+    return parseInt(startMatch[1], 10);
+  }
+  
+  // Fallback to intake_year or created_at year
+  if (project.intake_year) {
+    return project.intake_year;
+  }
+  
+  return new Date(project.created_at).getFullYear();
+}
+
 export interface ComparisonResult {
   project: ProjectForComparison;
   milestones: Record<string, string | null>; // milestone_code -> completed_at
@@ -170,8 +192,8 @@ export function useComparisonDataManual(
         ...comparisonProjectIds.map(id => projectsMap.get(id)).filter(Boolean),
       ] as ProjectForComparison[];
 
-      const baselineDate = new Date(baselineProject.created_at);
-      const baselineYear = baselineProject.intake_year || baselineDate.getFullYear();
+      // Get baseline year from project_code (most reliable source)
+      const baselineYear = extractProjectYear(baselineProject as ProjectForComparison);
 
       // 3. Get all milestones for these projects
       const { data: milestones, error: milestoneError } = await supabase
@@ -336,7 +358,7 @@ export function useComparisonData(
       if (baselineError) throw baselineError;
 
       const baselineDate = new Date(baselineProject.created_at);
-      const baselineYear = baselineProject.intake_year || baselineDate.getFullYear();
+      const baselineYear = extractProjectYear(baselineProject as ProjectForComparison);
       const minDate = new Date(baselineDate);
       minDate.setDate(minDate.getDate() - sameYearRange);
       const maxDate = new Date(baselineDate);
