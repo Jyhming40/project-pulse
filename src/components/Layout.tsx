@@ -27,7 +27,8 @@ import {
   Link2,
   FolderOpen,
   Copy,
-  Briefcase
+  Briefcase,
+  Scale
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -53,6 +54,7 @@ const dashboardItems = [
 // ==========================================
 const projectManagementItems = [
   { to: '/projects', icon: Building2, label: '案場列表', module: MODULES.PROJECTS },
+  { to: '/projects/compare', icon: Scale, label: '案件進度比較', module: MODULES.PROJECTS },
   { to: '/partners', icon: HardHat, label: '施工夥伴', module: MODULES.PARTNERS },
 ];
 
