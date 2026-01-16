@@ -38,6 +38,17 @@ export const COMPARISON_PAIRS = [
   },
 ] as const;
 
+// Milestone definitions for timeline chart
+export const TIMELINE_MILESTONES = [
+  { code: 'ADMIN_01_LAND_CONFIRMED', label: '土地確認', color: 'yellow' },
+  { code: 'ADMIN_02_STRUCTURE_SIGNED', label: '結構簽證', color: 'green' },
+  { code: 'ADMIN_03_TAIPOWER_OPINION', label: '台電審查意見書', color: 'green' },
+  { code: 'ADMIN_04_ENERGY_APPROVAL', label: '能源署同意備案', color: 'blue' },
+  { code: 'ADMIN_08_METER_INSTALLED', label: '報竣掛表', color: 'purple' },
+  { code: 'ADMIN_09_EQUIPMENT_REG', label: '設備登記完成', color: 'orange' },
+  { code: 'ADMIN_09B_FIT_OFFICIAL', label: '正式躉售函', color: 'red' },
+];
+
 export type ComparisonPair = typeof COMPARISON_PAIRS[number];
 
 export interface ProjectForComparison {
@@ -47,6 +58,7 @@ export interface ProjectForComparison {
   created_at: string;
   revenue_model: string | null;
   installation_type: string | null;
+  intake_year: number | null;
 }
 
 export interface ProjectMilestoneData {
@@ -87,7 +99,7 @@ export function useProjectsForComparison() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
-        .select('id, project_name, project_code, created_at, revenue_model, installation_type')
+        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year')
         .eq('is_deleted', false)
         .order('project_name', { ascending: true });
 
@@ -97,7 +109,213 @@ export function useProjectsForComparison() {
   });
 }
 
-// Fetch comparison data
+// Get unique years from projects
+export function useProjectYears() {
+  return useQuery({
+    queryKey: ['project-years'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('intake_year, created_at')
+        .eq('is_deleted', false);
+
+      if (error) throw error;
+
+      const years = new Set<number>();
+      data?.forEach(p => {
+        if (p.intake_year) {
+          years.add(p.intake_year);
+        } else if (p.created_at) {
+          years.add(new Date(p.created_at).getFullYear());
+        }
+      });
+
+      return Array.from(years).sort((a, b) => b - a); // Descending
+    },
+  });
+}
+
+// Fetch comparison data with manual project selection
+export function useComparisonDataManual(
+  baselineProjectId: string | null,
+  comparisonProjectIds: string[]
+) {
+  return useQuery({
+    queryKey: ['comparison-data-manual', baselineProjectId, comparisonProjectIds],
+    queryFn: async () => {
+      if (!baselineProjectId) return null;
+
+      // 1. Get baseline project
+      const { data: baselineProject, error: baselineError } = await supabase
+        .from('projects')
+        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year')
+        .eq('id', baselineProjectId)
+        .single();
+
+      if (baselineError) throw baselineError;
+
+      // 2. Get comparison projects
+      const allProjectIds = [baselineProjectId, ...comparisonProjectIds];
+      const { data: allProjectsData, error: projectsError } = await supabase
+        .from('projects')
+        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year')
+        .in('id', allProjectIds);
+
+      if (projectsError) throw projectsError;
+
+      // Maintain order: baseline first, then comparison projects in selection order
+      const projectsMap = new Map(allProjectsData?.map(p => [p.id, p]));
+      const allProjects = [
+        baselineProject,
+        ...comparisonProjectIds.map(id => projectsMap.get(id)).filter(Boolean),
+      ] as ProjectForComparison[];
+
+      const baselineDate = new Date(baselineProject.created_at);
+      const baselineYear = baselineProject.intake_year || baselineDate.getFullYear();
+
+      // 3. Get all milestones for these projects
+      const { data: milestones, error: milestoneError } = await supabase
+        .from('project_milestones')
+        .select('project_id, milestone_code, completed_at, is_completed')
+        .in('project_id', allProjectIds);
+
+      if (milestoneError) throw milestoneError;
+
+      // 4. Build milestone map per project
+      const milestonesMap: Record<string, Record<string, string | null>> = {};
+      for (const m of milestones || []) {
+        if (!milestonesMap[m.project_id]) {
+          milestonesMap[m.project_id] = {};
+        }
+        milestonesMap[m.project_id][m.milestone_code] = m.is_completed ? m.completed_at : null;
+      }
+
+      // 5. Calculate intervals for each project
+      const calculateIntervals = (
+        project: ProjectForComparison,
+        baselineMilestones: Record<string, string | null> | undefined
+      ): Record<string, IntervalResult> => {
+        const projectMilestones = milestonesMap[project.id] || {};
+        const intervals: Record<string, IntervalResult> = {};
+
+        for (const pair of COMPARISON_PAIRS) {
+          // Skip FIT-only pairs for non-FIT projects
+          if (pair.fitOnly && project.revenue_model !== 'FIT') {
+            intervals[pair.id] = {
+              fromDate: null,
+              toDate: null,
+              days: null,
+              delta: null,
+              status: 'na',
+            };
+            continue;
+          }
+
+          const fromDate = projectMilestones[pair.from] || null;
+          const toDate = projectMilestones[pair.to] || null;
+
+          if (fromDate && toDate) {
+            const from = new Date(fromDate);
+            const to = new Date(toDate);
+            const days = Math.floor((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+
+            // Calculate delta from baseline
+            let delta: number | null = null;
+            if (baselineMilestones) {
+              const baselineFrom = baselineMilestones[pair.from];
+              const baselineTo = baselineMilestones[pair.to];
+              if (baselineFrom && baselineTo) {
+                const baseFromDate = new Date(baselineFrom);
+                const baseToDate = new Date(baselineTo);
+                const baselineDays = Math.floor(
+                  (baseToDate.getTime() - baseFromDate.getTime()) / (1000 * 60 * 60 * 24)
+                );
+                delta = days - baselineDays;
+              }
+            }
+
+            intervals[pair.id] = {
+              fromDate,
+              toDate,
+              days,
+              delta,
+              status: 'complete',
+            };
+          } else {
+            intervals[pair.id] = {
+              fromDate,
+              toDate,
+              days: null,
+              delta: null,
+              status: 'incomplete',
+            };
+          }
+        }
+
+        return intervals;
+      };
+
+      // Process baseline first
+      const baselineMilestones = milestonesMap[baselineProject.id];
+      const results: ComparisonResult[] = allProjects.map((project, index) => ({
+        project,
+        milestones: milestonesMap[project.id] || {},
+        intervals: calculateIntervals(
+          project,
+          index === 0 ? undefined : baselineMilestones
+        ),
+        isBaseline: index === 0,
+      }));
+
+      // Calculate statistics
+      const stats: ComparisonStats[] = COMPARISON_PAIRS.map(pair => {
+        const validDays = results
+          .filter(r => !r.isBaseline && r.intervals[pair.id]?.status === 'complete')
+          .map(r => r.intervals[pair.id].days!)
+          .filter(d => d !== null);
+
+        if (validDays.length === 0) {
+          return {
+            pairId: pair.id,
+            count: 0,
+            average: null,
+            median: null,
+            min: null,
+            max: null,
+          };
+        }
+
+        const sorted = [...validDays].sort((a, b) => a - b);
+        const sum = validDays.reduce((a, b) => a + b, 0);
+        const median =
+          sorted.length % 2 === 0
+            ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
+            : sorted[Math.floor(sorted.length / 2)];
+
+        return {
+          pairId: pair.id,
+          count: validDays.length,
+          average: Math.round(sum / validDays.length),
+          median: Math.round(median),
+          min: sorted[0],
+          max: sorted[sorted.length - 1],
+        };
+      });
+
+      return {
+        baseline: baselineProject,
+        baselineYear,
+        results,
+        stats,
+        totalCompared: comparisonProjectIds.length,
+        milestonesMap,
+      };
+    },
+    enabled: !!baselineProjectId,
+  });
+}
+
+// Legacy auto-filter version (keeping for reference)
 export function useComparisonData(
   baselineProjectId: string | null,
   sameYearRange: number, // ± days
@@ -111,14 +329,14 @@ export function useComparisonData(
       // 1. Get baseline project
       const { data: baselineProject, error: baselineError } = await supabase
         .from('projects')
-        .select('id, project_name, project_code, created_at, revenue_model, installation_type')
+        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year')
         .eq('id', baselineProjectId)
         .single();
 
       if (baselineError) throw baselineError;
 
       const baselineDate = new Date(baselineProject.created_at);
-      const baselineYear = baselineDate.getFullYear();
+      const baselineYear = baselineProject.intake_year || baselineDate.getFullYear();
       const minDate = new Date(baselineDate);
       minDate.setDate(minDate.getDate() - sameYearRange);
       const maxDate = new Date(baselineDate);
@@ -127,7 +345,7 @@ export function useComparisonData(
       // 2. Get comparison projects (same year + within range)
       const { data: comparisonProjects, error: compError } = await supabase
         .from('projects')
-        .select('id, project_name, project_code, created_at, revenue_model, installation_type')
+        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year')
         .eq('is_deleted', false)
         .gte('created_at', minDate.toISOString())
         .lte('created_at', maxDate.toISOString())
@@ -137,10 +355,10 @@ export function useComparisonData(
 
       if (compError) throw compError;
 
-      // Filter by same year
+      // Filter by same year (using intake_year if available)
       const sameYearProjects = comparisonProjects.filter(p => {
-        const year = new Date(p.created_at).getFullYear();
-        return year === baselineYear;
+        const projectYear = p.intake_year || new Date(p.created_at).getFullYear();
+        return projectYear === baselineYear;
       });
 
       const allProjects = [baselineProject, ...sameYearProjects] as ProjectForComparison[];
@@ -281,6 +499,7 @@ export function useComparisonData(
         results,
         stats,
         totalCompared: sameYearProjects.length,
+        milestonesMap,
       };
     },
     enabled: !!baselineProjectId,
@@ -345,7 +564,7 @@ export function generateLegalSummary(
   stats: ComparisonStats[],
   sameYearRange: number
 ): string {
-  const baselineYear = new Date(baseline.created_at).getFullYear();
+  const baselineYear = baseline.intake_year || new Date(baseline.created_at).getFullYear();
   const totalCompared = results.length - 1; // exclude baseline
 
   const baselineResult = results.find(r => r.isBaseline);
@@ -358,8 +577,7 @@ export function generateLegalSummary(
 
 ### 二、比較母體定義
 - **基準案件**：${baseline.project_name}（${baseline.project_code}）
-- **同年度**：${baselineYear} 年
-- **同期範圍**：±${sameYearRange} 天
+- **基準年度**：${baselineYear} 年
 - **納入案件數**：${totalCompared} 件
 
 ### 三、比較方法
