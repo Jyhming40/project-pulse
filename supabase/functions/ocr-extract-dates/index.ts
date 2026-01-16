@@ -991,19 +991,30 @@ serve(async (req) => {
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Create client with user's auth header to validate token
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } }
+    });
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
 
-    if (authError || !user) {
+    if (claimsError || !claimsData?.claims) {
+      console.error('[OCR] Auth error:', claimsError?.message);
       return new Response(
         JSON.stringify({ error: '無效的認證令牌' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const userId = claimsData.claims.sub;
+    console.log(`[OCR] Authenticated user: ${userId}`);
+
+    // Use service role client for database operations
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const contentType = req.headers.get('content-type') || '';
     let imageBase64: string | null = null;
@@ -1105,7 +1116,7 @@ serve(async (req) => {
       const { data: tokenData, error: tokenError } = await supabase
         .from('user_drive_tokens')
         .select('access_token, refresh_token, token_expires_at')
-        .eq('user_id', user.id)
+        .eq('user_id', userId)
         .single();
 
       if (tokenError || !tokenData) {
@@ -1136,7 +1147,7 @@ serve(async (req) => {
             token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
             updated_at: new Date().toISOString(),
           })
-          .eq('user_id', user.id);
+          .eq('user_id', userId);
       }
 
       const driveFile = await fetchDriveFile(docData.drive_file_id, accessToken, {
