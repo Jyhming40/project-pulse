@@ -32,6 +32,7 @@ import PendingApproval from "./pages/PendingApproval";
 import DuplicateScanner from "./pages/DuplicateScanner";
 import DocumentTypeConfig from "./pages/DocumentTypeConfig";
 import DashboardAudit from "./pages/DashboardAudit";
+import ProjectComparison from "./pages/ProjectComparison";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -50,6 +51,7 @@ const App = () => (
             {/* 日常工作 */}
             <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
             <Route path="/projects" element={<ProtectedRoute><Layout><Projects /></Layout></ProtectedRoute>} />
+            <Route path="/projects/compare" element={<ProtectedRoute><Layout><ProjectComparison /></Layout></ProtectedRoute>} />
             <Route path="/projects/:id" element={<ProtectedRoute><Layout><ProjectDetail /></Layout></ProtectedRoute>} />
             <Route path="/documents" element={<ProtectedRoute><Layout><Documents /></Layout></ProtectedRoute>} />
             <Route path="/import-batch" element={<ProtectedRoute><Layout><ImportBatch /></Layout></ProtectedRoute>} />
