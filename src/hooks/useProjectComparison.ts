@@ -2,18 +2,21 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * Timeline milestones based on PDF comparison table:
- * 1. 台電審查意見書 (TPC_REVIEW issued_at)
- * 2. 能源署同意備案函 (MOEA_CONSENT issued_at)
- * 3. 台電躉購合約申請 (PPA_APPLY submitted_at or TPC_CONTRACT submitted_at)
- * 4. 台電檢驗與細部協商圖面函 (TPC_NEGOTIATION issued_at)
- * 5. 台電躉購合約蓋章完成 (TPC_CONTRACT issued_at)
- * 6. 免雜項執照同意函 (BUILD_EXEMPT issued_at)
- * 7. 免雜項執照竣工函 (BUILD_EXEMPT_COMP issued_at)
- * 8. 台電驗收掛表作業 (TPC_METER issued_at)
- * 9. 台電派員併聯函 (TPC_CONNECTION issued_at)
- * 10. 能源署設備登記 (MOEA_REGISTER issued_at)
- * 11. 台電正式躉售 (TPC_FIT_OFFICIAL issued_at)
+ * 時間軸里程碑定義（共 11 個節點）:
+ * 1. 與客戶簽訂合約 (projects.contract_signed_at)
+ * 2. 台電審查意見書 (TPC_REVIEW issued_at)
+ * 3. 能源署同意備案 (MOEA_CONSENT issued_at)
+ * 4. 結構技師簽證 (BUILD_EXEMPT_APP issued_at - 免雜申請備案回函)
+ * 5. 免雜項執照同意 (BUILD_EXEMPT_APP issued_at)
+ * 6. 台電躉購合約 (TPC_CONTRACT issued_at)
+ * 7. 電機技師簽證 (TPC_CONTRACT submitted_at - 躉售合約送件日)
+ * 8. 材料進場/施工 (BUILD_EXEMPT_COMP submitted_at 或實際開工日)
+ * 9. 免雜項執照竣工 (BUILD_EXEMPT_COMP issued_at)
+ * 10. 台電掛表(完工) (projects.actual_meter_date)
+ * 11. 設備登記核准 (MOEA_REGISTER issued_at)
+ * 
+ * 注意：結構技師 與 免雜同意 使用同一文件不同欄位；
+ *       電機技師 與 躉購合約 使用同一文件不同欄位
  */
 
 // Document type mappings for comparison timeline
@@ -21,6 +24,16 @@ import { supabase } from "@/integrations/supabase/client";
 export const TIMELINE_DOC_MAPPING = [
   { 
     step: 1, 
+    label: '與客戶簽訂合約', 
+    short: '簽約',
+    doc_type_codes: ['__USE_CONTRACT_SIGNED_AT__'],
+    doc_type_labels: ['與客戶簽訂合約', '客戶簽約', '簽約'],
+    date_field: 'issued_at' as const,
+    use_project_field: 'contract_signed_at' as const,
+    color: '#6366f1',
+  },
+  { 
+    step: 2, 
     label: '台電審查意見書', 
     short: '審查意見',
     doc_type_codes: ['TPC_REVIEW'],
@@ -29,8 +42,8 @@ export const TIMELINE_DOC_MAPPING = [
     color: '#3b82f6',
   },
   { 
-    step: 2, 
-    label: '能源署同意備案函', 
+    step: 3, 
+    label: '能源署同意備案', 
     short: '同意備案',
     doc_type_codes: ['MOEA_CONSENT'],
     doc_type_labels: ['同意備案', '能源署同意備案', '能源署同意備案函', '綠能容許'],
@@ -38,200 +51,208 @@ export const TIMELINE_DOC_MAPPING = [
     color: '#10b981',
   },
   { 
-    step: 3, 
-    label: '台電躉購合約申請', 
-    short: '躉購申請',
-    doc_type_codes: ['TPC_CONTRACT'], // 躉售合約的submitted_at = 申請日
-    doc_type_labels: ['躉售合約', '躉購合約申請', '台電躉購合約申請'],
-    date_field: 'submitted_at' as const, // Uses submitted_at for application
+    step: 4, 
+    label: '結構技師簽證', 
+    short: '結構簽證',
+    doc_type_codes: ['BUILD_EXEMPT_APP'], // 免雜項申請備案回函的issued_at = 結構技師完成點
+    doc_type_labels: ['免雜項申請', '結構技師簽證', '結構簽證'],
+    date_field: 'issued_at' as const,
     color: '#8b5cf6',
   },
   { 
-    step: 4, 
-    label: '台電檢驗與細部協商圖面函', 
-    short: '細部協商',
-    doc_type_codes: ['TPC_NEGOTIATION'],
-    doc_type_labels: ['細部協商', '台電細部協商', '台電檢驗與細部協商圖面函', '細部協商圖面函'],
+    step: 5, 
+    label: '免雜項執照同意', 
+    short: '免雜同意',
+    doc_type_codes: ['BUILD_EXEMPT_APP'],
+    doc_type_labels: ['免雜項執照同意函', '免雜項同意', '免雜同意', '免雜項執照', '免雜項申請'],
     date_field: 'issued_at' as const,
-    color: '#14b8a6',
+    color: '#06b6d4',
   },
   { 
-    step: 5, 
-    label: '台電躉購合約蓋章完成', 
-    short: '躉售合約',
+    step: 6, 
+    label: '台電躉購合約', 
+    short: '躉購合約',
     doc_type_codes: ['TPC_CONTRACT'],
     doc_type_labels: ['躉售合約', '躉購合約', '台電躉購合約', '台電躉購合約蓋章完成'],
     date_field: 'issued_at' as const,
     color: '#f59e0b',
   },
   { 
-    step: 6, 
-    label: '免雜項執照同意函', 
-    short: '免雜同意',
-    doc_type_codes: ['BUILD_EXEMPT_APP'], // 免雜項申請
-    doc_type_labels: ['免雜項執照同意函', '免雜項同意', '免雜同意', '免雜項執照', '免雜項申請'],
-    date_field: 'issued_at' as const,
-    color: '#06b6d4',
+    step: 7, 
+    label: '電機技師簽證', 
+    short: '電機簽證',
+    doc_type_codes: ['TPC_CONTRACT'], // 躉售合約的submitted_at = 電機技師完成點（送件日）
+    doc_type_labels: ['躉售合約', '電機技師簽證', '電機簽證'],
+    date_field: 'submitted_at' as const, // Uses submitted_at for electrical engineer
+    color: '#14b8a6',
   },
   { 
-    step: 7, 
-    label: '免雜項執照竣工函', 
+    step: 8, 
+    label: '材料進場/施工', 
+    short: '材料施工',
+    doc_type_codes: ['BUILD_EXEMPT_COMP'], // 使用免雜竣工的submitted_at作為開工日
+    doc_type_labels: ['材料進場', '施工', '開工'],
+    date_field: 'submitted_at' as const,
+    color: '#ec4899',
+  },
+  { 
+    step: 9, 
+    label: '免雜項執照竣工', 
     short: '免雜竣工',
-    doc_type_codes: ['BUILD_EXEMPT_COMP'], // 免雜項竣工
+    doc_type_codes: ['BUILD_EXEMPT_COMP'],
     doc_type_labels: ['免雜項執照竣工函', '免雜項竣工', '免雜竣工', '免雜項執照竣工'],
     date_field: 'issued_at' as const,
     color: '#ef4444',
   },
   { 
-    step: 8, 
-    label: '台電驗收掛表作業', 
-    short: '報竣掛表',
-    doc_type_codes: ['__USE_ACTUAL_METER_DATE__'], // 使用 projects.actual_meter_date
-    doc_type_labels: ['報竣掛表', '台電驗收掛表', '台電驗收掛表作業', '電表掛表', '掛表'],
-    date_field: 'issued_at' as const, // ignored, uses actual_meter_date
-    use_project_field: 'actual_meter_date' as const, // special flag
-    color: '#ec4899',
-  },
-  { 
-    step: 9, 
-    label: '台電派員併聯函', 
-    short: '派員併聯',
-    doc_type_codes: ['TPC_INSPECTION'], // 派員訪查併聯函
-    doc_type_labels: ['派員訪查併聯函', '台電派員併聯函', '派員併聯', '併聯函'],
-    date_field: 'issued_at' as const,
-    color: '#6366f1',
-  },
-  { 
     step: 10, 
-    label: '能源署設備登記', 
-    short: '設備登記',
-    doc_type_codes: ['MOEA_REGISTER'],
-    doc_type_labels: ['設備登記', '能源署設備登記', '設備登記函'],
+    label: '台電掛表(完工)', 
+    short: '報竣掛表',
+    doc_type_codes: ['__USE_ACTUAL_METER_DATE__'],
+    doc_type_labels: ['報竣掛表', '台電驗收掛表', '台電驗收掛表作業', '電表掛表', '掛表'],
     date_field: 'issued_at' as const,
+    use_project_field: 'actual_meter_date' as const,
     color: '#f97316',
   },
   { 
     step: 11, 
-    label: '台電正式躉售', 
-    short: '正式躉售',
-    doc_type_codes: ['TPC_FORMAL_FIT'], // 正式躉售
-    doc_type_labels: ['正式躉售', '台電正式躉售', '躉售函'],
+    label: '設備登記核准', 
+    short: '設備登記',
+    doc_type_codes: ['MOEA_REGISTER'],
+    doc_type_labels: ['設備登記', '能源署設備登記', '設備登記函', '設備登記核准'],
     date_field: 'issued_at' as const,
     color: '#a855f7',
   },
 ] as const;
 
-// Comparison pairs based on PDF intervals
+// Comparison pairs based on new 11-milestone timeline
 export const COMPARISON_PAIRS = [
+  // 連續節點區間（10個）
   {
     id: 'interval_01_02',
-    label: '審查意見→同意備案',
-    description: '台電審查意見書 → 能源署同意備案函',
+    label: '簽約→審查意見',
+    description: '與客戶簽訂合約 → 台電審查意見書',
     fromStep: 1,
     toStep: 2,
     fitOnly: false,
   },
   {
     id: 'interval_02_03',
-    label: '同意備案→躉購申請',
-    description: '能源署同意備案函 → 台電躉購合約申請',
+    label: '審查意見→同意備案',
+    description: '台電審查意見書 → 能源署同意備案',
     fromStep: 2,
     toStep: 3,
     fitOnly: false,
   },
   {
     id: 'interval_03_04',
-    label: '躉購申請→細部協商',
-    description: '台電躉購合約申請 → 台電檢驗與細部協商圖面函',
+    label: '同意備案→結構簽證',
+    description: '能源署同意備案 → 結構技師簽證',
     fromStep: 3,
     toStep: 4,
     fitOnly: false,
   },
   {
     id: 'interval_04_05',
-    label: '細部協商→躉售合約',
-    description: '台電檢驗與細部協商圖面函 → 台電躉購合約蓋章完成',
+    label: '結構簽證→免雜同意',
+    description: '結構技師簽證 → 免雜項執照同意',
     fromStep: 4,
     toStep: 5,
     fitOnly: false,
   },
   {
     id: 'interval_05_06',
-    label: '躉售合約→免雜同意',
-    description: '台電躉購合約蓋章完成 → 免雜項執照同意函',
+    label: '免雜同意→躉購合約',
+    description: '免雜項執照同意 → 台電躉購合約',
     fromStep: 5,
     toStep: 6,
     fitOnly: false,
   },
   {
     id: 'interval_06_07',
-    label: '免雜同意→免雜竣工',
-    description: '免雜項執照同意函 → 免雜項執照竣工函',
+    label: '躉購合約→電機簽證',
+    description: '台電躉購合約 → 電機技師簽證',
     fromStep: 6,
     toStep: 7,
     fitOnly: false,
   },
   {
     id: 'interval_07_08',
-    label: '免雜竣工→報竣掛表',
-    description: '免雜項執照竣工函 → 台電驗收掛表作業',
+    label: '電機簽證→材料施工',
+    description: '電機技師簽證 → 材料進場/施工',
     fromStep: 7,
     toStep: 8,
     fitOnly: false,
   },
   {
     id: 'interval_08_09',
-    label: '報竣掛表→派員併聯',
-    description: '台電驗收掛表作業 → 台電派員併聯函',
+    label: '材料施工→免雜竣工',
+    description: '材料進場/施工 → 免雜項執照竣工',
     fromStep: 8,
     toStep: 9,
     fitOnly: false,
   },
   {
     id: 'interval_09_10',
-    label: '派員併聯→設備登記',
-    description: '台電派員併聯函 → 能源署設備登記',
+    label: '免雜竣工→掛表完工',
+    description: '免雜項執照竣工 → 台電掛表(完工)',
     fromStep: 9,
     toStep: 10,
     fitOnly: false,
   },
   {
     id: 'interval_10_11',
-    label: '設備登記→正式躉售',
-    description: '能源署設備登記 → 台電正式躉售',
+    label: '掛表完工→設備登記',
+    description: '台電掛表(完工) → 設備登記核准',
     fromStep: 10,
     toStep: 11,
     fitOnly: false,
   },
-  // Summary intervals (from PDF)
+  // 跨流程區間（重要分析指標）
   {
     id: 'interval_total',
     label: '完整流程',
-    description: '台電審查意見書 → 台電正式躉售 (項次11-項次1)',
+    description: '與客戶簽訂合約 → 設備登記核准 (全流程)',
     fromStep: 1,
     toStep: 11,
     fitOnly: false,
   },
   {
-    id: 'interval_02_08',
-    label: '同備到掛表',
-    description: '能源署同意備案函 → 台電驗收掛表作業 (項次8-項次2)',
-    fromStep: 2,
-    toStep: 8,
+    id: 'interval_01_03',
+    label: '簽約到同備',
+    description: '與客戶簽訂合約 → 能源署同意備案 (前期行政)',
+    fromStep: 1,
+    toStep: 3,
     fitOnly: false,
   },
   {
-    id: 'interval_05_08',
-    label: '簽約到掛表',
-    description: '台電躉購合約蓋章完成 → 台電驗收掛表作業 (項次8-項次5)',
-    fromStep: 5,
-    toStep: 8,
+    id: 'interval_03_06',
+    label: '同備到躉購',
+    description: '能源署同意備案 → 台電躉購合約 (中期簽約)',
+    fromStep: 3,
+    toStep: 6,
+    fitOnly: false,
+  },
+  {
+    id: 'interval_06_10',
+    label: '躉購到掛表',
+    description: '台電躉購合約 → 台電掛表(完工) (工程期)',
+    fromStep: 6,
+    toStep: 10,
+    fitOnly: false,
+  },
+  {
+    id: 'interval_04_07',
+    label: '結構到電機',
+    description: '結構技師簽證 → 電機技師簽證 (技師簽證期)',
+    fromStep: 4,
+    toStep: 7,
     fitOnly: false,
   },
   {
     id: 'interval_08_10',
-    label: '掛表到設備登記',
-    description: '台電驗收掛表作業 → 能源署設備登記 (項次10-項次8)',
+    label: '施工到掛表',
+    description: '材料進場/施工 → 台電掛表(完工) (純施工期)',
     fromStep: 8,
     toStep: 10,
     fitOnly: false,
@@ -354,31 +375,31 @@ export function useComparisonDataManual(
     queryFn: async () => {
       if (!baselineProjectId) return null;
 
-      // 1. Get baseline project (include actual_meter_date)
+      // 1. Get baseline project (include actual_meter_date, contract_signed_at)
       const { data: baselineProject, error: baselineError } = await supabase
         .from('projects')
-        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year, actual_meter_date')
+        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year, actual_meter_date, contract_signed_at')
         .eq('id', baselineProjectId)
-        .single();
+        .single() as { data: any; error: any };
 
       if (baselineError) throw baselineError;
 
-      // 2. Get all comparison projects (include actual_meter_date)
+      // 2. Get all comparison projects (include actual_meter_date, contract_signed_at)
       const allProjectIds = [baselineProjectId, ...comparisonProjectIds];
       const { data: allProjectsData, error: projectsError } = await supabase
         .from('projects')
-        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year, actual_meter_date')
-        .in('id', allProjectIds);
+        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year, actual_meter_date, contract_signed_at')
+        .in('id', allProjectIds) as { data: any[]; error: any };
 
       if (projectsError) throw projectsError;
 
-      const projectsMap = new Map(allProjectsData?.map(p => [p.id, p]));
+      const projectsMap = new Map((allProjectsData as any[])?.map(p => [p.id, p]));
       const allProjects = [
         baselineProject,
         ...comparisonProjectIds.map(id => projectsMap.get(id)).filter(Boolean),
-      ] as (ProjectForComparison & { actual_meter_date?: string | null })[];
+      ] as (ProjectForComparison & { actual_meter_date?: string | null; contract_signed_at?: string | null })[];
 
-      const baselineYear = extractProjectYear(baselineProject as ProjectForComparison);
+      const baselineYear = extractProjectYear(baselineProject as any as ProjectForComparison);
 
       // 3. Get ALL documents for these projects
       const { data: allDocuments, error: docError } = await supabase
