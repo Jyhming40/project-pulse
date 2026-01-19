@@ -74,6 +74,15 @@ const ADMIN_MILESTONE_RULES: MilestoneRule[] = [
     check_field: 'issued_at',
     prerequisites: ['ADMIN_05_MISC_EXEMPT'],
   },
+  // 頁次 5B: 電機技師簽證 - 與台電細部協商完成連動（當細部協商有日期時自動完成）
+  // 此里程碑由 CROSS_MILESTONE_TRIGGERS 處理，不在此處定義文件規則
+  {
+    milestone_code: 'ADMIN_05B_ELECTRICAL_CERT',
+    doc_type_code: null,
+    doc_type_label: null,
+    check_field: 'project_exists', // 暫時設為 project_exists，實際由連動規則處理
+    prerequisites: ['ADMIN_05_MISC_EXEMPT'],
+  },
   // 頁次 7: 躉售合約完成 - 躉售合約 issued_at 有值
   {
     milestone_code: 'ADMIN_07_PPA_SIGNED',
@@ -173,6 +182,16 @@ const CROSS_MILESTONE_TRIGGERS: { adminCode: string; engineeringCode: string }[]
   { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_08_GRID_TEST' },
   { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_09_DEFECT_FIX' },
   { adminCode: 'ADMIN_08_METER_INSTALLED', engineeringCode: 'ENG_10_HANDOVER' },
+];
+
+/**
+ * 行政里程碑內部連動規則
+ * 當某個行政里程碑完成時，自動完成另一個行政里程碑
+ */
+const ADMIN_MILESTONE_TRIGGERS: { triggerCode: string; targetCode: string }[] = [
+  // 台電細部協商完成 → 電機技師簽證完成
+  // 因為細部協商代表所有技術文件（包含電機技師簽證）都已提交審核通過
+  { triggerCode: 'ADMIN_06_TAIPOWER_DETAIL', targetCode: 'ADMIN_05B_ELECTRICAL_CERT' },
 ];
 
 // deno-lint-ignore no-explicit-any
@@ -452,6 +471,54 @@ async function syncAdminMilestones(supabase: any, projectId: string, userId: str
     }
   }
 
+  // 5. 處理行政里程碑內部連動（行政 → 行政）
+  for (const trigger of ADMIN_MILESTONE_TRIGGERS) {
+    // 檢查觸發里程碑是否已完成
+    if (completedCodes.has(trigger.triggerCode)) {
+      const targetMilestone = milestoneMap[trigger.targetCode];
+      const targetCurrentCompleted = targetMilestone?.is_completed ?? false;
+
+      // 如果目標里程碑尚未完成，則自動完成
+      if (!targetCurrentCompleted) {
+        console.log(`[Admin-trigger] ${trigger.triggerCode} completed → auto-complete ${trigger.targetCode}`);
+        
+        changes.push({
+          code: trigger.targetCode,
+          from: false,
+          to: true,
+        });
+        synced.push(trigger.targetCode);
+        completedCodes.add(trigger.targetCode);
+
+        if (targetMilestone) {
+          // 更新現有記錄
+          await supabase
+            .from('project_milestones')
+            .update({
+              is_completed: true,
+              completed_at: new Date().toISOString(),
+              completed_by: userId,
+              note: `依據 ${trigger.triggerCode} 完成自動連動完成`,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', targetMilestone.id);
+        } else {
+          // 新增記錄
+          await supabase
+            .from('project_milestones')
+            .insert({
+              project_id: projectId,
+              milestone_code: trigger.targetCode,
+              is_completed: true,
+              completed_at: new Date().toISOString(),
+              completed_by: userId,
+              note: `依據 ${trigger.triggerCode} 完成自動連動完成`,
+            });
+        }
+      }
+    }
+  }
+
   console.log(`Sync complete: ${synced.length} completed, ${unsynced.length} incomplete, ${changes.length} changes`);
   return { synced, unsynced, changes };
 }
@@ -465,14 +532,15 @@ async function recalculateProgress(supabase: any, projectId: string): Promise<{
   admin_stage: string | null;
   engineering_stage: string | null;
 }> {
-  // Fetch project's installation_type
+  // Fetch project's installation_type and revenue_model
   const { data: projectData } = await supabase
     .from('projects')
-    .select('installation_type')
+    .select('installation_type, revenue_model')
     .eq('id', projectId)
     .single();
 
   const installationType = projectData?.installation_type || null;
+  const revenueModel = projectData?.revenue_model || null;
 
   // Fetch all active progress milestones with applicable_installation_types
   const { data: milestonesRaw } = await supabase
@@ -490,13 +558,20 @@ async function recalculateProgress(supabase: any, projectId: string): Promise<{
     applicable_installation_types: string[] | null;
   }[];
 
-  // Filter milestones based on installation_type
+  // Filter milestones based on installation_type and revenue_model
   // A milestone is applicable if:
   // 1. applicable_installation_types is null/empty (applicable to all), OR
-  // 2. installationType is null (unknown type, include all milestones), OR
-  // 3. installationType is in the applicable_installation_types array
+  // 2. For REC_ONLY milestones: only include if revenue_model is 'REC'
+  // 3. installationType is null (unknown type, include all milestones), OR
+  // 4. installationType is in the applicable_installation_types array
   const milestones = allMilestones.filter(m => {
     const types = m.applicable_installation_types;
+    
+    // 如果是 REC 專用里程碑（標記為 'REC_ONLY'），只有 REC 專案才適用
+    if (types && types.includes('REC_ONLY')) {
+      return revenueModel === 'REC';
+    }
+    
     if (!types || types.length === 0) return true; // Applicable to all
     if (!installationType) return true; // Unknown type, include all
     return types.includes(installationType);
