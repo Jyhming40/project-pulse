@@ -1767,6 +1767,7 @@ export type Database = {
           construction_status: string | null
           contact_person: string | null
           contact_phone: string | null
+          contract_signed_at: string | null
           coordinates: string | null
           created_at: string
           created_by: string | null
@@ -1828,6 +1829,7 @@ export type Database = {
           construction_status?: string | null
           contact_person?: string | null
           contact_phone?: string | null
+          contract_signed_at?: string | null
           coordinates?: string | null
           created_at?: string
           created_by?: string | null
@@ -1889,6 +1891,7 @@ export type Database = {
           construction_status?: string | null
           contact_person?: string | null
           contact_phone?: string | null
+          contract_signed_at?: string | null
           coordinates?: string | null
           created_at?: string
           created_by?: string | null
