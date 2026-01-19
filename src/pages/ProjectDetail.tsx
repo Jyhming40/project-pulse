@@ -139,7 +139,9 @@ export default function ProjectDetail() {
   const [isAddStatusOpen, setIsAddStatusOpen] = useState(false);
   const [isEditConstructionOpen, setIsEditConstructionOpen] = useState(false);
   const [isEditApprovalDateOpen, setIsEditApprovalDateOpen] = useState(false);
+  const [isEditContractDateOpen, setIsEditContractDateOpen] = useState(false);
   const [approvalDateForm, setApprovalDateForm] = useState('');
+  const [contractDateForm, setContractDateForm] = useState('');
   const [docForm, setDocForm] = useState<{
     doc_type?: DocType;
     doc_status?: DocStatus;
@@ -323,6 +325,26 @@ export default function ProjectDetail() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('同意備案日期已更新，案場編號已自動更新');
       setIsEditApprovalDateOpen(false);
+    },
+    onError: (error: Error) => {
+      toast.error('更新失敗', { description: error.message });
+    },
+  });
+
+  // Update contract signed date mutation
+  const updateContractDateMutation = useMutation({
+    mutationFn: async (newDate: string | null) => {
+      const { error } = await supabase
+        .from('projects')
+        .update({ contract_signed_at: newDate })
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast.success('與客戶簽訂合約日期已更新');
+      setIsEditContractDateOpen(false);
     },
     onError: (error: Error) => {
       toast.error('更新失敗', { description: error.message });
@@ -601,6 +623,25 @@ export default function ProjectDetail() {
                           onClick={() => {
                             setApprovalDateForm((project as any).approval_date || '');
                             setIsEditApprovalDateOpen(true);
+                          }}
+                        >
+                          <Edit className="w-3 h-3" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted-foreground">與客戶簽訂合約日期</p>
+                    <div className="flex items-center gap-2">
+                      <p>{(project as any).contract_signed_at || '-'}</p>
+                      {canEdit && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 px-2"
+                          onClick={() => {
+                            setContractDateForm((project as any).contract_signed_at || '');
+                            setIsEditContractDateOpen(true);
                           }}
                         >
                           <Edit className="w-3 h-3" />
@@ -1325,6 +1366,47 @@ export default function ProjectDetail() {
             <Button
               onClick={() => updateApprovalDateMutation.mutate(approvalDateForm || null)}
               disabled={updateApprovalDateMutation.isPending}
+            >
+              儲存
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Contract Signed Date Dialog */}
+      <Dialog open={isEditContractDateOpen} onOpenChange={setIsEditContractDateOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-primary" />
+              編輯與客戶簽訂合約日期
+            </DialogTitle>
+            <DialogDescription>
+              設定與客戶正式簽訂合約的日期
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>簽約日期</Label>
+              <Input
+                type="date"
+                value={contractDateForm}
+                onChange={(e) => setContractDateForm(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditContractDateOpen(false)}>取消</Button>
+            <Button
+              variant="destructive"
+              onClick={() => updateContractDateMutation.mutate(null)}
+              disabled={!contractDateForm || updateContractDateMutation.isPending}
+            >
+              清除日期
+            </Button>
+            <Button
+              onClick={() => updateContractDateMutation.mutate(contractDateForm || null)}
+              disabled={updateContractDateMutation.isPending}
             >
               儲存
             </Button>

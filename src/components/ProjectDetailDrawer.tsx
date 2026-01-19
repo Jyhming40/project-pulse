@@ -242,6 +242,10 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                           <p className="text-xs text-muted-foreground">同意備案日期</p>
                           <p>{(project as any).approval_date || '-'}</p>
                         </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">與客戶簽訂合約日期</p>
+                          <p>{(project as any).contract_signed_at || '-'}</p>
+                        </div>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground">地址</p>
