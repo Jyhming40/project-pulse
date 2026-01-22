@@ -628,9 +628,17 @@ export function generateComparisonCSV(results: ComparisonResult[]): string {
 }
 
 // Generate legal summary with charts and analysis
-export function generateLegalSummary(results: ComparisonResult[]): string {
+export function generateLegalSummary(
+  results: ComparisonResult[],
+  selectedIntervals?: string[]
+): string {
   const baseline = results.find(r => r.isBaseline);
   if (!baseline) return '';
+  
+  // Use all intervals if none selected
+  const intervals = selectedIntervals && selectedIntervals.length > 0 
+    ? selectedIntervals 
+    : COMPARISON_PAIRS.map(p => p.id);
   
   const others = results.filter(r => !r.isBaseline && r.intervals['interval_total']?.status === 'complete');
   
@@ -689,77 +697,81 @@ export function generateLegalSummary(results: ComparisonResult[]): string {
   }
   summary += `\`\`\`\n`;
   
-  // Add stage-by-step analysis table
-  summary += `\n### 四、階段耗時差異表\n\n`;
-  summary += `此表計算各階段的「耗費天數」，日期來源為文件的發文日或送件日。\n`;
-  summary += `紅色(+)代表落後基準案件，綠色(-)代表領先基準案件。\n\n`;
+  // Add stage-by-step analysis table - only include selected intervals
+  const stepPairs = COMPARISON_PAIRS.slice(0, 10).filter(p => intervals.includes(p.id));
   
-  // Table header
-  summary += `| 步驟 | 比較階段 | `;
-  for (const r of results) {
-    const label = r.isBaseline ? `${r.project.project_name} (基準)` : r.project.project_name;
-    summary += `${label} | `;
-  }
-  summary += `同期平均 |\n`;
-  
-  summary += `| --- | --- | ${results.map(() => '---').join(' | ')} | --- |\n`;
-  
-  // Get step pairs for analysis
-  const stepPairs = COMPARISON_PAIRS.slice(0, 10);
-  
-  for (const pair of stepPairs) {
-    const stepNum = parseInt(pair.id.split('_')[1]) + 1;
-    summary += `| ${stepNum} | ${pair.label} | `;
+  if (stepPairs.length > 0) {
+    summary += `\n### 四、階段耗時差異表\n\n`;
+    summary += `此表計算各階段的「耗費天數」，日期來源為文件的發文日或送件日。\n`;
+    summary += `(+)代表落後基準案件，(-)代表領先基準案件。\n\n`;
     
-    // Get baseline days for this pair
-    const baselineInterval = baseline.intervals[pair.id];
-    const baselineDays = baselineInterval?.status === 'complete' ? baselineInterval.days : null;
-    
-    // Calculate average
-    const validDays = results
-      .filter(r => !r.isBaseline && r.intervals[pair.id]?.status === 'complete')
-      .map(r => r.intervals[pair.id].days!)
-      .filter(d => d !== null);
-    const average = validDays.length > 0 
-      ? Math.round(validDays.reduce((a, b) => a + b, 0) / validDays.length)
-      : null;
-    
+    // Table header
+    summary += `| 步驟 | 比較階段 | `;
     for (const r of results) {
-      const interval = r.intervals[pair.id];
-      if (!interval || interval.status !== 'complete') {
-        summary += `- | `;
-      } else {
-        const days = interval.days;
-        if (r.isBaseline) {
-          summary += `${days}天 (基準) | `;
+      const label = r.isBaseline ? `${r.project.project_name} (基準)` : r.project.project_name;
+      summary += `${label} | `;
+    }
+    summary += `同期平均 |\n`;
+    
+    summary += `| --- | --- | ${results.map(() => '---').join(' | ')} | --- |\n`;
+    
+    for (const pair of stepPairs) {
+      const stepNum = parseInt(pair.id.split('_')[1]) + 1;
+      summary += `| ${stepNum} | ${pair.label} | `;
+      
+      // Get baseline days for this pair
+      const baselineInterval = baseline.intervals[pair.id];
+      const baselineDays = baselineInterval?.status === 'complete' ? baselineInterval.days : null;
+      
+      // Calculate average
+      const validDays = results
+        .filter(r => !r.isBaseline && r.intervals[pair.id]?.status === 'complete')
+        .map(r => r.intervals[pair.id].days!)
+        .filter(d => d !== null);
+      const average = validDays.length > 0 
+        ? Math.round(validDays.reduce((a, b) => a + b, 0) / validDays.length)
+        : null;
+      
+      for (const r of results) {
+        const interval = r.intervals[pair.id];
+        if (!interval || interval.status !== 'complete') {
+          summary += `- | `;
         } else {
-          const delta = baselineDays !== null ? days! - baselineDays : null;
-          if (delta !== null && delta !== 0) {
-            const sign = delta > 0 ? '+' : '';
-            summary += `${days}天 (${sign}${delta}) | `;
+          const days = interval.days;
+          if (r.isBaseline) {
+            summary += `${days}天 (基準) | `;
           } else {
-            summary += `${days}天 | `;
+            const delta = baselineDays !== null ? days! - baselineDays : null;
+            if (delta !== null && delta !== 0) {
+              const sign = delta > 0 ? '+' : '';
+              summary += `${days}天 (${sign}${delta}) | `;
+            } else {
+              summary += `${days}天 | `;
+            }
           }
         }
       }
+      
+      summary += `${average !== null ? `${average}天` : '-'} |\n`;
     }
-    
-    summary += `${average !== null ? `${average}天` : '-'} |\n`;
   }
   
-  // Add summary intervals
-  summary += `\n### 五、總結區間\n\n`;
-  const summaryPairs = COMPARISON_PAIRS.slice(10);
+  // Add summary intervals - only include selected
+  const summaryPairs = COMPARISON_PAIRS.slice(10).filter(p => intervals.includes(p.id));
   
-  for (const pair of summaryPairs) {
-    summary += `**${pair.label}** (${pair.description})：\n`;
-    for (const r of results) {
-      const interval = r.intervals[pair.id];
-      const days = interval?.status === 'complete' ? interval.days : null;
-      const label = r.isBaseline ? `[基準] ${r.project.project_name}` : r.project.project_name;
-      summary += `  - ${label}: ${days !== null ? `${days} 天` : '未完成'}\n`;
+  if (summaryPairs.length > 0) {
+    summary += `\n### 五、總結區間\n\n`;
+    
+    for (const pair of summaryPairs) {
+      summary += `**${pair.label}** (${pair.description})：\n`;
+      for (const r of results) {
+        const interval = r.intervals[pair.id];
+        const days = interval?.status === 'complete' ? interval.days : null;
+        const label = r.isBaseline ? `[基準] ${r.project.project_name}` : r.project.project_name;
+        summary += `  - ${label}: ${days !== null ? `${days} 天` : '未完成'}\n`;
+      }
+      summary += '\n';
     }
-    summary += '\n';
   }
   
   return summary;
