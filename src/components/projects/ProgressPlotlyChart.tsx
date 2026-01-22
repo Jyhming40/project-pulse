@@ -5,14 +5,12 @@ import { zhTW } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { ComparisonResult, TIMELINE_DOC_MAPPING } from "@/hooks/useProjectComparison";
 import { ProjectDispute, DisputeDisplayStrategy } from "@/hooks/useProjectDisputesLocal";
-import { TimelineDocMappingItem } from "@/hooks/useMilestoneOrder";
 import type { Data, Layout, Shape } from "plotly.js";
 
 interface ProgressPlotlyChartProps {
   results: ComparisonResult[];
   disputes?: ProjectDispute[];
   displayStrategy?: DisputeDisplayStrategy;
-  customMilestoneOrder?: TimelineDocMappingItem[];
 }
 
 // Baseline (stuck project) - very prominent red
@@ -33,34 +31,25 @@ const COMPARISON_COLORS = [
   "#14b8a6", // teal
 ];
 
-export function ProgressPlotlyChart({ 
-  results, 
-  disputes = [], 
-  displayStrategy,
-  customMilestoneOrder 
-}: ProgressPlotlyChartProps) {
+export function ProgressPlotlyChart({ results, disputes = [], displayStrategy }: ProgressPlotlyChartProps) {
   const { traces, layout } = useMemo(() => {
     if (results.length === 0) {
       return { traces: [], layout: {} };
     }
 
-    // Use custom order if provided, otherwise default
-    const milestoneMapping = customMilestoneOrder || TIMELINE_DOC_MAPPING;
-
     const traces: Data[] = [];
-    const milestoneLabels = milestoneMapping.map(m => m.short);
+    const milestoneLabels = TIMELINE_DOC_MAPPING.map(m => m.short);
 
     results.forEach((result, index) => {
-      const events: { date: Date; step: number; orderIndex: number }[] = [];
+      const events: { date: Date; step: number }[] = [];
 
-      // Collect milestone events using custom order
-      milestoneMapping.forEach((mapping, orderIndex) => {
+      // Collect milestone events
+      TIMELINE_DOC_MAPPING.forEach(mapping => {
         const docDate = result.documentDates?.[mapping.step];
         if (docDate?.date) {
           events.push({
             date: new Date(docDate.date),
             step: mapping.step,
-            orderIndex: orderIndex + 1, // 1-based position in custom order
           });
         }
       });
@@ -70,20 +59,18 @@ export function ProgressPlotlyChart({
 
       if (events.length === 0) return;
 
-      // Build trace data - use orderIndex for y-axis when custom order is active
+      // Build trace data
       const x: string[] = [];
       const y: number[] = [];
       const customData: any[] = [];
-      let currentHighestOrder = 0;
+      let currentHighestStep = 0;
 
       events.forEach(event => {
-        // Use the order index for position on y-axis
-        const yValue = customMilestoneOrder ? event.orderIndex : event.step;
-        currentHighestOrder = Math.max(currentHighestOrder, yValue);
+        currentHighestStep = Math.max(currentHighestStep, event.step);
         x.push(format(event.date, "yyyy-MM-dd"));
-        y.push(currentHighestOrder);
+        y.push(currentHighestStep);
         
-        const milestone = milestoneMapping.find(m => m.step === event.step);
+        const milestone = TIMELINE_DOC_MAPPING.find(m => m.step === event.step);
         customData.push({
           projectName: result.project.project_name,
           projectCode: result.project.project_code,

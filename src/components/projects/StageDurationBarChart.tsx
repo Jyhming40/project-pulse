@@ -3,13 +3,11 @@ import { Plot } from "@/lib/plotly";
 import { ComparisonResult, COMPARISON_PAIRS } from "@/hooks/useProjectComparison";
 import { ProjectDispute, calculateOverlapDays, DisputeDisplayStrategy } from "@/hooks/useProjectDisputesLocal";
 import type { Data, Layout } from "plotly.js";
-import type { ComparisonPair } from "@/hooks/useProjectComparison";
 
 interface StageDurationBarChartProps {
   results: ComparisonResult[];
   disputes?: ProjectDispute[];
   displayStrategy?: DisputeDisplayStrategy;
-  customComparisonPairs?: readonly ComparisonPair[];
 }
 
 // Colors for projects
@@ -30,19 +28,15 @@ const PROJECT_COLORS = [
 export function StageDurationBarChart({ 
   results, 
   disputes = [],
-  displayStrategy,
-  customComparisonPairs
+  displayStrategy 
 }: StageDurationBarChartProps) {
   const { traces, layout } = useMemo(() => {
     if (results.length === 0) {
       return { traces: [], layout: {} };
     }
 
-    // Use custom pairs if provided, otherwise default
-    const allPairs = customComparisonPairs || COMPARISON_PAIRS;
-    
     // Only use step-by-step intervals (first 10)
-    const stepIntervals = allPairs.filter((p) => p.id.startsWith("interval_") && !p.id.includes("total") && p.id.split("_").length === 3);
+    const stepIntervals = COMPARISON_PAIRS.filter((p) => p.id.startsWith("interval_") && !p.id.includes("total") && p.id.split("_").length === 3);
     const intervalLabels = stepIntervals.map((p) => p.label);
 
     const traces: Data[] = [];
