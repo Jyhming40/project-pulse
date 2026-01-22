@@ -4,10 +4,13 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { ComparisonResult, TIMELINE_DOC_MAPPING } from "@/hooks/useProjectComparison";
-import type { Data, Layout } from "plotly.js";
+import { ProjectDispute, DisputeDisplayStrategy } from "@/hooks/useProjectDisputesLocal";
+import type { Data, Layout, Shape } from "plotly.js";
 
 interface ProgressPlotlyChartProps {
   results: ComparisonResult[];
+  disputes?: ProjectDispute[];
+  displayStrategy?: DisputeDisplayStrategy;
 }
 
 // Baseline (stuck project) - very prominent red
@@ -28,7 +31,7 @@ const COMPARISON_COLORS = [
   "#14b8a6", // teal
 ];
 
-export function ProgressPlotlyChart({ results }: ProgressPlotlyChartProps) {
+export function ProgressPlotlyChart({ results, disputes = [], displayStrategy }: ProgressPlotlyChartProps) {
   const { traces, layout } = useMemo(() => {
     if (results.length === 0) {
       return { traces: [], layout: {} };
@@ -135,10 +138,31 @@ export function ProgressPlotlyChart({ results }: ProgressPlotlyChartProps) {
       } as Data);
     });
 
+    // Create shapes for dispute periods
+    const shapes: Partial<Shape>[] = [];
+    if (displayStrategy?.showDisputeLabels !== false) {
+      disputes.forEach((dispute) => {
+        const opacity = dispute.severity === "high" ? 0.25 : dispute.severity === "medium" ? 0.15 : 0.1;
+        const color = dispute.severity === "high" ? "rgba(239,68,68," : dispute.severity === "medium" ? "rgba(245,158,11," : "rgba(34,197,94,";
+        shapes.push({
+          type: "rect",
+          xref: "x",
+          yref: "paper",
+          x0: dispute.start_date,
+          x1: dispute.end_date,
+          y0: 0,
+          y1: 1,
+          fillcolor: color + opacity + ")",
+          line: { width: 1, color: color + "0.5)", dash: "dot" },
+        });
+      });
+    }
+
     const layout: Partial<Layout> = {
       autosize: true,
       height: 500,
       margin: { l: 120, r: 40, t: 40, b: 80 },
+      shapes,
       xaxis: {
         title: { text: "日期", font: { size: 14 } },
         type: "date",
@@ -174,7 +198,7 @@ export function ProgressPlotlyChart({ results }: ProgressPlotlyChartProps) {
     };
 
     return { traces, layout, milestoneLabels };
-  }, [results]);
+  }, [results, disputes, displayStrategy]);
 
   if (results.length === 0) {
     return (
