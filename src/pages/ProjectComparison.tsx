@@ -14,6 +14,8 @@ import {
   Loader2,
   AlertOctagon,
   Calculator,
+  Grid3X3,
+  Scale,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -45,15 +47,20 @@ import {
   generateLegalSummary,
   generateLegalTable,
 } from "@/hooks/useProjectComparison";
+import { useProjectDisputesLocal } from "@/hooks/useProjectDisputesLocal";
 import { ProjectSearchCombobox } from "@/components/projects/ProjectSearchCombobox";
 import { ProjectMultiSelect } from "@/components/projects/ProjectMultiSelect";
 import { ProgressPlotlyChart } from "@/components/projects/ProgressPlotlyChart";
+import { StageDurationBarChart } from "@/components/projects/StageDurationBarChart";
+import { StageDurationHeatmap } from "@/components/projects/StageDurationHeatmap";
 import { StageAnalysisTable } from "@/components/projects/StageAnalysisTable";
 import { MilestoneDatesTable } from "@/components/projects/MilestoneDatesTable";
-import { ComparisonSidebar, SectionVisibility } from "@/components/projects/ComparisonSidebar";
+import { ComparisonControlPanel, SectionVisibility, ChartMode } from "@/components/projects/ComparisonControlPanel";
 import { BottleneckAnalysis } from "@/components/projects/BottleneckAnalysis";
 import { ComparisonStatsCards } from "@/components/projects/ComparisonStatsCards";
 import { IntervalSelector } from "@/components/projects/IntervalSelector";
+import { DisputeSettingsPanel, DisputeDisplayStrategyPanel } from "@/components/projects/DisputeSettingsPanel";
+import { DisputeKpiCards } from "@/components/projects/DisputeKpiCards";
 import { useBatchSyncMilestones } from "@/hooks/useBatchSyncMilestones";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
@@ -68,8 +75,8 @@ export default function ProjectComparison() {
     COMPARISON_PAIRS.map(p => p.id)
   );
   
-  // Sidebar state
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Right panel state
+  const [panelCollapsed, setPanelCollapsed] = useState(false);
   const [sectionVisibility, setSectionVisibility] = useState<SectionVisibility>({
     chart: true,
     bottleneck: true,
@@ -79,6 +86,9 @@ export default function ProjectComparison() {
     pairInfo: false,
   });
   
+  // Chart mode state
+  const [chartMode, setChartMode] = useState<ChartMode>("progress");
+  
   // Section expanded state (for collapsible sections)
   const [sectionsExpanded, setSectionsExpanded] = useState({
     chart: true,
@@ -87,7 +97,11 @@ export default function ProjectComparison() {
     analysis: true,
     dates: true,
     pairInfo: false,
+    disputeKpi: true,
   });
+
+  // Dispute settings from localStorage
+  const { disputes, strategy } = useProjectDisputesLocal();
 
   const { data: projects, isLoading: projectsLoading, refetch: refetchProjects } = useProjectsForComparison();
   const { data: comparisonData, isLoading: comparisonLoading, refetch: refetchComparison } = useComparisonDataManual(
@@ -126,6 +140,18 @@ export default function ProjectComparison() {
     return baseline ? [baseline, ...others] : others;
   }, [comparisonData]);
 
+  // Get selected projects for dispute panel
+  const selectedProjects = useMemo(() => {
+    if (!projects) return [];
+    const ids = baselineProjectId ? [baselineProjectId, ...comparisonProjectIds] : comparisonProjectIds;
+    return projects.filter(p => ids.includes(p.id));
+  }, [projects, baselineProjectId, comparisonProjectIds]);
+
+  // Filter disputes based on selected projects
+  const relevantDisputes = useMemo(() => {
+    return disputes.filter(d => selectedProjects.some(p => p.id === d.project_id));
+  }, [disputes, selectedProjects]);
+
   const handleExportCSV = () => {
     if (!comparisonData) return;
     const csv = generateComparisonCSV(sortedResults);
@@ -157,17 +183,26 @@ export default function ProjectComparison() {
     setSectionsExpanded(prev => ({ ...prev, [section]: !prev[section] }));
   };
 
+  // Get chart icon based on mode
+  const getChartIcon = () => {
+    switch (chartMode) {
+      case "progress": return <LineChart className="h-5 w-5 text-primary" />;
+      case "duration-bar": return <BarChart3 className="h-5 w-5 text-primary" />;
+      case "heatmap": return <Grid3X3 className="h-5 w-5 text-primary" />;
+    }
+  };
+
+  const getChartTitle = () => {
+    switch (chartMode) {
+      case "progress": return "進度爬升曲線";
+      case "duration-bar": return "階段耗時長條圖";
+      case "heatmap": return "階段耗時熱力圖";
+    }
+  };
+
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
-      {/* Sidebar */}
-      <ComparisonSidebar
-        visibility={sectionVisibility}
-        onVisibilityChange={setSectionVisibility}
-        isCollapsed={sidebarCollapsed}
-        onCollapseChange={setSidebarCollapsed}
-      />
-
-      {/* Main Content */}
+      {/* Main Content (Left) */}
       <div className="flex-1 overflow-auto">
         <div className="p-6 space-y-6">
           {/* Header */}
@@ -382,8 +417,8 @@ export default function ProjectComparison() {
                 </Card>
                 <Card>
                   <CardContent className="pt-6">
-                    <div className="text-2xl font-bold">{TIMELINE_MILESTONES.length}</div>
-                    <p className="text-sm text-muted-foreground">里程碑總數</p>
+                    <div className="text-2xl font-bold">{relevantDisputes.length}</div>
+                    <p className="text-sm text-muted-foreground">爭議記錄</p>
                   </CardContent>
                 </Card>
               </div>
@@ -396,8 +431,8 @@ export default function ProjectComparison() {
                       <CollapsibleTrigger asChild>
                         <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
                           <div className="flex items-center gap-2">
-                            <LineChart className="h-5 w-5 text-primary" />
-                            <CardTitle className="text-lg">爬升歷程圖</CardTitle>
+                            {getChartIcon()}
+                            <CardTitle className="text-lg">{getChartTitle()}</CardTitle>
                           </div>
                           <div className="flex items-center gap-2">
                             <Badge variant="secondary" className="text-xs">Plotly 互動</Badge>
@@ -415,7 +450,65 @@ export default function ProjectComparison() {
                     </CardHeader>
                     <CollapsibleContent>
                       <CardContent className="pt-4">
-                        <ProgressPlotlyChart results={sortedResults} />
+                        {chartMode === "progress" && (
+                          <ProgressPlotlyChart 
+                            results={sortedResults} 
+                            disputes={relevantDisputes}
+                            displayStrategy={strategy}
+                          />
+                        )}
+                        {chartMode === "duration-bar" && (
+                          <StageDurationBarChart 
+                            results={sortedResults}
+                            disputes={relevantDisputes}
+                            displayStrategy={strategy}
+                          />
+                        )}
+                        {chartMode === "heatmap" && (
+                          <StageDurationHeatmap 
+                            results={sortedResults}
+                            disputes={relevantDisputes}
+                            displayStrategy={strategy}
+                          />
+                        )}
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
+
+              {/* Dispute KPI Cards (Iteration 2) */}
+              {relevantDisputes.length > 0 && (
+                <Collapsible open={sectionsExpanded.disputeKpi} onOpenChange={() => toggleSectionExpanded('disputeKpi')}>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CollapsibleTrigger asChild>
+                        <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
+                          <div className="flex items-center gap-2">
+                            <Scale className="h-5 w-5 text-amber-500" />
+                            <CardTitle className="text-lg">爭議影響分析</CardTitle>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="text-xs">Iteration 2</Badge>
+                            {sectionsExpanded.disputeKpi ? (
+                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CardDescription>
+                        各案場爭議期間與流程區間的重疊統計
+                      </CardDescription>
+                    </CardHeader>
+                    <CollapsibleContent>
+                      <CardContent className="pt-4">
+                        <DisputeKpiCards 
+                          results={sortedResults}
+                          disputes={relevantDisputes}
+                          strategy={strategy}
+                        />
                       </CardContent>
                     </CollapsibleContent>
                   </Card>
@@ -434,7 +527,6 @@ export default function ProjectComparison() {
                             <CardTitle className="text-lg">瓶頸階段識別</CardTitle>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Badge variant="destructive" className="text-xs">NEW</Badge>
                             {sectionsExpanded.bottleneck ? (
                               <ChevronDown className="h-5 w-5 text-muted-foreground" />
                             ) : (
@@ -471,7 +563,6 @@ export default function ProjectComparison() {
                             <CardTitle className="text-lg">同年度統計分析</CardTitle>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-xs">NEW</Badge>
                             {sectionsExpanded.stats ? (
                               <ChevronDown className="h-5 w-5 text-muted-foreground" />
                             ) : (
@@ -629,6 +720,22 @@ export default function ProjectComparison() {
           )}
         </div>
       </div>
+
+      {/* Right Control Panel */}
+      <ComparisonControlPanel
+        visibility={sectionVisibility}
+        onVisibilityChange={setSectionVisibility}
+        isCollapsed={panelCollapsed}
+        onCollapseChange={setPanelCollapsed}
+        chartMode={chartMode}
+        onChartModeChange={setChartMode}
+        disputeSettingsSlot={
+          <DisputeSettingsPanel selectedProjects={selectedProjects} />
+        }
+        disputeStrategySlot={
+          <DisputeDisplayStrategyPanel />
+        }
+      />
     </div>
   );
 }
