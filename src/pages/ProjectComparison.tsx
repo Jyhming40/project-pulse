@@ -53,6 +53,7 @@ import { MilestoneDatesTable } from "@/components/projects/MilestoneDatesTable";
 import { ComparisonSidebar, SectionVisibility } from "@/components/projects/ComparisonSidebar";
 import { BottleneckAnalysis } from "@/components/projects/BottleneckAnalysis";
 import { ComparisonStatsCards } from "@/components/projects/ComparisonStatsCards";
+import { IntervalSelector } from "@/components/projects/IntervalSelector";
 import { useBatchSyncMilestones } from "@/hooks/useBatchSyncMilestones";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
@@ -61,6 +62,11 @@ export default function ProjectComparison() {
   const [comparisonProjectIds, setComparisonProjectIds] = useState<string[]>([]);
   const [copied, setCopied] = useState(false);
   const [legalDialogOpen, setLegalDialogOpen] = useState(false);
+  
+  // Selected intervals for legal output (default: all)
+  const [selectedIntervals, setSelectedIntervals] = useState<string[]>(
+    COMPARISON_PAIRS.map(p => p.id)
+  );
   
   // Sidebar state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -136,7 +142,7 @@ export default function ProjectComparison() {
   const handleCopyLegal = () => {
     if (!comparisonData) return;
     
-    const summary = generateLegalSummary(sortedResults);
+    const summary = generateLegalSummary(sortedResults, selectedIntervals);
     const table = generateLegalTable(sortedResults);
     const fullContent = `${summary}\n\n---\n\n## 詳細日期比較表格\n\n${table}`;
 
@@ -206,11 +212,23 @@ export default function ProjectComparison() {
                         可複製貼到說明書、存證信函或法律文件
                       </DialogDescription>
                     </DialogHeader>
-                    <ScrollArea className="h-[60vh] pr-4">
+                    
+                    {/* Interval selector */}
+                    <div className="flex items-center gap-4 py-2 border-b">
+                      <IntervalSelector
+                        selectedIntervals={selectedIntervals}
+                        onSelectionChange={setSelectedIntervals}
+                      />
+                      <span className="text-sm text-muted-foreground">
+                        已選擇 {selectedIntervals.length} / {COMPARISON_PAIRS.length} 個區間
+                      </span>
+                    </div>
+                    
+                    <ScrollArea className="h-[55vh] pr-4">
                       <div className="space-y-4">
                         <div className="prose prose-sm dark:prose-invert max-w-none">
                           <pre className="whitespace-pre-wrap text-sm bg-muted p-4 rounded-lg overflow-x-auto">
-                            {generateLegalSummary(sortedResults)}
+                            {generateLegalSummary(sortedResults, selectedIntervals)}
                           </pre>
                         </div>
                         <Separator />
