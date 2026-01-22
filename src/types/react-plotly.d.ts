@@ -1,4 +1,4 @@
-declare module 'react-plotly.js' {
+declare module 'react-plotly.js/factory' {
   import * as Plotly from 'plotly.js';
   import * as React from 'react';
 
@@ -28,7 +28,12 @@ declare module 'react-plotly.js' {
     onClickAnnotation?: (event: Plotly.ClickAnnotationEvent) => void;
   }
 
-  class Plot extends React.Component<PlotParams> {}
+  function createPlotlyComponent(plotly: typeof Plotly): React.ComponentType<PlotParams>;
+  
+  export = createPlotlyComponent;
+}
 
-  export default Plot;
+declare module 'plotly.js-dist-min' {
+  import * as Plotly from 'plotly.js';
+  export = Plotly;
 }

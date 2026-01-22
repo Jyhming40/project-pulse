@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import Plot from "react-plotly.js";
+import { Plot } from "@/lib/plotly";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
