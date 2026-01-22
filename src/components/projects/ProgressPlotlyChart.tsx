@@ -10,19 +10,22 @@ interface ProgressPlotlyChartProps {
   results: ComparisonResult[];
 }
 
-// Color palette for projects - more vibrant for better visibility
-const PROJECT_COLORS = [
-  "#ef4444", // red - baseline
+// Baseline (stuck project) - very prominent red
+const BASELINE_COLOR = "#dc2626"; // bright red
+const BASELINE_COLOR_LIGHT = "rgba(220, 38, 38, 0.15)"; // for fill
+
+// Comparison projects - softer, muted colors that don't compete with baseline
+const COMPARISON_COLORS = [
   "#3b82f6", // blue
-  "#22c55e", // green
-  "#f59e0b", // amber
+  "#10b981", // emerald
   "#8b5cf6", // violet
+  "#f59e0b", // amber
   "#06b6d4", // cyan
   "#ec4899", // pink
-  "#f97316", // orange
-  "#14b8a6", // teal
-  "#a855f7", // purple
   "#84cc16", // lime
+  "#f97316", // orange
+  "#6366f1", // indigo
+  "#14b8a6", // teal
 ];
 
 export function ProgressPlotlyChart({ results }: ProgressPlotlyChartProps) {
@@ -74,8 +77,27 @@ export function ProgressPlotlyChart({ results }: ProgressPlotlyChartProps) {
         });
       });
 
-      const color = PROJECT_COLORS[index % PROJECT_COLORS.length];
       const isBaseline = result.isBaseline;
+      // Baseline uses index 0 of its own color, comparisons use their own palette
+      const comparisonIndex = isBaseline ? 0 : index - 1;
+      const color = isBaseline 
+        ? BASELINE_COLOR 
+        : COMPARISON_COLORS[comparisonIndex % COMPARISON_COLORS.length];
+
+      // For baseline, add a filled area trace first for emphasis
+      if (isBaseline && x.length > 0) {
+        traces.push({
+          x,
+          y,
+          type: "scatter",
+          mode: "none",
+          name: `${result.project.project_name} (卡關) - 區域`,
+          fill: "tozeroy",
+          fillcolor: BASELINE_COLOR_LIGHT,
+          showlegend: false,
+          hoverinfo: "skip",
+        } as Data);
+      }
 
       traces.push({
         x,
@@ -83,24 +105,33 @@ export function ProgressPlotlyChart({ results }: ProgressPlotlyChartProps) {
         type: "scatter",
         mode: "lines+markers",
         name: isBaseline 
-          ? `${result.project.project_name} (卡關)` 
+          ? `🚨 ${result.project.project_name} (卡關)` 
           : result.project.project_name,
         line: {
           color,
-          width: isBaseline ? 4 : 2,
-          dash: isBaseline ? "solid" : "dot",
+          width: isBaseline ? 5 : 2,
+          dash: isBaseline ? "solid" : "dash",
+          shape: "spline",
         },
         marker: {
-          color,
-          size: isBaseline ? 12 : 8,
+          color: isBaseline ? "#ffffff" : color,
+          size: isBaseline ? 14 : 8,
           symbol: isBaseline ? "diamond" : "circle",
+          line: isBaseline ? {
+            color: BASELINE_COLOR,
+            width: 3,
+          } : undefined,
         },
         customdata: customData,
-        hovertemplate: 
-          "<b>%{customdata.projectName}</b><br>" +
-          "里程碑：%{customdata.milestone}<br>" +
-          "日期：%{customdata.date}<br>" +
-          "進度：Step %{customdata.step}<extra></extra>",
+        hovertemplate: isBaseline
+          ? "<b>🚨 %{customdata.projectName} (卡關案件)</b><br>" +
+            "里程碑：%{customdata.milestone}<br>" +
+            "日期：%{customdata.date}<br>" +
+            "進度：Step %{customdata.step}<extra></extra>"
+          : "<b>%{customdata.projectName}</b><br>" +
+            "里程碑：%{customdata.milestone}<br>" +
+            "日期：%{customdata.date}<br>" +
+            "進度：Step %{customdata.step}<extra></extra>",
       } as Data);
     });
 
@@ -170,24 +201,33 @@ export function ProgressPlotlyChart({ results }: ProgressPlotlyChartProps) {
     <div className="space-y-4">
       {/* Legend with project badges */}
       <div className="flex flex-wrap gap-2">
-        {results.map((result, index) => (
-          <Badge 
-            key={result.project.id}
-            variant={result.isBaseline ? "destructive" : "outline"}
-            className="flex items-center gap-2"
-            style={!result.isBaseline ? { 
-              borderColor: PROJECT_COLORS[index % PROJECT_COLORS.length],
-              color: PROJECT_COLORS[index % PROJECT_COLORS.length],
-            } : {}}
-          >
-            <span 
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: PROJECT_COLORS[index % PROJECT_COLORS.length] }}
-            />
-            {result.project.project_name}
-            {result.isBaseline && " (卡關)"}
-          </Badge>
-        ))}
+        {results.map((result, index) => {
+          const isBaseline = result.isBaseline;
+          const comparisonIndex = isBaseline ? 0 : index - 1;
+          const color = isBaseline 
+            ? BASELINE_COLOR 
+            : COMPARISON_COLORS[comparisonIndex % COMPARISON_COLORS.length];
+          
+          return (
+            <Badge 
+              key={result.project.id}
+              variant={isBaseline ? "destructive" : "outline"}
+              className={`flex items-center gap-2 ${isBaseline ? 'text-base px-3 py-1 animate-pulse' : ''}`}
+              style={!isBaseline ? { 
+                borderColor: color,
+                color: color,
+              } : {}}
+            >
+              <span 
+                className={`rounded-full ${isBaseline ? 'w-3 h-3' : 'w-2 h-2'}`}
+                style={{ backgroundColor: color }}
+              />
+              {isBaseline && "🚨 "}
+              {result.project.project_name}
+              {isBaseline && " (卡關)"}
+            </Badge>
+          );
+        })}
       </div>
 
       {/* Plotly Chart */}
