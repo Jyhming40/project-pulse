@@ -12,8 +12,8 @@ import {
   Calendar,
   RefreshCw,
   Loader2,
-  PanelLeftClose,
-  PanelLeft,
+  AlertOctagon,
+  Calculator,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,8 @@ import { ProgressPlotlyChart } from "@/components/projects/ProgressPlotlyChart";
 import { StageAnalysisTable } from "@/components/projects/StageAnalysisTable";
 import { MilestoneDatesTable } from "@/components/projects/MilestoneDatesTable";
 import { ComparisonSidebar, SectionVisibility } from "@/components/projects/ComparisonSidebar";
+import { BottleneckAnalysis } from "@/components/projects/BottleneckAnalysis";
+import { ComparisonStatsCards } from "@/components/projects/ComparisonStatsCards";
 import { useBatchSyncMilestones } from "@/hooks/useBatchSyncMilestones";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
@@ -64,14 +66,18 @@ export default function ProjectComparison() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sectionVisibility, setSectionVisibility] = useState<SectionVisibility>({
     chart: true,
+    bottleneck: true,
+    stats: true,
     analysis: true,
     dates: true,
-    pairInfo: true,
+    pairInfo: false,
   });
   
   // Section expanded state (for collapsible sections)
   const [sectionsExpanded, setSectionsExpanded] = useState({
     chart: true,
+    bottleneck: true,
+    stats: true,
     analysis: true,
     dates: true,
     pairInfo: false,
@@ -392,6 +398,80 @@ export default function ProjectComparison() {
                     <CollapsibleContent>
                       <CardContent className="pt-4">
                         <ProgressPlotlyChart results={sortedResults} />
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
+
+              {/* Bottleneck Analysis Section */}
+              {sectionVisibility.bottleneck && (
+                <Collapsible open={sectionsExpanded.bottleneck} onOpenChange={() => toggleSectionExpanded('bottleneck')}>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CollapsibleTrigger asChild>
+                        <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
+                          <div className="flex items-center gap-2">
+                            <AlertOctagon className="h-5 w-5 text-destructive" />
+                            <CardTitle className="text-lg">瓶頸階段識別</CardTitle>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="destructive" className="text-xs">NEW</Badge>
+                            {sectionsExpanded.bottleneck ? (
+                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CardDescription>
+                        自動識別各案件延遲最嚴重的階段，突顯超過平均 1.5 倍或 2 倍的瓶頸
+                      </CardDescription>
+                    </CardHeader>
+                    <CollapsibleContent>
+                      <CardContent className="pt-4">
+                        <BottleneckAnalysis 
+                          results={sortedResults} 
+                          stats={comparisonData.stats}
+                        />
+                      </CardContent>
+                    </CollapsibleContent>
+                  </Card>
+                </Collapsible>
+              )}
+
+              {/* Statistics Section */}
+              {sectionVisibility.stats && (
+                <Collapsible open={sectionsExpanded.stats} onOpenChange={() => toggleSectionExpanded('stats')}>
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CollapsibleTrigger asChild>
+                        <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
+                          <div className="flex items-center gap-2">
+                            <Calculator className="h-5 w-5 text-primary" />
+                            <CardTitle className="text-lg">同年度統計分析</CardTitle>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary" className="text-xs">NEW</Badge>
+                            {sectionsExpanded.stats ? (
+                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                            ) : (
+                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                            )}
+                          </div>
+                        </div>
+                      </CollapsibleTrigger>
+                      <CardDescription>
+                        平均值、中位數、標準差等統計指標，以及基準案件與同期的差異
+                      </CardDescription>
+                    </CardHeader>
+                    <CollapsibleContent>
+                      <CardContent className="pt-4">
+                        <ComparisonStatsCards 
+                          results={sortedResults} 
+                          stats={comparisonData.stats}
+                        />
                       </CardContent>
                     </CollapsibleContent>
                   </Card>

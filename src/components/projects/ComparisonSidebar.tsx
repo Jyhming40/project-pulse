@@ -1,4 +1,4 @@
-import { Eye, EyeOff, LineChart, BarChart3, Calendar, Info, Settings2 } from "lucide-react";
+import { Eye, EyeOff, LineChart, BarChart3, Calendar, Info, Settings2, AlertOctagon, Calculator } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 
 export interface SectionVisibility {
   chart: boolean;
+  bottleneck: boolean;
+  stats: boolean;
   analysis: boolean;
   dates: boolean;
   pairInfo: boolean;
@@ -22,6 +24,8 @@ interface ComparisonSidebarProps {
 
 const sections = [
   { id: "chart" as const, label: "爬升歷程圖", icon: LineChart },
+  { id: "bottleneck" as const, label: "瓶頸階段識別", icon: AlertOctagon },
+  { id: "stats" as const, label: "統計分析", icon: Calculator },
   { id: "analysis" as const, label: "階段耗時差異分析", icon: BarChart3 },
   { id: "dates" as const, label: "原始日期列表", icon: Calendar },
   { id: "pairInfo" as const, label: "比較區間說明", icon: Info },
@@ -47,6 +51,8 @@ export function ComparisonSidebar({
     const newValue = !allVisible;
     onVisibilityChange({
       chart: newValue,
+      bottleneck: newValue,
+      stats: newValue,
       analysis: newValue,
       dates: newValue,
       pairInfo: newValue,

@@ -9,13 +9,21 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { AlertTriangle, TrendingDown, TrendingUp, Minus } from "lucide-react";
-import { COMPARISON_PAIRS, TIMELINE_DOC_MAPPING, ComparisonResult, ComparisonStats } from "@/hooks/useProjectComparison";
+import { AlertTriangle, TrendingDown, TrendingUp, Minus, AlertOctagon, Flame } from "lucide-react";
+import { COMPARISON_PAIRS, ComparisonResult, ComparisonStats } from "@/hooks/useProjectComparison";
 import { cn } from "@/lib/utils";
 
 interface StageAnalysisTableProps {
   results: ComparisonResult[];
   stats: ComparisonStats[];
+}
+
+// Calculate if a stage is a bottleneck (> 1.5x average)
+function isBottleneck(days: number, average: number | null): 'critical' | 'warning' | null {
+  if (!average || average === 0) return null;
+  if (days > average * 2) return 'critical';
+  if (days > average * 1.5) return 'warning';
+  return null;
 }
 
 export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) {
@@ -40,6 +48,11 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
       const baselineDays = baselineInterval?.status === 'complete' 
         ? baselineInterval.days 
         : null;
+      
+      // Check if baseline is bottleneck for this stage
+      const baselineBottleneck = baselineDays !== null 
+        ? isBottleneck(baselineDays, stat?.average ?? null) 
+        : null;
 
       // Get all project data for this stage
       const projectData = results.map(r => {
@@ -50,7 +63,8 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
             days: null, 
             delta: null, 
             status: 'na' as const,
-            isBaseline: r.isBaseline
+            isBaseline: r.isBaseline,
+            bottleneck: null
           };
         }
         if (interval.status === 'incomplete') {
@@ -59,7 +73,8 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
             days: null, 
             delta: null, 
             status: 'incomplete' as const,
-            isBaseline: r.isBaseline
+            isBaseline: r.isBaseline,
+            bottleneck: null
           };
         }
         return {
@@ -67,7 +82,8 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
           days: interval.days,
           delta: r.isBaseline ? null : interval.delta,
           status: 'complete' as const,
-          isBaseline: r.isBaseline
+          isBaseline: r.isBaseline,
+          bottleneck: interval.days !== null ? isBottleneck(interval.days, stat?.average ?? null) : null
         };
       });
 
@@ -78,6 +94,7 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
         average: stat?.average ?? null,
         median: stat?.median ?? null,
         projectData,
+        baselineBottleneck,
       };
     });
   }, [results, stats, baselineResult, stepPairs]);
@@ -140,11 +157,25 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
               </p>
               <p className="text-muted-foreground mt-1">
                 此表計算各階段的「耗費天數」，日期來源為文件的發文日或送件日。
-                <span className="text-red-500 font-medium">紅色數字</span>
-                代表落後基準案件，
-                <span className="text-green-500 font-medium">綠色數字</span>
-                代表領先基準案件，是法庭上證明「非正常延宕」的有力證據。
               </p>
+              <div className="flex flex-wrap gap-3 mt-2">
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-3 h-3 rounded bg-red-500" />
+                  <span>落後基準/紅色背景=瓶頸</span>
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <span className="w-3 h-3 rounded bg-green-500" />
+                  <span>領先基準</span>
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Flame className="h-3 w-3 text-orange-500" />
+                  <span>嚴重瓶頸(超過1.5倍平均)</span>
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <AlertOctagon className="h-3 w-3 text-red-500" />
+                  <span>極度嚴重(超過2倍平均)</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -181,9 +212,24 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
             </TableHeader>
             <TableBody>
               {stageData.map((stage) => (
-                <TableRow key={stage.pair.id} className="hover:bg-muted/30">
+                <TableRow 
+                  key={stage.pair.id} 
+                  className={cn(
+                    "hover:bg-muted/30",
+                    stage.baselineBottleneck === 'critical' && "bg-red-100/50 dark:bg-red-900/20",
+                    stage.baselineBottleneck === 'warning' && "bg-orange-100/50 dark:bg-orange-900/20"
+                  )}
+                >
                   <TableCell className="text-center font-medium text-muted-foreground">
-                    {stage.step}
+                    <div className="flex items-center justify-center gap-1">
+                      {stage.step}
+                      {stage.baselineBottleneck === 'critical' && (
+                        <AlertOctagon className="h-4 w-4 text-red-500" />
+                      )}
+                      {stage.baselineBottleneck === 'warning' && (
+                        <Flame className="h-4 w-4 text-orange-500" />
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <Tooltip>
@@ -197,6 +243,9 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>{stage.pair.description}</p>
+                        {stage.average !== null && (
+                          <p className="text-xs mt-1">同期平均：{stage.average}天</p>
+                        )}
                       </TooltipContent>
                     </Tooltip>
                   </TableCell>
@@ -208,6 +257,7 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
                         status={pd.status}
                         isBaseline={pd.isBaseline}
                         average={stage.average}
+                        bottleneck={pd.bottleneck}
                       />
                     </TableCell>
                   ))}
@@ -282,9 +332,10 @@ interface StageCellProps {
   status: 'complete' | 'incomplete' | 'na';
   isBaseline: boolean;
   average: number | null;
+  bottleneck: 'critical' | 'warning' | null;
 }
 
-function StageCell({ days, delta, status, isBaseline, average }: StageCellProps) {
+function StageCell({ days, delta, status, isBaseline, average, bottleneck }: StageCellProps) {
   if (status === 'na') {
     return <span className="text-muted-foreground text-sm">N/A</span>;
   }
@@ -303,13 +354,25 @@ function StageCell({ days, delta, status, isBaseline, average }: StageCellProps)
 
   return (
     <div className="flex flex-col items-center gap-1">
-      <span className={cn(
-        "font-medium text-lg",
-        isDelayed && "text-red-500",
-        isAhead && "text-green-500"
+      <div className={cn(
+        "flex items-center gap-1",
+        isDelayed && "text-red-600 dark:text-red-400",
+        isAhead && "text-green-600 dark:text-green-400"
       )}>
-        {days} 天
-      </span>
+        {bottleneck === 'critical' && (
+          <AlertOctagon className="h-4 w-4 text-red-500" />
+        )}
+        {bottleneck === 'warning' && (
+          <Flame className="h-4 w-4 text-orange-500" />
+        )}
+        <span className={cn(
+          "font-medium text-lg",
+          bottleneck === 'critical' && "font-bold",
+          bottleneck === 'warning' && "font-semibold"
+        )}>
+          {days} 天
+        </span>
+      </div>
       {!isBaseline && delta !== null && (
         <DeltaBadge delta={delta} />
       )}
