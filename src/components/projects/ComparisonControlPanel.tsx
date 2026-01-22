@@ -1,4 +1,4 @@
-import { Eye, EyeOff, LineChart, BarChart3, Calendar, Info, Settings2, AlertOctagon, Calculator, Grid3X3, PanelRightClose, PanelRight, Scale } from "lucide-react";
+import { Eye, EyeOff, LineChart, BarChart3, Calendar, Info, Settings2, AlertOctagon, Calculator, Grid3X3, PanelRightClose, PanelRight, Scale, ListOrdered } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MilestoneOrderPanel } from "./MilestoneOrderPanel";
 
 export interface SectionVisibility {
   chart: boolean;
@@ -29,6 +30,8 @@ interface ComparisonControlPanelProps {
   disputeSettingsSlot?: React.ReactNode;
   // Dispute display strategy slot
   disputeStrategySlot?: React.ReactNode;
+  // Milestone order change callback
+  onMilestoneOrderChange?: (order: string[] | null) => void;
 }
 
 const sections = [
@@ -55,6 +58,7 @@ export function ComparisonControlPanel({
   onChartModeChange,
   disputeSettingsSlot,
   disputeStrategySlot,
+  onMilestoneOrderChange,
 }: ComparisonControlPanelProps) {
   const toggleSection = (sectionId: keyof SectionVisibility) => {
     onVisibilityChange({
@@ -172,6 +176,17 @@ export function ComparisonControlPanel({
                   </div>
                 ))}
               </div>
+            </div>
+
+            <Separator />
+
+            {/* Milestone Order Panel */}
+            <div className="space-y-2">
+              <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                <ListOrdered className="h-3.5 w-3.5" />
+                里程碑順序設定
+              </Label>
+              <MilestoneOrderPanel onOrderChange={onMilestoneOrderChange} />
             </div>
 
             <Separator />

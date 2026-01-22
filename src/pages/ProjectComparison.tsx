@@ -62,6 +62,7 @@ import { IntervalSelector } from "@/components/projects/IntervalSelector";
 import { DisputeSettingsPanel, DisputeDisplayStrategyPanel } from "@/components/projects/DisputeSettingsPanel";
 import { DisputeKpiCards } from "@/components/projects/DisputeKpiCards";
 import { useBatchSyncMilestones } from "@/hooks/useBatchSyncMilestones";
+import { useMilestoneOrder, getReorderedMilestones, getReorderedComparisonPairs } from "@/hooks/useMilestoneOrder";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
 export default function ProjectComparison() {
@@ -99,6 +100,21 @@ export default function ProjectComparison() {
     pairInfo: false,
     disputeKpi: true,
   });
+
+  // Milestone order state
+  const [customMilestoneOrder, setCustomMilestoneOrder] = useState<string[] | null>(null);
+  const { data: savedMilestoneOrder } = useMilestoneOrder();
+  
+  // Initialize custom order from saved order
+  useMemo(() => {
+    if (savedMilestoneOrder && savedMilestoneOrder.length > 0 && !customMilestoneOrder) {
+      setCustomMilestoneOrder(savedMilestoneOrder);
+    }
+  }, [savedMilestoneOrder]);
+
+  // Get reordered milestones and pairs
+  const reorderedMilestones = useMemo(() => getReorderedMilestones(customMilestoneOrder), [customMilestoneOrder]);
+  const reorderedPairs = useMemo(() => getReorderedComparisonPairs(customMilestoneOrder), [customMilestoneOrder]);
 
   // Dispute settings from localStorage
   const { disputes, strategy } = useProjectDisputesLocal();
@@ -735,6 +751,7 @@ export default function ProjectComparison() {
         disputeStrategySlot={
           <DisputeDisplayStrategyPanel />
         }
+        onMilestoneOrderChange={setCustomMilestoneOrder}
       />
     </div>
   );
