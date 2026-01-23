@@ -58,25 +58,24 @@ export function StageDurationBarChart({
       return { traces: [], layout: {} };
     }
 
-    // Use custom stages if provided, otherwise use default step intervals
-    let stagesToUse: StageDefinition[];
-    if (customStages && customStages.length > 0) {
-      stagesToUse = customStages;
-    } else {
-      // Only use step-by-step intervals (first 10)
-      const stepIntervals = COMPARISON_PAIRS.filter((p) => 
-        p.id.startsWith("interval_") && !p.id.includes("total") && p.id.split("_").length === 3
-      );
-      stagesToUse = stepIntervals.map((p, idx) => ({
-        id: p.id,
-        label: p.label,
-        fromStep: p.fromStep,
-        toStep: p.toStep,
-        isSystem: true,
-        description: p.description,
-        sortOrder: idx,
-      }));
-    }
+    // Build stages list: system stages + custom stages (if any)
+    const stepIntervals = COMPARISON_PAIRS.filter((p) => 
+      p.id.startsWith("interval_") && !p.id.includes("total") && p.id.split("_").length === 3
+    );
+    const systemStages: StageDefinition[] = stepIntervals.map((p, idx) => ({
+      id: p.id,
+      label: p.label,
+      fromStep: p.fromStep,
+      toStep: p.toStep,
+      isSystem: true,
+      description: p.description,
+      sortOrder: idx,
+    }));
+    
+    // Combine system stages + custom user stages
+    const stagesToUse: StageDefinition[] = customStages && customStages.length > 0
+      ? [...systemStages, ...customStages]
+      : systemStages;
     
     const intervalLabels = stagesToUse.map((s) => s.label);
     const traces: Data[] = [];
