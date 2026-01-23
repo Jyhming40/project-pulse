@@ -1,6 +1,10 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "sonner";
 
-// Dispute data stored in localStorage
+// Dispute data stored in database
 export interface ProjectDispute {
   id: string;
   project_id: string;
@@ -9,16 +13,18 @@ export interface ProjectDispute {
   end_date: string; // YYYY-MM-DD
   severity: "low" | "medium" | "high";
   note?: string;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
-// Display strategy settings
+// Display strategy settings (kept in localStorage as it's UI preference)
 export interface DisputeDisplayStrategy {
   filter: "all" | "high" | "intersecting";
   showOverlapDays: boolean;
   showDisputeLabels: boolean;
 }
 
-const DISPUTES_STORAGE_KEY = "projectDisputes:v1";
 const SETTINGS_STORAGE_KEY = "projectDisputesSettings:v1";
 
 const DEFAULT_STRATEGY: DisputeDisplayStrategy = {
@@ -26,11 +32,6 @@ const DEFAULT_STRATEGY: DisputeDisplayStrategy = {
   showOverlapDays: true,
   showDisputeLabels: true,
 };
-
-// Generate unique ID
-function generateId(): string {
-  return `dispute_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
 
 // Calculate overlap days between two date ranges
 export function calculateOverlapDays(
@@ -65,62 +66,169 @@ export function disputeIntersectsInterval(
   return calculateOverlapDays(intervalStart, intervalEnd, dispute.start_date, dispute.end_date) > 0;
 }
 
-export function useProjectDisputesLocal() {
-  const [disputes, setDisputes] = useState<ProjectDispute[]>([]);
-  const [strategy, setStrategy] = useState<DisputeDisplayStrategy>(DEFAULT_STRATEGY);
-  const [isLoaded, setIsLoaded] = useState(false);
+// Database row type (before types.ts is regenerated)
+interface ProjectDisputeRow {
+  id: string;
+  project_id: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  severity: string;
+  note: string | null;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
-  // Load from localStorage on mount
+export function useProjectDisputes() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const [strategy, setStrategy] = useState<DisputeDisplayStrategy>(DEFAULT_STRATEGY);
+
+  // Load strategy from localStorage on mount
   useEffect(() => {
     try {
-      const storedDisputes = localStorage.getItem(DISPUTES_STORAGE_KEY);
-      if (storedDisputes) {
-        setDisputes(JSON.parse(storedDisputes));
-      }
-
       const storedSettings = localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (storedSettings) {
         setStrategy({ ...DEFAULT_STRATEGY, ...JSON.parse(storedSettings) });
       }
     } catch (e) {
-      console.error("Failed to load disputes from localStorage:", e);
+      console.error("Failed to load dispute settings from localStorage:", e);
     }
-    setIsLoaded(true);
   }, []);
-
-  // Save disputes to localStorage
-  useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(DISPUTES_STORAGE_KEY, JSON.stringify(disputes));
-    }
-  }, [disputes, isLoaded]);
 
   // Save strategy to localStorage
   useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(strategy));
-    }
-  }, [strategy, isLoaded]);
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(strategy));
+  }, [strategy]);
+
+  // Fetch disputes from database using type cast until types are regenerated
+  const { data: disputes = [], isLoading, refetch } = useQuery({
+    queryKey: ["project-disputes"],
+    queryFn: async () => {
+      const result = await supabase
+        .from("project_disputes" as "projects")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (result.error) {
+        console.error("Failed to fetch disputes:", result.error);
+        throw result.error;
+      }
+
+      return ((result.data as unknown as ProjectDisputeRow[]) || []).map((d) => ({
+        id: d.id,
+        project_id: d.project_id,
+        title: d.title,
+        start_date: d.start_date,
+        end_date: d.end_date,
+        severity: d.severity as "low" | "medium" | "high",
+        note: d.note || undefined,
+        created_by: d.created_by || undefined,
+        created_at: d.created_at,
+        updated_at: d.updated_at,
+      })) as ProjectDispute[];
+    },
+    enabled: !!user,
+  });
+
+  // Add dispute mutation
+  const addMutation = useMutation({
+    mutationFn: async (dispute: Omit<ProjectDispute, "id" | "created_by" | "created_at" | "updated_at">) => {
+      const { data, error } = await supabase
+        .from("project_disputes" as "projects")
+        .insert({
+          project_id: dispute.project_id,
+          title: dispute.title,
+          start_date: dispute.start_date,
+          end_date: dispute.end_date,
+          severity: dispute.severity,
+          note: dispute.note || null,
+          created_by: user?.id,
+        } as never)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-disputes"] });
+      toast.success("爭議期間已新增");
+    },
+    onError: (error) => {
+      console.error("Failed to add dispute:", error);
+      toast.error("新增爭議失敗");
+    },
+  });
+
+  // Update dispute mutation
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Omit<ProjectDispute, "id">> }) => {
+      const { data, error } = await supabase
+        .from("project_disputes" as "projects")
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString(),
+        } as never)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-disputes"] });
+      toast.success("爭議期間已更新");
+    },
+    onError: (error) => {
+      console.error("Failed to update dispute:", error);
+      toast.error("更新爭議失敗");
+    },
+  });
+
+  // Delete dispute mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("project_disputes" as "projects")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["project-disputes"] });
+      toast.success("爭議期間已刪除");
+    },
+    onError: (error) => {
+      console.error("Failed to delete dispute:", error);
+      toast.error("刪除爭議失敗");
+    },
+  });
 
   // CRUD operations
-  const addDispute = useCallback((dispute: Omit<ProjectDispute, "id">) => {
-    const newDispute: ProjectDispute = {
-      ...dispute,
-      id: generateId(),
-    };
-    setDisputes((prev) => [...prev, newDispute]);
-    return newDispute;
-  }, []);
+  const addDispute = useCallback(
+    (dispute: Omit<ProjectDispute, "id" | "created_by" | "created_at" | "updated_at">) => {
+      return addMutation.mutateAsync(dispute);
+    },
+    [addMutation]
+  );
 
-  const updateDispute = useCallback((id: string, updates: Partial<Omit<ProjectDispute, "id">>) => {
-    setDisputes((prev) =>
-      prev.map((d) => (d.id === id ? { ...d, ...updates } : d))
-    );
-  }, []);
+  const updateDispute = useCallback(
+    (id: string, updates: Partial<Omit<ProjectDispute, "id">>) => {
+      return updateMutation.mutateAsync({ id, updates });
+    },
+    [updateMutation]
+  );
 
-  const deleteDispute = useCallback((id: string) => {
-    setDisputes((prev) => prev.filter((d) => d.id !== id));
-  }, []);
+  const deleteDispute = useCallback(
+    (id: string) => {
+      return deleteMutation.mutateAsync(id);
+    },
+    [deleteMutation]
+  );
 
   const getDisputesByProject = useCallback(
     (projectId: string) => {
@@ -163,7 +271,8 @@ export function useProjectDisputesLocal() {
   return {
     disputes,
     strategy,
-    isLoaded,
+    isLoading,
+    isLoaded: !isLoading,
     addDispute,
     updateDispute,
     deleteDispute,
@@ -171,6 +280,8 @@ export function useProjectDisputesLocal() {
     updateStrategy,
     getFilteredDisputes,
     calculateOverlapDays,
+    refetch,
+    isSaving: addMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
   };
 }
 
@@ -236,11 +347,6 @@ export function calculateDisputeKpi(
     }
   }
 
-  // If filtering by "intersecting", only count intervals that have overlap
-  if (strategy.filter === "intersecting") {
-    // Already handled in the loop
-  }
-
   return {
     projectId,
     projectName,
@@ -251,3 +357,6 @@ export function calculateDisputeKpi(
     highSeverityOverlapDays,
   };
 }
+
+// Backward compatibility: re-export old hook name
+export { useProjectDisputes as useProjectDisputesLocal };

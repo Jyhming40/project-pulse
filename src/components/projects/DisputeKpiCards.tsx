@@ -9,7 +9,7 @@ import {
   DisputeDisplayStrategy, 
   calculateDisputeKpi,
   DisputeKpiStats 
-} from "@/hooks/useProjectDisputesLocal";
+} from "@/hooks/useProjectDisputes";
 
 interface DisputeKpiCardsProps {
   results: ComparisonResult[];

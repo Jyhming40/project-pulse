@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { Plot } from "@/lib/plotly";
 import { ComparisonResult, COMPARISON_PAIRS } from "@/hooks/useProjectComparison";
-import { ProjectDispute, calculateOverlapDays, DisputeDisplayStrategy } from "@/hooks/useProjectDisputesLocal";
+import { ProjectDispute, calculateOverlapDays, DisputeDisplayStrategy } from "@/hooks/useProjectDisputes";
 import { StageDefinition } from "@/types/compareConfig";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle } from "lucide-react";

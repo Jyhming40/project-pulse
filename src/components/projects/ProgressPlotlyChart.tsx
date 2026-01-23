@@ -4,7 +4,7 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { ComparisonResult, TIMELINE_DOC_MAPPING } from "@/hooks/useProjectComparison";
-import { ProjectDispute, DisputeDisplayStrategy } from "@/hooks/useProjectDisputesLocal";
+import { ProjectDispute, DisputeDisplayStrategy } from "@/hooks/useProjectDisputes";
 import type { Data, Layout, Shape } from "plotly.js";
 
 interface ProgressPlotlyChartProps {
