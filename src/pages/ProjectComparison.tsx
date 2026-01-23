@@ -47,6 +47,7 @@ import {
   generateLegalSummary,
   generateLegalTable,
 } from "@/hooks/useProjectComparison";
+import { useCustomStages } from "@/hooks/useCustomStages";
 import { useProjectDisputesLocal } from "@/hooks/useProjectDisputesLocal";
 import { ProjectSearchCombobox } from "@/components/projects/ProjectSearchCombobox";
 import { ProjectMultiSelect } from "@/components/projects/ProjectMultiSelect";
@@ -102,6 +103,9 @@ export default function ProjectComparison() {
 
   // Dispute settings from localStorage
   const { disputes, strategy } = useProjectDisputesLocal();
+  
+  // Custom stages from useCustomStages hook
+  const { userStages } = useCustomStages();
 
   const { data: projects, isLoading: projectsLoading, refetch: refetchProjects } = useProjectsForComparison();
   const { data: comparisonData, isLoading: comparisonLoading, refetch: refetchComparison } = useComparisonDataManual(
@@ -462,6 +466,7 @@ export default function ProjectComparison() {
                             results={sortedResults}
                             disputes={relevantDisputes}
                             displayStrategy={strategy}
+                            customStages={userStages}
                           />
                         )}
                         {chartMode === "heatmap" && (
@@ -469,6 +474,7 @@ export default function ProjectComparison() {
                             results={sortedResults}
                             disputes={relevantDisputes}
                             displayStrategy={strategy}
+                            customStages={userStages}
                           />
                         )}
                       </CardContent>
