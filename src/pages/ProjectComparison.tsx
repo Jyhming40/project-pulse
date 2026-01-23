@@ -586,6 +586,7 @@ export default function ProjectComparison() {
                         <ComparisonStatsCards 
                           results={sortedResults} 
                           stats={comparisonData.stats}
+                          customStages={userStages}
                         />
                       </CardContent>
                     </CollapsibleContent>
@@ -617,6 +618,7 @@ export default function ProjectComparison() {
                         <StageAnalysisTable 
                           results={sortedResults} 
                           stats={comparisonData.stats}
+                          customStages={userStages}
                         />
                       </CardContent>
                     </CollapsibleContent>

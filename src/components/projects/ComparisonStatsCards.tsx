@@ -13,10 +13,12 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ComparisonResult, ComparisonStats, COMPARISON_PAIRS } from "@/hooks/useProjectComparison";
+import { StageDefinition } from "@/types/compareConfig";
 
 interface ComparisonStatsCardsProps {
   results: ComparisonResult[];
   stats: ComparisonStats[];
+  customStages?: StageDefinition[];
 }
 
 interface ExtendedStats {
@@ -30,16 +32,38 @@ interface ExtendedStats {
   stdDev: number | null;
   baselineDays: number | null;
   baselineDelta: number | null; // baseline - average
+  isCustom?: boolean;
 }
 
-export function ComparisonStatsCards({ results, stats }: ComparisonStatsCardsProps) {
+/**
+ * Calculate interval data based on stage definition
+ */
+function calculateIntervalFromStage(
+  result: ComparisonResult,
+  stage: StageDefinition
+): { days: number | null; status: 'complete' | 'incomplete' } {
+  const fromDate = result.documentDates[stage.fromStep]?.date || null;
+  const toDate = result.documentDates[stage.toStep]?.date || null;
+  
+  if (fromDate && toDate) {
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    const days = Math.floor((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+    return { days, status: 'complete' };
+  }
+  
+  return { days: null, status: 'incomplete' };
+}
+
+export function ComparisonStatsCards({ results, stats, customStages = [] }: ComparisonStatsCardsProps) {
   const baseline = useMemo(() => results.find(r => r.isBaseline), [results]);
   
   // Calculate extended statistics including std deviation
   const extendedStats = useMemo((): ExtendedStats[] => {
+    // System step pairs (first 10)
     const stepPairs = COMPARISON_PAIRS.slice(0, 10);
     
-    return stepPairs.map(pair => {
+    const systemStats = stepPairs.map(pair => {
       const stat = stats.find(s => s.pairId === pair.id);
       
       // Get all valid days for this interval (excluding baseline)
@@ -75,9 +99,67 @@ export function ComparisonStatsCards({ results, stats }: ComparisonStatsCardsPro
         stdDev,
         baselineDays,
         baselineDelta,
+        isCustom: false,
       };
     });
-  }, [results, stats, baseline]);
+
+    // Custom stages stats
+    const customStats = customStages.map(stage => {
+      // Calculate days for all projects
+      const allDays = results.map(r => {
+        const existing = r.intervals[stage.id];
+        if (existing?.status === 'complete') {
+          return { isBaseline: r.isBaseline, days: existing.days };
+        }
+        const calculated = calculateIntervalFromStage(r, stage);
+        return { isBaseline: r.isBaseline, days: calculated.days };
+      });
+
+      // Get non-baseline valid days
+      const validDays = allDays
+        .filter(d => !d.isBaseline && d.days !== null)
+        .map(d => d.days!);
+
+      const count = validDays.length;
+      const average = count > 0 ? Math.round(validDays.reduce((a, b) => a + b, 0) / count) : null;
+      
+      // Calculate median
+      const sorted = [...validDays].sort((a, b) => a - b);
+      const median = sorted.length > 0
+        ? sorted.length % 2 === 0
+          ? Math.round((sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2)
+          : sorted[Math.floor(sorted.length / 2)]
+        : null;
+
+      // Calculate std dev
+      let stdDev: number | null = null;
+      if (average !== null && validDays.length > 1) {
+        const variance = validDays.reduce((sum, val) => sum + Math.pow(val - average, 2), 0) / validDays.length;
+        stdDev = Math.round(Math.sqrt(variance) * 10) / 10;
+      }
+
+      // Get baseline days
+      const baselineData = allDays.find(d => d.isBaseline);
+      const baselineDays = baselineData?.days ?? null;
+      const baselineDelta = baselineDays !== null && average !== null ? baselineDays - average : null;
+
+      return {
+        pairId: stage.id,
+        label: stage.label,
+        count,
+        average,
+        median,
+        min: sorted[0] ?? null,
+        max: sorted[sorted.length - 1] ?? null,
+        stdDev,
+        baselineDays,
+        baselineDelta,
+        isCustom: true,
+      };
+    });
+
+    return [...systemStats, ...customStats];
+  }, [results, stats, baseline, customStages]);
 
   // Calculate overall statistics
   const overallStats = useMemo(() => {
@@ -309,8 +391,18 @@ export function ComparisonStatsCards({ results, stats }: ComparisonStatsCardsPro
                 </thead>
                 <tbody>
                   {extendedStats.map((stat) => (
-                    <tr key={stat.pairId} className="border-b hover:bg-muted/30">
-                      <td className="py-2 px-2 font-medium">{stat.label}</td>
+                    <tr key={stat.pairId} className={cn(
+                      "border-b hover:bg-muted/30",
+                      stat.isCustom && "bg-primary/5"
+                    )}>
+                      <td className="py-2 px-2 font-medium">
+                        <div className="flex items-center gap-2">
+                          {stat.label}
+                          {stat.isCustom && (
+                            <Badge variant="outline" className="text-xs">自定義</Badge>
+                          )}
+                        </div>
+                      </td>
                       <td className="text-center py-2 px-2 text-muted-foreground">{stat.count}</td>
                       <td className="text-center py-2 px-2">
                         {stat.average !== null ? `${stat.average}天` : '-'}
