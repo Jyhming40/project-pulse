@@ -8,27 +8,22 @@ interface StageDurationHeatmapProps {
   results: ComparisonResult[];
   disputes?: ProjectDispute[];
   displayStrategy?: DisputeDisplayStrategy;
-  selectedIntervals?: string[];
 }
 
 export function StageDurationHeatmap({ 
   results, 
   disputes = [],
-  displayStrategy,
-  selectedIntervals 
+  displayStrategy 
 }: StageDurationHeatmapProps) {
   const { traces, layout } = useMemo(() => {
     if (results.length === 0) {
       return { traces: [], layout: {} };
     }
 
-    // Only use step-by-step intervals, filtered by selectedIntervals if provided
-    let stepIntervals = COMPARISON_PAIRS.filter((p) => 
+    // Only use step-by-step intervals (first 10)
+    const stepIntervals = COMPARISON_PAIRS.filter((p) => 
       p.id.startsWith("interval_") && !p.id.includes("total") && p.id.split("_").length === 3
     );
-    if (selectedIntervals && selectedIntervals.length > 0) {
-      stepIntervals = stepIntervals.filter(p => selectedIntervals.includes(p.id));
-    }
     const intervalLabels = stepIntervals.map((p) => p.label);
 
     // Project names for y-axis

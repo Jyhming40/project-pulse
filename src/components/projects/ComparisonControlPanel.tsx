@@ -1,4 +1,4 @@
-import { Eye, EyeOff, LineChart, BarChart3, Calendar, Info, Settings2, AlertOctagon, Calculator, Grid3X3, PanelRightClose, PanelRight, Scale, Sliders } from "lucide-react";
+import { Eye, EyeOff, LineChart, BarChart3, Calendar, Info, Settings2, AlertOctagon, Calculator, Grid3X3, PanelRightClose, PanelRight, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -29,8 +29,6 @@ interface ComparisonControlPanelProps {
   disputeSettingsSlot?: React.ReactNode;
   // Dispute display strategy slot
   disputeStrategySlot?: React.ReactNode;
-  // Milestone settings slot
-  milestoneSettingsSlot?: React.ReactNode;
 }
 
 const sections = [
@@ -57,7 +55,6 @@ export function ComparisonControlPanel({
   onChartModeChange,
   disputeSettingsSlot,
   disputeStrategySlot,
-  milestoneSettingsSlot,
 }: ComparisonControlPanelProps) {
   const toggleSection = (sectionId: keyof SectionVisibility) => {
     onVisibilityChange({
@@ -202,20 +199,6 @@ export function ComparisonControlPanel({
                     爭議顯示策略
                   </Label>
                   {disputeStrategySlot}
-                </div>
-                <Separator />
-              </>
-            )}
-
-            {/* Milestone Settings Slot */}
-            {milestoneSettingsSlot && (
-              <>
-                <div className="space-y-2">
-                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
-                    <Sliders className="h-3.5 w-3.5" />
-                    比較項目設定
-                  </Label>
-                  {milestoneSettingsSlot}
                 </div>
                 <Separator />
               </>
