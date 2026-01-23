@@ -1,9 +1,10 @@
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { Plot } from "@/lib/plotly";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { ComparisonResult, TIMELINE_DOC_MAPPING } from "@/hooks/useProjectComparison";
+import { useMilestoneOrder } from "@/hooks/useMilestoneOrder";
 import { ProjectDispute, DisputeDisplayStrategy } from "@/hooks/useProjectDisputes";
 import type { Data, Layout, Shape } from "plotly.js";
 
@@ -32,13 +33,26 @@ const COMPARISON_COLORS = [
 ];
 
 export function ProgressPlotlyChart({ results, disputes = [], displayStrategy }: ProgressPlotlyChartProps) {
+  const { orderedMilestones, order } = useMilestoneOrder();
+  const [updateTrigger, setUpdateTrigger] = useState(0);
+
+  // Listen for milestone order changes
+  useEffect(() => {
+    const handler = () => setUpdateTrigger(prev => prev + 1);
+    window.addEventListener("milestoneOrderChanged", handler);
+    return () => window.removeEventListener("milestoneOrderChanged", handler);
+  }, []);
+
   const { traces, layout } = useMemo(() => {
     if (results.length === 0) {
       return { traces: [], layout: {} };
     }
 
     const traces: Data[] = [];
-    const milestoneLabels = TIMELINE_DOC_MAPPING.map(m => m.short);
+    // Use ordered milestones for labels
+    const milestoneLabels = orderedMilestones.map(m => m.short);
+    // Create position map: step -> display position
+    const stepToPosition = new Map(order.map((step, index) => [step, index + 1]));
 
     results.forEach((result, index) => {
       const events: { date: Date; step: number }[] = [];
@@ -59,16 +73,15 @@ export function ProgressPlotlyChart({ results, disputes = [], displayStrategy }:
 
       if (events.length === 0) return;
 
-      // Build trace data
+      // Build trace data - use stepToPosition for y values
       const x: string[] = [];
       const y: number[] = [];
       const customData: any[] = [];
-      let currentHighestStep = 0;
 
       events.forEach(event => {
-        currentHighestStep = Math.max(currentHighestStep, event.step);
+        const position = stepToPosition.get(event.step) || event.step;
         x.push(format(event.date, "yyyy-MM-dd"));
-        y.push(currentHighestStep);
+        y.push(position);
         
         const milestone = TIMELINE_DOC_MAPPING.find(m => m.step === event.step);
         customData.push({
@@ -77,6 +90,7 @@ export function ProgressPlotlyChart({ results, disputes = [], displayStrategy }:
           milestone: milestone?.label || `Step ${event.step}`,
           date: format(event.date, "yyyy年M月d日", { locale: zhTW }),
           step: event.step,
+          position,
         });
       });
 
@@ -173,7 +187,7 @@ export function ProgressPlotlyChart({ results, disputes = [], displayStrategy }:
       yaxis: {
         title: { text: "里程碑進度", font: { size: 14 } },
         tickmode: "array",
-        tickvals: TIMELINE_DOC_MAPPING.map(m => m.step),
+        tickvals: order.map((_, index) => index + 1),
         ticktext: milestoneLabels,
         range: [0.5, 11.5],
         gridcolor: "rgba(0,0,0,0.1)",
@@ -198,7 +212,7 @@ export function ProgressPlotlyChart({ results, disputes = [], displayStrategy }:
     };
 
     return { traces, layout, milestoneLabels };
-  }, [results, disputes, displayStrategy]);
+  }, [results, disputes, displayStrategy, orderedMilestones, order, updateTrigger]);
 
   if (results.length === 0) {
     return (
