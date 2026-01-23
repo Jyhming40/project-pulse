@@ -116,22 +116,25 @@ function SortableRow({ milestone, displayIndex, results, formatDate }: SortableR
 export function MilestoneDatesTable({ results }: MilestoneDatesTableProps) {
   const { order, orderedMilestones, isCustomOrder, resetOrder, isSaving, moveMilestone } = useMilestoneOrder();
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(TouchSensor, {
-      activationConstraint: {
-        delay: 200,
-        tolerance: 5,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
+  // Define sensors with stable references - must be before any conditional returns
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: {
+      distance: 8,
+    },
+  });
+  
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: {
+      delay: 200,
+      tolerance: 5,
+    },
+  });
+  
+  const keyboardSensor = useSensor(KeyboardSensor, {
+    coordinateGetter: sortableKeyboardCoordinates,
+  });
+
+  const sensors = useSensors(pointerSensor, touchSensor, keyboardSensor);
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
