@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 interface StageAnalysisTableProps {
   results: ComparisonResult[];
   stats: ComparisonStats[];
+  selectedIntervals?: string[];
 }
 
 // Calculate if a stage is a bottleneck (> 1.5x average)
@@ -26,17 +27,29 @@ function isBottleneck(days: number, average: number | null): 'critical' | 'warni
   return null;
 }
 
-export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) {
+export function StageAnalysisTable({ results, stats, selectedIntervals }: StageAnalysisTableProps) {
   // Get baseline result
   const baselineResult = useMemo(() => {
     return results.find(r => r.isBaseline);
   }, [results]);
 
-  // Get first 10 pairs (step-by-step intervals) for detailed analysis
-  const stepPairs = COMPARISON_PAIRS.slice(0, 10);
+  // Get step-by-step intervals, filtered by selectedIntervals if provided
+  const stepPairs = useMemo(() => {
+    let pairs = COMPARISON_PAIRS.slice(0, 10);
+    if (selectedIntervals && selectedIntervals.length > 0) {
+      pairs = pairs.filter(p => selectedIntervals.includes(p.id));
+    }
+    return pairs;
+  }, [selectedIntervals]);
   
-  // Get summary pairs (total, 同備到掛表, etc.)
-  const summaryPairs = COMPARISON_PAIRS.slice(10);
+  // Get summary pairs, filtered by selectedIntervals if provided
+  const summaryPairs = useMemo(() => {
+    let pairs = COMPARISON_PAIRS.slice(10);
+    if (selectedIntervals && selectedIntervals.length > 0) {
+      pairs = pairs.filter(p => selectedIntervals.includes(p.id));
+    }
+    return pairs;
+  }, [selectedIntervals]);
 
   // Calculate comparison data for each stage
   const stageData = useMemo(() => {

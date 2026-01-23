@@ -9,6 +9,7 @@ import { ComparisonResult, ComparisonStats, COMPARISON_PAIRS } from "@/hooks/use
 interface BottleneckAnalysisProps {
   results: ComparisonResult[];
   stats: ComparisonStats[];
+  selectedIntervals?: string[];
 }
 
 interface BottleneckInfo {
@@ -28,10 +29,14 @@ interface BottleneckInfo {
   avgDelta: number | null;
 }
 
-export function BottleneckAnalysis({ results, stats }: BottleneckAnalysisProps) {
+export function BottleneckAnalysis({ results, stats, selectedIntervals }: BottleneckAnalysisProps) {
   // Calculate bottleneck info for each project
   const bottleneckData = useMemo(() => {
-    const stepPairs = COMPARISON_PAIRS.slice(0, 10);
+    // Filter step pairs by selectedIntervals if provided
+    let stepPairs = COMPARISON_PAIRS.slice(0, 10);
+    if (selectedIntervals && selectedIntervals.length > 0) {
+      stepPairs = stepPairs.filter(p => selectedIntervals.includes(p.id));
+    }
     
     return results.map((result): BottleneckInfo => {
       let worstStage: BottleneckInfo['worstStage'] = null;

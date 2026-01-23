@@ -48,6 +48,7 @@ import {
   generateLegalTable,
 } from "@/hooks/useProjectComparison";
 import { useProjectDisputesLocal } from "@/hooks/useProjectDisputesLocal";
+import { useUserMilestoneSettings, filterComparisonPairs } from "@/hooks/useUserMilestoneSettings";
 import { ProjectSearchCombobox } from "@/components/projects/ProjectSearchCombobox";
 import { ProjectMultiSelect } from "@/components/projects/ProjectMultiSelect";
 import { ProgressPlotlyChart } from "@/components/projects/ProgressPlotlyChart";
@@ -61,6 +62,7 @@ import { ComparisonStatsCards } from "@/components/projects/ComparisonStatsCards
 import { IntervalSelector } from "@/components/projects/IntervalSelector";
 import { DisputeSettingsPanel, DisputeDisplayStrategyPanel } from "@/components/projects/DisputeSettingsPanel";
 import { DisputeKpiCards } from "@/components/projects/DisputeKpiCards";
+import { MilestoneSettingsPanel } from "@/components/projects/MilestoneSettingsPanel";
 import { useBatchSyncMilestones } from "@/hooks/useBatchSyncMilestones";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
@@ -102,6 +104,14 @@ export default function ProjectComparison() {
 
   // Dispute settings from localStorage
   const { disputes, strategy } = useProjectDisputesLocal();
+
+  // User milestone settings from database
+  const { selectedIntervals: userSelectedIntervals, isLoading: settingsLoading } = useUserMilestoneSettings();
+
+  // Filtered comparison pairs based on user settings
+  const filteredPairs = useMemo(() => {
+    return filterComparisonPairs(userSelectedIntervals);
+  }, [userSelectedIntervals]);
 
   const { data: projects, isLoading: projectsLoading, refetch: refetchProjects } = useProjectsForComparison();
   const { data: comparisonData, isLoading: comparisonLoading, refetch: refetchComparison } = useComparisonDataManual(
@@ -462,6 +472,7 @@ export default function ProjectComparison() {
                             results={sortedResults}
                             disputes={relevantDisputes}
                             displayStrategy={strategy}
+                            selectedIntervals={userSelectedIntervals}
                           />
                         )}
                         {chartMode === "heatmap" && (
@@ -469,6 +480,7 @@ export default function ProjectComparison() {
                             results={sortedResults}
                             disputes={relevantDisputes}
                             displayStrategy={strategy}
+                            selectedIntervals={userSelectedIntervals}
                           />
                         )}
                       </CardContent>
@@ -508,6 +520,7 @@ export default function ProjectComparison() {
                           results={sortedResults}
                           disputes={relevantDisputes}
                           strategy={strategy}
+                          selectedIntervals={userSelectedIntervals}
                         />
                       </CardContent>
                     </CollapsibleContent>
@@ -544,6 +557,7 @@ export default function ProjectComparison() {
                         <BottleneckAnalysis 
                           results={sortedResults} 
                           stats={comparisonData.stats}
+                          selectedIntervals={userSelectedIntervals}
                         />
                       </CardContent>
                     </CollapsibleContent>
@@ -580,6 +594,7 @@ export default function ProjectComparison() {
                         <ComparisonStatsCards 
                           results={sortedResults} 
                           stats={comparisonData.stats}
+                          selectedIntervals={userSelectedIntervals}
                         />
                       </CardContent>
                     </CollapsibleContent>
@@ -611,6 +626,7 @@ export default function ProjectComparison() {
                         <StageAnalysisTable 
                           results={sortedResults} 
                           stats={comparisonData.stats}
+                          selectedIntervals={userSelectedIntervals}
                         />
                       </CardContent>
                     </CollapsibleContent>
@@ -734,6 +750,9 @@ export default function ProjectComparison() {
         }
         disputeStrategySlot={
           <DisputeDisplayStrategyPanel />
+        }
+        milestoneSettingsSlot={
+          <MilestoneSettingsPanel />
         }
       />
     </div>
