@@ -1,52 +1,99 @@
+import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   Wrench,
-  Palette
+  Palette,
+  TrendingUp,
+  Settings2,
+  FileText
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import BrandingSettings from '@/components/BrandingSettings';
 import UserManagement from '@/components/UserManagement';
 import PermissionManagement from '@/components/PermissionManagement';
+import { ProgressSettingsPanel } from '@/components/settings/ProgressSettingsPanel';
+import { SystemOptionsPanel } from '@/components/settings/SystemOptionsPanel';
+import { DocumentTypePanel } from '@/components/settings/DocumentTypePanel';
 
 export default function Settings() {
   const { isAdmin } = useAuth();
+  const [activeTab, setActiveTab] = useState('branding');
+
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-muted-foreground">僅限管理員存取</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-fade-in">
       <div>
         <h1 className="text-2xl font-display font-bold">系統設定</h1>
-        <p className="text-muted-foreground mt-1">管理個人設定與系統配置</p>
+        <p className="text-muted-foreground mt-1">管理系統配置與資料選項</p>
       </div>
 
-      {/* Branding Settings - Admin Only */}
-      {isAdmin && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Palette className="w-5 h-5" />
-              品牌與公司資訊
-            </CardTitle>
-            <CardDescription>
-              設定系統名稱、Logo 與公司基本資訊
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <BrandingSettings />
-          </CardContent>
-        </Card>
-      )}
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+          <TabsTrigger value="branding" className="flex items-center gap-2">
+            <Palette className="w-4 h-4" />
+            <span className="hidden sm:inline">公司設定</span>
+          </TabsTrigger>
+          <TabsTrigger value="progress" className="flex items-center gap-2">
+            <TrendingUp className="w-4 h-4" />
+            <span className="hidden sm:inline">進度設定</span>
+          </TabsTrigger>
+          <TabsTrigger value="codebook" className="flex items-center gap-2">
+            <Settings2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Codebook</span>
+          </TabsTrigger>
+          <TabsTrigger value="doctype" className="flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            <span className="hidden sm:inline">文件類型</span>
+          </TabsTrigger>
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <Wrench className="w-4 h-4" />
+            <span className="hidden sm:inline">人員權限</span>
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Admin-only sections */}
-      {isAdmin && (
-        <>
-          {/* User Management */}
+        <TabsContent value="branding" className="mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Palette className="w-5 h-5" />
+                品牌與公司資訊
+              </CardTitle>
+              <CardDescription>
+                設定系統名稱、Logo 與公司基本資訊
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <BrandingSettings />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="progress" className="mt-6">
+          <ProgressSettingsPanel />
+        </TabsContent>
+
+        <TabsContent value="codebook" className="mt-6">
+          <SystemOptionsPanel />
+        </TabsContent>
+
+        <TabsContent value="doctype" className="mt-6">
+          <DocumentTypePanel />
+        </TabsContent>
+
+        <TabsContent value="users" className="mt-6 space-y-6">
           <UserManagement />
-
-          {/* Permission Management */}
           <PermissionManagement />
-
+          
           {/* Engineering Interface - Redirect to dedicated page */}
           <Card className="border-amber-500/50">
             <CardHeader>
@@ -59,9 +106,6 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground mb-4">
-                系統治理中心為獨立模組，包含系統狀態監控、雲端連結設定、資料完整性檢查、資料庫備份與重置等功能。
-              </p>
               <Button asChild>
                 <RouterLink to="/engineering">
                   <Wrench className="w-4 h-4 mr-2" />
@@ -70,8 +114,8 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
-        </>
-      )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
