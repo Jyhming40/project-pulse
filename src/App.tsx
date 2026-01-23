@@ -11,7 +11,6 @@ import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import Investors from "./pages/Investors";
-import InvestorCodeReference from "./pages/InvestorCodeReference";
 import InvestorDataManagement from "./pages/InvestorDataManagement";
 import Documents from "./pages/Documents";
 import ImportBatch from "./pages/ImportBatch";
@@ -21,12 +20,9 @@ import Permissions from "./pages/Permissions";
 import SystemOptions from "./pages/SystemOptions";
 import Partners from "./pages/Partners";
 import RecycleBin from "./pages/RecycleBin";
-import DeletionPolicies from "./pages/DeletionPolicies";
-import AuditLogs from "./pages/AuditLogs";
 import Engineering from "./pages/Engineering";
 import ProgressSettings from "./pages/ProgressSettings";
 import ChangePassword from "./pages/ChangePassword";
-import Branding from "./pages/Branding";
 import Integrations from "./pages/Integrations";
 import PendingApproval from "./pages/PendingApproval";
 import DuplicateScanner from "./pages/DuplicateScanner";
@@ -66,17 +62,13 @@ const App = () => (
             <Route path="/progress-settings" element={<ProtectedRoute adminOnly><Layout><ProgressSettings /></Layout></ProtectedRoute>} />
             <Route path="/system-options" element={<ProtectedRoute adminOnly><Layout><SystemOptions /></Layout></ProtectedRoute>} />
             <Route path="/document-types" element={<ProtectedRoute adminOnly><Layout><DocumentTypeConfig /></Layout></ProtectedRoute>} />
-            <Route path="/investor-codes" element={<ProtectedRoute adminOnly><Layout><InvestorCodeReference /></Layout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Layout><Settings /></Layout></ProtectedRoute>} />
-            <Route path="/branding" element={<ProtectedRoute adminOnly><Layout><Branding /></Layout></ProtectedRoute>} />
             {/* 管理與設定 (Admin) - 外部整合 */}
             <Route path="/integrations" element={<ProtectedRoute adminOnly><Layout><Integrations /></Layout></ProtectedRoute>} />
             
             {/* 系統治理中心 (Admin) */}
             <Route path="/engineering" element={<ProtectedRoute adminOnly><Layout><Engineering /></Layout></ProtectedRoute>} />
-            <Route path="/deletion-policies" element={<ProtectedRoute adminOnly><Layout><DeletionPolicies /></Layout></ProtectedRoute>} />
             <Route path="/recycle-bin" element={<ProtectedRoute adminOnly><Layout><RecycleBin /></Layout></ProtectedRoute>} />
-            <Route path="/audit-logs" element={<ProtectedRoute adminOnly><Layout><AuditLogs /></Layout></ProtectedRoute>} />
             <Route path="/duplicate-scanner" element={<ProtectedRoute adminOnly><Layout><DuplicateScanner /></Layout></ProtectedRoute>} />
             
             {/* Dev Tools (開發環境) */}

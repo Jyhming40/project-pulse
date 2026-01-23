@@ -13,11 +13,8 @@ import {
   Zap,
   ChevronLeft,
   ChevronDown,
-  BookOpen,
   HardHat,
   Trash2,
-  Shield,
-  ClipboardList,
   TrendingUp,
   AlertTriangle,
   Activity,
@@ -28,7 +25,8 @@ import {
   FolderOpen,
   Copy,
   Briefcase,
-  Scale
+  Scale,
+  Lock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -71,7 +69,6 @@ const investorItems = [
 const documentItems = [
   { to: '/documents', icon: FileText, label: '文件管理', module: MODULES.DOCUMENTS },
   { to: '/import-batch', icon: FolderOpen, label: '批次匯入', module: MODULES.DOCUMENTS },
-  { to: '/investor-codes', icon: BookOpen, label: '代碼對照表', adminOnly: true },
 ];
 
 // ==========================================
@@ -80,12 +77,12 @@ const documentItems = [
 const systemSettingsItems = [
   // 人員管理
   { to: '/users', icon: UserCog, label: '使用者與角色', adminOnly: true },
-  { to: '/permissions', icon: Shield, label: '權限設定', adminOnly: true },
+  { to: '/permissions', icon: Lock, label: '權限設定', adminOnly: true },
   // 系統設定
   { to: '/progress-settings', icon: TrendingUp, label: '進度設定', adminOnly: true },
   { to: '/system-options', icon: Settings2, label: 'Codebook', adminOnly: true },
   { to: '/document-types', icon: FileText, label: '文件類型管理', adminOnly: true },
-  { to: '/branding', icon: Palette, label: '公司設定', adminOnly: true },
+  { to: '/settings', icon: Palette, label: '公司設定', adminOnly: true },
   // 外部整合
   { to: '/integrations', icon: Link2, label: '外部整合', adminOnly: true },
 ];
@@ -94,9 +91,7 @@ const systemSettingsItems = [
 const systemGovernanceItems = [
   { to: '/engineering', icon: Activity, label: '系統狀態' },
   { to: '/duplicate-scanner', icon: Copy, label: '重複案件掃描' },
-  { to: '/deletion-policies', icon: Shield, label: '刪除政策' },
   { to: '/recycle-bin', icon: Trash2, label: '回收區' },
-  { to: '/audit-logs', icon: ClipboardList, label: '稽核日誌' },
 ];
 
 export default function Layout({ children }: LayoutProps) {
