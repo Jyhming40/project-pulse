@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { 
   StageDefinition, 
@@ -11,6 +10,9 @@ import {
 } from '@/types/compareConfig';
 import { COMPARISON_PAIRS, TIMELINE_DOC_MAPPING } from './useProjectComparison';
 import { toast } from 'sonner';
+
+// Custom event to notify subscribers of stage changes
+const CUSTOM_STAGES_CHANGE_EVENT = 'customStagesChanged';
 
 /**
  * 將系統預設的 COMPARISON_PAIRS 轉換為 StageDefinition 格式
@@ -157,11 +159,6 @@ export function useCustomStages() {
     return customStages.filter(s => !s.isSystem);
   }, [customStages]);
 
-  // Sync to localStorage when stages change
-  useEffect(() => {
-    saveCustomStagesToStorage(customStages);
-  }, [customStages]);
-
   // Sync templates to localStorage
   useEffect(() => {
     saveTemplatesToStorage(templates);
@@ -171,6 +168,21 @@ export function useCustomStages() {
   useEffect(() => {
     setActiveTemplateId(activeTemplateId);
   }, [activeTemplateId]);
+
+  // Listen for changes from other hook instances
+  useEffect(() => {
+    const handleStageChange = () => {
+      const newStages = loadCustomStagesFromStorage();
+      setCustomStagesState(newStages);
+    };
+    window.addEventListener(CUSTOM_STAGES_CHANGE_EVENT, handleStageChange);
+    return () => window.removeEventListener(CUSTOM_STAGES_CHANGE_EVENT, handleStageChange);
+  }, []);
+
+  // ===== Notify subscribers when stages change =====
+  const notifyStageChange = useCallback(() => {
+    window.dispatchEvent(new CustomEvent(CUSTOM_STAGES_CHANGE_EVENT));
+  }, []);
 
   // ===== CRUD Operations =====
 
@@ -184,43 +196,61 @@ export function useCustomStages() {
       isSystem: false,
       sortOrder: allStages.length,
     };
-    setCustomStagesState(prev => [...prev, newStage]);
+    setCustomStagesState(prev => {
+      const newStages = [...prev, newStage];
+      // Immediately save to localStorage
+      saveCustomStagesToStorage(newStages);
+      // Notify after state update
+      setTimeout(notifyStageChange, 0);
+      return newStages;
+    });
     toast.success('已新增自定義階段');
     return newStage;
-  }, [allStages.length]);
+  }, [allStages.length, notifyStageChange]);
 
   /**
    * 更新階段
    */
   const updateStage = useCallback((id: string, updates: Partial<StageDefinition>) => {
-    setCustomStagesState(prev => 
-      prev.map(s => s.id === id ? { ...s, ...updates } : s)
-    );
+    setCustomStagesState(prev => {
+      const newStages = prev.map(s => s.id === id ? { ...s, ...updates } : s);
+      saveCustomStagesToStorage(newStages);
+      setTimeout(notifyStageChange, 0);
+      return newStages;
+    });
     toast.success('已更新階段設定');
-  }, []);
+  }, [notifyStageChange]);
 
   /**
    * 刪除自定義階段 (系統階段不可刪除)
    */
   const deleteStage = useCallback((id: string) => {
-    setCustomStagesState(prev => prev.filter(s => s.id !== id));
+    setCustomStagesState(prev => {
+      const newStages = prev.filter(s => s.id !== id);
+      saveCustomStagesToStorage(newStages);
+      setTimeout(notifyStageChange, 0);
+      return newStages;
+    });
     toast.success('已刪除自定義階段');
-  }, []);
+  }, [notifyStageChange]);
 
   /**
    * 重新排序階段
    */
   const reorderStages = useCallback((stageIds: string[]) => {
     setCustomStagesState(prev => {
-      return prev.map(stage => {
+      const newStages = prev.map(stage => {
         const newOrder = stageIds.indexOf(stage.id);
         if (newOrder !== -1) {
           return { ...stage, sortOrder: newOrder + systemStages.length };
         }
         return stage;
       });
+      saveCustomStagesToStorage(newStages);
+      setTimeout(notifyStageChange, 0);
+      return newStages;
     });
-  }, [systemStages.length]);
+  }, [systemStages.length, notifyStageChange]);
 
   // ===== Template Operations =====
 
@@ -253,10 +283,12 @@ export function useCustomStages() {
     const template = templates.find(t => t.id === templateId);
     if (template) {
       setCustomStagesState(template.config.stages);
+      saveCustomStagesToStorage(template.config.stages);
       setActiveTemplateIdState(templateId);
+      setTimeout(notifyStageChange, 0);
       toast.success(`已載入範本「${template.name}」`);
     }
-  }, [templates]);
+  }, [templates, notifyStageChange]);
 
   /**
    * 刪除範本
@@ -274,9 +306,11 @@ export function useCustomStages() {
    */
   const resetToDefault = useCallback(() => {
     setCustomStagesState([]);
+    saveCustomStagesToStorage([]);
     setActiveTemplateIdState(null);
+    setTimeout(notifyStageChange, 0);
     toast.success('已重設為系統預設');
-  }, []);
+  }, [notifyStageChange]);
 
   // ===== Supabase Sync (Future) =====
   // TODO: 實作雲端同步

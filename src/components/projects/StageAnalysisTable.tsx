@@ -11,11 +11,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { AlertTriangle, TrendingDown, TrendingUp, Minus, AlertOctagon, Flame } from "lucide-react";
 import { COMPARISON_PAIRS, ComparisonResult, ComparisonStats } from "@/hooks/useProjectComparison";
+import { StageDefinition } from "@/types/compareConfig";
 import { cn } from "@/lib/utils";
 
 interface StageAnalysisTableProps {
   results: ComparisonResult[];
   stats: ComparisonStats[];
+  customStages?: StageDefinition[];
 }
 
 // Calculate if a stage is a bottleneck (> 1.5x average)
@@ -26,7 +28,27 @@ function isBottleneck(days: number, average: number | null): 'critical' | 'warni
   return null;
 }
 
-export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) {
+/**
+ * Calculate interval data based on stage definition
+ */
+function calculateIntervalFromStage(
+  result: ComparisonResult,
+  stage: StageDefinition
+): { days: number | null; status: 'complete' | 'incomplete' } {
+  const fromDate = result.documentDates[stage.fromStep]?.date || null;
+  const toDate = result.documentDates[stage.toStep]?.date || null;
+  
+  if (fromDate && toDate) {
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    const days = Math.floor((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+    return { days, status: 'complete' };
+  }
+  
+  return { days: null, status: 'incomplete' };
+}
+
+export function StageAnalysisTable({ results, stats, customStages = [] }: StageAnalysisTableProps) {
   // Get baseline result
   const baselineResult = useMemo(() => {
     return results.find(r => r.isBaseline);
@@ -37,6 +59,18 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
   
   // Get summary pairs (total, 同備到掛表, etc.)
   const summaryPairs = COMPARISON_PAIRS.slice(10);
+
+  // Convert custom stages to pair-like objects for uniform handling
+  const customPairs = useMemo(() => {
+    return customStages.map(stage => ({
+      id: stage.id,
+      label: stage.label,
+      description: stage.description || `${stage.fromStep} → ${stage.toStep}`,
+      fromStep: stage.fromStep,
+      toStep: stage.toStep,
+      isCustom: true,
+    }));
+  }, [customStages]);
 
   // Calculate comparison data for each stage
   const stageData = useMemo(() => {
@@ -98,6 +132,80 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
       };
     });
   }, [results, stats, baselineResult, stepPairs]);
+
+  // Calculate custom stage data
+  const customStageData = useMemo(() => {
+    return customPairs.map((pair, index) => {
+      // Calculate average for non-baseline projects
+      const allDays = results.map(r => {
+        const existing = r.intervals[pair.id];
+        if (existing?.status === 'complete') {
+          return { isBaseline: r.isBaseline, days: existing.days };
+        }
+        const calculated = calculateIntervalFromStage(r, { ...pair, isSystem: false, sortOrder: 0 });
+        return { isBaseline: r.isBaseline, days: calculated.days };
+      });
+
+      const validDays = allDays
+        .filter(d => !d.isBaseline && d.days !== null)
+        .map(d => d.days!);
+
+      const average = validDays.length > 0 
+        ? Math.round(validDays.reduce((a, b) => a + b, 0) / validDays.length)
+        : null;
+
+      // Get baseline days
+      const baselineData = allDays.find(d => d.isBaseline);
+      const baselineDays = baselineData?.days ?? null;
+      
+      // Check if baseline is bottleneck for this stage
+      const baselineBottleneck = baselineDays !== null 
+        ? isBottleneck(baselineDays, average) 
+        : null;
+
+      // Get all project data for this stage
+      const projectData = results.map(r => {
+        const existing = r.intervals[pair.id];
+        let days: number | null = null;
+        let status: 'complete' | 'incomplete' | 'na' = 'incomplete';
+        
+        if (existing?.status === 'complete') {
+          days = existing.days;
+          status = 'complete';
+        } else if (existing?.status === 'na') {
+          status = 'na';
+        } else {
+          const calculated = calculateIntervalFromStage(r, { ...pair, isSystem: false, sortOrder: 0 });
+          days = calculated.days;
+          status = calculated.status;
+        }
+
+        const delta = r.isBaseline || days === null || baselineDays === null 
+          ? null 
+          : days - baselineDays;
+        
+        return {
+          projectName: r.project.project_name,
+          days,
+          delta,
+          status,
+          isBaseline: r.isBaseline,
+          bottleneck: days !== null ? isBottleneck(days, average) : null
+        };
+      });
+
+      return {
+        pair,
+        step: `C${index + 1}`,
+        baselineDays,
+        average,
+        median: null,
+        projectData,
+        baselineBottleneck,
+        isCustom: true,
+      };
+    });
+  }, [results, customPairs]);
 
   // Calculate summary rows
   const summaryData = useMemo(() => {
@@ -270,6 +378,80 @@ export function StageAnalysisTable({ results, stats }: StageAnalysisTableProps) 
                   </TableCell>
                 </TableRow>
               ))}
+              
+              {/* Custom stages section */}
+              {customStageData.length > 0 && (
+                <>
+                  <TableRow className="bg-primary/20 border-t-2">
+                    <TableCell colSpan={2 + results.length + 1} className="py-2">
+                      <span className="font-semibold text-sm">自定義階段</span>
+                    </TableCell>
+                  </TableRow>
+                  
+                  {customStageData.map((stage) => (
+                    <TableRow 
+                      key={stage.pair.id} 
+                      className={cn(
+                        "hover:bg-muted/30 bg-primary/5",
+                        stage.baselineBottleneck === 'critical' && "bg-red-100/50 dark:bg-red-900/20",
+                        stage.baselineBottleneck === 'warning' && "bg-orange-100/50 dark:bg-orange-900/20"
+                      )}
+                    >
+                      <TableCell className="text-center font-medium text-muted-foreground">
+                        <div className="flex items-center justify-center gap-1">
+                          {stage.step}
+                          {stage.baselineBottleneck === 'critical' && (
+                            <AlertOctagon className="h-4 w-4 text-red-500" />
+                          )}
+                          {stage.baselineBottleneck === 'warning' && (
+                            <Flame className="h-4 w-4 text-orange-500" />
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="cursor-help">
+                              <div className="font-medium flex items-center gap-2">
+                                {stage.pair.label}
+                                <Badge variant="outline" className="text-xs">自定義</Badge>
+                              </div>
+                              <div className="text-xs text-muted-foreground">
+                                {stage.pair.description}
+                              </div>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{stage.pair.description}</p>
+                            {stage.average !== null && (
+                              <p className="text-xs mt-1">同期平均：{stage.average}天</p>
+                            )}
+                          </TooltipContent>
+                        </Tooltip>
+                      </TableCell>
+                      {stage.projectData.map((pd, idx) => (
+                        <TableCell key={idx} className="text-center">
+                          <StageCell 
+                            days={pd.days} 
+                            delta={pd.delta} 
+                            status={pd.status}
+                            isBaseline={pd.isBaseline}
+                            average={stage.average}
+                            bottleneck={pd.bottleneck}
+                          />
+                        </TableCell>
+                      ))}
+                      <TableCell className="text-center bg-muted/30 font-medium">
+                        {stage.average !== null ? (
+                          <span>{stage.average} 天</span>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </>
+              )}
               
               {/* Summary rows */}
               <TableRow className="bg-muted/30 border-t-2">
