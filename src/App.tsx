@@ -11,22 +11,18 @@ import Dashboard from "./pages/Dashboard";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import Investors from "./pages/Investors";
-import InvestorDataManagement from "./pages/InvestorDataManagement";
 import Documents from "./pages/Documents";
 import ImportBatch from "./pages/ImportBatch";
 import Settings from "./pages/Settings";
 import Users from "./pages/Users";
 import Permissions from "./pages/Permissions";
-import SystemOptions from "./pages/SystemOptions";
 import Partners from "./pages/Partners";
 import RecycleBin from "./pages/RecycleBin";
 import Engineering from "./pages/Engineering";
-import ProgressSettings from "./pages/ProgressSettings";
 import ChangePassword from "./pages/ChangePassword";
 import Integrations from "./pages/Integrations";
 import PendingApproval from "./pages/PendingApproval";
 import DuplicateScanner from "./pages/DuplicateScanner";
-import DocumentTypeConfig from "./pages/DocumentTypeConfig";
 import DashboardAudit from "./pages/DashboardAudit";
 import ProjectComparison from "./pages/ProjectComparison";
 import NotFound from "./pages/NotFound";
@@ -52,18 +48,12 @@ const App = () => (
             <Route path="/documents" element={<ProtectedRoute><Layout><Documents /></Layout></ProtectedRoute>} />
             <Route path="/import-batch" element={<ProtectedRoute><Layout><ImportBatch /></Layout></ProtectedRoute>} />
             <Route path="/investors" element={<ProtectedRoute><Layout><Investors /></Layout></ProtectedRoute>} />
-            <Route path="/investor-data" element={<ProtectedRoute><Layout><InvestorDataManagement /></Layout></ProtectedRoute>} />
             <Route path="/partners" element={<ProtectedRoute><Layout><Partners /></Layout></ProtectedRoute>} />
             
-            {/* 管理與設定 (Admin) - 人員管理 */}
+            {/* 管理與設定 (Admin) */}
             <Route path="/users" element={<ProtectedRoute adminOnly><Layout><Users /></Layout></ProtectedRoute>} />
             <Route path="/permissions" element={<ProtectedRoute adminOnly><Layout><Permissions /></Layout></ProtectedRoute>} />
-            {/* 管理與設定 (Admin) - 系統設定 */}
-            <Route path="/progress-settings" element={<ProtectedRoute adminOnly><Layout><ProgressSettings /></Layout></ProtectedRoute>} />
-            <Route path="/system-options" element={<ProtectedRoute adminOnly><Layout><SystemOptions /></Layout></ProtectedRoute>} />
-            <Route path="/document-types" element={<ProtectedRoute adminOnly><Layout><DocumentTypeConfig /></Layout></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute adminOnly><Layout><Settings /></Layout></ProtectedRoute>} />
-            {/* 管理與設定 (Admin) - 外部整合 */}
             <Route path="/integrations" element={<ProtectedRoute adminOnly><Layout><Integrations /></Layout></ProtectedRoute>} />
             
             {/* 系統治理中心 (Admin) */}
