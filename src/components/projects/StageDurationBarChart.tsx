@@ -3,6 +3,7 @@ import { Plot } from "@/lib/plotly";
 import { ComparisonResult, COMPARISON_PAIRS } from "@/hooks/useProjectComparison";
 import { ProjectDispute, calculateOverlapDays, DisputeDisplayStrategy } from "@/hooks/useProjectDisputes";
 import { StageDefinition } from "@/types/compareConfig";
+import { useEditableStages } from "@/hooks/useEditableStages";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle } from "lucide-react";
 import type { Data, Layout, Annotations } from "plotly.js";
@@ -55,6 +56,8 @@ export function StageDurationBarChart({
   displayStrategy,
   customStages 
 }: StageDurationBarChartProps) {
+  // Get editable stages configuration
+  const { editableStages, getStageLabel } = useEditableStages();
   // Calculate dispute overlap summary for the legend
   const disputeOverlapSummary = useMemo(() => {
     if (disputes.length === 0) return { hasOverlaps: false, totalOverlapDays: 0, affectedIntervals: 0 };
@@ -101,17 +104,14 @@ export function StageDurationBarChart({
       return { traces: [], layout: {}, annotations: [] };
     }
 
-    // Build stages list: system stages + custom stages (if any)
-    const stepIntervals = COMPARISON_PAIRS.filter((p) => 
-      p.id.startsWith("interval_") && !p.id.includes("total") && p.id.split("_").length === 3
-    );
-    const systemStages: StageDefinition[] = stepIntervals.map((p, idx) => ({
-      id: p.id,
-      label: p.label,
-      fromStep: p.fromStep,
-      toStep: p.toStep,
+    // Use editableStages for system stages (respects user edits)
+    const systemStages: StageDefinition[] = editableStages.map((stage, idx) => ({
+      id: stage.id,
+      label: stage.isEdited ? getStageLabel(stage.id) : stage.label,
+      fromStep: stage.fromStep,
+      toStep: stage.toStep,
       isSystem: true,
-      description: p.description,
+      description: `${stage.fromStep} → ${stage.toStep}`,
       sortOrder: idx,
     }));
     
@@ -302,7 +302,7 @@ export function StageDurationBarChart({
     };
 
     return { traces, layout, annotations };
-  }, [results, disputes, displayStrategy, customStages]);
+  }, [results, disputes, displayStrategy, customStages, editableStages, getStageLabel]);
 
   if (results.length === 0) {
     return (

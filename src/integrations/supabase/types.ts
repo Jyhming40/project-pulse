@@ -1535,6 +1535,60 @@ export type Database = {
           },
         ]
       }
+      project_disputes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          end_date: string
+          id: string
+          note: string | null
+          project_id: string
+          severity: string
+          start_date: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          id?: string
+          note?: string | null
+          project_id: string
+          severity?: string
+          start_date: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          id?: string
+          note?: string | null
+          project_id?: string
+          severity?: string
+          start_date?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_disputes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_disputes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_field_config: {
         Row: {
           created_at: string

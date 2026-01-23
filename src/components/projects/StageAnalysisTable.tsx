@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { AlertTriangle, TrendingDown, TrendingUp, Minus, AlertOctagon, Flame } from "lucide-react";
 import { COMPARISON_PAIRS, ComparisonResult, ComparisonStats } from "@/hooks/useProjectComparison";
 import { StageDefinition } from "@/types/compareConfig";
+import { useEditableStages } from "@/hooks/useEditableStages";
 import { cn } from "@/lib/utils";
 
 interface StageAnalysisTableProps {
@@ -49,13 +50,25 @@ function calculateIntervalFromStage(
 }
 
 export function StageAnalysisTable({ results, stats, customStages = [] }: StageAnalysisTableProps) {
+  // Get editable stages configuration
+  const { editableStages, getStageLabel } = useEditableStages();
+  
   // Get baseline result
   const baselineResult = useMemo(() => {
     return results.find(r => r.isBaseline);
   }, [results]);
 
-  // Get first 10 pairs (step-by-step intervals) for detailed analysis
-  const stepPairs = COMPARISON_PAIRS.slice(0, 10);
+  // Use editableStages instead of static COMPARISON_PAIRS for step pairs
+  const stepPairs = useMemo(() => {
+    return editableStages.map(stage => ({
+      id: stage.id,
+      label: stage.isEdited ? getStageLabel(stage.id) : stage.label,
+      description: `Step ${stage.fromStep} → ${stage.toStep}`,
+      fromStep: stage.fromStep,
+      toStep: stage.toStep,
+      isEdited: stage.isEdited,
+    }));
+  }, [editableStages, getStageLabel]);
   
   // Get summary pairs (total, 同備到掛表, etc.)
   const summaryPairs = COMPARISON_PAIRS.slice(10);

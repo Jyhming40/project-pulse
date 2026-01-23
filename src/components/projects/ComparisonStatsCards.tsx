@@ -6,14 +6,18 @@ import {
   Sigma, 
   BarChart2,
   Clock,
-  Target
+  Target,
+  RotateCcw
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { ComparisonResult, ComparisonStats, COMPARISON_PAIRS } from "@/hooks/useProjectComparison";
 import { StageDefinition } from "@/types/compareConfig";
+import { useEditableStages } from "@/hooks/useEditableStages";
+import { EditableStageRow } from "./EditableStageRow";
 
 interface ComparisonStatsCardsProps {
   results: ComparisonResult[];
@@ -58,48 +62,91 @@ function calculateIntervalFromStage(
 export function ComparisonStatsCards({ results, stats, customStages = [] }: ComparisonStatsCardsProps) {
   const baseline = useMemo(() => results.find(r => r.isBaseline), [results]);
   
+  // Editable stages hook
+  const { 
+    editableStages, 
+    milestoneOptions, 
+    updateStage, 
+    resetStage, 
+    resetAllStages, 
+    hasEdits,
+    getStageLabel 
+  } = useEditableStages();
+  
   // Calculate extended statistics including std deviation
+  // Now respects editable stage configurations
   const extendedStats = useMemo((): ExtendedStats[] => {
-    // System step pairs (first 10)
-    const stepPairs = COMPARISON_PAIRS.slice(0, 10);
-    
-    const systemStats = stepPairs.map(pair => {
-      const stat = stats.find(s => s.pairId === pair.id);
+    // Use editableStages instead of static COMPARISON_PAIRS for step intervals
+    const systemStats = editableStages.map(stage => {
+      // Calculate days dynamically based on current fromStep/toStep
+      const allDays = results.map(r => {
+        const fromDate = r.documentDates[stage.fromStep]?.date || null;
+        const toDate = r.documentDates[stage.toStep]?.date || null;
+        
+        if (fromDate && toDate) {
+          const from = new Date(fromDate);
+          const to = new Date(toDate);
+          const days = Math.floor((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+          return { isBaseline: r.isBaseline, days, status: 'complete' as const };
+        }
+        return { isBaseline: r.isBaseline, days: null, status: 'incomplete' as const };
+      });
+
+      // Get non-baseline valid days
+      const validDays = allDays
+        .filter(d => !d.isBaseline && d.days !== null)
+        .map(d => d.days!);
       
-      // Get all valid days for this interval (excluding baseline)
-      const validDays = results
-        .filter(r => !r.isBaseline && r.intervals[pair.id]?.status === 'complete')
-        .map(r => r.intervals[pair.id].days!)
-        .filter((d): d is number => d !== null);
+      const count = validDays.length;
+      const average = count > 0 ? Math.round(validDays.reduce((a, b) => a + b, 0) / count) : null;
+      
+      // Calculate median
+      const sorted = [...validDays].sort((a, b) => a - b);
+      const median = sorted.length > 0
+        ? sorted.length % 2 === 0
+          ? Math.round((sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2)
+          : sorted[Math.floor(sorted.length / 2)]
+        : null;
       
       // Calculate standard deviation
       let stdDev: number | null = null;
-      if (stat?.average && validDays.length > 1) {
+      if (average !== null && validDays.length > 1) {
         const variance = validDays.reduce((sum, val) => {
-          return sum + Math.pow(val - stat.average!, 2);
+          return sum + Math.pow(val - average, 2);
         }, 0) / validDays.length;
         stdDev = Math.round(Math.sqrt(variance) * 10) / 10;
       }
       
       // Get baseline days
-      const baselineInterval = baseline?.intervals[pair.id];
-      const baselineDays = baselineInterval?.status === 'complete' ? baselineInterval.days : null;
-      const baselineDelta = baselineDays !== null && stat?.average !== null 
-        ? baselineDays - stat.average 
+      const baselineData = allDays.find(d => d.isBaseline);
+      const baselineDays = baselineData?.days ?? null;
+      const baselineDelta = baselineDays !== null && average !== null 
+        ? baselineDays - average 
         : null;
       
+      // Generate dynamic label if edited
+      const dynamicLabel = stage.isEdited 
+        ? getStageLabel(stage.id)
+        : stage.label;
+      
       return {
-        pairId: pair.id,
-        label: pair.label,
-        count: stat?.count || 0,
-        average: stat?.average ?? null,
-        median: stat?.median ?? null,
-        min: stat?.min ?? null,
-        max: stat?.max ?? null,
+        pairId: stage.id,
+        label: dynamicLabel,
+        count,
+        average,
+        median,
+        min: sorted[0] ?? null,
+        max: sorted[sorted.length - 1] ?? null,
         stdDev,
         baselineDays,
         baselineDelta,
         isCustom: false,
+        // Additional fields for editable row
+        fromStep: stage.fromStep,
+        toStep: stage.toStep,
+        isEdited: stage.isEdited,
+        originalFromStep: stage.originalFromStep,
+        originalToStep: stage.originalToStep,
       };
     });
 
@@ -159,7 +206,7 @@ export function ComparisonStatsCards({ results, stats, customStages = [] }: Comp
     });
 
     return [...systemStats, ...customStats];
-  }, [results, stats, baseline, customStages]);
+  }, [results, baseline, customStages, editableStages, getStageLabel]);
 
   // Calculate overall statistics
   const overallStats = useMemo(() => {
@@ -368,17 +415,37 @@ export function ComparisonStatsCards({ results, stats, customStages = [] }: Comp
         {/* Stage-by-stage stats table */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-base">各階段統計數據</CardTitle>
-            <CardDescription>
-              包含平均值、中位數、標準差等統計指標
-            </CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">各階段統計數據</CardTitle>
+                <CardDescription>
+                  點擊階段名稱可調整起迄里程碑，數據將即時重新計算
+                </CardDescription>
+              </div>
+              {hasEdits && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={resetAllStages}
+                  className="gap-2"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  重設全部
+                </Button>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left py-2 px-2 font-medium">階段</th>
+                    <th className="text-left py-2 px-2 font-medium min-w-[200px]">
+                      階段
+                      <span className="text-xs text-muted-foreground font-normal ml-2">
+                        (點擊可編輯)
+                      </span>
+                    </th>
                     <th className="text-center py-2 px-2 font-medium">樣本數</th>
                     <th className="text-center py-2 px-2 font-medium">平均</th>
                     <th className="text-center py-2 px-2 font-medium">中位數</th>
@@ -390,52 +457,89 @@ export function ComparisonStatsCards({ results, stats, customStages = [] }: Comp
                   </tr>
                 </thead>
                 <tbody>
-                  {extendedStats.map((stat) => (
-                    <tr key={stat.pairId} className={cn(
-                      "border-b hover:bg-muted/30",
-                      stat.isCustom && "bg-primary/5"
-                    )}>
-                      <td className="py-2 px-2 font-medium">
-                        <div className="flex items-center gap-2">
-                          {stat.label}
-                          {stat.isCustom && (
-                            <Badge variant="outline" className="text-xs">自定義</Badge>
-                          )}
-                        </div>
-                      </td>
-                      <td className="text-center py-2 px-2 text-muted-foreground">{stat.count}</td>
-                      <td className="text-center py-2 px-2">
-                        {stat.average !== null ? `${stat.average}天` : '-'}
-                      </td>
-                      <td className="text-center py-2 px-2">
-                        {stat.median !== null ? `${stat.median}天` : '-'}
-                      </td>
-                      <td className="text-center py-2 px-2">
-                        {stat.stdDev !== null ? `±${stat.stdDev}` : '-'}
-                      </td>
-                      <td className="text-center py-2 px-2 text-green-600 dark:text-green-400">
-                        {stat.min !== null ? `${stat.min}天` : '-'}
-                      </td>
-                      <td className="text-center py-2 px-2 text-orange-600 dark:text-orange-400">
-                        {stat.max !== null ? `${stat.max}天` : '-'}
-                      </td>
-                      <td className="text-center py-2 px-2 bg-destructive/5 font-medium">
-                        {stat.baselineDays !== null ? `${stat.baselineDays}天` : '-'}
-                      </td>
-                      <td className={cn(
-                        "text-center py-2 px-2 bg-destructive/5 font-bold",
-                        stat.baselineDelta !== null && stat.baselineDelta > 0 
-                          ? "text-destructive" 
-                          : stat.baselineDelta !== null && stat.baselineDelta < 0 
-                            ? "text-green-600 dark:text-green-400"
-                            : ""
+                  {extendedStats.map((stat) => {
+                    // For system stages (non-custom), use EditableStageRow
+                    if (!stat.isCustom && 'fromStep' in stat) {
+                      const editableStat = stat as ExtendedStats & {
+                        fromStep: number;
+                        toStep: number;
+                        isEdited: boolean;
+                        originalFromStep?: number;
+                        originalToStep?: number;
+                      };
+                      return (
+                        <EditableStageRow
+                          key={stat.pairId}
+                          stageId={stat.pairId}
+                          label={stat.label}
+                          fromStep={editableStat.fromStep}
+                          toStep={editableStat.toStep}
+                          isEdited={editableStat.isEdited}
+                          originalFromStep={editableStat.originalFromStep}
+                          originalToStep={editableStat.originalToStep}
+                          milestoneOptions={milestoneOptions}
+                          onUpdate={updateStage}
+                          onReset={resetStage}
+                          count={stat.count}
+                          average={stat.average}
+                          median={stat.median}
+                          stdDev={stat.stdDev}
+                          min={stat.min}
+                          max={stat.max}
+                          baselineDays={stat.baselineDays}
+                          baselineDelta={stat.baselineDelta}
+                        />
+                      );
+                    }
+                    
+                    // For custom stages, render as before
+                    return (
+                      <tr key={stat.pairId} className={cn(
+                        "border-b hover:bg-muted/30",
+                        stat.isCustom && "bg-primary/5"
                       )}>
-                        {stat.baselineDelta !== null 
-                          ? `${stat.baselineDelta > 0 ? '+' : ''}${stat.baselineDelta}` 
-                          : '-'}
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="py-2 px-2 font-medium">
+                          <div className="flex items-center gap-2">
+                            {stat.label}
+                            {stat.isCustom && (
+                              <Badge variant="outline" className="text-xs">自定義</Badge>
+                            )}
+                          </div>
+                        </td>
+                        <td className="text-center py-2 px-2 text-muted-foreground">{stat.count}</td>
+                        <td className="text-center py-2 px-2">
+                          {stat.average !== null ? `${stat.average}天` : '-'}
+                        </td>
+                        <td className="text-center py-2 px-2">
+                          {stat.median !== null ? `${stat.median}天` : '-'}
+                        </td>
+                        <td className="text-center py-2 px-2">
+                          {stat.stdDev !== null ? `±${stat.stdDev}` : '-'}
+                        </td>
+                        <td className="text-center py-2 px-2 text-green-600 dark:text-green-400">
+                          {stat.min !== null ? `${stat.min}天` : '-'}
+                        </td>
+                        <td className="text-center py-2 px-2 text-orange-600 dark:text-orange-400">
+                          {stat.max !== null ? `${stat.max}天` : '-'}
+                        </td>
+                        <td className="text-center py-2 px-2 bg-destructive/5 font-medium">
+                          {stat.baselineDays !== null ? `${stat.baselineDays}天` : '-'}
+                        </td>
+                        <td className={cn(
+                          "text-center py-2 px-2 bg-destructive/5 font-bold",
+                          stat.baselineDelta !== null && stat.baselineDelta > 0 
+                            ? "text-destructive" 
+                            : stat.baselineDelta !== null && stat.baselineDelta < 0 
+                              ? "text-green-600 dark:text-green-400"
+                              : ""
+                        )}>
+                          {stat.baselineDelta !== null 
+                            ? `${stat.baselineDelta > 0 ? '+' : ''}${stat.baselineDelta}` 
+                            : '-'}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
