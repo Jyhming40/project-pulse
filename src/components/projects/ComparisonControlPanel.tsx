@@ -1,4 +1,4 @@
-import { Eye, EyeOff, LineChart, BarChart3, Calendar, Info, Settings2, AlertOctagon, Calculator, Grid3X3, PanelRightClose, PanelRight, Scale } from "lucide-react";
+import { Eye, EyeOff, LineChart, BarChart3, Calendar, Info, Settings2, AlertOctagon, Calculator, Grid3X3, PanelRightClose, PanelRight, Scale, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
+import { CustomStagesPanel } from "./CustomStagesPanel";
 export interface SectionVisibility {
   chart: boolean;
   bottleneck: boolean;
@@ -29,6 +29,8 @@ interface ComparisonControlPanelProps {
   disputeSettingsSlot?: React.ReactNode;
   // Dispute display strategy slot
   disputeStrategySlot?: React.ReactNode;
+  // Show custom stages panel
+  showCustomStages?: boolean;
 }
 
 const sections = [
@@ -55,6 +57,7 @@ export function ComparisonControlPanel({
   onChartModeChange,
   disputeSettingsSlot,
   disputeStrategySlot,
+  showCustomStages = true,
 }: ComparisonControlPanelProps) {
   const toggleSection = (sectionId: keyof SectionVisibility) => {
     onVisibilityChange({
@@ -175,6 +178,20 @@ export function ComparisonControlPanel({
             </div>
 
             <Separator />
+
+            {/* Custom Stages Panel */}
+            {showCustomStages && (
+              <>
+                <div className="space-y-2">
+                  <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <Layers className="h-3.5 w-3.5" />
+                    比較階段設定
+                  </Label>
+                  <CustomStagesPanel />
+                </div>
+                <Separator />
+              </>
+            )}
 
             {/* Dispute Settings Slot */}
             {disputeSettingsSlot && (

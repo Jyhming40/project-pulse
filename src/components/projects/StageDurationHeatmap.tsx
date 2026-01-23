@@ -2,29 +2,68 @@ import { useMemo } from "react";
 import { Plot } from "@/lib/plotly";
 import { ComparisonResult, COMPARISON_PAIRS } from "@/hooks/useProjectComparison";
 import { ProjectDispute, calculateOverlapDays, DisputeDisplayStrategy } from "@/hooks/useProjectDisputesLocal";
+import { StageDefinition } from "@/types/compareConfig";
 import type { Data, Layout } from "plotly.js";
 
 interface StageDurationHeatmapProps {
   results: ComparisonResult[];
   disputes?: ProjectDispute[];
   displayStrategy?: DisputeDisplayStrategy;
+  customStages?: StageDefinition[];
+}
+
+/**
+ * Calculate interval data based on stage definition
+ */
+function calculateIntervalFromStage(
+  result: ComparisonResult,
+  stage: StageDefinition
+): { days: number | null; fromDate: string | null; toDate: string | null; status: 'complete' | 'incomplete' | 'na' } {
+  const fromDate = result.documentDates[stage.fromStep]?.date || null;
+  const toDate = result.documentDates[stage.toStep]?.date || null;
+  
+  if (fromDate && toDate) {
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+    const days = Math.floor((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+    return { days, fromDate, toDate, status: 'complete' };
+  }
+  
+  return { days: null, fromDate, toDate, status: 'incomplete' };
 }
 
 export function StageDurationHeatmap({ 
   results, 
   disputes = [],
-  displayStrategy 
+  displayStrategy,
+  customStages 
 }: StageDurationHeatmapProps) {
   const { traces, layout } = useMemo(() => {
     if (results.length === 0) {
       return { traces: [], layout: {} };
     }
 
-    // Only use step-by-step intervals (first 10)
-    const stepIntervals = COMPARISON_PAIRS.filter((p) => 
-      p.id.startsWith("interval_") && !p.id.includes("total") && p.id.split("_").length === 3
-    );
-    const intervalLabels = stepIntervals.map((p) => p.label);
+    // Use custom stages if provided, otherwise use default step intervals
+    let stagesToUse: StageDefinition[];
+    if (customStages && customStages.length > 0) {
+      stagesToUse = customStages;
+    } else {
+      // Only use step-by-step intervals (first 10)
+      const stepIntervals = COMPARISON_PAIRS.filter((p) => 
+        p.id.startsWith("interval_") && !p.id.includes("total") && p.id.split("_").length === 3
+      );
+      stagesToUse = stepIntervals.map((p, idx) => ({
+        id: p.id,
+        label: p.label,
+        fromStep: p.fromStep,
+        toStep: p.toStep,
+        isSystem: true,
+        description: p.description,
+        sortOrder: idx,
+      }));
+    }
+
+    const intervalLabels = stagesToUse.map((s) => s.label);
 
     // Project names for y-axis
     const projectLabels = results.map((r) => 
@@ -39,20 +78,33 @@ export function StageDurationHeatmap({
       const row: (number | null)[] = [];
       const customRow: any[] = [];
 
-      stepIntervals.forEach((pair) => {
-        const interval = result.intervals[pair.id];
-        const days = interval?.status === "complete" ? interval.days : null;
-        row.push(days);
+      stagesToUse.forEach((stage) => {
+        // Try to use existing interval data, or calculate from stage
+        const existingInterval = result.intervals[stage.id];
+        let intervalData: { days: number | null; fromDate: string | null; toDate: string | null; status: 'complete' | 'incomplete' | 'na' };
+        
+        if (existingInterval) {
+          intervalData = {
+            days: existingInterval.status === 'complete' ? existingInterval.days : null,
+            fromDate: existingInterval.fromDate,
+            toDate: existingInterval.toDate,
+            status: existingInterval.status,
+          };
+        } else {
+          intervalData = calculateIntervalFromStage(result, stage);
+        }
+
+        row.push(intervalData.days);
 
         // Calculate dispute overlaps
         let overlapInfo: { title: string; overlapDays: number; severity: string }[] = [];
-        if (disputes.length > 0 && interval?.fromDate && interval?.toDate) {
+        if (disputes.length > 0 && intervalData.fromDate && intervalData.toDate) {
           const projectDisputes = disputes.filter((d) => d.project_id === result.project.id);
           
           projectDisputes.forEach((dispute) => {
             const overlapDays = calculateOverlapDays(
-              interval.fromDate,
-              interval.toDate,
+              intervalData.fromDate,
+              intervalData.toDate,
               dispute.start_date,
               dispute.end_date
             );
@@ -69,10 +121,10 @@ export function StageDurationHeatmap({
         customRow.push({
           projectName: result.project.project_name,
           projectCode: result.project.project_code,
-          interval: pair.label,
-          days: days,
-          fromDate: interval?.fromDate || "N/A",
-          toDate: interval?.toDate || "N/A",
+          interval: stage.label,
+          days: intervalData.days,
+          fromDate: intervalData.fromDate || "N/A",
+          toDate: intervalData.toDate || "N/A",
           overlaps: overlapInfo,
           isBaseline: result.isBaseline,
         });
@@ -152,7 +204,7 @@ export function StageDurationHeatmap({
     };
 
     return { traces, layout };
-  }, [results, disputes, displayStrategy]);
+  }, [results, disputes, displayStrategy, customStages]);
 
   if (results.length === 0) {
     return (
