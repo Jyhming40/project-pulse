@@ -48,7 +48,7 @@ import {
   generateLegalTable,
 } from "@/hooks/useProjectComparison";
 import { useCustomStages } from "@/hooks/useCustomStages";
-import { useProjectDisputesLocal } from "@/hooks/useProjectDisputesLocal";
+import { useProjectDisputes } from "@/hooks/useProjectDisputes";
 import { ProjectSearchCombobox } from "@/components/projects/ProjectSearchCombobox";
 import { ProjectMultiSelect } from "@/components/projects/ProjectMultiSelect";
 import { ProgressPlotlyChart } from "@/components/projects/ProgressPlotlyChart";
@@ -102,7 +102,7 @@ export default function ProjectComparison() {
   });
 
   // Dispute settings from localStorage
-  const { disputes, strategy } = useProjectDisputesLocal();
+  const { disputes, strategy, isLoading: disputesLoading } = useProjectDisputes();
   
   // Custom stages from useCustomStages hook
   const { userStages } = useCustomStages();

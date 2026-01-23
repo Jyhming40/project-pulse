@@ -36,8 +36,8 @@ import { CalendarIcon } from "lucide-react";
 import { 
   ProjectDispute, 
   DisputeDisplayStrategy,
-  useProjectDisputesLocal 
-} from "@/hooks/useProjectDisputesLocal";
+  useProjectDisputes 
+} from "@/hooks/useProjectDisputes";
 import { ProjectForComparison } from "@/hooks/useProjectComparison";
 
 interface DisputeSettingsPanelProps {
@@ -107,7 +107,8 @@ export function DisputeSettingsPanel({ selectedProjects }: DisputeSettingsPanelP
     deleteDispute,
     getDisputesByProject,
     updateStrategy,
-  } = useProjectDisputesLocal();
+    isSaving,
+  } = useProjectDisputes();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingDispute, setEditingDispute] = useState<ProjectDispute | null>(null);
@@ -149,22 +150,30 @@ export function DisputeSettingsPanel({ selectedProjects }: DisputeSettingsPanelP
     setDialogOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!formData.project_id || !formData.title || !formData.start_date || !formData.end_date) {
       return;
     }
 
-    if (editingDispute) {
-      updateDispute(editingDispute.id, formData);
-    } else {
-      addDispute(formData);
+    try {
+      if (editingDispute) {
+        await updateDispute(editingDispute.id, formData);
+      } else {
+        await addDispute(formData);
+      }
+      setDialogOpen(false);
+      resetForm();
+    } catch (error) {
+      // Error toast is handled in the mutation
     }
-    setDialogOpen(false);
-    resetForm();
   };
 
-  const handleDelete = (id: string) => {
-    deleteDispute(id);
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDispute(id);
+    } catch (error) {
+      // Error toast is handled in the mutation
+    }
   };
 
   // Get disputes for selected projects
@@ -368,7 +377,7 @@ export function DisputeSettingsPanel({ selectedProjects }: DisputeSettingsPanelP
 
 // Dispute Display Strategy Controls
 export function DisputeDisplayStrategyPanel() {
-  const { strategy, updateStrategy } = useProjectDisputesLocal();
+  const { strategy, updateStrategy } = useProjectDisputes();
 
   return (
     <div className="space-y-3">
