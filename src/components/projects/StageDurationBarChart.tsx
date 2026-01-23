@@ -3,7 +3,9 @@ import { Plot } from "@/lib/plotly";
 import { ComparisonResult, COMPARISON_PAIRS } from "@/hooks/useProjectComparison";
 import { ProjectDispute, calculateOverlapDays, DisputeDisplayStrategy } from "@/hooks/useProjectDisputesLocal";
 import { StageDefinition } from "@/types/compareConfig";
-import type { Data, Layout } from "plotly.js";
+import { Badge } from "@/components/ui/badge";
+import { AlertTriangle } from "lucide-react";
+import type { Data, Layout, Annotations } from "plotly.js";
 
 interface StageDurationBarChartProps {
   results: ComparisonResult[];
@@ -53,9 +55,50 @@ export function StageDurationBarChart({
   displayStrategy,
   customStages 
 }: StageDurationBarChartProps) {
-  const { traces, layout } = useMemo(() => {
+  // Calculate dispute overlap summary for the legend
+  const disputeOverlapSummary = useMemo(() => {
+    if (disputes.length === 0) return { hasOverlaps: false, totalOverlapDays: 0, affectedIntervals: 0 };
+    
+    let totalOverlapDays = 0;
+    let affectedIntervals = new Set<string>();
+
+    results.forEach((result) => {
+      const projectDisputes = disputes.filter((d) => d.project_id === result.project.id);
+      if (projectDisputes.length === 0) return;
+
+      const stepIntervals = COMPARISON_PAIRS.filter((p) => 
+        p.id.startsWith("interval_") && !p.id.includes("total") && p.id.split("_").length === 3
+      );
+
+      stepIntervals.forEach((stage) => {
+        const interval = result.intervals[stage.id];
+        if (interval?.status === 'complete' && interval.fromDate && interval.toDate) {
+          projectDisputes.forEach((dispute) => {
+            const overlap = calculateOverlapDays(
+              interval.fromDate,
+              interval.toDate,
+              dispute.start_date,
+              dispute.end_date
+            );
+            if (overlap > 0) {
+              totalOverlapDays += overlap;
+              affectedIntervals.add(`${result.project.id}-${stage.id}`);
+            }
+          });
+        }
+      });
+    });
+
+    return { 
+      hasOverlaps: totalOverlapDays > 0, 
+      totalOverlapDays, 
+      affectedIntervals: affectedIntervals.size 
+    };
+  }, [results, disputes]);
+
+  const { traces, layout, annotations } = useMemo(() => {
     if (results.length === 0) {
-      return { traces: [], layout: {} };
+      return { traces: [], layout: {}, annotations: [] };
     }
 
     // Build stages list: system stages + custom stages (if any)
@@ -79,6 +122,10 @@ export function StageDurationBarChart({
     
     const intervalLabels = stagesToUse.map((s) => s.label);
     const traces: Data[] = [];
+    const annotations: Partial<Annotations>[] = [];
+
+    // Track overlaps for annotation markers
+    const overlapMarkers: { x: string; y: number; text: string; color: string }[] = [];
 
     results.forEach((result, index) => {
       const isBaseline = result.isBaseline;
@@ -86,8 +133,11 @@ export function StageDurationBarChart({
       
       const y: (number | null)[] = [];
       const customData: any[] = [];
+      const markerColors: string[] = [];
+      const markerLineColors: string[] = [];
+      const markerLineWidths: number[] = [];
 
-      stagesToUse.forEach((stage) => {
+      stagesToUse.forEach((stage, stageIndex) => {
         // Try to use existing interval data, or calculate from stage
         const existingInterval = result.intervals[stage.id];
         let intervalData: { days: number | null; fromDate: string | null; toDate: string | null; status: 'complete' | 'incomplete' | 'na' };
@@ -107,6 +157,9 @@ export function StageDurationBarChart({
 
         // Calculate dispute overlaps for this interval
         let overlapInfo: { title: string; overlapDays: number; severity: string }[] = [];
+        let totalOverlap = 0;
+        let highestSeverity = "";
+        
         if (disputes.length > 0 && intervalData.fromDate && intervalData.toDate) {
           const projectDisputes = disputes.filter((d) => d.project_id === result.project.id);
           
@@ -123,8 +176,39 @@ export function StageDurationBarChart({
                 overlapDays,
                 severity: dispute.severity,
               });
+              totalOverlap += overlapDays;
+              if (!highestSeverity || 
+                  (dispute.severity === "high") || 
+                  (dispute.severity === "medium" && highestSeverity !== "high")) {
+                highestSeverity = dispute.severity;
+              }
             }
           });
+        }
+
+        // Apply visual style based on overlap
+        const hasOverlap = totalOverlap > 0 && displayStrategy?.showOverlapDays !== false;
+        if (hasOverlap) {
+          // Lighten the bar color and add a warning border
+          markerColors.push(color);
+          const borderColor = highestSeverity === "high" ? "#ef4444" : 
+                             highestSeverity === "medium" ? "#f59e0b" : "#22c55e";
+          markerLineColors.push(borderColor);
+          markerLineWidths.push(3);
+          
+          // Add annotation marker for overlapping bars
+          if (intervalData.days !== null && intervalData.days > 0) {
+            overlapMarkers.push({
+              x: stage.label,
+              y: intervalData.days,
+              text: `⚠️`,
+              color: borderColor,
+            });
+          }
+        } else {
+          markerColors.push(color);
+          markerLineColors.push(isBaseline ? "#991b1b" : "transparent");
+          markerLineWidths.push(isBaseline ? 2 : 0);
         }
 
         customData.push({
@@ -135,6 +219,7 @@ export function StageDurationBarChart({
           fromDate: intervalData.fromDate || "N/A",
           toDate: intervalData.toDate || "N/A",
           overlaps: overlapInfo,
+          totalOverlap,
           isBaseline,
         });
       });
@@ -175,10 +260,10 @@ export function StageDurationBarChart({
           ? `🚨 ${result.project.project_name} (基準)`
           : result.project.project_name,
         marker: {
-          color,
+          color: markerColors,
           line: {
-            color: isBaseline ? "#991b1b" : "transparent",
-            width: isBaseline ? 2 : 0,
+            color: markerLineColors,
+            width: markerLineWidths,
           },
         },
         customdata: customData,
@@ -216,7 +301,7 @@ export function StageDurationBarChart({
       },
     };
 
-    return { traces, layout };
+    return { traces, layout, annotations };
   }, [results, disputes, displayStrategy, customStages]);
 
   if (results.length === 0) {
@@ -240,6 +325,20 @@ export function StageDurationBarChart({
 
   return (
     <div className="space-y-2">
+      {/* Dispute overlap summary */}
+      {disputeOverlapSummary.hasOverlaps && displayStrategy?.showOverlapDays !== false && (
+        <div className="flex items-center gap-2 p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-900">
+          <AlertTriangle className="h-4 w-4 text-amber-500 shrink-0" />
+          <span className="text-sm text-amber-700 dark:text-amber-300">
+            共有 <strong>{disputeOverlapSummary.affectedIntervals}</strong> 個區間與爭議期間重疊，
+            累計 <strong>{disputeOverlapSummary.totalOverlapDays}</strong> 天
+          </span>
+          <Badge variant="outline" className="ml-auto text-xs border-amber-300 text-amber-600">
+            有重疊區間以粗邊框標示
+          </Badge>
+        </div>
+      )}
+
       <div className="border rounded-lg bg-card p-2">
         <Plot
           data={traces}
@@ -266,6 +365,7 @@ export function StageDurationBarChart({
         <span>📊 群組長條比較各案耗時</span>
         <span>🔍 滑鼠滾輪縮放</span>
         <span>📷 右上角可下載圖片</span>
+        {disputes.length > 0 && <span>⚠️ 有爭議重疊的柱子會顯示彩色邊框</span>}
       </div>
     </div>
   );
