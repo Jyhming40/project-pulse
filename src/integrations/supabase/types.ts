@@ -2025,6 +2025,7 @@ export type Database = {
           created_at: string
           id: string
           milestone_order: string[]
+          selected_intervals: string[] | null
           updated_at: string
           user_id: string
         }
@@ -2032,6 +2033,7 @@ export type Database = {
           created_at?: string
           id?: string
           milestone_order?: string[]
+          selected_intervals?: string[] | null
           updated_at?: string
           user_id: string
         }
@@ -2039,6 +2041,7 @@ export type Database = {
           created_at?: string
           id?: string
           milestone_order?: string[]
+          selected_intervals?: string[] | null
           updated_at?: string
           user_id?: string
         }
