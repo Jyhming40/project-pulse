@@ -15,16 +15,21 @@ interface DisputeKpiCardsProps {
   results: ComparisonResult[];
   disputes: ProjectDispute[];
   strategy: DisputeDisplayStrategy;
+  selectedIntervals?: string[];
 }
 
-export function DisputeKpiCards({ results, disputes, strategy }: DisputeKpiCardsProps) {
+export function DisputeKpiCards({ results, disputes, strategy, selectedIntervals }: DisputeKpiCardsProps) {
   const kpiStats = useMemo(() => {
     if (results.length === 0 || disputes.length === 0) return [];
 
-    // Only use step-by-step intervals for KPI calculation
-    const stepIntervalIds = COMPARISON_PAIRS
+    // Only use step-by-step intervals for KPI calculation, filtered by selectedIntervals
+    let stepIntervalIds = COMPARISON_PAIRS
       .filter((p) => p.id.startsWith("interval_") && !p.id.includes("total") && p.id.split("_").length === 3)
       .map((p) => p.id);
+    
+    if (selectedIntervals && selectedIntervals.length > 0) {
+      stepIntervalIds = stepIntervalIds.filter(id => selectedIntervals.includes(id));
+    }
 
     return results.map((result) => {
       const intervals = stepIntervalIds.map((pairId) => {

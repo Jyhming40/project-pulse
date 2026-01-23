@@ -8,6 +8,7 @@ interface StageDurationBarChartProps {
   results: ComparisonResult[];
   disputes?: ProjectDispute[];
   displayStrategy?: DisputeDisplayStrategy;
+  selectedIntervals?: string[];
 }
 
 // Colors for projects
@@ -28,15 +29,19 @@ const PROJECT_COLORS = [
 export function StageDurationBarChart({ 
   results, 
   disputes = [],
-  displayStrategy 
+  displayStrategy,
+  selectedIntervals 
 }: StageDurationBarChartProps) {
   const { traces, layout } = useMemo(() => {
     if (results.length === 0) {
       return { traces: [], layout: {} };
     }
 
-    // Only use step-by-step intervals (first 10)
-    const stepIntervals = COMPARISON_PAIRS.filter((p) => p.id.startsWith("interval_") && !p.id.includes("total") && p.id.split("_").length === 3);
+    // Only use step-by-step intervals, filtered by selectedIntervals if provided
+    let stepIntervals = COMPARISON_PAIRS.filter((p) => p.id.startsWith("interval_") && !p.id.includes("total") && p.id.split("_").length === 3);
+    if (selectedIntervals && selectedIntervals.length > 0) {
+      stepIntervals = stepIntervals.filter(p => selectedIntervals.includes(p.id));
+    }
     const intervalLabels = stepIntervals.map((p) => p.label);
 
     const traces: Data[] = [];

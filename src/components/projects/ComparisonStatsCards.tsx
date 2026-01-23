@@ -17,6 +17,7 @@ import { ComparisonResult, ComparisonStats, COMPARISON_PAIRS } from "@/hooks/use
 interface ComparisonStatsCardsProps {
   results: ComparisonResult[];
   stats: ComparisonStats[];
+  selectedIntervals?: string[];
 }
 
 interface ExtendedStats {
@@ -32,12 +33,16 @@ interface ExtendedStats {
   baselineDelta: number | null; // baseline - average
 }
 
-export function ComparisonStatsCards({ results, stats }: ComparisonStatsCardsProps) {
+export function ComparisonStatsCards({ results, stats, selectedIntervals }: ComparisonStatsCardsProps) {
   const baseline = useMemo(() => results.find(r => r.isBaseline), [results]);
   
   // Calculate extended statistics including std deviation
   const extendedStats = useMemo((): ExtendedStats[] => {
-    const stepPairs = COMPARISON_PAIRS.slice(0, 10);
+    // Filter step pairs by selectedIntervals if provided
+    let stepPairs = COMPARISON_PAIRS.slice(0, 10);
+    if (selectedIntervals && selectedIntervals.length > 0) {
+      stepPairs = stepPairs.filter(p => selectedIntervals.includes(p.id));
+    }
     
     return stepPairs.map(pair => {
       const stat = stats.find(s => s.pairId === pair.id);
