@@ -85,26 +85,57 @@ export function StageAnalysisTable({ results, stats, customStages = [] }: StageA
     }));
   }, [customStages]);
 
-  // Calculate comparison data for each stage
+  // Calculate comparison data for each stage using edited milestone pairs
   const stageData = useMemo(() => {
     return stepPairs.map((pair, index) => {
-      const stat = stats.find(s => s.pairId === pair.id);
+      // Calculate days based on edited fromStep/toStep (not original intervals)
+      const calculateDays = (r: ComparisonResult) => {
+        const fromDate = r.documentDates[pair.fromStep]?.date || null;
+        const toDate = r.documentDates[pair.toStep]?.date || null;
+        
+        if (fromDate && toDate) {
+          const from = new Date(fromDate);
+          const to = new Date(toDate);
+          const days = Math.floor((to.getTime() - from.getTime()) / (1000 * 60 * 60 * 24));
+          return { days, status: 'complete' as const };
+        }
+        
+        if (!fromDate && !toDate) {
+          return { days: null, status: 'na' as const };
+        }
+        
+        return { days: null, status: 'incomplete' as const };
+      };
+
+      // Calculate all project days first to get average
+      const allProjectDays = results.map(r => ({
+        ...calculateDays(r),
+        isBaseline: r.isBaseline,
+      }));
       
-      // Get baseline days
-      const baselineInterval = baselineResult?.intervals[pair.id];
-      const baselineDays = baselineInterval?.status === 'complete' 
-        ? baselineInterval.days 
+      // Calculate average from non-baseline completed projects
+      const validDays = allProjectDays
+        .filter(d => !d.isBaseline && d.status === 'complete' && d.days !== null)
+        .map(d => d.days!);
+      
+      const average = validDays.length > 0 
+        ? Math.round(validDays.reduce((a, b) => a + b, 0) / validDays.length)
         : null;
+
+      // Get baseline days
+      const baselineData = allProjectDays.find(d => d.isBaseline);
+      const baselineDays = baselineData?.status === 'complete' ? baselineData.days : null;
       
       // Check if baseline is bottleneck for this stage
       const baselineBottleneck = baselineDays !== null 
-        ? isBottleneck(baselineDays, stat?.average ?? null) 
+        ? isBottleneck(baselineDays, average) 
         : null;
 
-      // Get all project data for this stage
-      const projectData = results.map(r => {
-        const interval = r.intervals[pair.id];
-        if (!interval || interval.status === 'na') {
+      // Get all project data for this stage with delta calculation
+      const projectData = results.map((r, idx) => {
+        const data = allProjectDays[idx];
+        
+        if (data.status === 'na') {
           return { 
             projectName: r.project.project_name, 
             days: null, 
@@ -114,7 +145,7 @@ export function StageAnalysisTable({ results, stats, customStages = [] }: StageA
             bottleneck: null
           };
         }
-        if (interval.status === 'incomplete') {
+        if (data.status === 'incomplete') {
           return { 
             projectName: r.project.project_name, 
             days: null, 
@@ -124,13 +155,18 @@ export function StageAnalysisTable({ results, stats, customStages = [] }: StageA
             bottleneck: null
           };
         }
+        
+        const delta = r.isBaseline || data.days === null || baselineDays === null 
+          ? null 
+          : data.days - baselineDays;
+        
         return {
           projectName: r.project.project_name,
-          days: interval.days,
-          delta: r.isBaseline ? null : interval.delta,
+          days: data.days,
+          delta,
           status: 'complete' as const,
           isBaseline: r.isBaseline,
-          bottleneck: interval.days !== null ? isBottleneck(interval.days, stat?.average ?? null) : null
+          bottleneck: data.days !== null ? isBottleneck(data.days, average) : null
         };
       });
 
@@ -138,13 +174,13 @@ export function StageAnalysisTable({ results, stats, customStages = [] }: StageA
         pair,
         step: index + 1,
         baselineDays,
-        average: stat?.average ?? null,
-        median: stat?.median ?? null,
+        average,
+        median: null, // Could calculate if needed
         projectData,
         baselineBottleneck,
       };
     });
-  }, [results, stats, baselineResult, stepPairs]);
+  }, [results, stepPairs]);
 
   // Calculate custom stage data
   const customStageData = useMemo(() => {
