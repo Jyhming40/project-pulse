@@ -2,26 +2,36 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * 時間軸里程碑定義（共 11 個節點）:
+ * 時間軸里程碑定義（共 12 個節點）:
+ * 0. 初步現勘 (projects.initial_survey_date)
  * 1. 與客戶簽訂合約 (projects.contract_signed_at)
  * 2. 台電審查意見書 (TPC_REVIEW issued_at)
  * 3. 能源署同意備案 (MOEA_CONSENT issued_at)
- * 4. 結構技師簽證 (BUILD_EXEMPT_APP issued_at - 免雜申請備案回函)
+ * 4. 結構技師簽證 (projects.structural_cert_date，備用：BUILD_EXEMPT_APP submitted_at)
  * 5. 免雜項執照同意 (BUILD_EXEMPT_APP issued_at)
  * 6. 台電躉購合約 (TPC_CONTRACT issued_at)
- * 7. 電機技師簽證 (TPC_CONTRACT submitted_at - 躉售合約送件日)
- * 8. 材料進場/施工 (BUILD_EXEMPT_COMP submitted_at 或實際開工日)
+ * 7. 電機技師簽證 (projects.electrical_cert_date，備用：TPC_CONTRACT submitted_at)
+ * 8. 材料進場/施工 (projects.construction_start_date，備用：BUILD_EXEMPT_COMP submitted_at)
  * 9. 免雜項執照竣工 (BUILD_EXEMPT_COMP issued_at)
  * 10. 台電掛表(完工) (projects.actual_meter_date)
  * 11. 設備登記核准 (MOEA_REGISTER issued_at)
  * 
- * 注意：結構技師 與 免雜同意 使用同一文件不同欄位；
- *       電機技師 與 躉購合約 使用同一文件不同欄位
+ * 注意：第4、7、8項有專屬日期欄位，若無則使用備用邏輯
  */
 
 // Document type mappings for comparison timeline
 // Each milestone maps to document type codes/labels and uses issued_at date
 export const TIMELINE_DOC_MAPPING = [
+  { 
+    step: 0, 
+    label: '初步現勘', 
+    short: '現勘',
+    doc_type_codes: ['__USE_INITIAL_SURVEY_DATE__'],
+    doc_type_labels: ['初步現勘', '現勘', '場勘'],
+    date_field: 'issued_at' as const,
+    use_project_field: 'initial_survey_date' as const,
+    color: '#78716c',
+  },
   { 
     step: 1, 
     label: '與客戶簽訂合約', 
@@ -54,9 +64,12 @@ export const TIMELINE_DOC_MAPPING = [
     step: 4, 
     label: '結構技師簽證', 
     short: '結構簽證',
-    doc_type_codes: ['BUILD_EXEMPT_APP'], // 免雜項申請備案回函的issued_at = 結構技師完成點
+    doc_type_codes: ['BUILD_EXEMPT_APP'],
     doc_type_labels: ['免雜項申請', '結構技師簽證', '結構簽證'],
     date_field: 'issued_at' as const,
+    // Primary: use project field, Fallback: BUILD_EXEMPT_APP.submitted_at
+    use_project_field: 'structural_cert_date' as const,
+    fallback_doc_field: 'submitted_at' as const,
     color: '#8b5cf6',
   },
   { 
@@ -81,18 +94,24 @@ export const TIMELINE_DOC_MAPPING = [
     step: 7, 
     label: '電機技師簽證', 
     short: '電機簽證',
-    doc_type_codes: ['TPC_CONTRACT'], // 躉售合約的submitted_at = 電機技師完成點（送件日）
+    doc_type_codes: ['TPC_CONTRACT'],
     doc_type_labels: ['躉售合約', '電機技師簽證', '電機簽證'],
-    date_field: 'submitted_at' as const, // Uses submitted_at for electrical engineer
+    date_field: 'issued_at' as const,
+    // Primary: use project field, Fallback: TPC_CONTRACT.submitted_at
+    use_project_field: 'electrical_cert_date' as const,
+    fallback_doc_field: 'submitted_at' as const,
     color: '#14b8a6',
   },
   { 
     step: 8, 
     label: '材料進場/施工', 
     short: '材料施工',
-    doc_type_codes: ['BUILD_EXEMPT_COMP'], // 使用免雜竣工的submitted_at作為開工日
+    doc_type_codes: ['BUILD_EXEMPT_COMP'],
     doc_type_labels: ['材料進場', '施工', '開工'],
-    date_field: 'submitted_at' as const,
+    date_field: 'issued_at' as const,
+    // Primary: use project field, Fallback: BUILD_EXEMPT_COMP.submitted_at
+    use_project_field: 'construction_start_date' as const,
+    fallback_doc_field: 'submitted_at' as const,
     color: '#ec4899',
   },
   { 
@@ -125,9 +144,17 @@ export const TIMELINE_DOC_MAPPING = [
   },
 ] as const;
 
-// Comparison pairs based on new 11-milestone timeline
+// Comparison pairs based on new 12-milestone timeline (step 0-11)
 export const COMPARISON_PAIRS = [
-  // 連續節點區間（10個）
+  // 連續節點區間（11個）
+  {
+    id: 'interval_00_01',
+    label: '現勘→簽約',
+    description: '初步現勘 → 與客戶簽訂合約',
+    fromStep: 0,
+    toStep: 1,
+    fitOnly: false,
+  },
   {
     id: 'interval_01_02',
     label: '簽約→審查意見',
@@ -375,20 +402,22 @@ export function useComparisonDataManual(
     queryFn: async () => {
       if (!baselineProjectId) return null;
 
-      // 1. Get baseline project (include actual_meter_date, contract_signed_at)
+      // 1. Get baseline project (include all milestone date fields)
+      const projectSelectFields = 'id, project_name, project_code, created_at, revenue_model, installation_type, intake_year, actual_meter_date, contract_signed_at, initial_survey_date, structural_cert_date, electrical_cert_date, construction_start_date';
+      
       const { data: baselineProject, error: baselineError } = await supabase
         .from('projects')
-        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year, actual_meter_date, contract_signed_at')
+        .select(projectSelectFields)
         .eq('id', baselineProjectId)
         .single() as { data: any; error: any };
 
       if (baselineError) throw baselineError;
 
-      // 2. Get all comparison projects (include actual_meter_date, contract_signed_at)
+      // 2. Get all comparison projects (include all milestone date fields)
       const allProjectIds = [baselineProjectId, ...comparisonProjectIds];
       const { data: allProjectsData, error: projectsError } = await supabase
         .from('projects')
-        .select('id, project_name, project_code, created_at, revenue_model, installation_type, intake_year, actual_meter_date, contract_signed_at')
+        .select(projectSelectFields)
         .in('id', allProjectIds) as { data: any[]; error: any };
 
       if (projectsError) throw projectsError;
@@ -397,7 +426,14 @@ export function useComparisonDataManual(
       const allProjects = [
         baselineProject,
         ...comparisonProjectIds.map(id => projectsMap.get(id)).filter(Boolean),
-      ] as (ProjectForComparison & { actual_meter_date?: string | null; contract_signed_at?: string | null })[];
+      ] as (ProjectForComparison & { 
+        actual_meter_date?: string | null; 
+        contract_signed_at?: string | null;
+        initial_survey_date?: string | null;
+        structural_cert_date?: string | null;
+        electrical_cert_date?: string | null;
+        construction_start_date?: string | null;
+      })[];
 
       const baselineYear = extractProjectYear(baselineProject as any as ProjectForComparison);
 
@@ -421,17 +457,46 @@ export function useComparisonDataManual(
         
         // For each step, find matching document and extract date
         for (const mapping of TIMELINE_DOC_MAPPING) {
-          // Special case: use project field instead of document
+          let date: string | null = null;
+          let docType: string | null = mapping.label;
+          
+          // Check for use_project_field (primary source)
           if ('use_project_field' in mapping && mapping.use_project_field) {
             const fieldValue = (projectData as any)?.[mapping.use_project_field];
+            
+            if (fieldValue) {
+              // Use project field value directly
+              date = fieldValue;
+            } else if ('fallback_doc_field' in mapping && mapping.fallback_doc_field) {
+              // Fallback to document field if project field is empty
+              let matchedDoc = null;
+              
+              // Search by doc_type_code first
+              for (const code of mapping.doc_type_codes) {
+                if (code.startsWith('__USE_')) continue;
+                const found = projectDocs.find(d => d.doc_type_code === code);
+                if (found) {
+                  matchedDoc = found;
+                  break;
+                }
+              }
+              
+              if (matchedDoc) {
+                const fallbackField = mapping.fallback_doc_field as 'submitted_at' | 'issued_at';
+                date = matchedDoc[fallbackField] || null;
+                docType = matchedDoc.doc_type || mapping.label;
+              }
+            }
+            
             docDatesMap[projectId][mapping.step] = {
               step: mapping.step,
-              date: fieldValue || null,
-              doc_type: mapping.label,
+              date,
+              doc_type: docType,
             };
             continue;
           }
           
+          // Standard document lookup
           let matchedDoc = null;
           
           // Search by doc_type_code first
@@ -457,17 +522,18 @@ export function useComparisonDataManual(
           }
           
           // Extract date based on date_field
-          let date: string | null = null;
           if (matchedDoc) {
-            date = mapping.date_field === 'submitted_at' 
+            const dateField = mapping.date_field as 'submitted_at' | 'issued_at';
+            date = dateField === 'submitted_at' 
               ? (matchedDoc.submitted_at || matchedDoc.issued_at)
               : matchedDoc.issued_at;
+            docType = matchedDoc.doc_type || mapping.label;
           }
           
           docDatesMap[projectId][mapping.step] = {
             step: mapping.step,
             date,
-            doc_type: matchedDoc?.doc_type || null,
+            doc_type: docType,
           };
         }
       }
