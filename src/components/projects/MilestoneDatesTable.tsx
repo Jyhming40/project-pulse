@@ -65,9 +65,11 @@ function SortableRow({ milestone, displayIndex, results, formatDate }: SortableR
     <TableRow ref={setNodeRef} style={style} className="hover:bg-muted/30">
       <TableCell className="text-center font-medium text-muted-foreground w-[40px]">
         <button
+          type="button"
           {...attributes}
           {...listeners}
-          className="cursor-grab active:cursor-grabbing p-1 rounded hover:bg-muted"
+          className="cursor-grab active:cursor-grabbing p-2 rounded hover:bg-muted touch-none"
+          style={{ touchAction: 'none' }}
         >
           <GripVertical className="h-4 w-4 text-muted-foreground" />
         </button>
