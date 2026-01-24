@@ -32,7 +32,14 @@ export interface ImportPreview<T> {
 }
 
 // Extended types for import mapping
-type ProjectInsertWithInvestor = ProjectInsert & { investor_name?: string; _rowIndex?: number };
+type ProjectInsertWithInvestor = ProjectInsert & { 
+  investor_name?: string; 
+  _rowIndex?: number;
+  initial_survey_date?: string;
+  structural_cert_date?: string;
+  electrical_cert_date?: string;
+  construction_start_date?: string;
+};
 type DocumentInsertWithProject = DocumentInsert & { project_code?: string; project_name?: string; owner_name?: string; _rowIndex?: number };
 type InvestorContactInsertWithCode = InvestorContactInsert & { investor_code?: string; investor_name?: string; _rowIndex?: number };
 type InvestorPaymentMethodInsertWithCode = InvestorPaymentMethodInsert & { investor_code?: string; investor_name?: string; _rowIndex?: number };
@@ -55,6 +62,10 @@ const projectColumnMap: Record<string, keyof ProjectInsertWithInvestor> = {
   '聯絡人': 'contact_person',
   '聯絡電話': 'contact_phone',
   '年度': 'fiscal_year',
+  '初步現勘日期': 'initial_survey_date',
+  '結構技師簽證日期': 'structural_cert_date',
+  '電機技師簽證日期': 'electrical_cert_date',
+  '材料進場日期': 'construction_start_date',
   '備註': 'note',
 };
 
@@ -195,6 +206,11 @@ function mapRowToProject(row: Record<string, any>, rowIndex: number): Partial<Pr
       if (mappedKey === 'capacity_kwp' || mappedKey === 'fiscal_year') {
         const num = Number(value);
         if (!isNaN(num)) (mapped as any)[mappedKey] = num;
+      } else if (mappedKey === 'initial_survey_date' || mappedKey === 'structural_cert_date' || 
+                 mappedKey === 'electrical_cert_date' || mappedKey === 'construction_start_date') {
+        // Parse date fields
+        const parsedDate = parseDate(value);
+        if (parsedDate) (mapped as any)[mappedKey] = parsedDate;
       } else {
         (mapped as any)[mappedKey] = String(value).trim();
       }

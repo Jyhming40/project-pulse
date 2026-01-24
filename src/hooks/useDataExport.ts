@@ -37,6 +37,10 @@ const projectColumns = [
   { key: 'contact_person', label: '聯絡人' },
   { key: 'contact_phone', label: '聯絡電話' },
   { key: 'fiscal_year', label: '年度' },
+  { key: 'initial_survey_date', label: '初步現勘日期' },
+  { key: 'structural_cert_date', label: '結構技師簽證日期' },
+  { key: 'electrical_cert_date', label: '電機技師簽證日期' },
+  { key: 'construction_start_date', label: '材料進場日期' },
   { key: 'note', label: '備註' },
 ];
 
