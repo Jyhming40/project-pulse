@@ -1,5 +1,20 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { format } from "date-fns";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import {
   Download,
   FileText,
@@ -16,6 +31,8 @@ import {
   Calculator,
   Grid3X3,
   Scale,
+  GripVertical,
+  RotateCcw,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,6 +54,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { toast } from "sonner";
 import {
   useProjectsForComparison,
@@ -49,6 +72,7 @@ import {
 } from "@/hooks/useProjectComparison";
 import { useCustomStages } from "@/hooks/useCustomStages";
 import { useProjectDisputes } from "@/hooks/useProjectDisputes";
+import { useSectionOrder, SectionId } from "@/hooks/useSectionOrder";
 import { ProjectSearchCombobox } from "@/components/projects/ProjectSearchCombobox";
 import { ProjectMultiSelect } from "@/components/projects/ProjectMultiSelect";
 import { ProgressPlotlyChart } from "@/components/projects/ProgressPlotlyChart";
@@ -62,6 +86,7 @@ import { ComparisonStatsCards } from "@/components/projects/ComparisonStatsCards
 import { IntervalSelector } from "@/components/projects/IntervalSelector";
 import { DisputeSettingsPanel, DisputeDisplayStrategyPanel } from "@/components/projects/DisputeSettingsPanel";
 import { DisputeKpiCards } from "@/components/projects/DisputeKpiCards";
+import { SortableSectionCard } from "@/components/projects/SortableSectionCard";
 import { useBatchSyncMilestones } from "@/hooks/useBatchSyncMilestones";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
@@ -106,6 +131,23 @@ export default function ProjectComparison() {
   
   // Custom stages from useCustomStages hook
   const { userStages } = useCustomStages();
+
+  // Section order (drag-and-drop)
+  const { sectionOrder, reorderSections, resetOrder } = useSectionOrder();
+
+  // DnD sensors
+  const pointerSensor = useSensor(PointerSensor, { activationConstraint: { distance: 8 } });
+  const touchSensor = useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } });
+  const keyboardSensor = useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates });
+  const sensors = useSensors(pointerSensor, touchSensor, keyboardSensor);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      reorderSections(active.id as string, over.id as string);
+      toast.success('區塊順序已更新');
+    }
+  }, [reorderSections]);
 
   const { data: projects, isLoading: projectsLoading, refetch: refetchProjects } = useProjectsForComparison();
   const { data: comparisonData, isLoading: comparisonLoading, refetch: refetchComparison } = useComparisonDataManual(
@@ -427,275 +469,321 @@ export default function ProjectComparison() {
                 </Card>
               </div>
 
-              {/* Chart Section */}
-              {sectionVisibility.chart && (
-                <Collapsible open={sectionsExpanded.chart} onOpenChange={() => toggleSectionExpanded('chart')}>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CollapsibleTrigger asChild>
-                        <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
-                          <div className="flex items-center gap-2">
-                            {getChartIcon()}
-                            <CardTitle className="text-lg">{getChartTitle()}</CardTitle>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="secondary" className="text-xs">Plotly 互動</Badge>
-                            {sectionsExpanded.chart ? (
-                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                            )}
-                          </div>
-                        </div>
-                      </CollapsibleTrigger>
-                      <CardDescription>
-                        基準案件：{comparisonData.baseline.project_name}（{comparisonData.baseline.project_code}）
-                      </CardDescription>
-                    </CardHeader>
-                    <CollapsibleContent>
-                      <CardContent className="pt-4">
-                        {chartMode === "progress" && (
-                          <ProgressPlotlyChart 
-                            results={sortedResults} 
-                            disputes={relevantDisputes}
-                            displayStrategy={strategy}
-                          />
-                        )}
-                        {chartMode === "duration-bar" && (
-                          <StageDurationBarChart 
-                            results={sortedResults}
-                            disputes={relevantDisputes}
-                            displayStrategy={strategy}
-                            customStages={userStages}
-                          />
-                        )}
-                        {chartMode === "heatmap" && (
-                          <StageDurationHeatmap 
-                            results={sortedResults}
-                            disputes={relevantDisputes}
-                            displayStrategy={strategy}
-                            customStages={userStages}
-                          />
-                        )}
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              )}
+              {/* Sortable Sections with Drag Hint */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <GripVertical className="h-3 w-3" />
+                  <span>拖曳左側手柄可調整區塊順序</span>
+                </div>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="ghost" size="sm" onClick={resetOrder}>
+                        <RotateCcw className="h-3 w-3 mr-1" />
+                        重置順序
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>恢復預設區塊順序</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
 
-              {/* Dispute KPI Cards (Iteration 2) */}
-              {relevantDisputes.length > 0 && (
-                <Collapsible open={sectionsExpanded.disputeKpi} onOpenChange={() => toggleSectionExpanded('disputeKpi')}>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CollapsibleTrigger asChild>
-                        <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
-                          <div className="flex items-center gap-2">
-                            <Scale className="h-5 w-5 text-amber-500" />
-                            <CardTitle className="text-lg">爭議影響分析</CardTitle>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="text-xs">Iteration 2</Badge>
-                            {sectionsExpanded.disputeKpi ? (
-                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                            )}
-                          </div>
-                        </div>
-                      </CollapsibleTrigger>
-                      <CardDescription>
-                        各案場爭議期間與流程區間的重疊統計
-                      </CardDescription>
-                    </CardHeader>
-                    <CollapsibleContent>
-                      <CardContent className="pt-4">
-                        <DisputeKpiCards 
-                          results={sortedResults}
-                          disputes={relevantDisputes}
-                          strategy={strategy}
-                        />
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              )}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext items={sectionOrder} strategy={verticalListSortingStrategy}>
+                  <div className="space-y-6">
+                    {sectionOrder.map((sectionId) => {
+                      // Render each section based on its ID and visibility
+                      switch (sectionId) {
+                        case 'chart':
+                          if (!sectionVisibility.chart) return null;
+                          return (
+                            <SortableSectionCard key={sectionId} id={sectionId}>
+                              <Collapsible open={sectionsExpanded.chart} onOpenChange={() => toggleSectionExpanded('chart')}>
+                                <CardHeader className="pb-2 pl-10">
+                                  <CollapsibleTrigger asChild>
+                                    <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
+                                      <div className="flex items-center gap-2">
+                                        {getChartIcon()}
+                                        <CardTitle className="text-lg">{getChartTitle()}</CardTitle>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant="secondary" className="text-xs">Plotly 互動</Badge>
+                                        {sectionsExpanded.chart ? (
+                                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                                        ) : (
+                                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </CollapsibleTrigger>
+                                  <CardDescription className="ml-1">
+                                    基準案件：{comparisonData.baseline.project_name}（{comparisonData.baseline.project_code}）
+                                  </CardDescription>
+                                </CardHeader>
+                                <CollapsibleContent>
+                                  <CardContent className="pt-4">
+                                    {chartMode === "progress" && (
+                                      <ProgressPlotlyChart 
+                                        results={sortedResults} 
+                                        disputes={relevantDisputes}
+                                        displayStrategy={strategy}
+                                      />
+                                    )}
+                                    {chartMode === "duration-bar" && (
+                                      <StageDurationBarChart 
+                                        results={sortedResults}
+                                        disputes={relevantDisputes}
+                                        displayStrategy={strategy}
+                                        customStages={userStages}
+                                      />
+                                    )}
+                                    {chartMode === "heatmap" && (
+                                      <StageDurationHeatmap 
+                                        results={sortedResults}
+                                        disputes={relevantDisputes}
+                                        displayStrategy={strategy}
+                                        customStages={userStages}
+                                      />
+                                    )}
+                                  </CardContent>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            </SortableSectionCard>
+                          );
 
-              {/* Bottleneck Analysis Section */}
-              {sectionVisibility.bottleneck && (
-                <Collapsible open={sectionsExpanded.bottleneck} onOpenChange={() => toggleSectionExpanded('bottleneck')}>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CollapsibleTrigger asChild>
-                        <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
-                          <div className="flex items-center gap-2">
-                            <AlertOctagon className="h-5 w-5 text-destructive" />
-                            <CardTitle className="text-lg">瓶頸階段識別</CardTitle>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {sectionsExpanded.bottleneck ? (
-                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                            )}
-                          </div>
-                        </div>
-                      </CollapsibleTrigger>
-                      <CardDescription>
-                        自動識別各案件延遲最嚴重的階段，突顯超過平均 1.5 倍或 2 倍的瓶頸
-                      </CardDescription>
-                    </CardHeader>
-                    <CollapsibleContent>
-                      <CardContent className="pt-4">
-                        <BottleneckAnalysis 
-                          results={sortedResults} 
-                          stats={comparisonData.stats}
-                        />
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              )}
+                        case 'disputeKpi':
+                          if (relevantDisputes.length === 0) return null;
+                          return (
+                            <SortableSectionCard key={sectionId} id={sectionId}>
+                              <Collapsible open={sectionsExpanded.disputeKpi} onOpenChange={() => toggleSectionExpanded('disputeKpi')}>
+                                <CardHeader className="pb-2 pl-10">
+                                  <CollapsibleTrigger asChild>
+                                    <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
+                                      <div className="flex items-center gap-2">
+                                        <Scale className="h-5 w-5 text-amber-500" />
+                                        <CardTitle className="text-lg">爭議影響分析</CardTitle>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        <Badge variant="outline" className="text-xs">Iteration 2</Badge>
+                                        {sectionsExpanded.disputeKpi ? (
+                                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                                        ) : (
+                                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </CollapsibleTrigger>
+                                  <CardDescription className="ml-1">
+                                    各案場爭議期間與流程區間的重疊統計
+                                  </CardDescription>
+                                </CardHeader>
+                                <CollapsibleContent>
+                                  <CardContent className="pt-4">
+                                    <DisputeKpiCards 
+                                      results={sortedResults}
+                                      disputes={relevantDisputes}
+                                      strategy={strategy}
+                                    />
+                                  </CardContent>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            </SortableSectionCard>
+                          );
 
-              {/* Statistics Section */}
-              {sectionVisibility.stats && (
-                <Collapsible open={sectionsExpanded.stats} onOpenChange={() => toggleSectionExpanded('stats')}>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CollapsibleTrigger asChild>
-                        <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
-                          <div className="flex items-center gap-2">
-                            <Calculator className="h-5 w-5 text-primary" />
-                            <CardTitle className="text-lg">同年度統計分析</CardTitle>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {sectionsExpanded.stats ? (
-                              <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                            ) : (
-                              <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                            )}
-                          </div>
-                        </div>
-                      </CollapsibleTrigger>
-                      <CardDescription>
-                        平均值、中位數、標準差等統計指標，以及基準案件與同期的差異
-                      </CardDescription>
-                    </CardHeader>
-                    <CollapsibleContent>
-                      <CardContent className="pt-4">
-                        <ComparisonStatsCards 
-                          results={sortedResults} 
-                          stats={comparisonData.stats}
-                          customStages={userStages}
-                        />
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              )}
+                        case 'bottleneck':
+                          if (!sectionVisibility.bottleneck) return null;
+                          return (
+                            <SortableSectionCard key={sectionId} id={sectionId}>
+                              <Collapsible open={sectionsExpanded.bottleneck} onOpenChange={() => toggleSectionExpanded('bottleneck')}>
+                                <CardHeader className="pb-2 pl-10">
+                                  <CollapsibleTrigger asChild>
+                                    <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
+                                      <div className="flex items-center gap-2">
+                                        <AlertOctagon className="h-5 w-5 text-destructive" />
+                                        <CardTitle className="text-lg">瓶頸階段識別</CardTitle>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {sectionsExpanded.bottleneck ? (
+                                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                                        ) : (
+                                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </CollapsibleTrigger>
+                                  <CardDescription className="ml-1">
+                                    自動識別各案件延遲最嚴重的階段，突顯超過平均 1.5 倍或 2 倍的瓶頸
+                                  </CardDescription>
+                                </CardHeader>
+                                <CollapsibleContent>
+                                  <CardContent className="pt-4">
+                                    <BottleneckAnalysis 
+                                      results={sortedResults} 
+                                      stats={comparisonData.stats}
+                                    />
+                                  </CardContent>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            </SortableSectionCard>
+                          );
 
-              {/* Analysis Section */}
-              {sectionVisibility.analysis && (
-                <Collapsible open={sectionsExpanded.analysis} onOpenChange={() => toggleSectionExpanded('analysis')}>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CollapsibleTrigger asChild>
-                        <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
-                          <div className="flex items-center gap-2">
-                            <BarChart3 className="h-5 w-5 text-primary" />
-                            <CardTitle className="text-lg">階段耗時差異分析</CardTitle>
-                          </div>
-                          {sectionsExpanded.analysis ? (
-                            <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                          )}
-                        </div>
-                      </CollapsibleTrigger>
-                    </CardHeader>
-                    <CollapsibleContent>
-                      <CardContent className="pt-4">
-                        <StageAnalysisTable 
-                          results={sortedResults} 
-                          stats={comparisonData.stats}
-                          customStages={userStages}
-                        />
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              )}
+                        case 'stats':
+                          if (!sectionVisibility.stats) return null;
+                          return (
+                            <SortableSectionCard key={sectionId} id={sectionId}>
+                              <Collapsible open={sectionsExpanded.stats} onOpenChange={() => toggleSectionExpanded('stats')}>
+                                <CardHeader className="pb-2 pl-10">
+                                  <CollapsibleTrigger asChild>
+                                    <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
+                                      <div className="flex items-center gap-2">
+                                        <Calculator className="h-5 w-5 text-primary" />
+                                        <CardTitle className="text-lg">同年度統計分析</CardTitle>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {sectionsExpanded.stats ? (
+                                          <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                                        ) : (
+                                          <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                        )}
+                                      </div>
+                                    </div>
+                                  </CollapsibleTrigger>
+                                  <CardDescription className="ml-1">
+                                    平均值、中位數、標準差等統計指標，以及基準案件與同期的差異
+                                  </CardDescription>
+                                </CardHeader>
+                                <CollapsibleContent>
+                                  <CardContent className="pt-4">
+                                    <ComparisonStatsCards 
+                                      results={sortedResults} 
+                                      stats={comparisonData.stats}
+                                      customStages={userStages}
+                                    />
+                                  </CardContent>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            </SortableSectionCard>
+                          );
 
-              {/* Dates Section */}
-              {sectionVisibility.dates && (
-                <Collapsible open={sectionsExpanded.dates} onOpenChange={() => toggleSectionExpanded('dates')}>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CollapsibleTrigger asChild>
-                        <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
-                          <div className="flex items-center gap-2">
-                            <Calendar className="h-5 w-5 text-primary" />
-                            <CardTitle className="text-lg">原始日期列表</CardTitle>
-                          </div>
-                          {sectionsExpanded.dates ? (
-                            <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                          )}
-                        </div>
-                      </CollapsibleTrigger>
-                    </CardHeader>
-                    <CollapsibleContent>
-                      <CardContent className="pt-4">
-                        <MilestoneDatesTable results={sortedResults} />
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              )}
+                        case 'analysis':
+                          if (!sectionVisibility.analysis) return null;
+                          return (
+                            <SortableSectionCard key={sectionId} id={sectionId}>
+                              <Collapsible open={sectionsExpanded.analysis} onOpenChange={() => toggleSectionExpanded('analysis')}>
+                                <CardHeader className="pb-2 pl-10">
+                                  <CollapsibleTrigger asChild>
+                                    <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
+                                      <div className="flex items-center gap-2">
+                                        <BarChart3 className="h-5 w-5 text-primary" />
+                                        <CardTitle className="text-lg">階段耗時差異分析</CardTitle>
+                                      </div>
+                                      {sectionsExpanded.analysis ? (
+                                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                                      ) : (
+                                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                  </CollapsibleTrigger>
+                                </CardHeader>
+                                <CollapsibleContent>
+                                  <CardContent className="pt-4">
+                                    <StageAnalysisTable 
+                                      results={sortedResults} 
+                                      stats={comparisonData.stats}
+                                      customStages={userStages}
+                                    />
+                                  </CardContent>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            </SortableSectionCard>
+                          );
 
-              {/* Comparison Pairs Info */}
-              {sectionVisibility.pairInfo && (
-                <Collapsible open={sectionsExpanded.pairInfo} onOpenChange={() => toggleSectionExpanded('pairInfo')}>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CollapsibleTrigger asChild>
-                        <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
-                          <div className="flex items-center gap-2">
-                            <Info className="h-5 w-5 text-primary" />
-                            <CardTitle className="text-lg">比較區間說明</CardTitle>
-                          </div>
-                          {sectionsExpanded.pairInfo ? (
-                            <ChevronDown className="h-5 w-5 text-muted-foreground" />
-                          ) : (
-                            <ChevronRight className="h-5 w-5 text-muted-foreground" />
-                          )}
-                        </div>
-                      </CollapsibleTrigger>
-                    </CardHeader>
-                    <CollapsibleContent>
-                      <CardContent className="pt-4">
-                        <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
-                          {COMPARISON_PAIRS.map((pair, idx) => (
-                            <div key={pair.id} className="text-sm p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
-                              <div className="flex items-center gap-2">
-                                <span className="font-mono text-xs text-muted-foreground">{idx + 1}.</span>
-                                <span className="font-medium">{pair.label}</span>
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1 ml-5">
-                                {pair.description}
-                                {pair.fitOnly && (
-                                  <Badge variant="outline" className="ml-2 text-xs">FIT</Badge>
-                                )}
-                              </p>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </CollapsibleContent>
-                  </Card>
-                </Collapsible>
-              )}
+                        case 'dates':
+                          if (!sectionVisibility.dates) return null;
+                          return (
+                            <SortableSectionCard key={sectionId} id={sectionId}>
+                              <Collapsible open={sectionsExpanded.dates} onOpenChange={() => toggleSectionExpanded('dates')}>
+                                <CardHeader className="pb-2 pl-10">
+                                  <CollapsibleTrigger asChild>
+                                    <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
+                                      <div className="flex items-center gap-2">
+                                        <Calendar className="h-5 w-5 text-primary" />
+                                        <CardTitle className="text-lg">原始日期列表</CardTitle>
+                                      </div>
+                                      {sectionsExpanded.dates ? (
+                                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                                      ) : (
+                                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                  </CollapsibleTrigger>
+                                </CardHeader>
+                                <CollapsibleContent>
+                                  <CardContent className="pt-4">
+                                    <MilestoneDatesTable results={sortedResults} />
+                                  </CardContent>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            </SortableSectionCard>
+                          );
+
+                        case 'pairInfo':
+                          if (!sectionVisibility.pairInfo) return null;
+                          return (
+                            <SortableSectionCard key={sectionId} id={sectionId}>
+                              <Collapsible open={sectionsExpanded.pairInfo} onOpenChange={() => toggleSectionExpanded('pairInfo')}>
+                                <CardHeader className="pb-2 pl-10">
+                                  <CollapsibleTrigger asChild>
+                                    <div className="flex items-center justify-between cursor-pointer hover:bg-muted/50 -mx-6 -mt-6 px-6 pt-6 pb-2 rounded-t-lg">
+                                      <div className="flex items-center gap-2">
+                                        <Info className="h-5 w-5 text-primary" />
+                                        <CardTitle className="text-lg">比較區間說明</CardTitle>
+                                      </div>
+                                      {sectionsExpanded.pairInfo ? (
+                                        <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                                      ) : (
+                                        <ChevronRight className="h-5 w-5 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                  </CollapsibleTrigger>
+                                </CardHeader>
+                                <CollapsibleContent>
+                                  <CardContent className="pt-4">
+                                    <div className="grid gap-2 md:grid-cols-2 lg:grid-cols-4">
+                                      {COMPARISON_PAIRS.map((pair, idx) => (
+                                        <div key={pair.id} className="text-sm p-2 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-mono text-xs text-muted-foreground">{idx + 1}.</span>
+                                            <span className="font-medium">{pair.label}</span>
+                                          </div>
+                                          <p className="text-xs text-muted-foreground mt-1 ml-5">
+                                            {pair.description}
+                                            {pair.fitOnly && (
+                                              <Badge variant="outline" className="ml-2 text-xs">FIT</Badge>
+                                            )}
+                                          </p>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </CardContent>
+                                </CollapsibleContent>
+                              </Collapsible>
+                            </SortableSectionCard>
+                          );
+
+                        default:
+                          return null;
+                      }
+                    })}
+                  </div>
+                </SortableContext>
+              </DndContext>
             </>
           )}
 
