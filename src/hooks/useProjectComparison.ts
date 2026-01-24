@@ -481,6 +481,19 @@ export function useComparisonDataManual(
                 }
               }
               
+              // Also search by doc_type label if not found by code (for legacy data)
+              if (!matchedDoc) {
+                for (const label of mapping.doc_type_labels) {
+                  const found = projectDocs.find(d => 
+                    d.doc_type?.includes(label) || d.doc_type === label
+                  );
+                  if (found) {
+                    matchedDoc = found;
+                    break;
+                  }
+                }
+              }
+              
               if (matchedDoc) {
                 const fallbackField = mapping.fallback_doc_field as 'submitted_at' | 'issued_at';
                 date = matchedDoc[fallbackField] || null;
