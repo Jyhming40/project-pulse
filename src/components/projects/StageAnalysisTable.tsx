@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   Table,
   TableBody,
@@ -14,7 +14,6 @@ import { COMPARISON_PAIRS, ComparisonResult, ComparisonStats } from "@/hooks/use
 import { StageDefinition } from "@/types/compareConfig";
 import { useEditableStages } from "@/hooks/useEditableStages";
 import { cn } from "@/lib/utils";
-
 interface StageAnalysisTableProps {
   results: ComparisonResult[];
   stats: ComparisonStats[];
@@ -50,6 +49,15 @@ function calculateIntervalFromStage(
 }
 
 export function StageAnalysisTable({ results, stats, customStages = [] }: StageAnalysisTableProps) {
+  // Force re-render when editable stages change
+  const [, forceUpdate] = useState(0);
+  
+  useEffect(() => {
+    const handleChange = () => forceUpdate(n => n + 1);
+    window.addEventListener('editableStagesChanged', handleChange);
+    return () => window.removeEventListener('editableStagesChanged', handleChange);
+  }, []);
+  
   // Get editable stages configuration
   const { editableStages, getStageLabel } = useEditableStages();
   
