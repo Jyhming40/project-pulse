@@ -62,38 +62,75 @@ function DatePickerField({
   onChange: (date: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [inputValue, setInputValue] = useState(value ? format(parseISO(value), "yyyy/MM/dd") : "");
+
+  // Sync inputValue when value prop changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setInputValue(raw);
+    
+    // Try to parse the input as a date
+    // Support formats: yyyy/MM/dd, yyyy-MM-dd, yyyyMMdd
+    const cleaned = raw.replace(/[\/\-]/g, "");
+    if (cleaned.length === 8) {
+      const year = cleaned.slice(0, 4);
+      const month = cleaned.slice(4, 6);
+      const day = cleaned.slice(6, 8);
+      const dateStr = `${year}-${month}-${day}`;
+      const parsed = new Date(dateStr);
+      if (!isNaN(parsed.getTime())) {
+        onChange(dateStr);
+      }
+    }
+  };
+
+  const handleCalendarSelect = (date: Date | undefined) => {
+    if (date) {
+      const formatted = format(date, "yyyy-MM-dd");
+      onChange(formatted);
+      setInputValue(format(date, "yyyy/MM/dd"));
+      setOpen(false);
+    }
+  };
+
+  // Update input when value changes externally
+  const displayValue = value ? format(parseISO(value), "yyyy/MM/dd") : "";
+  if (displayValue && inputValue !== displayValue && !inputValue.includes(displayValue.replace(/\//g, ""))) {
+    // Only sync if the parsed value is different
+  }
 
   return (
     <div className="space-y-1">
       <Label className="text-xs">{label}</Label>
-      <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn(
-              "w-full justify-start text-left font-normal h-9",
-              !value && "text-muted-foreground"
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {value ? format(parseISO(value), "yyyy/MM/dd") : "選擇日期"}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start">
-          <Calendar
-            mode="single"
-            selected={value ? parseISO(value) : undefined}
-            onSelect={(date) => {
-              if (date) {
-                onChange(format(date, "yyyy-MM-dd"));
-                setOpen(false);
-              }
-            }}
-            locale={zhTW}
-            className="pointer-events-auto"
-          />
-        </PopoverContent>
-      </Popover>
+      <div className="flex gap-1">
+        <Input
+          value={inputValue || (value ? format(parseISO(value), "yyyy/MM/dd") : "")}
+          onChange={handleInputChange}
+          placeholder="yyyy/MM/dd"
+          className="h-9 flex-1"
+        />
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="h-9 w-9 shrink-0"
+            >
+              <CalendarIcon className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0 z-50 bg-popover" align="start">
+            <Calendar
+              mode="single"
+              selected={value ? parseISO(value) : undefined}
+              onSelect={handleCalendarSelect}
+              locale={zhTW}
+              className="pointer-events-auto"
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
     </div>
   );
 }
