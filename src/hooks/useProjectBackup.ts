@@ -76,6 +76,7 @@ const projectColumns = [
   'coordinates', 'land_owner', 'land_owner_contact', 'contact_person', 'contact_phone',
   'fiscal_year', 'intake_year', 'seq', 'approval_date', 'installation_type', 'taipower_pv_id',
   'grid_connection_type', 'power_phase_type', 'power_voltage', 'pole_status', 'construction_status',
+  'initial_survey_date', 'structural_cert_date', 'electrical_cert_date', 'construction_start_date',
   'drive_folder_id', 'drive_folder_url', 'folder_status', 'folder_error', 'note', 'created_at', 'updated_at'
 ];
 
@@ -87,6 +88,8 @@ const projectLabels: Record<string, string> = {
   fiscal_year: '年度', intake_year: '收件年度', seq: '序號', approval_date: '同意備案日',
   installation_type: '裝置類型', taipower_pv_id: '台電PV編號', grid_connection_type: '併網類型',
   power_phase_type: '相別', power_voltage: '電壓', pole_status: '電桿狀態', construction_status: '施工狀態',
+  initial_survey_date: '初步現勘日期', structural_cert_date: '結構技師簽證日期', 
+  electrical_cert_date: '電機技師簽證日期', construction_start_date: '材料進場日期',
   drive_folder_id: 'Drive資料夾ID', drive_folder_url: 'Drive資料夾網址', folder_status: '資料夾狀態',
   folder_error: '資料夾錯誤', note: '備註', created_at: '建立時間', updated_at: '更新時間'
 };

@@ -1818,6 +1818,7 @@ export type Database = {
           archived_by: string | null
           capacity_kwp: number | null
           city: string | null
+          construction_start_date: string | null
           construction_status: string | null
           contact_person: string | null
           contact_phone: string | null
@@ -1831,6 +1832,7 @@ export type Database = {
           district: string | null
           drive_folder_id: string | null
           drive_folder_url: string | null
+          electrical_cert_date: string | null
           energy_permit_id: string | null
           engineering_progress: number | null
           engineering_stage: string | null
@@ -1840,6 +1842,7 @@ export type Database = {
           folder_status: string | null
           grid_connection_type: string | null
           id: string
+          initial_survey_date: string | null
           installation_type: string | null
           intake_year: number | null
           inverter_model: string | null
@@ -1864,6 +1867,7 @@ export type Database = {
           seq: number | null
           site_code_display: string | null
           status: string
+          structural_cert_date: string | null
           taipower_contract_no: string | null
           taipower_pv_id: string | null
           updated_at: string
@@ -1880,6 +1884,7 @@ export type Database = {
           archived_by?: string | null
           capacity_kwp?: number | null
           city?: string | null
+          construction_start_date?: string | null
           construction_status?: string | null
           contact_person?: string | null
           contact_phone?: string | null
@@ -1893,6 +1898,7 @@ export type Database = {
           district?: string | null
           drive_folder_id?: string | null
           drive_folder_url?: string | null
+          electrical_cert_date?: string | null
           energy_permit_id?: string | null
           engineering_progress?: number | null
           engineering_stage?: string | null
@@ -1902,6 +1908,7 @@ export type Database = {
           folder_status?: string | null
           grid_connection_type?: string | null
           id?: string
+          initial_survey_date?: string | null
           installation_type?: string | null
           intake_year?: number | null
           inverter_model?: string | null
@@ -1926,6 +1933,7 @@ export type Database = {
           seq?: number | null
           site_code_display?: string | null
           status?: string
+          structural_cert_date?: string | null
           taipower_contract_no?: string | null
           taipower_pv_id?: string | null
           updated_at?: string
@@ -1942,6 +1950,7 @@ export type Database = {
           archived_by?: string | null
           capacity_kwp?: number | null
           city?: string | null
+          construction_start_date?: string | null
           construction_status?: string | null
           contact_person?: string | null
           contact_phone?: string | null
@@ -1955,6 +1964,7 @@ export type Database = {
           district?: string | null
           drive_folder_id?: string | null
           drive_folder_url?: string | null
+          electrical_cert_date?: string | null
           energy_permit_id?: string | null
           engineering_progress?: number | null
           engineering_stage?: string | null
@@ -1964,6 +1974,7 @@ export type Database = {
           folder_status?: string | null
           grid_connection_type?: string | null
           id?: string
+          initial_survey_date?: string | null
           installation_type?: string | null
           intake_year?: number | null
           inverter_model?: string | null
@@ -1988,6 +1999,7 @@ export type Database = {
           seq?: number | null
           site_code_display?: string | null
           status?: string
+          structural_cert_date?: string | null
           taipower_contract_no?: string | null
           taipower_pv_id?: string | null
           updated_at?: string

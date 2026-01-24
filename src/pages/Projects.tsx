@@ -168,6 +168,10 @@ export default function Projects() {
     construction_status?: string;
     intake_year?: number;
     revenue_model?: string;
+    initial_survey_date?: string;
+    structural_cert_date?: string;
+    electrical_cert_date?: string;
+    construction_start_date?: string;
   }>({});
   
   // Selected investor code (for display)
@@ -622,6 +626,10 @@ export default function Projects() {
       pole_status: (project as any).pole_status,
       construction_status: (project as any).construction_status,
       revenue_model: (project as any).revenue_model,
+      initial_survey_date: (project as any).initial_survey_date,
+      structural_cert_date: (project as any).structural_cert_date,
+      electrical_cert_date: (project as any).electrical_cert_date,
+      construction_start_date: (project as any).construction_start_date,
     });
   };
 
@@ -1320,6 +1328,49 @@ export default function Projects() {
                   value={formData.pole_status}
                   onValueChange={(value) => setFormData({ ...formData, pole_status: value })}
                   placeholder="選擇立桿狀態"
+                />
+              </div>
+            </div>
+
+            {/* Milestone Dates Section */}
+            <h3 className="font-semibold text-foreground border-b pb-2 mt-4">里程碑日期</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="initial_survey_date">初步現勘日期</Label>
+                <Input
+                  id="initial_survey_date"
+                  type="date"
+                  value={formData.initial_survey_date || ''}
+                  onChange={(e) => setFormData({ ...formData, initial_survey_date: e.target.value || undefined })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="structural_cert_date">結構技師簽證日期</Label>
+                <Input
+                  id="structural_cert_date"
+                  type="date"
+                  value={formData.structural_cert_date || ''}
+                  onChange={(e) => setFormData({ ...formData, structural_cert_date: e.target.value || undefined })}
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="electrical_cert_date">電機技師簽證日期</Label>
+                <Input
+                  id="electrical_cert_date"
+                  type="date"
+                  value={formData.electrical_cert_date || ''}
+                  onChange={(e) => setFormData({ ...formData, electrical_cert_date: e.target.value || undefined })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="construction_start_date">材料進場/施工日期</Label>
+                <Input
+                  id="construction_start_date"
+                  type="date"
+                  value={formData.construction_start_date || ''}
+                  onChange={(e) => setFormData({ ...formData, construction_start_date: e.target.value || undefined })}
                 />
               </div>
             </div>

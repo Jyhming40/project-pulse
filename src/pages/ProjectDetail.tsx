@@ -612,6 +612,10 @@ export default function ProjectDetail() {
                     <p>{(project as any).installation_type || '-'}</p>
                   </div>
                   <div>
+                    <p className="text-sm text-muted-foreground">初步現勘日期</p>
+                    <p>{(project as any).initial_survey_date || '-'}</p>
+                  </div>
+                  <div>
                     <p className="text-sm text-muted-foreground">同意備案日期</p>
                     <div className="flex items-center gap-2">
                       <p>{(project as any).approval_date || '-'}</p>
@@ -623,25 +627,6 @@ export default function ProjectDetail() {
                           onClick={() => {
                             setApprovalDateForm((project as any).approval_date || '');
                             setIsEditApprovalDateOpen(true);
-                          }}
-                        >
-                          <Edit className="w-3 h-3" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">與客戶簽訂合約日期</p>
-                    <div className="flex items-center gap-2">
-                      <p>{(project as any).contract_signed_at || '-'}</p>
-                      {canEdit && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 px-2"
-                          onClick={() => {
-                            setContractDateForm((project as any).contract_signed_at || '');
-                            setIsEditContractDateOpen(true);
                           }}
                         >
                           <Edit className="w-3 h-3" />
@@ -900,6 +885,18 @@ export default function ProjectDetail() {
                 <div>
                   <p className="text-sm text-muted-foreground">立桿狀態</p>
                   <p>{(project as any).pole_status || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">結構技師簽證日期</p>
+                  <p className="font-mono">{(project as any).structural_cert_date || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">電機技師簽證日期</p>
+                  <p className="font-mono">{(project as any).electrical_cert_date || '-'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">材料進場/施工日期</p>
+                  <p className="font-mono">{(project as any).construction_start_date || '-'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">實際掛表日</p>
