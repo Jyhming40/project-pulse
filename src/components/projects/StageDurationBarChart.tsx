@@ -138,20 +138,9 @@ export function StageDurationBarChart({
       const markerLineWidths: number[] = [];
 
       stagesToUse.forEach((stage, stageIndex) => {
-        // Try to use existing interval data, or calculate from stage
-        const existingInterval = result.intervals[stage.id];
-        let intervalData: { days: number | null; fromDate: string | null; toDate: string | null; status: 'complete' | 'incomplete' | 'na' };
-        
-        if (existingInterval) {
-          intervalData = {
-            days: existingInterval.status === 'complete' ? existingInterval.days : null,
-            fromDate: existingInterval.fromDate,
-            toDate: existingInterval.toDate,
-            status: existingInterval.status,
-          };
-        } else {
-          intervalData = calculateIntervalFromStage(result, stage);
-        }
+        // Always recalculate based on current stage definition (supports user edits)
+        // This ensures charts sync with the editable stages table
+        const intervalData = calculateIntervalFromStage(result, stage);
         
         y.push(intervalData.days);
 
