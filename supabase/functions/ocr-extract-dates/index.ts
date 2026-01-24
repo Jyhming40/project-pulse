@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PDFDocument } from "https://esm.sh/pdf-lib@1.17.1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,9 +8,10 @@ const corsHeaders = {
 };
 
 // Maximum file size for OCR processing (10MB)
-// Note: Larger PDFs cannot be partially processed as it creates invalid files
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB - maximum for processing
+// For PDFs larger than this, we'll extract only the first page
+const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB - maximum for full processing
 const ABSOLUTE_MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB - skip with clear message
+const LARGE_PDF_THRESHOLD = 10 * 1024 * 1024; // 10MB - extract first page for PDFs over this size
 
 interface ExtractedDate {
   type: 'submission' | 'issue' | 'meter_date' | 'unknown';
@@ -532,6 +534,34 @@ function extractWithRegexFallback(text: string, aiResult: AIExtractedResult): Ex
   };
 }
 
+// Extract first page from PDF using pdf-lib
+async function extractFirstPageFromPdf(pdfBytes: Uint8Array): Promise<Uint8Array | null> {
+  try {
+    console.log('[OCR] Extracting first page from large PDF...');
+    const originalPdf = await PDFDocument.load(pdfBytes, { ignoreEncryption: true });
+    const pageCount = originalPdf.getPageCount();
+    console.log(`[OCR] Original PDF has ${pageCount} pages`);
+    
+    if (pageCount === 0) {
+      console.error('[OCR] PDF has no pages');
+      return null;
+    }
+    
+    // Create a new PDF with only the first page
+    const newPdf = await PDFDocument.create();
+    const [firstPage] = await newPdf.copyPages(originalPdf, [0]);
+    newPdf.addPage(firstPage);
+    
+    const newPdfBytes = await newPdf.save();
+    console.log(`[OCR] First page extracted, new size: ${(newPdfBytes.length / 1024 / 1024).toFixed(2)}MB`);
+    
+    return newPdfBytes;
+  } catch (error) {
+    console.error('[OCR] Failed to extract first page from PDF:', error);
+    return null;
+  }
+}
+
 // Refresh Google Drive access token
 async function refreshAccessToken(refreshToken: string): Promise<string | null> {
   const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
@@ -605,9 +635,6 @@ async function fetchDriveFile(
       };
     }
     
-    // Note: We no longer try to extract first page from PDFs as it creates invalid files
-    // Large PDFs will be checked after download and skipped if too large
-    
     let finalMimeType = metadata.mimeType;
     let downloadUrl: string;
     
@@ -627,30 +654,41 @@ async function fetchDriveFile(
       return null;
     }
     
-    const buffer = await fileResponse.arrayBuffer();
-    const bufferSizeMB = buffer.byteLength / 1024 / 1024;
+    let buffer = await fileResponse.arrayBuffer();
+    let bufferSizeMB = buffer.byteLength / 1024 / 1024;
+    let wasFirstPageExtracted = false;
     
-    // For large PDF files, we cannot simply slice bytes - it creates invalid PDFs
-    // The AI API rejects truncated PDFs with "The document has no pages" error
-    // So we need to skip large PDFs and ask for manual input
-    if (finalMimeType === 'application/pdf' && buffer.byteLength > MAX_FILE_SIZE_BYTES) {
-      console.log(`[OCR] PDF too large for OCR processing (${bufferSizeMB.toFixed(1)}MB > ${MAX_FILE_SIZE_BYTES / 1024 / 1024}MB), skipping`);
-      return { 
-        content: '', 
-        mimeType: finalMimeType,
-        skipped: true,
-        skipReason: `PDF 檔案過大 (${bufferSizeMB.toFixed(1)}MB)，超過 ${(MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB 限制。由於無法正確截取 PDF 第一頁，請手動輸入日期資訊。`
-      };
+    // For large PDF files, extract only the first page using pdf-lib
+    if (finalMimeType === 'application/pdf' && buffer.byteLength > LARGE_PDF_THRESHOLD) {
+      console.log(`[OCR] PDF exceeds threshold (${bufferSizeMB.toFixed(1)}MB > ${LARGE_PDF_THRESHOLD / 1024 / 1024}MB), extracting first page...`);
+      
+      const firstPageBytes = await extractFirstPageFromPdf(new Uint8Array(buffer));
+      
+      if (firstPageBytes) {
+        buffer = firstPageBytes.buffer as ArrayBuffer;
+        bufferSizeMB = firstPageBytes.byteLength / 1024 / 1024;
+        wasFirstPageExtracted = true;
+        console.log(`[OCR] Successfully extracted first page, new size: ${bufferSizeMB.toFixed(2)}MB`);
+      } else {
+        // If extraction failed, skip with message
+        console.log('[OCR] First page extraction failed, skipping');
+        return { 
+          content: '', 
+          mimeType: finalMimeType,
+          skipped: true,
+          skipReason: `無法擷取 PDF 第一頁，請手動輸入日期資訊`
+        };
+      }
     }
     
-    // Check if non-PDF file is too large
+    // Check if file is still too large after first page extraction (shouldn't happen but just in case)
     if (buffer.byteLength > MAX_FILE_SIZE_BYTES) {
-      console.log(`[OCR] File too large, skipping: ${bufferSizeMB.toFixed(1)}MB`);
+      console.log(`[OCR] File too large after processing, skipping: ${bufferSizeMB.toFixed(1)}MB`);
       return { 
         content: '', 
         mimeType: finalMimeType,
         skipped: true,
-        skipReason: `檔案過大 (${bufferSizeMB.toFixed(1)}MB)，超過 ${(MAX_FILE_SIZE_BYTES / 1024 / 1024).toFixed(0)}MB 限制，請手動輸入日期`
+        skipReason: `檔案過大 (${bufferSizeMB.toFixed(1)}MB)，請手動輸入日期`
       };
     }
     
@@ -663,8 +701,8 @@ async function fetchDriveFile(
     }
     const content = btoa(binary);
     
-    console.log(`[OCR] Base64 encoded content length: ${content.length}`);
-    return { content, mimeType: finalMimeType };
+    console.log(`[OCR] Base64 encoded content length: ${content.length}${wasFirstPageExtracted ? ' (first page only)' : ''}`);
+    return { content, mimeType: finalMimeType, firstPageOnly: wasFirstPageExtracted };
   } catch (error) {
     console.error('[OCR] Drive file fetch error:', error);
     return null;
