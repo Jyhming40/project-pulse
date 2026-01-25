@@ -14,6 +14,11 @@ export interface ProcessStage {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // 比較分析擴展欄位
+  from_milestone_step: number | null;
+  to_milestone_step: number | null;
+  is_comparison_stage: boolean;
+  comparison_sort_order: number | null;
 }
 
 export const PHASE_OPTIONS = [
@@ -35,7 +40,14 @@ export function useProcessStages() {
         .order('sort_order', { ascending: true });
       
       if (error) throw error;
-      return data as ProcessStage[];
+      // 補充新欄位的預設值以確保類型安全 (types.ts 尚未同步)
+      return (data || []).map((row: Record<string, unknown>) => ({
+        ...row,
+        from_milestone_step: (row as Record<string, unknown>).from_milestone_step ?? null,
+        to_milestone_step: (row as Record<string, unknown>).to_milestone_step ?? null,
+        is_comparison_stage: (row as Record<string, unknown>).is_comparison_stage ?? false,
+        comparison_sort_order: (row as Record<string, unknown>).comparison_sort_order ?? null,
+      })) as ProcessStage[];
     },
   });
 
