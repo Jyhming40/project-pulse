@@ -1246,46 +1246,58 @@ export type Database = {
       process_stages: {
         Row: {
           code: string
+          comparison_sort_order: number | null
           created_at: string | null
           created_by: string | null
           default_sla_days: number | null
           description: string | null
+          from_milestone_step: number | null
           id: string
           is_active: boolean | null
+          is_comparison_stage: boolean | null
           milestone_step: number | null
           name: string
           phase: string
           sort_order: number | null
+          to_milestone_step: number | null
           updated_at: string | null
           updated_by: string | null
         }
         Insert: {
           code: string
+          comparison_sort_order?: number | null
           created_at?: string | null
           created_by?: string | null
           default_sla_days?: number | null
           description?: string | null
+          from_milestone_step?: number | null
           id?: string
           is_active?: boolean | null
+          is_comparison_stage?: boolean | null
           milestone_step?: number | null
           name: string
           phase?: string
           sort_order?: number | null
+          to_milestone_step?: number | null
           updated_at?: string | null
           updated_by?: string | null
         }
         Update: {
           code?: string
+          comparison_sort_order?: number | null
           created_at?: string | null
           created_by?: string | null
           default_sla_days?: number | null
           description?: string | null
+          from_milestone_step?: number | null
           id?: string
           is_active?: boolean | null
+          is_comparison_stage?: boolean | null
           milestone_step?: number | null
           name?: string
           phase?: string
           sort_order?: number | null
+          to_milestone_step?: number | null
           updated_at?: string | null
           updated_by?: string | null
         }
