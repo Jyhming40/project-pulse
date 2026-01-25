@@ -426,6 +426,17 @@ export default function Projects() {
           case 'risk':
             // 風險篩選特殊處理
             return riskProjectIds.includes(item.id) ? 'high' : 'none';
+          case 'issue_type': {
+            // 問題類型篩選：檢查該案場是否有未解決的特定類型問題
+            const summary = issueSummaryMap[item.id];
+            if (!summary) return 'none';
+            // 返回有問題的類型（允許多值匹配）
+            const types: string[] = [];
+            if (summary.dispute_count > 0) types.push('dispute');
+            if (summary.delay_count > 0) types.push('delay');
+            if (summary.design_change_count > 0) types.push('design_change');
+            return types.length > 0 ? types.join(',') : 'none';
+          }
           default:
             return null;
         }
@@ -433,7 +444,7 @@ export default function Projects() {
       
       return matchesFilters;
     });
-  }, [projectsWithDocProgress, filters.search, filters.filterStates, riskProjectIds, showCancelled]);
+  }, [projectsWithDocProgress, filters.search, filters.filterStates, riskProjectIds, showCancelled, issueSummaryMap]);
 
   // Count cancelled projects for toggle display
   const cancelledCount = useMemo(() => 
@@ -728,6 +739,15 @@ export default function Projects() {
               { value: 'created', label: '已建立' },
               { value: 'pending', label: '待建立' },
               { value: 'failed', label: '錯誤' },
+            ],
+          },
+          {
+            key: 'issue_type',
+            label: '問題',
+            options: [
+              { value: 'dispute', label: '爭議' },
+              { value: 'delay', label: '延遲' },
+              { value: 'design_change', label: '設計變更' },
             ],
           },
         ]}
