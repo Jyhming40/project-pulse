@@ -42,6 +42,8 @@ import {
 import ProjectConstructionAssignments from '@/components/ProjectConstructionAssignments';
 import { ProjectMilestones } from '@/components/ProjectMilestones';
 import { ProjectStageIndicator } from '@/components/ProjectStageIndicator';
+import { ProjectIssuesPanel } from '@/components/ProjectIssuesPanel';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ProjectDetailDrawerProps {
   projectId: string | null;
@@ -85,6 +87,7 @@ const getConstructionStatusColor = (status: string) => {
 
 export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDetailDrawerProps) {
   const navigate = useNavigate();
+  const { canEdit } = useAuth();
   const { getLabel: getDocTypeLabel, getRequiredDocTypesForProject, isRequired: isDocTypeRequired, labelCodeMap } = useDocTypeLabel();
 
   // Fetch project
@@ -414,6 +417,9 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                     adminStage={(project as any).admin_stage}
                     engineeringStage={(project as any).engineering_stage}
                   />
+
+                  {/* 問題與爭議追蹤 */}
+                  <ProjectIssuesPanel projectId={projectId!} canEdit={canEdit} />
 
                   {/* 狀態歷史 */}
                   <Card>
