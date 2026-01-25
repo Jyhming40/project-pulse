@@ -48,6 +48,7 @@ const DEFAULT_FILTERS: FilterConfig[] = [
   { key: 'city', urlParam: 'city' },
   { key: 'drive_status', urlParam: 'drive_status' },
   { key: 'risk', urlParam: 'risk' },
+  { key: 'issue_type', urlParam: 'issue_type' },
 ];
 
 export function useProjectFilters(options?: UseProjectFiltersOptions): UseProjectFiltersReturn {
@@ -210,8 +211,15 @@ export function useProjectFilters(options?: UseProjectFiltersOptions): UseProjec
           return false;
         }
       } else {
-        // 一般匹配
-        if (!filterValues.includes(fieldValue || '')) {
+        // 支援多值匹配：fieldValue 可能是以逗號分隔的多個值
+        const fieldValues = (fieldValue || '').split(',').map(v => v.trim()).filter(Boolean);
+        
+        // 檢查是否有任何一個 filterValue 存在於 fieldValues 中
+        const hasMatch = filterValues.some(fv => 
+          fieldValues.includes(fv) || fieldValue === fv
+        );
+        
+        if (!hasMatch) {
           return false;
         }
       }
