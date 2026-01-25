@@ -83,6 +83,7 @@ import { ProjectDocumentsTab } from '@/components/ProjectDocumentsTab';
 import { useCancellationCheck } from '@/hooks/useCancellationCheck';
 import { CancellationWarningDialog } from '@/components/CancellationWarningDialog';
 import { ProjectStageIndicator } from '@/components/ProjectStageIndicator';
+import { ProjectIssuesPanel } from '@/components/ProjectIssuesPanel';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 type DocType = Database['public']['Enums']['doc_type'];
@@ -1004,6 +1005,9 @@ export default function ProjectDetail() {
             adminStage={(project as any).admin_stage}
             engineeringStage={(project as any).engineering_stage}
           />
+
+          {/* Issues & Disputes Tracking */}
+          <ProjectIssuesPanel projectId={id!} canEdit={canEdit} />
 
           {/* Status History */}
           <Card>
