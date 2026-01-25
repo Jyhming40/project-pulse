@@ -12,9 +12,11 @@ import { useBatchSelect } from '@/hooks/useBatchSelect';
 import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { useProjectFilters } from '@/hooks/useProjectFilters';
 import { useProjectDocumentProgress } from '@/hooks/useProjectDocumentProgress';
+import { useProjectIssueSummary } from '@/hooks/useProjectIssueSummary';
 
 import { CodebookSelect } from '@/components/CodebookSelect';
 import { ProjectFilterBar } from '@/components/projects/ProjectFilterBar';
+import { ProjectIssueIndicators } from '@/components/projects/ProjectIssueIndicators';
 import { TablePagination } from '@/components/ui/table-pagination';
 import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
 import { BatchUpdateDialog, BatchUpdateField } from '@/components/BatchUpdateDialog';
@@ -245,6 +247,9 @@ export default function Projects() {
       doc_required: docProgressMapRaw[p.id]?.requiredCount ?? 0,
     }));
   }, [projects, docProgressMapRaw]);
+
+  // Fetch project issue summary for indicators
+  const { issueSummaryMap, getIssueSummary } = useProjectIssueSummary();
 
   // Fetch risk project IDs from analytics view (for risk filtering)
   const { data: riskProjectIds = [] } = useQuery({
@@ -821,7 +826,12 @@ export default function Projects() {
                       </TableCell>
                     )}
                     <TableCell className="font-mono text-sm">{(project as any).site_code_display || project.project_code}</TableCell>
-                    <TableCell className="font-medium">{project.project_name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex items-center">
+                        <span>{project.project_name}</span>
+                        <ProjectIssueIndicators summary={getIssueSummary(project.id)} />
+                      </div>
+                    </TableCell>
                     <TableCell>{(project.investors as any)?.company_name || '-'}</TableCell>
                     <TableCell>
                       <Badge className={getStatusColor(project.status)} variant="secondary">
