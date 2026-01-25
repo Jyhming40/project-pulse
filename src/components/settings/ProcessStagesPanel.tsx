@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, BarChart3 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,8 +30,21 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '@/components/ui/collapsible';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { useProcessStages, ProcessStage, PHASE_OPTIONS } from '@/hooks/useProcessStages';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TIMELINE_DOC_MAPPING } from '@/hooks/useProjectComparison';
 
 interface StageFormData {
   code: string;
@@ -42,6 +55,11 @@ interface StageFormData {
   default_sla_days: number | null;
   sort_order: number;
   is_active: boolean;
+  // 比較分析擴展欄位
+  from_milestone_step: number | null;
+  to_milestone_step: number | null;
+  is_comparison_stage: boolean;
+  comparison_sort_order: number | null;
 }
 
 const initialFormData: StageFormData = {
@@ -53,6 +71,10 @@ const initialFormData: StageFormData = {
   default_sla_days: 14,
   sort_order: 0,
   is_active: true,
+  from_milestone_step: null,
+  to_milestone_step: null,
+  is_comparison_stage: false,
+  comparison_sort_order: null,
 };
 
 const phaseColors: Record<string, string> = {
@@ -61,6 +83,14 @@ const phaseColors: Record<string, string> = {
   construction: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300',
   operation: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300',
 };
+
+// 里程碑選項 (0-11)
+const milestoneOptions = TIMELINE_DOC_MAPPING.map(m => ({
+  step: m.step,
+  label: m.label,
+  short: m.short,
+  color: m.color,
+}));
 
 export function ProcessStagesPanel() {
   const { stages, isLoading, createStage, updateStage, deleteStage } = useProcessStages();
@@ -89,6 +119,10 @@ export function ProcessStagesPanel() {
       default_sla_days: stage.default_sla_days,
       sort_order: stage.sort_order,
       is_active: stage.is_active,
+      from_milestone_step: stage.from_milestone_step,
+      to_milestone_step: stage.to_milestone_step,
+      is_comparison_stage: stage.is_comparison_stage,
+      comparison_sort_order: stage.comparison_sort_order,
     });
     setIsDialogOpen(true);
   };
@@ -158,7 +192,22 @@ export function ProcessStagesPanel() {
                 <TableHead>名稱</TableHead>
                 <TableHead>階段分類</TableHead>
                 <TableHead className="text-center">里程碑</TableHead>
-                <TableHead className="text-center">SLA (天)</TableHead>
+                <TableHead className="text-center">SLA</TableHead>
+                <TableHead className="text-center">
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="inline-flex items-center gap-1 cursor-help">
+                          <BarChart3 className="w-3 h-3" />
+                          比較
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>是否用於案件比較分析</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </TableHead>
                 <TableHead className="w-20">狀態</TableHead>
                 <TableHead className="w-24">操作</TableHead>
               </TableRow>
@@ -189,6 +238,28 @@ export function ProcessStagesPanel() {
                   <TableCell className="text-center">
                     {stage.default_sla_days ?? '-'}
                   </TableCell>
+                  <TableCell className="text-center">
+                    {stage.is_comparison_stage ? (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Badge variant="default" className="text-xs">
+                              {stage.from_milestone_step}→{stage.to_milestone_step}
+                            </Badge>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>
+                              {milestoneOptions.find(m => m.step === stage.from_milestone_step)?.short || stage.from_milestone_step}
+                              {' → '}
+                              {milestoneOptions.find(m => m.step === stage.to_milestone_step)?.short || stage.to_milestone_step}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Switch
                       checked={stage.is_active}
@@ -217,7 +288,7 @@ export function ProcessStagesPanel() {
               ))}
               {stages.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                     尚無流程階段資料
                   </TableCell>
                 </TableRow>
@@ -336,6 +407,121 @@ export function ProcessStagesPanel() {
               />
               <Label htmlFor="is_active">啟用</Label>
             </div>
+
+            <Separator />
+
+            {/* 比較分析設定區塊 */}
+            <Collapsible>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" className="w-full justify-between px-0 hover:bg-transparent">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4" />
+                    <span className="text-sm font-medium">比較分析設定</span>
+                  </div>
+                  {formData.is_comparison_stage && (
+                    <Badge variant="secondary" className="text-xs">
+                      已設定
+                    </Badge>
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-4">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="is_comparison_stage"
+                    checked={formData.is_comparison_stage}
+                    onCheckedChange={(checked) => setFormData({ 
+                      ...formData, 
+                      is_comparison_stage: checked,
+                      // 若開啟則設定預設值
+                      from_milestone_step: checked && formData.from_milestone_step === null ? 0 : formData.from_milestone_step,
+                      to_milestone_step: checked && formData.to_milestone_step === null ? 1 : formData.to_milestone_step,
+                    })}
+                  />
+                  <Label htmlFor="is_comparison_stage">用於案件比較分析</Label>
+                </div>
+
+                {formData.is_comparison_stage && (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>起始節點 *</Label>
+                        <Select
+                          value={formData.from_milestone_step?.toString() ?? '0'}
+                          onValueChange={(v) => setFormData({ 
+                            ...formData, 
+                            from_milestone_step: parseInt(v) 
+                          })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {milestoneOptions.map((m) => (
+                              <SelectItem key={m.step} value={m.step.toString()}>
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="w-2 h-2 rounded-full shrink-0"
+                                    style={{ backgroundColor: m.color }}
+                                  />
+                                  <span className="truncate">{m.step}. {m.short}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>結束節點 *</Label>
+                        <Select
+                          value={formData.to_milestone_step?.toString() ?? '1'}
+                          onValueChange={(v) => setFormData({ 
+                            ...formData, 
+                            to_milestone_step: parseInt(v) 
+                          })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {milestoneOptions.map((m) => (
+                              <SelectItem key={m.step} value={m.step.toString()}>
+                                <div className="flex items-center gap-2">
+                                  <span
+                                    className="w-2 h-2 rounded-full shrink-0"
+                                    style={{ backgroundColor: m.color }}
+                                  />
+                                  <span className="truncate">{m.step}. {m.short}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    {formData.from_milestone_step === formData.to_milestone_step && (
+                      <p className="text-sm text-destructive">起始與結束節點不可相同</p>
+                    )}
+                    <div className="space-y-2">
+                      <Label htmlFor="comparison_sort_order">比較排序</Label>
+                      <Input
+                        id="comparison_sort_order"
+                        type="number"
+                        value={formData.comparison_sort_order ?? ''}
+                        onChange={(e) => setFormData({ 
+                          ...formData, 
+                          comparison_sort_order: e.target.value ? parseInt(e.target.value) : null 
+                        })}
+                        placeholder="顯示順序"
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      設定後，此階段將出現在「案件比較分析」頁面的區間選項中
+                    </p>
+                  </>
+                )}
+              </CollapsibleContent>
+            </Collapsible>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>

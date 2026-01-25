@@ -1,6 +1,6 @@
-export { ProgressSettingsPanel } from './ProgressSettingsPanel';
-export { SystemOptionsPanel } from './SystemOptionsPanel';
-export { DocumentTypePanel } from './DocumentTypePanel';
 export { DepartmentsPanel } from './DepartmentsPanel';
+export { DocumentTypePanel } from './DocumentTypePanel';
 export { ProcessStagesPanel } from './ProcessStagesPanel';
+export { ProgressSettingsPanel } from './ProgressSettingsPanel';
 export { StageResponsibilitiesPanel } from './StageResponsibilitiesPanel';
+export { SystemOptionsPanel } from './SystemOptionsPanel';
