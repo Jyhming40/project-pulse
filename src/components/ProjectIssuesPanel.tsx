@@ -450,14 +450,14 @@ export function ProjectIssuesPanel({ projectId, canEdit = false }: ProjectIssues
             <div className="space-y-1">
               <Label className="text-xs">關聯階段（選填）</Label>
               <Select
-                value={formData.stage_id}
-                onValueChange={(v) => setFormData((prev) => ({ ...prev, stage_id: v }))}
+                value={formData.stage_id || "__none__"}
+                onValueChange={(v) => setFormData((prev) => ({ ...prev, stage_id: v === "__none__" ? "" : v }))}
               >
                 <SelectTrigger className="h-9">
                   <SelectValue placeholder="選擇階段" />
                 </SelectTrigger>
                 <SelectContent className="z-50 bg-popover">
-                  <SelectItem value="">不關聯</SelectItem>
+                  <SelectItem value="__none__">不關聯</SelectItem>
                   {stages.map((stage) => (
                     <SelectItem key={stage.id} value={stage.id}>
                       {stage.name}
