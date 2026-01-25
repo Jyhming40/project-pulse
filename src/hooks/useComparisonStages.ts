@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useProcessStages, ProcessStage } from './useProcessStages';
 import { COMPARISON_PAIRS, TIMELINE_DOC_MAPPING } from './useProjectComparison';
 
@@ -18,9 +18,19 @@ export interface ComparisonStage {
 }
 
 /**
+ * 里程碑選項
+ */
+export interface MilestoneOption {
+  step: number;
+  label: string;
+  shortLabel: string;
+  color: string;
+}
+
+/**
  * 取得里程碑選項
  */
-export function getMilestoneOptions() {
+export function getMilestoneOptions(): MilestoneOption[] {
   return TIMELINE_DOC_MAPPING.map(m => ({
     step: m.step,
     label: m.label,
@@ -70,11 +80,14 @@ function getSystemComparisonStages(): ComparisonStage[] {
 /**
  * useComparisonStages Hook
  * 
- * 整合資料庫中的 process_stages (is_comparison_stage = true) 
- * 與系統預設的 COMPARISON_PAIRS，提供統一的比較階段資料來源
+ * 統一的比較階段資料來源 - 整合資料庫設定與系統預設
+ * 提供與 useEditableStages 相容的介面
  */
 export function useComparisonStages() {
   const { stages, isLoading, error } = useProcessStages();
+
+  // 里程碑選項
+  const milestoneOptions = useMemo(() => getMilestoneOptions(), []);
 
   // 從資料庫取得的比較階段
   const dbStages = useMemo(() => {
@@ -89,26 +102,88 @@ export function useComparisonStages() {
   const systemStages = useMemo(() => getSystemComparisonStages(), []);
 
   // 合併後的所有比較階段
-  // 策略：如果資料庫有設定比較階段，則使用 DB 設定 + 系統預設
-  // 如果資料庫完全沒有設定，則只使用系統預設
+  // 策略：優先使用 DB 設定，如果沒有則使用系統預設
   const allStages = useMemo(() => {
     if (dbStages.length > 0) {
       // 合併：DB stages 優先，然後是系統 stages（避免重複）
       const dbIds = new Set(dbStages.map(s => s.id));
       const uniqueSystemStages = systemStages.filter(s => !dbIds.has(s.id));
-      return [...dbStages, ...uniqueSystemStages];
+      return [...dbStages, ...uniqueSystemStages].sort((a, b) => a.sortOrder - b.sortOrder);
     }
     return systemStages;
   }, [dbStages, systemStages]);
-
-  // 里程碑選項
-  const milestoneOptions = useMemo(() => getMilestoneOptions(), []);
 
   // 只取得資料庫中設定的比較階段
   const customStages = dbStages;
 
   // 是否有自訂階段
   const hasCustomStages = dbStages.length > 0;
+
+  /**
+   * 取得階段的有效配置 (相容 useEditableStages 介面)
+   */
+  const getStageConfig = useCallback((stageId: string) => {
+    const stage = allStages.find(s => s.id === stageId);
+    if (!stage) {
+      // Fallback 到系統預設
+      const systemStage = COMPARISON_PAIRS.find(p => p.id === stageId);
+      if (!systemStage) return null;
+      return {
+        fromStep: systemStage.fromStep,
+        toStep: systemStage.toStep,
+        isEdited: false,
+      };
+    }
+    return {
+      fromStep: stage.fromStep,
+      toStep: stage.toStep,
+      isEdited: stage.isFromDB,
+    };
+  }, [allStages]);
+
+  /**
+   * 根據階段配置計算區間標籤
+   */
+  const getStageLabel = useCallback((stageId: string) => {
+    const config = getStageConfig(stageId);
+    if (!config) return '';
+    
+    const fromMilestone = milestoneOptions.find(m => m.step === config.fromStep);
+    const toMilestone = milestoneOptions.find(m => m.step === config.toStep);
+    
+    if (!fromMilestone || !toMilestone) return '';
+    
+    return `${fromMilestone.shortLabel}→${toMilestone.shortLabel}`;
+  }, [getStageConfig, milestoneOptions]);
+
+  /**
+   * 建立可編輯的階段列表 (相容 useEditableStages 的 editableStages)
+   * 只取前 10 個系統階段用於統計卡片
+   */
+  const editableStages = useMemo(() => {
+    const stepPairs = COMPARISON_PAIRS.slice(0, 10);
+    
+    return stepPairs.map(pair => {
+      // 查找 DB 是否有覆蓋設定
+      const dbOverride = dbStages.find(s => s.id === pair.id);
+      
+      return {
+        id: pair.id,
+        label: pair.label,
+        fromStep: dbOverride?.fromStep ?? pair.fromStep,
+        toStep: dbOverride?.toStep ?? pair.toStep,
+        isSystem: true,
+        isEdited: !!dbOverride,
+        originalFromStep: pair.fromStep,
+        originalToStep: pair.toStep,
+      };
+    });
+  }, [dbStages]);
+
+  /**
+   * 檢查是否有任何編輯 (相容 useEditableStages)
+   */
+  const hasEdits = dbStages.length > 0;
 
   return {
     // 所有比較階段 (DB + System)
@@ -124,5 +199,10 @@ export function useComparisonStages() {
     // 載入狀態
     isLoading,
     error,
+    // 相容 useEditableStages 的介面
+    editableStages,
+    getStageConfig,
+    getStageLabel,
+    hasEdits,
   };
 }
