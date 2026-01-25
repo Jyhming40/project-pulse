@@ -6,7 +6,10 @@ import {
   Palette,
   TrendingUp,
   Settings2,
-  FileText
+  FileText,
+  Building2,
+  GitBranch,
+  Users
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -17,6 +20,9 @@ import PermissionManagement from '@/components/PermissionManagement';
 import { ProgressSettingsPanel } from '@/components/settings/ProgressSettingsPanel';
 import { SystemOptionsPanel } from '@/components/settings/SystemOptionsPanel';
 import { DocumentTypePanel } from '@/components/settings/DocumentTypePanel';
+import { DepartmentsPanel } from '@/components/settings/DepartmentsPanel';
+import { ProcessStagesPanel } from '@/components/settings/ProcessStagesPanel';
+import { StageResponsibilitiesPanel } from '@/components/settings/StageResponsibilitiesPanel';
 
 export default function Settings() {
   const { isAdmin } = useAuth();
@@ -38,14 +44,14 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5 max-w-2xl">
+        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 max-w-4xl">
           <TabsTrigger value="branding" className="flex items-center gap-2">
             <Palette className="w-4 h-4" />
-            <span className="hidden sm:inline">公司設定</span>
+            <span className="hidden sm:inline">公司</span>
           </TabsTrigger>
           <TabsTrigger value="progress" className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4" />
-            <span className="hidden sm:inline">進度設定</span>
+            <span className="hidden sm:inline">進度</span>
           </TabsTrigger>
           <TabsTrigger value="codebook" className="flex items-center gap-2">
             <Settings2 className="w-4 h-4" />
@@ -53,11 +59,23 @@ export default function Settings() {
           </TabsTrigger>
           <TabsTrigger value="doctype" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
-            <span className="hidden sm:inline">文件類型</span>
+            <span className="hidden sm:inline">文件</span>
+          </TabsTrigger>
+          <TabsTrigger value="departments" className="flex items-center gap-2">
+            <Building2 className="w-4 h-4" />
+            <span className="hidden sm:inline">部門</span>
+          </TabsTrigger>
+          <TabsTrigger value="stages" className="flex items-center gap-2">
+            <GitBranch className="w-4 h-4" />
+            <span className="hidden sm:inline">流程</span>
+          </TabsTrigger>
+          <TabsTrigger value="raci" className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            <span className="hidden sm:inline">責任</span>
           </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Wrench className="w-4 h-4" />
-            <span className="hidden sm:inline">人員權限</span>
+            <span className="hidden sm:inline">權限</span>
           </TabsTrigger>
         </TabsList>
 
@@ -88,6 +106,18 @@ export default function Settings() {
 
         <TabsContent value="doctype" className="mt-6">
           <DocumentTypePanel />
+        </TabsContent>
+
+        <TabsContent value="departments" className="mt-6">
+          <DepartmentsPanel />
+        </TabsContent>
+
+        <TabsContent value="stages" className="mt-6">
+          <ProcessStagesPanel />
+        </TabsContent>
+
+        <TabsContent value="raci" className="mt-6">
+          <StageResponsibilitiesPanel />
         </TabsContent>
 
         <TabsContent value="users" className="mt-6 space-y-6">
