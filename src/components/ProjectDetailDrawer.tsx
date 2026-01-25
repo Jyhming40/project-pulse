@@ -41,6 +41,7 @@ import {
 } from '@/components/ui/table';
 import ProjectConstructionAssignments from '@/components/ProjectConstructionAssignments';
 import { ProjectMilestones } from '@/components/ProjectMilestones';
+import { ProjectStageIndicator } from '@/components/ProjectStageIndicator';
 
 interface ProjectDetailDrawerProps {
   projectId: string | null;
@@ -396,6 +397,11 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
 
                 {/* 行政流程 / 進度 Tab */}
                 <TabsContent value="admin-progress" className="p-6 space-y-4 mt-0">
+                  {/* 流程階段追蹤 - 顯示目前階段與主責部門 */}
+                  <ProjectStageIndicator 
+                    projectStatus={project.status} 
+                    variant="full" 
+                  />
 
                   {/* 里程碑 - 不再重複顯示進度條 */}
                   <ProjectMilestones 

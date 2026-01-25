@@ -82,6 +82,7 @@ import { ProjectMilestones } from '@/components/ProjectMilestones';
 import { ProjectDocumentsTab } from '@/components/ProjectDocumentsTab';
 import { useCancellationCheck } from '@/hooks/useCancellationCheck';
 import { CancellationWarningDialog } from '@/components/CancellationWarningDialog';
+import { ProjectStageIndicator } from '@/components/ProjectStageIndicator';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 type DocType = Database['public']['Enums']['doc_type'];
@@ -986,6 +987,12 @@ export default function ProjectDetail() {
         {/* 行政流程 / 進度 Tab - 進度追蹤、狀態紀錄 */}
         {/* ========================================== */}
         <TabsContent value="admin-progress" className="space-y-6 mt-6">
+          {/* 流程階段追蹤 - 顯示目前階段與主責部門 */}
+          <ProjectStageIndicator 
+            projectStatus={project.status} 
+            variant="full" 
+          />
+
           {/* Progress Milestones */}
           <ProjectMilestones 
             projectId={id!}
