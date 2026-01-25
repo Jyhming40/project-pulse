@@ -27,6 +27,7 @@ import {
   HealthKPICards,
   PhaseOverviewSection,
   Phase2TracksSection,
+  IssuesSummarySection,
 } from '@/components/dashboard';
 import { DashboardSettingsPanel } from '@/components/dashboard/DashboardSettingsPanel';
 import { useAnalyticsSummary, useRiskProjects } from '@/hooks/useProjectAnalytics';
@@ -152,6 +153,8 @@ export default function Dashboard() {
             isLoading={summaryLoading}
           />
         );
+      case 'issues-summary':
+        return <IssuesSummarySection key={section.id} />;
       case 'action-required':
         return (
           <ActionRequiredSection
