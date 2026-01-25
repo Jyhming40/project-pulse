@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { AlertTriangle, TrendingDown, TrendingUp, Minus, AlertOctagon, Flame } from "lucide-react";
 import { COMPARISON_PAIRS, ComparisonResult, ComparisonStats } from "@/hooks/useProjectComparison";
 import { StageDefinition } from "@/types/compareConfig";
-import { useEditableStages } from "@/hooks/useEditableStages";
+import { useComparisonStages } from "@/hooks/useComparisonStages";
 import { cn } from "@/lib/utils";
 interface StageAnalysisTableProps {
   results: ComparisonResult[];
@@ -58,8 +58,8 @@ export function StageAnalysisTable({ results, stats, customStages = [] }: StageA
     return () => window.removeEventListener('editableStagesChanged', handleChange);
   }, []);
   
-  // Get editable stages configuration
-  const { editableStages, getStageLabel } = useEditableStages();
+  // Get comparison stages configuration (unified data source)
+  const { editableStages, getStageLabel } = useComparisonStages();
   
   // Get baseline result
   const baselineResult = useMemo(() => {

@@ -16,7 +16,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { cn } from "@/lib/utils";
 import { ComparisonResult, ComparisonStats, COMPARISON_PAIRS } from "@/hooks/useProjectComparison";
 import { StageDefinition } from "@/types/compareConfig";
-import { useEditableStages } from "@/hooks/useEditableStages";
+import { useComparisonStages } from "@/hooks/useComparisonStages";
 import { EditableStageRow } from "./EditableStageRow";
 
 interface ComparisonStatsCardsProps {
@@ -62,16 +62,13 @@ function calculateIntervalFromStage(
 export function ComparisonStatsCards({ results, stats, customStages = [] }: ComparisonStatsCardsProps) {
   const baseline = useMemo(() => results.find(r => r.isBaseline), [results]);
   
-  // Editable stages hook
+  // Unified comparison stages hook (replaces useEditableStages)
   const { 
     editableStages, 
     milestoneOptions, 
-    updateStage, 
-    resetStage, 
-    resetAllStages, 
     hasEdits,
     getStageLabel 
-  } = useEditableStages();
+  } = useComparisonStages();
   
   // Calculate extended statistics including std deviation
   // Now respects editable stage configurations
@@ -419,19 +416,15 @@ export function ComparisonStatsCards({ results, stats, customStages = [] }: Comp
               <div>
                 <CardTitle className="text-base">各階段統計數據</CardTitle>
                 <CardDescription>
-                  點擊階段名稱可調整起迄里程碑，數據將即時重新計算
+                  {hasEdits 
+                    ? "已套用自訂比較區間設定（可至「設定 → 流程」調整）" 
+                    : "使用系統預設比較區間"}
                 </CardDescription>
               </div>
               {hasEdits && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={resetAllStages}
-                  className="gap-2"
-                >
-                  <RotateCcw className="h-4 w-4" />
-                  重設全部
-                </Button>
+                <Badge variant="secondary" className="text-xs">
+                  已自訂
+                </Badge>
               )}
             </div>
           </CardHeader>
@@ -442,10 +435,8 @@ export function ComparisonStatsCards({ results, stats, customStages = [] }: Comp
                   <tr className="border-b">
                     <th className="text-left py-2 px-2 font-medium min-w-[200px]">
                       階段
-                      <span className="text-xs text-muted-foreground font-normal ml-2">
-                        (點擊可編輯)
-                      </span>
                     </th>
+                    <th className="text-center py-2 px-2 font-medium">區間</th>
                     <th className="text-center py-2 px-2 font-medium">樣本數</th>
                     <th className="text-center py-2 px-2 font-medium">平均</th>
                     <th className="text-center py-2 px-2 font-medium">中位數</th>
@@ -458,53 +449,35 @@ export function ComparisonStatsCards({ results, stats, customStages = [] }: Comp
                 </thead>
                 <tbody>
                   {extendedStats.map((stat) => {
-                    // For system stages (non-custom), use EditableStageRow
-                    if (!stat.isCustom && 'fromStep' in stat) {
-                      const editableStat = stat as ExtendedStats & {
-                        fromStep: number;
-                        toStep: number;
-                        isEdited: boolean;
-                        originalFromStep?: number;
-                        originalToStep?: number;
-                      };
-                      return (
-                        <EditableStageRow
-                          key={stat.pairId}
-                          stageId={stat.pairId}
-                          label={stat.label}
-                          fromStep={editableStat.fromStep}
-                          toStep={editableStat.toStep}
-                          isEdited={editableStat.isEdited}
-                          originalFromStep={editableStat.originalFromStep}
-                          originalToStep={editableStat.originalToStep}
-                          milestoneOptions={milestoneOptions}
-                          onUpdate={updateStage}
-                          onReset={resetStage}
-                          count={stat.count}
-                          average={stat.average}
-                          median={stat.median}
-                          stdDev={stat.stdDev}
-                          min={stat.min}
-                          max={stat.max}
-                          baselineDays={stat.baselineDays}
-                          baselineDelta={stat.baselineDelta}
-                        />
-                      );
-                    }
+                    const editableStat = stat as ExtendedStats & {
+                      fromStep?: number;
+                      toStep?: number;
+                      isEdited?: boolean;
+                    };
                     
-                    // For custom stages, render as before
                     return (
                       <tr key={stat.pairId} className={cn(
                         "border-b hover:bg-muted/30",
+                        editableStat.isEdited && "bg-amber-50 dark:bg-amber-950/20",
                         stat.isCustom && "bg-primary/5"
                       )}>
-                        <td className="py-2 px-2 font-medium">
+                        <td className="py-2 px-2">
                           <div className="flex items-center gap-2">
-                            {stat.label}
+                            <span className="font-medium">{stat.label}</span>
+                            {editableStat.isEdited && (
+                              <Badge variant="outline" className="text-xs bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 border-amber-300">
+                                已調整
+                              </Badge>
+                            )}
                             {stat.isCustom && (
                               <Badge variant="outline" className="text-xs">自定義</Badge>
                             )}
                           </div>
+                        </td>
+                        <td className="text-center py-2 px-2 text-xs text-muted-foreground">
+                          {editableStat.fromStep !== undefined && editableStat.toStep !== undefined
+                            ? `${editableStat.fromStep}→${editableStat.toStep}`
+                            : '-'}
                         </td>
                         <td className="text-center py-2 px-2 text-muted-foreground">{stat.count}</td>
                         <td className="text-center py-2 px-2">
@@ -534,7 +507,7 @@ export function ComparisonStatsCards({ results, stats, customStages = [] }: Comp
                               : ""
                         )}>
                           {stat.baselineDelta !== null 
-                            ? `${stat.baselineDelta > 0 ? '+' : ''}${stat.baselineDelta}` 
+                            ? `${stat.baselineDelta > 0 ? '+' : ''}${stat.baselineDelta}天` 
                             : '-'}
                         </td>
                       </tr>

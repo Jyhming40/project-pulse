@@ -3,7 +3,7 @@ import { Plot } from "@/lib/plotly";
 import { ComparisonResult, COMPARISON_PAIRS } from "@/hooks/useProjectComparison";
 import { ProjectDispute, calculateOverlapDays, DisputeDisplayStrategy } from "@/hooks/useProjectDisputes";
 import { StageDefinition } from "@/types/compareConfig";
-import { useEditableStages } from "@/hooks/useEditableStages";
+import { useComparisonStages } from "@/hooks/useComparisonStages";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle } from "lucide-react";
 import type { Data, Layout, Annotations } from "plotly.js";
@@ -56,8 +56,8 @@ export function StageDurationBarChart({
   displayStrategy,
   customStages 
 }: StageDurationBarChartProps) {
-  // Get editable stages configuration
-  const { editableStages, getStageLabel } = useEditableStages();
+  // Get comparison stages configuration (unified data source)
+  const { editableStages, getStageLabel } = useComparisonStages();
   // Calculate dispute overlap summary for the legend
   const disputeOverlapSummary = useMemo(() => {
     if (disputes.length === 0) return { hasOverlaps: false, totalOverlapDays: 0, affectedIntervals: 0 };
