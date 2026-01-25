@@ -191,6 +191,45 @@ export type Database = {
         }
         Relationships: []
       }
+      departments: {
+        Row: {
+          code: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       document_files: {
         Row: {
           delete_reason: string | null
@@ -1204,6 +1243,54 @@ export type Database = {
         }
         Relationships: []
       }
+      process_stages: {
+        Row: {
+          code: string
+          created_at: string | null
+          created_by: string | null
+          default_sla_days: number | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          milestone_step: number | null
+          name: string
+          phase: string
+          sort_order: number | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string | null
+          created_by?: string | null
+          default_sla_days?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          milestone_step?: number | null
+          name: string
+          phase?: string
+          sort_order?: number | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string | null
+          created_by?: string | null
+          default_sla_days?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          milestone_step?: number | null
+          name?: string
+          phase?: string
+          sort_order?: number | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1633,6 +1720,99 @@ export type Database = {
           },
         ]
       }
+      project_issues: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          end_date: string
+          evidence_document_id: string | null
+          id: string
+          is_resolved: boolean | null
+          issue_type: string
+          project_id: string
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          stage_id: string | null
+          start_date: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date: string
+          evidence_document_id?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          issue_type?: string
+          project_id: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          stage_id?: string | null
+          start_date: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          end_date?: string
+          evidence_document_id?: string | null
+          id?: string
+          is_resolved?: boolean | null
+          issue_type?: string
+          project_id?: string
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          stage_id?: string | null
+          start_date?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_issues_evidence_document_id_fkey"
+            columns: ["evidence_document_id"]
+            isOneToOne: false
+            referencedRelation: "document_analytics_view"
+            referencedColumns: ["document_id"]
+          },
+          {
+            foreignKeyName: "project_issues_evidence_document_id_fkey"
+            columns: ["evidence_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_issues_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_issues_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_issues_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "process_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_milestones: {
         Row: {
           completed_at: string | null
@@ -1756,6 +1936,77 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_stages: {
+        Row: {
+          actual_date: string | null
+          created_at: string | null
+          id: string
+          notes: string | null
+          owner_department_id: string | null
+          project_id: string
+          stage_id: string
+          status: string | null
+          target_date: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          actual_date?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          owner_department_id?: string | null
+          project_id: string
+          stage_id: string
+          status?: string | null
+          target_date?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          actual_date?: string | null
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          owner_department_id?: string | null
+          project_id?: string
+          stage_id?: string
+          status?: string | null
+          target_date?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_stages_owner_department_id_fkey"
+            columns: ["owner_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_stages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_stages_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_stages_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "process_stages"
             referencedColumns: ["id"]
           },
         ]
@@ -2010,6 +2261,57 @@ export type Database = {
             columns: ["investor_id"]
             isOneToOne: false
             referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      stage_responsibilities: {
+        Row: {
+          consulted_department_ids: string[] | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notes: string | null
+          responsible_department_id: string
+          stage_id: string
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          consulted_department_ids?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          responsible_department_id: string
+          stage_id: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          consulted_department_ids?: string[] | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          responsible_department_id?: string
+          stage_id?: string
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stage_responsibilities_responsible_department_id_fkey"
+            columns: ["responsible_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stage_responsibilities_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: true
+            referencedRelation: "process_stages"
             referencedColumns: ["id"]
           },
         ]
