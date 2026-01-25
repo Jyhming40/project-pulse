@@ -30,8 +30,9 @@ export const DEFAULT_SECTIONS: DashboardSection[] = [
   { id: 'phase-overview', label: '兩階段流程概覽', visible: true, order: 0 },
   { id: 'phase2-tracks', label: '第二階段多軌追蹤', visible: true, order: 1 },
   { id: 'health-kpis', label: '健康指標 KPI', visible: true, order: 2 },
-  { id: 'action-required', label: '待處理事項', visible: true, order: 3 },
-  { id: 'advanced-analysis', label: '進階分析', visible: true, order: 4 },
+  { id: 'issues-summary', label: '問題追蹤', visible: true, order: 3 },
+  { id: 'action-required', label: '待處理事項', visible: true, order: 4 },
+  { id: 'advanced-analysis', label: '進階分析', visible: true, order: 5 },
 ];
 
 // 預設篩選條件

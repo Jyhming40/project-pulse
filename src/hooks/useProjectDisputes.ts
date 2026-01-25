@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 
-// Dispute data stored in database
+// Dispute data stored in database (now uses project_issues table)
 export interface ProjectDispute {
   id: string;
   project_id: string;
@@ -16,6 +16,9 @@ export interface ProjectDispute {
   created_by?: string;
   created_at?: string;
   updated_at?: string;
+  // New fields from project_issues
+  issue_type?: string;
+  is_resolved?: boolean;
 }
 
 // Display strategy settings (kept in localStorage as it's UI preference)
@@ -66,20 +69,6 @@ export function disputeIntersectsInterval(
   return calculateOverlapDays(intervalStart, intervalEnd, dispute.start_date, dispute.end_date) > 0;
 }
 
-// Database row type (before types.ts is regenerated)
-interface ProjectDisputeRow {
-  id: string;
-  project_id: string;
-  title: string;
-  start_date: string;
-  end_date: string;
-  severity: string;
-  note: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
 export function useProjectDisputes() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -102,50 +91,54 @@ export function useProjectDisputes() {
     localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(strategy));
   }, [strategy]);
 
-  // Fetch disputes from database using type cast until types are regenerated
+  // Fetch disputes from project_issues table (issue_type = 'dispute')
   const { data: disputes = [], isLoading, refetch } = useQuery({
     queryKey: ["project-disputes"],
     queryFn: async () => {
-      const result = await supabase
-        .from("project_disputes" as "projects")
+      const { data, error } = await supabase
+        .from("project_issues")
         .select("*")
+        .eq("issue_type", "dispute")
         .order("created_at", { ascending: false });
 
-      if (result.error) {
-        console.error("Failed to fetch disputes:", result.error);
-        throw result.error;
+      if (error) {
+        console.error("Failed to fetch disputes:", error);
+        throw error;
       }
 
-      return ((result.data as unknown as ProjectDisputeRow[]) || []).map((d) => ({
+      return (data || []).map((d) => ({
         id: d.id,
         project_id: d.project_id,
         title: d.title,
         start_date: d.start_date,
         end_date: d.end_date,
         severity: d.severity as "low" | "medium" | "high",
-        note: d.note || undefined,
+        note: d.description || undefined,
         created_by: d.created_by || undefined,
-        created_at: d.created_at,
-        updated_at: d.updated_at,
+        created_at: d.created_at || undefined,
+        updated_at: d.updated_at || undefined,
+        issue_type: d.issue_type,
+        is_resolved: d.is_resolved || false,
       })) as ProjectDispute[];
     },
     enabled: !!user,
   });
 
-  // Add dispute mutation
+  // Add dispute mutation (now uses project_issues table)
   const addMutation = useMutation({
     mutationFn: async (dispute: Omit<ProjectDispute, "id" | "created_by" | "created_at" | "updated_at">) => {
       const { data, error } = await supabase
-        .from("project_disputes" as "projects")
+        .from("project_issues")
         .insert({
           project_id: dispute.project_id,
+          issue_type: "dispute",
           title: dispute.title,
           start_date: dispute.start_date,
           end_date: dispute.end_date,
           severity: dispute.severity,
-          note: dispute.note || null,
+          description: dispute.note || null,
           created_by: user?.id,
-        } as never)
+        })
         .select()
         .single();
 
@@ -154,6 +147,8 @@ export function useProjectDisputes() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project-disputes"] });
+      queryClient.invalidateQueries({ queryKey: ["project-issues"] });
+      queryClient.invalidateQueries({ queryKey: ["project-issue-summary"] });
       toast.success("爭議期間已新增");
     },
     onError: (error) => {
@@ -162,15 +157,22 @@ export function useProjectDisputes() {
     },
   });
 
-  // Update dispute mutation
+  // Update dispute mutation (now uses project_issues table)
   const updateMutation = useMutation({
     mutationFn: async ({ id, updates }: { id: string; updates: Partial<Omit<ProjectDispute, "id">> }) => {
+      const updateData: Record<string, unknown> = {
+        updated_at: new Date().toISOString(),
+      };
+      
+      if (updates.title !== undefined) updateData.title = updates.title;
+      if (updates.start_date !== undefined) updateData.start_date = updates.start_date;
+      if (updates.end_date !== undefined) updateData.end_date = updates.end_date;
+      if (updates.severity !== undefined) updateData.severity = updates.severity;
+      if (updates.note !== undefined) updateData.description = updates.note;
+
       const { data, error } = await supabase
-        .from("project_disputes" as "projects")
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString(),
-        } as never)
+        .from("project_issues")
+        .update(updateData)
         .eq("id", id)
         .select()
         .single();
@@ -180,6 +182,8 @@ export function useProjectDisputes() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project-disputes"] });
+      queryClient.invalidateQueries({ queryKey: ["project-issues"] });
+      queryClient.invalidateQueries({ queryKey: ["project-issue-summary"] });
       toast.success("爭議期間已更新");
     },
     onError: (error) => {
@@ -188,11 +192,11 @@ export function useProjectDisputes() {
     },
   });
 
-  // Delete dispute mutation
+  // Delete dispute mutation (now uses project_issues table)
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
-        .from("project_disputes" as "projects")
+        .from("project_issues")
         .delete()
         .eq("id", id);
 
@@ -200,6 +204,8 @@ export function useProjectDisputes() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project-disputes"] });
+      queryClient.invalidateQueries({ queryKey: ["project-issues"] });
+      queryClient.invalidateQueries({ queryKey: ["project-issue-summary"] });
       toast.success("爭議期間已刪除");
     },
     onError: (error) => {
