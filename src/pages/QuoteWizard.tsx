@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,6 +22,13 @@ import QuoteCostCalculatorTab from "@/components/quotes/QuoteCostCalculatorTab";
 import QuoteFinancialAnalysisTab from "@/components/quotes/QuoteFinancialAnalysisTab";
 import QuoteScheduleTab from "@/components/quotes/QuoteScheduleTab";
 import { calculate20YearProjection, QuoteParams } from "@/lib/quoteCalculations";
+import { 
+  ModuleItem, 
+  InverterItem, 
+  createDefaultModule, 
+  createDefaultInverter,
+  generateId 
+} from "@/hooks/useQuoteEngineering";
 
 const STEPS = [
   { id: "basic", label: "基本資訊", icon: FileText, description: "案場與投資方" },
@@ -73,6 +80,12 @@ export default function QuoteWizard() {
     invertersTotal: 0,
   });
 
+  // Modules and inverters state - lifted from QuoteCostCalculatorTab
+  const [modules, setModules] = useState<ModuleItem[]>([createDefaultModule()]);
+  const [inverters, setInverters] = useState<InverterItem[]>([createDefaultInverter()]);
+  const [exchangeRate, setExchangeRate] = useState(30);
+  const [modulesLoaded, setModulesLoaded] = useState(false);
+
   // Fetch existing quote if editing
   const { data: existingQuote, isLoading: isLoadingQuote } = useQuery({
     queryKey: ["quote", id],
@@ -85,6 +98,38 @@ export default function QuoteWizard() {
         .maybeSingle();
       if (error) throw error;
       return data;
+    },
+    enabled: !!id,
+  });
+
+  // Fetch existing modules
+  const { data: existingModules } = useQuery({
+    queryKey: ["quote-modules", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data, error } = await supabase
+        .from("quote_modules")
+        .select("*")
+        .eq("quote_id", id)
+        .order("sort_order");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!id,
+  });
+
+  // Fetch existing inverters
+  const { data: existingInverters } = useQuery({
+    queryKey: ["quote-inverters", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data, error } = await supabase
+        .from("quote_inverters")
+        .select("*")
+        .eq("quote_id", id)
+        .order("sort_order");
+      if (error) throw error;
+      return data || [];
     },
     enabled: !!id,
   });
@@ -117,6 +162,45 @@ export default function QuoteWizard() {
       setInvestorId(existingQuote.investor_id);
     }
   }, [existingQuote]);
+
+  // Load existing modules into state
+  useEffect(() => {
+    if (existingModules && existingModules.length > 0 && !modulesLoaded) {
+      const mappedModules: ModuleItem[] = existingModules.map((m: any) => ({
+        id: m.id,
+        moduleModel: m.module_model || "",
+        wattagePerPanel: m.wattage_per_panel,
+        panelCount: m.panel_count,
+        pricePerWattUsd: Number(m.price_per_watt_usd) || 0.22,
+        exchangeRate: Number(m.exchange_rate) || 30,
+        priceNtd: Number(m.price_ntd) || 0,
+        sortOrder: m.sort_order || 0,
+        note: m.note,
+      }));
+      setModules(mappedModules);
+      if (mappedModules.length > 0 && mappedModules[0].exchangeRate) {
+        setExchangeRate(mappedModules[0].exchangeRate);
+      }
+      setModulesLoaded(true);
+    }
+  }, [existingModules, modulesLoaded]);
+
+  // Load existing inverters into state
+  useEffect(() => {
+    if (existingInverters && existingInverters.length > 0 && !modulesLoaded) {
+      const mappedInverters: InverterItem[] = existingInverters.map((inv: any) => ({
+        id: inv.id,
+        inverterModel: inv.inverter_model || "",
+        capacityKw: Number(inv.capacity_kw),
+        inverterCount: inv.inverter_count,
+        pricePerUnitNtd: Number(inv.price_per_unit_ntd) || 30000,
+        totalPriceNtd: Number(inv.total_price_ntd) || 0,
+        sortOrder: inv.sort_order || 0,
+        note: inv.note,
+      }));
+      setInverters(mappedInverters);
+    }
+  }, [existingInverters, modulesLoaded]);
 
   // Calculate projections
   const projections = formData.capacityKwp
@@ -169,6 +253,8 @@ export default function QuoteWizard() {
         roi_20_year: projections?.summary.totalRoi,
       };
 
+      let quoteId = id;
+
       if (isEditing && id) {
         const { error } = await supabase
           .from("project_quotes")
@@ -176,18 +262,73 @@ export default function QuoteWizard() {
           .eq("id", id);
         if (error) throw error;
       } else {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from("project_quotes")
           .insert({
             ...quoteData,
             quote_number: generateQuoteNumber(),
             quote_status: "draft",
-          });
+          })
+          .select("id")
+          .single();
         if (error) throw error;
+        quoteId = data.id;
+      }
+
+      // Save modules - delete existing and insert new
+      if (quoteId) {
+        // Delete existing modules
+        await supabase.from("quote_modules").delete().eq("quote_id", quoteId);
+        
+        // Insert new modules
+        if (modules.length > 0) {
+          const moduleData = modules.map((m, idx) => ({
+            quote_id: quoteId,
+            module_model: m.moduleModel || null,
+            wattage_per_panel: m.wattagePerPanel,
+            panel_count: m.panelCount,
+            price_per_watt_usd: m.pricePerWattUsd,
+            exchange_rate: exchangeRate,
+            price_ntd: m.wattagePerPanel * m.panelCount * m.pricePerWattUsd * exchangeRate,
+            sort_order: idx,
+            note: m.note || null,
+          }));
+          const { error: moduleError } = await supabase
+            .from("quote_modules")
+            .insert(moduleData);
+          if (moduleError) {
+            console.error("Error saving modules:", moduleError);
+          }
+        }
+
+        // Delete existing inverters
+        await supabase.from("quote_inverters").delete().eq("quote_id", quoteId);
+        
+        // Insert new inverters
+        if (inverters.length > 0) {
+          const inverterData = inverters.map((inv, idx) => ({
+            quote_id: quoteId,
+            inverter_model: inv.inverterModel || null,
+            capacity_kw: inv.capacityKw,
+            inverter_count: inv.inverterCount,
+            price_per_unit_ntd: inv.pricePerUnitNtd,
+            total_price_ntd: inv.inverterCount * inv.pricePerUnitNtd,
+            sort_order: idx,
+            note: inv.note || null,
+          }));
+          const { error: inverterError } = await supabase
+            .from("quote_inverters")
+            .insert(inverterData);
+          if (inverterError) {
+            console.error("Error saving inverters:", inverterError);
+          }
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project-quotes"] });
+      queryClient.invalidateQueries({ queryKey: ["quote-modules"] });
+      queryClient.invalidateQueries({ queryKey: ["quote-inverters"] });
       toast.success(isEditing ? "報價已更新" : "報價已建立");
       navigate("/quotes");
     },
@@ -247,6 +388,12 @@ export default function QuoteWizard() {
             formData={formData}
             setFormData={setFormData}
             onCostChange={setCostTotals}
+            modules={modules}
+            setModules={setModules}
+            inverters={inverters}
+            setInverters={setInverters}
+            exchangeRate={exchangeRate}
+            setExchangeRate={setExchangeRate}
           />
         );
       case "financial":
