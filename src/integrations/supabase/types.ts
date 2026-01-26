@@ -2362,6 +2362,59 @@ export type Database = {
           },
         ]
       }
+      quote_financial_projections: {
+        Row: {
+          created_at: string
+          cumulative_cash_flow: number | null
+          generation_kwh: number | null
+          id: string
+          insurance_cost: number | null
+          loan_payment: number | null
+          maintenance_cost: number | null
+          net_cash_flow: number | null
+          quote_id: string
+          rent_cost: number | null
+          revenue: number | null
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          cumulative_cash_flow?: number | null
+          generation_kwh?: number | null
+          id?: string
+          insurance_cost?: number | null
+          loan_payment?: number | null
+          maintenance_cost?: number | null
+          net_cash_flow?: number | null
+          quote_id: string
+          rent_cost?: number | null
+          revenue?: number | null
+          year: number
+        }
+        Update: {
+          created_at?: string
+          cumulative_cash_flow?: number | null
+          generation_kwh?: number | null
+          id?: string
+          insurance_cost?: number | null
+          loan_payment?: number | null
+          maintenance_cost?: number | null
+          net_cash_flow?: number | null
+          quote_id?: string
+          rent_cost?: number | null
+          revenue?: number | null
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_financial_projections_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "project_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_line_items: {
         Row: {
           category: string
