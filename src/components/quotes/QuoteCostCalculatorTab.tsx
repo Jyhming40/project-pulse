@@ -1,228 +1,193 @@
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Plus, RefreshCw, FolderPlus } from "lucide-react";
+import { toast } from "sonner";
+import { QuoteParams, formatCurrency } from "@/lib/quoteCalculations";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Separator } from "@/components/ui/separator";
-import { Plus, Trash2, RefreshCw } from "lucide-react";
-import { QuoteParams, DEFAULT_LINE_ITEMS, formatCurrency, calculateLineItemSubtotal } from "@/lib/quoteCalculations";
+  useEngineeringTemplates,
+  EngineeringCategory,
+  ModuleItem,
+  InverterItem,
+  initializeFromTemplates,
+  createDefaultModule,
+  createDefaultInverter,
+  generateId,
+  calculateItemSubtotal,
+  calculateModulePrice,
+  calculateInverterPrice,
+} from "@/hooks/useQuoteEngineering";
+import EngineeringCategoryCard from "./EngineeringCategoryCard";
+import EquipmentModulesCard from "./EquipmentModulesCard";
+import EquipmentInvertersCard from "./EquipmentInvertersCard";
+import QuoteCostSummaryCard from "./QuoteCostSummaryCard";
 
 interface QuoteCostCalculatorTabProps {
   formData: Partial<QuoteParams>;
   setFormData: (data: Partial<QuoteParams>) => void;
 }
 
-interface LineItem {
-  id: string;
-  category: "contractor" | "investor" | "special";
-  itemOrder: number;
-  itemCode: string;
-  itemName: string;
-  unitPrice: number;
-  unit: string;
-  quantity: number;
-  isOptional: boolean;
-}
-
 export default function QuoteCostCalculatorTab({
   formData,
   setFormData,
 }: QuoteCostCalculatorTabProps) {
-  const [lineItems, setLineItems] = useState<LineItem[]>(() =>
-    DEFAULT_LINE_ITEMS.map((item, idx) => ({
-      ...item,
-      id: `item-${idx}`,
-      quantity: item.unit === "kWp" ? formData.capacityKwp || 0 : item.quantity,
-    }))
-  );
-
-  // Calculate subtotals
-  const calculateSubtotal = (item: LineItem) => {
-    let qty = item.quantity;
-    if (item.unit === "kWp" && qty === 0) {
-      qty = formData.capacityKwp || 0;
-    }
-    return item.unitPrice * qty;
-  };
-
-  // Group items by category
-  const contractorItems = lineItems.filter((i) => i.category === "contractor");
-  const investorItems = lineItems.filter((i) => i.category === "investor");
-  const specialItems = lineItems.filter((i) => i.category === "special");
-
-  // Calculate totals
-  const contractorTotal = contractorItems.reduce((sum, i) => sum + calculateSubtotal(i), 0);
-  const investorTotal = investorItems.reduce((sum, i) => sum + calculateSubtotal(i), 0);
+  const { templates, loading } = useEngineeringTemplates();
   
-  // Special items need different handling
-  const totalPriceWithTax = (formData.capacityKwp || 0) * (formData.pricePerKwp || 0) * (1 + (formData.taxRate || 0.05));
-  const stampTax = totalPriceWithTax * 0.001;
-  const businessTax = totalPriceWithTax * 0.02;
-  const specialTotal = stampTax + businessTax;
+  // 工程項目分類
+  const [categories, setCategories] = useState<EngineeringCategory[]>([]);
+  
+  // 設備資料
+  const [modules, setModules] = useState<ModuleItem[]>([createDefaultModule()]);
+  const [inverters, setInverters] = useState<InverterItem[]>([createDefaultInverter()]);
+  const [exchangeRate, setExchangeRate] = useState(30);
 
-  const grandTotal = contractorTotal + investorTotal + specialTotal;
+  // 從範本初始化
+  useEffect(() => {
+    if (!loading && templates.length > 0 && categories.length === 0) {
+      setCategories(initializeFromTemplates(templates));
+    }
+  }, [templates, loading, categories.length]);
+
+  // 計算各項總計
+  const totals = useMemo(() => {
+    const capacityKwp = formData.capacityKwp || 0;
+    
+    // 工程項目總計
+    const engineeringTotal = categories.reduce((sum, cat) => {
+      return sum + cat.items.reduce((itemSum, item) => {
+        const qty = item.unit === "kWp" && item.quantity === 0 ? capacityKwp : item.quantity;
+        return itemSum + calculateItemSubtotal({ ...item, quantity: qty });
+      }, 0);
+    }, 0);
+
+    // 模組總計
+    const modulesTotal = modules.reduce((sum, m) => {
+      return sum + calculateModulePrice({ ...m, exchangeRate });
+    }, 0);
+
+    // 逆變器總計
+    const invertersTotal = inverters.reduce((sum, inv) => {
+      return sum + calculateInverterPrice(inv);
+    }, 0);
+
+    return { engineeringTotal, modulesTotal, invertersTotal };
+  }, [categories, modules, inverters, exchangeRate, formData.capacityKwp]);
+
+  // 更新類別
+  const handleUpdateCategory = (index: number, category: EngineeringCategory) => {
+    const newCategories = [...categories];
+    newCategories[index] = category;
+    setCategories(newCategories);
+  };
+
+  // 刪除類別
+  const handleDeleteCategory = (index: number) => {
+    const newCategories = categories.filter((_, i) => i !== index);
+    setCategories(newCategories);
+    toast.success("已刪除工程項目分類");
+  };
+
+  // 新增類別
+  const handleAddCategory = () => {
+    const newCategory: EngineeringCategory = {
+      categoryCode: `CUSTOM_${Date.now()}`,
+      categoryName: "新分類",
+      items: [],
+    };
+    setCategories([...categories, newCategory]);
+  };
+
+  // 重設為預設值
+  const handleReset = () => {
+    if (templates.length > 0) {
+      setCategories(initializeFromTemplates(templates));
+      setModules([createDefaultModule()]);
+      setInverters([createDefaultInverter()]);
+      setExchangeRate(30);
+      toast.success("已重設為預設值");
+    }
+  };
+
+  // 計算報價金額
   const sellingPrice = (formData.capacityKwp || 0) * (formData.pricePerKwp || 0);
-  const grossProfit = sellingPrice - grandTotal;
-  const grossMargin = sellingPrice > 0 ? (grossProfit / sellingPrice) * 100 : 0;
 
-  // Update item
-  const updateItem = (id: string, field: keyof LineItem, value: any) => {
-    setLineItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+        <Skeleton className="h-32 w-full" />
+      </div>
     );
-  };
-
-  // Reset to defaults
-  const resetToDefaults = () => {
-    setLineItems(
-      DEFAULT_LINE_ITEMS.map((item, idx) => ({
-        ...item,
-        id: `item-${idx}`,
-        quantity: item.unit === "kWp" ? formData.capacityKwp || 0 : item.quantity,
-      }))
-    );
-  };
-
-  const renderItemTable = (items: LineItem[], title: string, categoryColor: string) => (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Badge variant="outline" className={categoryColor}>{title}</Badge>
-            <span className="text-sm font-normal text-muted-foreground">
-              小計: {formatCurrency(items.reduce((sum, i) => sum + calculateSubtotal(i), 0), 0)}
-            </span>
-          </CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead className="w-12">項次</TableHead>
-              <TableHead>項目名稱</TableHead>
-              <TableHead className="w-24 text-right">單價</TableHead>
-              <TableHead className="w-20">單位</TableHead>
-              <TableHead className="w-24 text-right">數量</TableHead>
-              <TableHead className="w-32 text-right">小計</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item) => (
-              <TableRow key={item.id} className={item.isOptional ? "opacity-60" : ""}>
-                <TableCell className="font-mono text-xs">{item.itemCode || "-"}</TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    {item.itemName}
-                    {item.isOptional && (
-                      <Badge variant="outline" className="text-xs">選配</Badge>
-                    )}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Input
-                    type="number"
-                    className="w-24 text-right h-8"
-                    value={item.unitPrice}
-                    onChange={(e) => updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
-                  />
-                </TableCell>
-                <TableCell className="text-muted-foreground">{item.unit}</TableCell>
-                <TableCell>
-                  <Input
-                    type="number"
-                    className="w-20 text-right h-8"
-                    value={item.unit === "kWp" ? formData.capacityKwp || 0 : item.quantity}
-                    onChange={(e) => updateItem(item.id, "quantity", parseFloat(e.target.value) || 0)}
-                    disabled={item.unit === "kWp"}
-                  />
-                </TableCell>
-                <TableCell className="text-right font-medium">
-                  {formatCurrency(calculateSubtotal(item), 0)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  );
+  }
 
   return (
-    <div className="space-y-6">
-      {/* Actions */}
-      <div className="flex justify-end">
-        <Button variant="outline" onClick={resetToDefaults}>
-          <RefreshCw className="w-4 h-4 mr-2" />
-          重設為預設值
-        </Button>
+    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* 左側：項目明細 */}
+      <div className="lg:col-span-3 space-y-4">
+        {/* 動作列 */}
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">工程成本明細</h3>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleAddCategory}>
+              <FolderPlus className="h-4 w-4 mr-1" />
+              新增分類
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleReset}>
+              <RefreshCw className="h-4 w-4 mr-1" />
+              重設為預設
+            </Button>
+          </div>
+        </div>
+
+        {/* 主要設備：模組 */}
+        <EquipmentModulesCard
+          modules={modules}
+          onUpdate={setModules}
+          exchangeRate={exchangeRate}
+          onExchangeRateChange={setExchangeRate}
+        />
+
+        {/* 主要設備：逆變器 */}
+        <EquipmentInvertersCard
+          inverters={inverters}
+          onUpdate={setInverters}
+        />
+
+        {/* 工程項目分類 */}
+        {categories.map((category, index) => (
+          <EngineeringCategoryCard
+            key={category.categoryCode}
+            category={category}
+            onUpdate={(cat) => handleUpdateCategory(index, cat)}
+            onDelete={() => handleDeleteCategory(index)}
+            capacityKwp={formData.capacityKwp}
+          />
+        ))}
+
+        {categories.length === 0 && (
+          <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg">
+            <p className="mb-4">尚無工程項目分類</p>
+            <Button onClick={handleAddCategory}>
+              <Plus className="h-4 w-4 mr-1" />
+              新增第一個分類
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Contractor Items */}
-      {renderItemTable(contractorItems, "承裝業成本", "border-blue-500 text-blue-600")}
-
-      {/* Investor Items */}
-      {renderItemTable(investorItems, "投資者成本", "border-green-500 text-green-600")}
-
-      {/* Special Items */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Badge variant="outline" className="border-amber-500 text-amber-600">其他費用</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableBody>
-              <TableRow>
-                <TableCell>印花稅 (含稅總價之千分之一)</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(stampTax, 0)}</TableCell>
-              </TableRow>
-              <TableRow>
-                <TableCell>營所稅 (含稅總價之2%)</TableCell>
-                <TableCell className="text-right font-medium">{formatCurrency(businessTax, 0)}</TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Summary */}
-      <Card className="bg-primary/5 border-primary/20">
-        <CardContent className="pt-6">
-          <div className="grid gap-4 md:grid-cols-4">
-            <div>
-              <p className="text-sm text-muted-foreground">總成本</p>
-              <p className="text-2xl font-bold">{formatCurrency(grandTotal, 0)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">報價金額 (未稅)</p>
-              <p className="text-2xl font-bold">{formatCurrency(sellingPrice, 0)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">預估毛利</p>
-              <p className={`text-2xl font-bold ${grossProfit >= 0 ? "text-success" : "text-destructive"}`}>
-                {formatCurrency(grossProfit, 0)}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">毛利率</p>
-              <p className={`text-2xl font-bold ${grossMargin >= 0 ? "text-success" : "text-destructive"}`}>
-                {grossMargin.toFixed(1)}%
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* 右側：成本摘要 */}
+      <div className="lg:col-span-1">
+        <div className="sticky top-4">
+          <QuoteCostSummaryCard
+            engineeringTotal={totals.engineeringTotal}
+            modulesTotal={totals.modulesTotal}
+            invertersTotal={totals.invertersTotal}
+            sellingPrice={sellingPrice}
+            taxRate={formData.taxRate}
+          />
+        </div>
+      </div>
     </div>
   );
 }
