@@ -150,8 +150,9 @@ export default function EngineeringCategoryCard({
                   <TableHead className="w-28">計費方式</TableHead>
                   <TableHead className="w-16">單位</TableHead>
                   <TableHead className="w-24 text-right">單價</TableHead>
-                  <TableHead className="w-28 text-right whitespace-nowrap">數量/容量</TableHead>
+                  <TableHead className="w-32 text-right whitespace-nowrap">數量/容量</TableHead>
                   <TableHead className="w-28 text-right">小計</TableHead>
+                  <TableHead className="w-24 text-right whitespace-nowrap">每kW單價</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -281,6 +282,9 @@ export default function EngineeringCategoryCard({
                       </TableCell>
                       <TableCell className="text-right font-medium font-mono">
                         {formatCurrency(subtotal, 0)}
+                      </TableCell>
+                      <TableCell className="text-right text-sm text-muted-foreground font-mono">
+                        {capacityKwp > 0 ? formatCurrency(subtotal / capacityKwp, 0) : '-'}
                       </TableCell>
                       <TableCell>
                         <Button
