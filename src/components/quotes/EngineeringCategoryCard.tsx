@@ -148,8 +148,9 @@ export default function EngineeringCategoryCard({
                   <TableHead className="w-8"></TableHead>
                   <TableHead>項目名稱</TableHead>
                   <TableHead className="w-28">計費方式</TableHead>
+                  <TableHead className="w-16">單位</TableHead>
                   <TableHead className="w-24 text-right">單價</TableHead>
-                  <TableHead className="w-20 text-right">數量/容量</TableHead>
+                  <TableHead className="w-28 text-right whitespace-nowrap">數量/容量</TableHead>
                   <TableHead className="w-28 text-right">小計</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
@@ -208,6 +209,36 @@ export default function EngineeringCategoryCard({
                         )}
                       </TableCell>
                       <TableCell>
+                        {method === 'per_unit' ? (
+                          <Select
+                            value={item.unit || "個"}
+                            onValueChange={(value) => handleUpdateItem(index, { unit: value })}
+                          >
+                            <SelectTrigger className="h-8 w-16">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="個">個</SelectItem>
+                              <SelectItem value="台">台</SelectItem>
+                              <SelectItem value="組">組</SelectItem>
+                              <SelectItem value="式">式</SelectItem>
+                              <SelectItem value="座">座</SelectItem>
+                              <SelectItem value="片">片</SelectItem>
+                              <SelectItem value="批">批</SelectItem>
+                              <SelectItem value="趟">趟</SelectItem>
+                              <SelectItem value="m">m</SelectItem>
+                              <SelectItem value="m²">m²</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : method === 'per_kw' ? (
+                          <span className="text-sm text-muted-foreground">kW</span>
+                        ) : method === 'lump_sum' ? (
+                          <span className="text-sm text-muted-foreground">式</span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
                         {method === 'per_kw' || method === 'per_unit' ? (
                           <Input
                             type="number"
@@ -233,16 +264,19 @@ export default function EngineeringCategoryCard({
                       </TableCell>
                       <TableCell className="text-right">
                         {method === 'per_kw' || method === 'tiered' ? (
-                          <span className="text-sm font-medium">{capacityKwp} kW</span>
+                          <span className="text-sm font-medium whitespace-nowrap">{capacityKwp} kW</span>
                         ) : method === 'per_unit' ? (
-                          <Input
-                            type="number"
-                            value={item.quantity}
-                            onChange={(e) => handleUpdateItem(index, { quantity: parseFloat(e.target.value) || 0 })}
-                            className="h-8 w-20 text-right"
-                          />
+                          <div className="flex items-center justify-end gap-1">
+                            <Input
+                              type="number"
+                              value={item.quantity}
+                              onChange={(e) => handleUpdateItem(index, { quantity: parseFloat(e.target.value) || 0 })}
+                              className="h-8 w-20 text-right"
+                            />
+                            <span className="text-sm text-muted-foreground">{item.unit || "個"}</span>
+                          </div>
                         ) : (
-                          <span className="text-sm text-muted-foreground">1式</span>
+                          <span className="text-sm text-muted-foreground whitespace-nowrap">1 式</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right font-medium font-mono">
