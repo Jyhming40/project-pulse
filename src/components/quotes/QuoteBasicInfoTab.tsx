@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -11,9 +10,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
-import { Save, Loader2 } from "lucide-react";
-import { QuoteParams, formatCurrency } from "@/lib/quoteCalculations";
+import { Save, Loader2, Building2, MapPin, Phone, User } from "lucide-react";
+import { QuoteParams } from "@/lib/quoteCalculations";
+import { format } from "date-fns";
 
 interface QuoteBasicInfoTabProps {
   formData: Partial<QuoteParams>;
@@ -36,13 +35,29 @@ export default function QuoteBasicInfoTab({
   onSave,
   isSaving,
 }: QuoteBasicInfoTabProps) {
-  // Fetch projects
+  // Fetch projects with full details
   const { data: projects } = useQuery({
-    queryKey: ["projects-simple"],
+    queryKey: ["projects-for-quote"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projects")
-        .select("id, project_name, site_code_display, capacity_kwp, investor_id")
+        .select(`
+          id, 
+          project_name, 
+          site_code_display, 
+          capacity_kwp, 
+          investor_id,
+          address,
+          installation_type,
+          intake_year,
+          fiscal_year,
+          approval_date,
+          contract_signed_at,
+          land_owner,
+          land_owner_contact,
+          contact_person,
+          contact_phone
+        `)
         .eq("is_deleted", false)
         .order("created_at", { ascending: false })
         .limit(500);
@@ -53,17 +68,22 @@ export default function QuoteBasicInfoTab({
 
   // Fetch investors
   const { data: investors } = useQuery({
-    queryKey: ["investors-simple"],
+    queryKey: ["investors-for-quote"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("investors")
-        .select("id, company_name, investor_code")
+        .select("id, company_name, investor_code, contact_person, phone, email")
         .eq("is_deleted", false)
         .order("company_name");
       if (error) throw error;
       return data;
     },
   });
+
+  // Get selected project and investor
+  const selectedProject = projects?.find((p) => p.id === projectId);
+  const selectedInvestor = investors?.find((i) => i.id === investorId);
+
   // Handle project selection
   const handleProjectChange = (id: string) => {
     const project = projects?.find((p) => p.id === id);
@@ -84,17 +104,24 @@ export default function QuoteBasicInfoTab({
     }
   };
 
-  // Calculate totals
-  const totalPrice = (formData.capacityKwp || 0) * (formData.pricePerKwp || 0);
-  const totalPriceWithTax = totalPrice * (1 + (formData.taxRate || 0.05));
+  // Format date helper
+  const formatDate = (date: string | null) => {
+    if (!date) return "-";
+    try {
+      return format(new Date(date), "yyyy-MM-dd");
+    } catch {
+      return "-";
+    }
+  };
 
   return (
     <div className="space-y-6">
+      {/* Top Row: Selectors */}
       <div className="grid gap-6 md:grid-cols-2">
-        {/* Left Column - Project & Investor */}
+        {/* Left Column - Project & Business Unit */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">案場與投資方</CardTitle>
+            <CardTitle className="text-base">案場與業務單位</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -103,7 +130,7 @@ export default function QuoteBasicInfoTab({
                 <SelectTrigger>
                   <SelectValue placeholder="選擇案場 (選填)" />
                 </SelectTrigger>
-              <SelectContent>
+                <SelectContent>
                   <SelectItem value="__none__">不關聯案場</SelectItem>
                   {projects?.map((p) => (
                     <SelectItem key={p.id} value={p.id}>
@@ -115,13 +142,13 @@ export default function QuoteBasicInfoTab({
             </div>
 
             <div className="space-y-2">
-              <Label>投資方</Label>
+              <Label>業務單位</Label>
               <Select value={investorId || "__none__"} onValueChange={(v) => setInvestorId(v === "__none__" ? null : v)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="選擇投資方 (選填)" />
+                  <SelectValue placeholder="選擇業務單位 (選填)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">不關聯投資方</SelectItem>
+                  <SelectItem value="__none__">不關聯業務單位</SelectItem>
                   {investors?.map((i) => (
                     <SelectItem key={i.id} value={i.id}>
                       {i.company_name} ({i.investor_code})
@@ -133,125 +160,122 @@ export default function QuoteBasicInfoTab({
           </CardContent>
         </Card>
 
-        {/* Right Column - Basic Parameters */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">系統規格</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>規劃容量 (kWp)</Label>
-                <Input
-                  type="number"
-                  value={formData.capacityKwp || ""}
-                  onChange={(e) => {
-                    const capacity = parseFloat(e.target.value) || 0;
-                    setFormData({
-                      ...formData,
-                      capacityKwp: capacity,
-                      panelCount: Math.ceil((capacity * 1000) / (formData.panelWattage || 590)),
-                    });
-                  }}
-                />
+        {/* Right Column - Project Info Summary */}
+        {selectedProject && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Building2 className="h-4 w-4 text-primary" />
+                案場資訊
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <div>
+                  <span className="text-muted-foreground">案場編號</span>
+                  <p className="font-medium text-primary">{selectedProject.site_code_display || "-"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">進件年度</span>
+                  <p className="font-medium">{selectedProject.intake_year || "-"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">業績年度</span>
+                  <p className="font-medium">{selectedProject.fiscal_year || "-"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">裝置類型</span>
+                  <p className="font-medium">{selectedProject.installation_type || "-"}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">同意備案日期</span>
+                  <p className="font-medium">{formatDate(selectedProject.approval_date)}</p>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">與客戶簽訂合約日期</span>
+                  <p className="font-medium">{formatDate(selectedProject.contract_signed_at)}</p>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    地址
+                  </span>
+                  <p className="font-medium">{selectedProject.address || "-"}</p>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>模組功率 (W)</Label>
-                <Input
-                  type="number"
-                  value={formData.panelWattage || ""}
-                  onChange={(e) => setFormData({ ...formData, panelWattage: parseFloat(e.target.value) || 0 })}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>模組數量</Label>
-                <Input
-                  type="number"
-                  value={formData.panelCount || ""}
-                  onChange={(e) => setFormData({ ...formData, panelCount: parseInt(e.target.value) || 0 })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>逆變器容量 (kW)</Label>
-                <Input
-                  type="number"
-                  value={formData.inverterCapacityKw || ""}
-                  onChange={(e) => setFormData({ ...formData, inverterCapacityKw: parseFloat(e.target.value) || 0 })}
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>逆變器數量</Label>
-              <Input
-                type="number"
-                value={formData.inverterCount || ""}
-                onChange={(e) => setFormData({ ...formData, inverterCount: parseInt(e.target.value) || 1 })}
-              />
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Pricing */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">報價參數</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="space-y-2">
-              <Label>每 kWp 報價 (未稅)</Label>
-              <Input
-                type="number"
-                value={formData.pricePerKwp || ""}
-                onChange={(e) => setFormData({ ...formData, pricePerKwp: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>稅率 (%)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={(formData.taxRate || 0) * 100}
-                onChange={(e) => setFormData({ ...formData, taxRate: (parseFloat(e.target.value) || 0) / 100 })}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>躉購費率 (元/度)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                value={formData.tariffRate || ""}
-                onChange={(e) => setFormData({ ...formData, tariffRate: parseFloat(e.target.value) || 0 })}
-              />
-            </div>
-          </div>
+      {/* Second Row: Contact & Investor Info */}
+      {(selectedProject || selectedInvestor) && (
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Contact Info */}
+          {selectedProject && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Phone className="h-4 w-4 text-primary" />
+                  聯絡資訊
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">聯絡人</span>
+                    <p className="font-medium">{selectedProject.contact_person || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">聯絡電話</span>
+                    <p className="font-medium">{selectedProject.contact_phone || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">土地所有人</span>
+                    <p className="font-medium">{selectedProject.land_owner || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">所有人電話</span>
+                    <p className="font-medium">{selectedProject.land_owner_contact || "-"}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-          <Separator />
-
-          {/* Summary */}
-          <div className="grid gap-4 md:grid-cols-3 bg-muted/50 rounded-lg p-4">
-            <div>
-              <p className="text-sm text-muted-foreground">總建置價格 (未稅)</p>
-              <p className="text-xl font-semibold">{formatCurrency(totalPrice, 0)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">總建置價格 (含稅)</p>
-              <p className="text-xl font-semibold text-primary">{formatCurrency(totalPriceWithTax, 0)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">每 kWp 單價 (含稅)</p>
-              <p className="text-xl font-semibold">
-                {formatCurrency((formData.pricePerKwp || 0) * (1 + (formData.taxRate || 0.05)), 0)}
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          {/* Investor (Business Unit) Info */}
+          {selectedInvestor && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <User className="h-4 w-4 text-primary" />
+                  業務單位資訊
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">公司名稱</span>
+                    <p className="font-medium">{selectedInvestor.company_name}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">聯絡人</span>
+                    <p className="font-medium">{selectedInvestor.contact_person || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">電話</span>
+                    <p className="font-medium">{selectedInvestor.phone || "-"}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Email</span>
+                    <p className="font-medium text-primary">{selectedInvestor.email || "-"}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
       {/* Save Button */}
       <div className="flex justify-end">
