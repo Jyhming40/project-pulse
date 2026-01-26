@@ -32,22 +32,30 @@ interface QuoteCostCalculatorTabProps {
   formData: Partial<QuoteParams>;
   setFormData: (data: Partial<QuoteParams>) => void;
   onCostChange?: (costs: CostTotals) => void;
+  // Lifted state for modules and inverters
+  modules: ModuleItem[];
+  setModules: (modules: ModuleItem[]) => void;
+  inverters: InverterItem[];
+  setInverters: (inverters: InverterItem[]) => void;
+  exchangeRate: number;
+  setExchangeRate: (rate: number) => void;
 }
 
 export default function QuoteCostCalculatorTab({
   formData,
   setFormData,
   onCostChange,
+  modules,
+  setModules,
+  inverters,
+  setInverters,
+  exchangeRate,
+  setExchangeRate,
 }: QuoteCostCalculatorTabProps) {
   const { templates, loading } = useEngineeringTemplates();
   
   // 工程項目分類
   const [categories, setCategories] = useState<EngineeringCategory[]>([]);
-  
-  // 設備資料
-  const [modules, setModules] = useState<ModuleItem[]>([createDefaultModule()]);
-  const [inverters, setInverters] = useState<InverterItem[]>([createDefaultInverter()]);
-  const [exchangeRate, setExchangeRate] = useState(30);
 
   // 從範本初始化
   useEffect(() => {
