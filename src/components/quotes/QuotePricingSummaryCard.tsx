@@ -1,4 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { formatCurrency } from "@/lib/quoteCalculations";
 import { Calculator } from "lucide-react";
@@ -7,19 +9,21 @@ interface QuotePricingSummaryCardProps {
   capacityKwp: number;
   pricePerKwp: number;
   taxRate: number;
+  onPricePerKwpChange: (value: number) => void;
 }
 
 export default function QuotePricingSummaryCard({
   capacityKwp,
   pricePerKwp,
   taxRate = 0.05,
+  onPricePerKwpChange,
 }: QuotePricingSummaryCardProps) {
+  // 每kW報價 (含稅)
+  const pricePerKwpWithTax = pricePerKwp * (1 + taxRate);
   // 報價金額 (未稅)
   const totalPriceExcludingTax = capacityKwp * pricePerKwp;
   // 報價金額 (含稅)
   const totalPriceIncludingTax = totalPriceExcludingTax * (1 + taxRate);
-  // 每kW報價 (含稅)
-  const pricePerKwpWithTax = capacityKwp > 0 ? totalPriceIncludingTax / capacityKwp : 0;
 
   return (
     <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
@@ -31,16 +35,28 @@ export default function QuotePricingSummaryCard({
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-          {/* 每kW報價 */}
-          <div className="space-y-1">
-            <span className="text-sm text-muted-foreground">每kW報價 (未稅)</span>
-            <p className="text-lg font-bold font-mono text-primary">
-              {formatCurrency(pricePerKwp, 0)}
-            </p>
+          {/* 每kW報價 (未稅) - 可編輯 */}
+          <div className="space-y-1.5">
+            <Label htmlFor="pricePerKwp" className="text-sm text-muted-foreground">
+              每kW報價 (未稅)
+            </Label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                NT$
+              </span>
+              <Input
+                id="pricePerKwp"
+                type="number"
+                value={pricePerKwp || ""}
+                onChange={(e) => onPricePerKwpChange(Number(e.target.value) || 0)}
+                className="pl-12 text-lg font-bold font-mono text-primary h-11"
+                placeholder="45000"
+              />
+            </div>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <span className="text-sm text-muted-foreground">每kW報價 (含稅)</span>
-            <p className="text-lg font-bold font-mono text-primary">
+            <p className="text-lg font-bold font-mono text-primary h-11 flex items-center">
               {formatCurrency(pricePerKwpWithTax, 0)}
             </p>
           </div>
