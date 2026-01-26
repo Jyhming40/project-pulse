@@ -81,7 +81,6 @@ function getSystemComparisonStages(): ComparisonStage[] {
  * useComparisonStages Hook
  * 
  * 統一的比較階段資料來源 - 整合資料庫設定與系統預設
- * 提供與 useEditableStages 相容的介面
  */
 export function useComparisonStages() {
   const { stages, isLoading, error } = useProcessStages();
@@ -120,7 +119,7 @@ export function useComparisonStages() {
   const hasCustomStages = dbStages.length > 0;
 
   /**
-   * 取得階段的有效配置 (相容 useEditableStages 介面)
+   * 取得階段的有效配置
    */
   const getStageConfig = useCallback((stageId: string) => {
     const stage = allStages.find(s => s.id === stageId);
@@ -157,7 +156,7 @@ export function useComparisonStages() {
   }, [getStageConfig, milestoneOptions]);
 
   /**
-   * 建立可編輯的階段列表 (相容 useEditableStages 的 editableStages)
+   * 建立可編輯的階段列表
    * 只取前 10 個系統階段用於統計卡片
    */
   const editableStages = useMemo(() => {
@@ -181,7 +180,7 @@ export function useComparisonStages() {
   }, [dbStages]);
 
   /**
-   * 檢查是否有任何編輯 (相容 useEditableStages)
+   * 檢查是否有任何編輯
    */
   const hasEdits = dbStages.length > 0;
 
@@ -199,7 +198,7 @@ export function useComparisonStages() {
     // 載入狀態
     isLoading,
     error,
-    // 相容 useEditableStages 的介面
+    // 輔助介面
     editableStages,
     getStageConfig,
     getStageLabel,

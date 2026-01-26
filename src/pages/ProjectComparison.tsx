@@ -70,7 +70,7 @@ import {
   generateLegalSummary,
   generateLegalTable,
 } from "@/hooks/useProjectComparison";
-import { useCustomStages } from "@/hooks/useCustomStages";
+import { useComparisonStages } from "@/hooks/useComparisonStages";
 import { useProjectDisputes } from "@/hooks/useProjectDisputes";
 import { useSectionOrder, SectionId } from "@/hooks/useSectionOrder";
 import { ProjectSearchCombobox } from "@/components/projects/ProjectSearchCombobox";
@@ -129,8 +129,8 @@ export default function ProjectComparison() {
   // Dispute settings from localStorage
   const { disputes, strategy, isLoading: disputesLoading } = useProjectDisputes();
   
-  // Custom stages from useCustomStages hook
-  const { userStages } = useCustomStages();
+  // Comparison stages from unified hook (replaces useCustomStages)
+  const { customStages } = useComparisonStages();
 
   // Section order (drag-and-drop)
   const { sectionOrder, reorderSections, resetOrder } = useSectionOrder();
@@ -540,7 +540,7 @@ export default function ProjectComparison() {
                                         results={sortedResults}
                                         disputes={relevantDisputes}
                                         displayStrategy={strategy}
-                                        customStages={userStages}
+                                        customStages={customStages}
                                       />
                                     )}
                                     {chartMode === "heatmap" && (
@@ -548,7 +548,7 @@ export default function ProjectComparison() {
                                         results={sortedResults}
                                         disputes={relevantDisputes}
                                         displayStrategy={strategy}
-                                        customStages={userStages}
+                                        customStages={customStages}
                                       />
                                     )}
                                   </CardContent>
@@ -663,7 +663,7 @@ export default function ProjectComparison() {
                                     <ComparisonStatsCards 
                                       results={sortedResults} 
                                       stats={comparisonData.stats}
-                                      customStages={userStages}
+                                      customStages={customStages}
                                     />
                                   </CardContent>
                                 </CollapsibleContent>
@@ -696,7 +696,7 @@ export default function ProjectComparison() {
                                     <StageAnalysisTable 
                                       results={sortedResults} 
                                       stats={comparisonData.stats}
-                                      customStages={userStages}
+                                      customStages={customStages}
                                     />
                                   </CardContent>
                                 </CollapsibleContent>
