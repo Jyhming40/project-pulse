@@ -2362,6 +2362,125 @@ export type Database = {
           },
         ]
       }
+      quote_engineering_items: {
+        Row: {
+          category_code: string
+          category_name: string
+          created_at: string
+          id: string
+          is_lump_sum: boolean | null
+          item_code: string | null
+          item_name: string
+          lump_sum_amount: number | null
+          note: string | null
+          quantity: number | null
+          quote_id: string
+          sort_order: number | null
+          subtotal: number | null
+          unit: string | null
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          category_code: string
+          category_name: string
+          created_at?: string
+          id?: string
+          is_lump_sum?: boolean | null
+          item_code?: string | null
+          item_name: string
+          lump_sum_amount?: number | null
+          note?: string | null
+          quantity?: number | null
+          quote_id: string
+          sort_order?: number | null
+          subtotal?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          category_code?: string
+          category_name?: string
+          created_at?: string
+          id?: string
+          is_lump_sum?: boolean | null
+          item_code?: string | null
+          item_name?: string
+          lump_sum_amount?: number | null
+          note?: string | null
+          quantity?: number | null
+          quote_id?: string
+          sort_order?: number | null
+          subtotal?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_engineering_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "project_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_engineering_templates: {
+        Row: {
+          category_code: string
+          category_name: string
+          created_at: string
+          created_by: string | null
+          default_quantity: number | null
+          default_unit: string | null
+          default_unit_price: number | null
+          id: string
+          is_active: boolean | null
+          is_lump_sum: boolean | null
+          item_code: string | null
+          item_name: string
+          sort_order: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category_code: string
+          category_name: string
+          created_at?: string
+          created_by?: string | null
+          default_quantity?: number | null
+          default_unit?: string | null
+          default_unit_price?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_lump_sum?: boolean | null
+          item_code?: string | null
+          item_name: string
+          sort_order?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category_code?: string
+          category_name?: string
+          created_at?: string
+          created_by?: string | null
+          default_quantity?: number | null
+          default_unit?: string | null
+          default_unit_price?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_lump_sum?: boolean | null
+          item_code?: string | null
+          item_name?: string
+          sort_order?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       quote_financial_projections: {
         Row: {
           created_at: string
@@ -2415,6 +2534,56 @@ export type Database = {
           },
         ]
       }
+      quote_inverters: {
+        Row: {
+          capacity_kw: number
+          created_at: string
+          id: string
+          inverter_count: number
+          inverter_model: string | null
+          note: string | null
+          price_per_unit_ntd: number | null
+          quote_id: string
+          sort_order: number | null
+          total_price_ntd: number | null
+          updated_at: string
+        }
+        Insert: {
+          capacity_kw?: number
+          created_at?: string
+          id?: string
+          inverter_count?: number
+          inverter_model?: string | null
+          note?: string | null
+          price_per_unit_ntd?: number | null
+          quote_id: string
+          sort_order?: number | null
+          total_price_ntd?: number | null
+          updated_at?: string
+        }
+        Update: {
+          capacity_kw?: number
+          created_at?: string
+          id?: string
+          inverter_count?: number
+          inverter_model?: string | null
+          note?: string | null
+          price_per_unit_ntd?: number | null
+          quote_id?: string
+          sort_order?: number | null
+          total_price_ntd?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_inverters_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "project_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_line_items: {
         Row: {
           category: string
@@ -2461,6 +2630,59 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "quote_line_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "project_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_modules: {
+        Row: {
+          created_at: string
+          exchange_rate: number | null
+          id: string
+          module_model: string | null
+          note: string | null
+          panel_count: number
+          price_ntd: number | null
+          price_per_watt_usd: number | null
+          quote_id: string
+          sort_order: number | null
+          updated_at: string
+          wattage_per_panel: number
+        }
+        Insert: {
+          created_at?: string
+          exchange_rate?: number | null
+          id?: string
+          module_model?: string | null
+          note?: string | null
+          panel_count?: number
+          price_ntd?: number | null
+          price_per_watt_usd?: number | null
+          quote_id: string
+          sort_order?: number | null
+          updated_at?: string
+          wattage_per_panel?: number
+        }
+        Update: {
+          created_at?: string
+          exchange_rate?: number | null
+          id?: string
+          module_model?: string | null
+          note?: string | null
+          panel_count?: number
+          price_ntd?: number | null
+          price_per_watt_usd?: number | null
+          quote_id?: string
+          sort_order?: number | null
+          updated_at?: string
+          wattage_per_panel?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_modules_quote_id_fkey"
             columns: ["quote_id"]
             isOneToOne: false
             referencedRelation: "project_quotes"
