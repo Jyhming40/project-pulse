@@ -114,10 +114,17 @@ const FIELD_CATEGORIES: Record<string, CategoryDef> = {
     fields: [
       { key: 'initial_survey_date', label: '初步現勘日期' },
       { key: 'contract_signed_at', label: '與客戶簽訂合約' },
+      { key: 'doc_審查意見書_issued', label: '台電審查意見書日期' },
+      { key: 'doc_同意備案_issued', label: '能源署同意備案日期' },
       { key: 'structural_cert_date', label: '結構技師簽證日期' },
+      { key: 'doc_免雜項申請_issued', label: '免雜項執照同意日期' },
+      { key: 'doc_躉售合約_issued', label: '台電躉售合約日期' },
       { key: 'electrical_cert_date', label: '電機技師簽證日期' },
+      { key: 'construction_start_date', label: '材料進場/施工日期' },
+      { key: 'doc_免雜項竣工_issued', label: '免雜項執照竣工日期' },
       { key: 'actual_meter_date', label: '台電掛表/完工日期' },
-      { key: 'approval_date', label: '同意備案日期' },
+      { key: 'doc_設備登記_issued', label: '設備登記核准日期' },
+      { key: 'approval_date', label: '同意備案日期(專案欄位)' },
     ]
   },
   investor: {
@@ -304,18 +311,21 @@ export function ProjectCustomExportPanel() {
 
       if (projectError) throw projectError;
 
-      // Fetch document stats per project
-      const { data: docStats, error: docError } = await supabase
+      // Fetch document stats and dates per project
+      const { data: docData, error: docError } = await supabase
         .from('documents')
-        .select('project_id, doc_status')
+        .select('project_id, doc_status, doc_type, doc_type_code, submitted_at, issued_at')
         .in('project_id', Array.from(selectedProjects))
         .eq('is_deleted', false);
 
       if (docError) throw docError;
 
-      // Aggregate document stats
+      // Aggregate document stats and extract document dates
       const docStatsMap = new Map<string, { total: number; completed: number; pending: number }>();
-      (docStats || []).forEach(doc => {
+      const docDatesMap = new Map<string, Record<string, string | null>>();
+      
+      (docData || []).forEach(doc => {
+        // Stats aggregation
         if (!docStatsMap.has(doc.project_id)) {
           docStatsMap.set(doc.project_id, { total: 0, completed: 0, pending: 0 });
         }
@@ -326,6 +336,28 @@ export function ProjectCustomExportPanel() {
         } else if (doc.doc_status !== '未開始') {
           stats.pending++;
         }
+        
+        // Document dates extraction - use doc_type for matching
+        if (!docDatesMap.has(doc.project_id)) {
+          docDatesMap.set(doc.project_id, {});
+        }
+        const dates = docDatesMap.get(doc.project_id)!;
+        const docType = doc.doc_type;
+        
+        // Map doc_type to our field keys
+        if (docType === '審查意見書') {
+          dates['doc_審查意見書_issued'] = doc.issued_at;
+        } else if (docType === '同意備案') {
+          dates['doc_同意備案_issued'] = doc.issued_at;
+        } else if (docType === '免雜項申請') {
+          dates['doc_免雜項申請_issued'] = doc.issued_at;
+        } else if (docType === '躉售合約') {
+          dates['doc_躉售合約_issued'] = doc.issued_at;
+        } else if (docType === '免雜項竣工') {
+          dates['doc_免雜項竣工_issued'] = doc.issued_at;
+        } else if (docType === '設備登記') {
+          dates['doc_設備登記_issued'] = doc.issued_at;
+        }
       });
 
       // Build export data
@@ -334,6 +366,7 @@ export function ProjectCustomExportPanel() {
       const exportRows = (projectData || []).map(project => {
         const row: Record<string, any> = {};
         const docStat = docStatsMap.get(project.id) || { total: 0, completed: 0, pending: 0 };
+        const docDates = docDatesMap.get(project.id) || {};
 
         selectedFieldList.forEach(field => {
           let value: any = '';
@@ -366,6 +399,15 @@ export function ProjectCustomExportPanel() {
               break;
             case 'doc_pending_count':
               value = docStat.pending;
+              break;
+            // Handle document-based date fields
+            case 'doc_審查意見書_issued':
+            case 'doc_同意備案_issued':
+            case 'doc_免雜項申請_issued':
+            case 'doc_躉售合約_issued':
+            case 'doc_免雜項竣工_issued':
+            case 'doc_設備登記_issued':
+              value = docDates[field.key] || '';
               break;
             default:
               value = project[field.key as keyof typeof project] ?? '';
