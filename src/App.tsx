@@ -26,6 +26,7 @@ import DuplicateScanner from "./pages/DuplicateScanner";
 import DashboardAudit from "./pages/DashboardAudit";
 import ProjectComparison from "./pages/ProjectComparison";
 import Quotes from "./pages/Quotes";
+import QuoteWizard from "./pages/QuoteWizard";
 import NotFound from "./pages/NotFound";
 const queryClient = new QueryClient();
 
@@ -51,6 +52,8 @@ const App = () => (
             <Route path="/investors" element={<ProtectedRoute><Layout><Investors /></Layout></ProtectedRoute>} />
             <Route path="/partners" element={<ProtectedRoute><Layout><Partners /></Layout></ProtectedRoute>} />
             <Route path="/quotes" element={<ProtectedRoute><Layout><Quotes /></Layout></ProtectedRoute>} />
+            <Route path="/quotes/new" element={<ProtectedRoute><Layout><QuoteWizard /></Layout></ProtectedRoute>} />
+            <Route path="/quotes/:id" element={<ProtectedRoute><Layout><QuoteWizard /></Layout></ProtectedRoute>} />
             
             {/* 管理與設定 (Admin) */}
             <Route path="/users" element={<ProtectedRoute adminOnly><Layout><Users /></Layout></ProtectedRoute>} />

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,6 @@ import { toast } from "sonner";
 import { formatCurrency } from "@/lib/quoteCalculations";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
-import QuoteEditorDialog from "@/components/quotes/QuoteEditorDialog";
 
 // Temporary type until DB table is created
 interface QuoteData {
@@ -42,11 +42,10 @@ interface QuoteData {
 }
 
 export default function Quotes() {
+  const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
 
   // Placeholder data until DB table is created
   const quotes: QuoteData[] = [];
@@ -92,18 +91,11 @@ export default function Quotes() {
   };
 
   const handleCreate = () => {
-    setSelectedQuoteId(null);
-    setEditorOpen(true);
+    navigate("/quotes/new");
   };
 
   const handleEdit = (id: string) => {
-    setSelectedQuoteId(id);
-    setEditorOpen(true);
-  };
-
-  const handleDuplicate = async (quote: QuoteData) => {
-    // Will be implemented after DB table is created
-    toast.info("資料庫表尚未建立");
+    navigate(`/quotes/${id}`);
   };
 
   return (
@@ -251,7 +243,7 @@ export default function Quotes() {
                             <Eye className="w-4 h-4 mr-2" />
                             檢視 / 編輯
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDuplicate(quote)}>
+                          <DropdownMenuItem onClick={() => toast.info("資料庫表尚未建立")}>
                             <Copy className="w-4 h-4 mr-2" />
                             複製報價
                           </DropdownMenuItem>
@@ -274,13 +266,6 @@ export default function Quotes() {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Quote Editor Dialog */}
-      <QuoteEditorDialog
-        open={editorOpen}
-        onOpenChange={setEditorOpen}
-        quoteId={selectedQuoteId}
-      />
     </div>
   );
 }
