@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,36 +27,37 @@ import { formatCurrency } from "@/lib/quoteCalculations";
 import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 
-// Temporary type until DB table is created
-interface QuoteData {
-  id: string;
-  quote_number: string;
-  project_id: string | null;
-  investor_id: string | null;
-  capacity_kwp: number | null;
-  total_price_with_tax: number | null;
-  irr_20_year: number | null;
-  quote_status: string;
-  created_at: string;
-  project?: { site_name: string; site_code_display: string } | null;
-  investor?: { company_name: string; investor_code: string } | null;
-}
-
 export default function Quotes() {
   const navigate = useNavigate();
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Placeholder data until DB table is created
-  const quotes: QuoteData[] = [];
-  const isLoading = false;
+  // Fetch quotes from database
+  const { data: quotes = [], isLoading } = useQuery({
+    queryKey: ["project-quotes"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("project_quotes")
+        .select(`
+          *,
+          project:projects(project_name, site_code_display),
+          investor:investors(company_name, investor_code)
+        `)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
 
-  // Delete mutation - placeholder until DB table is created
+  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      // Will be implemented after DB table is created
-      toast.info("資料庫表尚未建立");
+      const { error } = await supabase
+        .from("project_quotes")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project-quotes"] });
@@ -69,7 +71,7 @@ export default function Quotes() {
   const filteredQuotes = quotes?.filter(
     (q) =>
       q.quote_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      q.project?.site_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      q.project?.project_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       q.investor?.company_name?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -211,7 +213,7 @@ export default function Quotes() {
                   <TableRow key={quote.id} className="cursor-pointer hover:bg-muted/50">
                     <TableCell className="font-medium">{quote.quote_number}</TableCell>
                     <TableCell>
-                      {quote.project?.site_name || (
+                      {quote.project?.project_name || (
                         <span className="text-muted-foreground">未關聯</span>
                       )}
                     </TableCell>
