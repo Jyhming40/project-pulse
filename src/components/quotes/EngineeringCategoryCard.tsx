@@ -200,7 +200,8 @@ export default function EngineeringCategoryCard({
                               <SelectValue placeholder="選擇級距" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="structural_engineer">結構/電機技師</SelectItem>
+                              <SelectItem value="structural_engineer">結構技師</SelectItem>
+                              <SelectItem value="electrical_engineer">電機技師</SelectItem>
                               <SelectItem value="environmental">明群環能</SelectItem>
                             </SelectContent>
                           </Select>
