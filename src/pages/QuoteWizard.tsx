@@ -289,7 +289,7 @@ export default function QuoteWizard() {
             panel_count: m.panelCount,
             price_per_watt_usd: m.pricePerWattUsd,
             exchange_rate: exchangeRate,
-            price_ntd: m.wattagePerPanel * m.panelCount * m.pricePerWattUsd * exchangeRate,
+            // price_ntd is a generated column, do not insert
             sort_order: idx,
             note: m.note || null,
           }));
@@ -312,7 +312,7 @@ export default function QuoteWizard() {
             capacity_kw: inv.capacityKw,
             inverter_count: inv.inverterCount,
             price_per_unit_ntd: inv.pricePerUnitNtd,
-            total_price_ntd: inv.inverterCount * inv.pricePerUnitNtd,
+            // total_price_ntd is a generated column, do not insert
             sort_order: idx,
             note: inv.note || null,
           }));
