@@ -20,7 +20,7 @@ import {
 import EngineeringCategoryCard from "./EngineeringCategoryCard";
 import EquipmentModulesCard from "./EquipmentModulesCard";
 import EquipmentInvertersCard from "./EquipmentInvertersCard";
-import QuoteCostSummaryCard from "./QuoteCostSummaryCard";
+import QuoteCostSummarySheet from "./QuoteCostSummarySheet";
 
 interface QuoteCostCalculatorTabProps {
   formData: Partial<QuoteParams>;
@@ -121,72 +121,65 @@ export default function QuoteCostCalculatorTab({
   }
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      {/* 左側：項目明細 */}
-      <div className="lg:col-span-3 space-y-4">
-        {/* 動作列 */}
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">工程成本明細</h3>
-          <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={handleAddCategory}>
-              <FolderPlus className="h-4 w-4 mr-1" />
-              新增分類
-            </Button>
-            <Button variant="outline" size="sm" onClick={handleReset}>
-              <RefreshCw className="h-4 w-4 mr-1" />
-              重設為預設
-            </Button>
-          </div>
-        </div>
+    <div className="space-y-4">
+      {/* 右側抽屜式成本摘要 */}
+      <QuoteCostSummarySheet
+        engineeringTotal={totals.engineeringTotal}
+        modulesTotal={totals.modulesTotal}
+        invertersTotal={totals.invertersTotal}
+        sellingPrice={sellingPrice}
+        taxRate={formData.taxRate}
+      />
 
-        {/* 主要設備：模組 */}
-        <EquipmentModulesCard
-          modules={modules}
-          onUpdate={setModules}
-          exchangeRate={exchangeRate}
-          onExchangeRateChange={setExchangeRate}
-        />
-
-        {/* 主要設備：逆變器 */}
-        <EquipmentInvertersCard
-          inverters={inverters}
-          onUpdate={setInverters}
-        />
-
-        {/* 工程項目分類 */}
-        {categories.map((category, index) => (
-          <EngineeringCategoryCard
-            key={category.categoryCode}
-            category={category}
-            onUpdate={(cat) => handleUpdateCategory(index, cat)}
-            onDelete={() => handleDeleteCategory(index)}
-            capacityKwp={formData.capacityKwp}
-          />
-        ))}
-
-        {categories.length === 0 && (
-          <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg">
-            <p className="mb-4">尚無工程項目分類</p>
-            <Button onClick={handleAddCategory}>
-              <Plus className="h-4 w-4 mr-1" />
-              新增第一個分類
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {/* 右側：成本摘要 */}
-      <div className="lg:col-span-1">
-        <div className="sticky top-4">
-          <QuoteCostSummaryCard
-            engineeringTotal={totals.engineeringTotal}
-            modulesTotal={totals.modulesTotal}
-            invertersTotal={totals.invertersTotal}
-            sellingPrice={sellingPrice}
-            taxRate={formData.taxRate}
-          />
+      {/* 動作列 */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">工程成本明細</h3>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={handleAddCategory}>
+            <FolderPlus className="h-4 w-4 mr-1" />
+            新增分類
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleReset}>
+            <RefreshCw className="h-4 w-4 mr-1" />
+            重設為預設
+          </Button>
         </div>
       </div>
+
+      {/* 主要設備：模組 */}
+      <EquipmentModulesCard
+        modules={modules}
+        onUpdate={setModules}
+        exchangeRate={exchangeRate}
+        onExchangeRateChange={setExchangeRate}
+      />
+
+      {/* 主要設備：逆變器 */}
+      <EquipmentInvertersCard
+        inverters={inverters}
+        onUpdate={setInverters}
+      />
+
+      {/* 工程項目分類 */}
+      {categories.map((category, index) => (
+        <EngineeringCategoryCard
+          key={category.categoryCode}
+          category={category}
+          onUpdate={(cat) => handleUpdateCategory(index, cat)}
+          onDelete={() => handleDeleteCategory(index)}
+          capacityKwp={formData.capacityKwp}
+        />
+      ))}
+
+      {categories.length === 0 && (
+        <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg">
+          <p className="mb-4">尚無工程項目分類</p>
+          <Button onClick={handleAddCategory}>
+            <Plus className="h-4 w-4 mr-1" />
+            新增第一個分類
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
