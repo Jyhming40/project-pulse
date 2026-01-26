@@ -1898,6 +1898,145 @@ export type Database = {
           },
         ]
       }
+      project_quotes: {
+        Row: {
+          annual_degradation_rate: number | null
+          capacity_kwp: number
+          created_at: string
+          created_by: string | null
+          high_efficiency_bonus: number | null
+          id: string
+          insurance_rate: number | null
+          inverter_capacity_kw: number | null
+          inverter_count: number | null
+          investor_id: string | null
+          irr_20_year: number | null
+          loan_interest_rate: number | null
+          loan_percentage: number | null
+          loan_term_months: number | null
+          maintenance_rate_11_to_15: number | null
+          maintenance_rate_16_to_20: number | null
+          maintenance_rate_6_to_10: number | null
+          net_profit_20_year: number | null
+          note: string | null
+          panel_count: number | null
+          panel_wattage: number | null
+          payback_years: number | null
+          price_per_kwp: number | null
+          project_id: string | null
+          project_start_date: string | null
+          quote_number: string
+          quote_status: string
+          rent_rate: number | null
+          roi_20_year: number | null
+          sunshine_hours: number | null
+          tariff_rate: number | null
+          tax_rate: number | null
+          total_price_with_tax: number | null
+          updated_at: string
+          updated_by: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          annual_degradation_rate?: number | null
+          capacity_kwp?: number
+          created_at?: string
+          created_by?: string | null
+          high_efficiency_bonus?: number | null
+          id?: string
+          insurance_rate?: number | null
+          inverter_capacity_kw?: number | null
+          inverter_count?: number | null
+          investor_id?: string | null
+          irr_20_year?: number | null
+          loan_interest_rate?: number | null
+          loan_percentage?: number | null
+          loan_term_months?: number | null
+          maintenance_rate_11_to_15?: number | null
+          maintenance_rate_16_to_20?: number | null
+          maintenance_rate_6_to_10?: number | null
+          net_profit_20_year?: number | null
+          note?: string | null
+          panel_count?: number | null
+          panel_wattage?: number | null
+          payback_years?: number | null
+          price_per_kwp?: number | null
+          project_id?: string | null
+          project_start_date?: string | null
+          quote_number: string
+          quote_status?: string
+          rent_rate?: number | null
+          roi_20_year?: number | null
+          sunshine_hours?: number | null
+          tariff_rate?: number | null
+          tax_rate?: number | null
+          total_price_with_tax?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          annual_degradation_rate?: number | null
+          capacity_kwp?: number
+          created_at?: string
+          created_by?: string | null
+          high_efficiency_bonus?: number | null
+          id?: string
+          insurance_rate?: number | null
+          inverter_capacity_kw?: number | null
+          inverter_count?: number | null
+          investor_id?: string | null
+          irr_20_year?: number | null
+          loan_interest_rate?: number | null
+          loan_percentage?: number | null
+          loan_term_months?: number | null
+          maintenance_rate_11_to_15?: number | null
+          maintenance_rate_16_to_20?: number | null
+          maintenance_rate_6_to_10?: number | null
+          net_profit_20_year?: number | null
+          note?: string | null
+          panel_count?: number | null
+          panel_wattage?: number | null
+          payback_years?: number | null
+          price_per_kwp?: number | null
+          project_id?: string | null
+          project_start_date?: string | null
+          quote_number?: string
+          quote_status?: string
+          rent_rate?: number | null
+          roi_20_year?: number | null
+          sunshine_hours?: number | null
+          tariff_rate?: number | null
+          tax_rate?: number | null
+          total_price_with_tax?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_quotes_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_quotes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_quotes_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_stages: {
         Row: {
           actual_date: string | null
@@ -2223,6 +2362,115 @@ export type Database = {
           },
         ]
       }
+      quote_line_items: {
+        Row: {
+          category: string
+          created_at: string
+          id: string
+          item_code: string | null
+          item_name: string
+          note: string | null
+          quantity: number | null
+          quote_id: string
+          sort_order: number | null
+          unit: string | null
+          unit_price: number | null
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          id?: string
+          item_code?: string | null
+          item_name: string
+          note?: string | null
+          quantity?: number | null
+          quote_id: string
+          sort_order?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          id?: string
+          item_code?: string | null
+          item_name?: string
+          note?: string | null
+          quantity?: number | null
+          quote_id?: string
+          sort_order?: number | null
+          unit?: string | null
+          unit_price?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_line_items_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "project_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quote_schedules: {
+        Row: {
+          created_at: string
+          depends_on: string[] | null
+          duration_days: number | null
+          end_date: string | null
+          id: string
+          is_milestone: boolean | null
+          note: string | null
+          phase_code: string
+          phase_name: string
+          quote_id: string
+          sort_order: number | null
+          start_date: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          depends_on?: string[] | null
+          duration_days?: number | null
+          end_date?: string | null
+          id?: string
+          is_milestone?: boolean | null
+          note?: string | null
+          phase_code: string
+          phase_name: string
+          quote_id: string
+          sort_order?: number | null
+          start_date?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          depends_on?: string[] | null
+          duration_days?: number | null
+          end_date?: string | null
+          id?: string
+          is_milestone?: boolean | null
+          note?: string | null
+          phase_code?: string
+          phase_name?: string
+          quote_id?: string
+          sort_order?: number | null
+          start_date?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quote_schedules_quote_id_fkey"
+            columns: ["quote_id"]
+            isOneToOne: false
+            referencedRelation: "project_quotes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       stage_responsibilities: {
         Row: {
           consulted_department_ids: string[] | null
@@ -2307,6 +2555,48 @@ export type Database = {
           sort_order?: number
           updated_at?: string
           value?: string
+        }
+        Relationships: []
+      }
+      system_tariff_rates: {
+        Row: {
+          capacity_max_kwp: number
+          capacity_min_kwp: number
+          created_at: string
+          effective_year: number
+          high_efficiency_bonus: number | null
+          id: string
+          installation_type: string | null
+          is_active: boolean | null
+          note: string | null
+          rate_per_kwh: number
+          updated_at: string
+        }
+        Insert: {
+          capacity_max_kwp: number
+          capacity_min_kwp: number
+          created_at?: string
+          effective_year: number
+          high_efficiency_bonus?: number | null
+          id?: string
+          installation_type?: string | null
+          is_active?: boolean | null
+          note?: string | null
+          rate_per_kwh: number
+          updated_at?: string
+        }
+        Update: {
+          capacity_max_kwp?: number
+          capacity_min_kwp?: number
+          created_at?: string
+          effective_year?: number
+          high_efficiency_bonus?: number | null
+          id?: string
+          installation_type?: string | null
+          is_active?: boolean | null
+          note?: string | null
+          rate_per_kwh?: number
+          updated_at?: string
         }
         Relationships: []
       }
