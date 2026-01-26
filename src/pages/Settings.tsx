@@ -9,7 +9,8 @@ import {
   FileText,
   Building2,
   GitBranch,
-  Users
+  Users,
+  Calculator
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import { DocumentTypePanel } from '@/components/settings/DocumentTypePanel';
 import { DepartmentsPanel } from '@/components/settings/DepartmentsPanel';
 import { ProcessStagesPanel } from '@/components/settings/ProcessStagesPanel';
 import { StageResponsibilitiesPanel } from '@/components/settings/StageResponsibilitiesPanel';
+import { TieredPricingPanel } from '@/components/settings';
 
 export default function Settings() {
   const { isAdmin } = useAuth();
@@ -44,7 +46,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 max-w-4xl">
+        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-9 max-w-5xl">
           <TabsTrigger value="branding" className="flex items-center gap-2">
             <Palette className="w-4 h-4" />
             <span className="hidden sm:inline">公司</span>
@@ -72,6 +74,10 @@ export default function Settings() {
           <TabsTrigger value="raci" className="flex items-center gap-2">
             <Users className="w-4 h-4" />
             <span className="hidden sm:inline">責任</span>
+          </TabsTrigger>
+          <TabsTrigger value="pricing" className="flex items-center gap-2">
+            <Calculator className="w-4 h-4" />
+            <span className="hidden sm:inline">定價</span>
           </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Wrench className="w-4 h-4" />
@@ -118,6 +124,10 @@ export default function Settings() {
 
         <TabsContent value="raci" className="mt-6">
           <StageResponsibilitiesPanel />
+        </TabsContent>
+
+        <TabsContent value="pricing" className="mt-6">
+          <TieredPricingPanel />
         </TabsContent>
 
         <TabsContent value="users" className="mt-6 space-y-6">
