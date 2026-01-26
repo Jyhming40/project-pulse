@@ -292,6 +292,7 @@ export default function QuoteBasicInfoTab({
         capacityKwp={formData.capacityKwp || 0}
         pricePerKwp={formData.pricePerKwp || 0}
         taxRate={formData.taxRate || 0.05}
+        onPricePerKwpChange={(value) => setFormData({ ...formData, pricePerKwp: value })}
       />
 
       {/* Quote Suggestion / Insights Card */}
