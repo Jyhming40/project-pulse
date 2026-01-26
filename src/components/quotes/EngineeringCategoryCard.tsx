@@ -3,7 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -18,8 +24,15 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Plus, Trash2, ChevronDown, GripVertical } from "lucide-react";
-import { EngineeringCategory, EngineeringItem, calculateItemSubtotal, generateId } from "@/hooks/useQuoteEngineering";
+import { 
+  EngineeringCategory, 
+  EngineeringItem, 
+  BillingMethod,
+  calculateItemSubtotal, 
+  generateId 
+} from "@/hooks/useQuoteEngineering";
 import { formatCurrency } from "@/lib/quoteCalculations";
+import { TieredPricingType, calculateTieredPrice, getTieredPricingLabel } from "@/lib/tieredPricing";
 
 interface EngineeringCategoryCardProps {
   category: EngineeringCategory;
@@ -40,9 +53,7 @@ export default function EngineeringCategoryCard({
 
   // 計算類別小計
   const categoryTotal = category.items.reduce((sum, item) => {
-    const qty = item.unit === "kWp" && item.quantity === 0 ? capacityKwp : item.quantity;
-    const itemWithQty = { ...item, quantity: qty };
-    return sum + calculateItemSubtotal(itemWithQty);
+    return sum + calculateItemSubtotal(item, capacityKwp);
   }, 0);
 
   // 更新單一項目
@@ -50,10 +61,7 @@ export default function EngineeringCategoryCard({
     const newItems = [...category.items];
     newItems[index] = { ...newItems[index], ...updates };
     // 重算小計
-    const qty = newItems[index].unit === "kWp" && newItems[index].quantity === 0 
-      ? capacityKwp 
-      : newItems[index].quantity;
-    newItems[index].subtotal = calculateItemSubtotal({ ...newItems[index], quantity: qty });
+    newItems[index].subtotal = calculateItemSubtotal(newItems[index], capacityKwp);
     onUpdate({ ...category, items: newItems });
   };
 
@@ -65,9 +73,9 @@ export default function EngineeringCategoryCard({
       categoryName: category.categoryName,
       itemName: "新項目",
       unitPrice: 0,
-      unit: "式",
+      unit: "kWp",
       quantity: 1,
-      isLumpSum: false,
+      billingMethod: 'per_kw',
       subtotal: 0,
       sortOrder: category.items.length,
     };
@@ -139,20 +147,22 @@ export default function EngineeringCategoryCard({
                 <TableRow>
                   <TableHead className="w-8"></TableHead>
                   <TableHead>項目名稱</TableHead>
+                  <TableHead className="w-28">計費方式</TableHead>
                   <TableHead className="w-24 text-right">單價</TableHead>
-                  <TableHead className="w-20">單位</TableHead>
-                  <TableHead className="w-20 text-right">數量</TableHead>
-                  <TableHead className="w-20 text-center">1式</TableHead>
+                  <TableHead className="w-20 text-right">數量/容量</TableHead>
                   <TableHead className="w-28 text-right">小計</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {category.items.map((item, index) => {
-                  const effectiveQty = item.unit === "kWp" && item.quantity === 0 ? capacityKwp : item.quantity;
-                  const subtotal = item.isLumpSum 
-                    ? (item.lumpSumAmount || 0) 
-                    : item.unitPrice * effectiveQty;
+                  const method = item.billingMethod || 'per_kw';
+                  const subtotal = calculateItemSubtotal(item, capacityKwp);
+                  
+                  // 取得階梯定價資訊
+                  const tieredInfo = method === 'tiered' && item.tieredPricingType 
+                    ? calculateTieredPrice(capacityKwp, item.tieredPricingType)
+                    : null;
                   
                   return (
                     <TableRow key={item.id}>
@@ -167,46 +177,72 @@ export default function EngineeringCategoryCard({
                         />
                       </TableCell>
                       <TableCell>
-                        <Input
-                          type="number"
-                          value={item.unitPrice}
-                          onChange={(e) => handleUpdateItem(index, { unitPrice: parseFloat(e.target.value) || 0 })}
-                          className="h-8 w-24 text-right"
-                          disabled={item.isLumpSum}
-                        />
+                        <Select
+                          value={method}
+                          onValueChange={(value: BillingMethod) => handleUpdateItem(index, { billingMethod: value })}
+                        >
+                          <SelectTrigger className="h-8 w-28">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="per_kw">每kW計價</SelectItem>
+                            <SelectItem value="per_unit">單位計價</SelectItem>
+                            <SelectItem value="lump_sum">一式計價</SelectItem>
+                            <SelectItem value="tiered">階梯定價</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {method === 'tiered' && (
+                          <Select
+                            value={item.tieredPricingType || 'none'}
+                            onValueChange={(value: TieredPricingType) => handleUpdateItem(index, { tieredPricingType: value })}
+                          >
+                            <SelectTrigger className="h-7 w-28 mt-1 text-xs">
+                              <SelectValue placeholder="選擇級距" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="structural_engineer">結構/電機技師</SelectItem>
+                              <SelectItem value="environmental">明群環能</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
                       </TableCell>
                       <TableCell>
-                        <Input
-                          value={item.unit}
-                          onChange={(e) => handleUpdateItem(index, { unit: e.target.value })}
-                          className="h-8 w-16"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          type="number"
-                          value={item.unit === "kWp" && item.quantity === 0 ? capacityKwp : item.quantity}
-                          onChange={(e) => handleUpdateItem(index, { quantity: parseFloat(e.target.value) || 0 })}
-                          className="h-8 w-20 text-right"
-                          disabled={item.isLumpSum || item.unit === "kWp"}
-                        />
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-2">
-                          <Checkbox
-                            checked={item.isLumpSum}
-                            onCheckedChange={(checked) => handleUpdateItem(index, { isLumpSum: !!checked })}
+                        {method === 'per_kw' || method === 'per_unit' ? (
+                          <Input
+                            type="number"
+                            value={item.unitPrice}
+                            onChange={(e) => handleUpdateItem(index, { unitPrice: parseFloat(e.target.value) || 0 })}
+                            className="h-8 w-24 text-right"
                           />
-                          {item.isLumpSum && (
-                            <Input
-                              type="number"
-                              value={item.lumpSumAmount || 0}
-                              onChange={(e) => handleUpdateItem(index, { lumpSumAmount: parseFloat(e.target.value) || 0 })}
-                              className="h-8 w-24 text-right"
-                              placeholder="金額"
-                            />
-                          )}
-                        </div>
+                        ) : method === 'lump_sum' ? (
+                          <Input
+                            type="number"
+                            value={item.lumpSumAmount || 0}
+                            onChange={(e) => handleUpdateItem(index, { lumpSumAmount: parseFloat(e.target.value) || 0 })}
+                            className="h-8 w-24 text-right"
+                            placeholder="金額"
+                          />
+                        ) : tieredInfo ? (
+                          <span className="text-sm text-muted-foreground">
+                            ${tieredInfo.perKwPrice}/kW
+                          </span>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {method === 'per_kw' || method === 'tiered' ? (
+                          <span className="text-sm font-medium">{capacityKwp} kW</span>
+                        ) : method === 'per_unit' ? (
+                          <Input
+                            type="number"
+                            value={item.quantity}
+                            onChange={(e) => handleUpdateItem(index, { quantity: parseFloat(e.target.value) || 0 })}
+                            className="h-8 w-20 text-right"
+                          />
+                        ) : (
+                          <span className="text-sm text-muted-foreground">1式</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-right font-medium font-mono">
                         {formatCurrency(subtotal, 0)}

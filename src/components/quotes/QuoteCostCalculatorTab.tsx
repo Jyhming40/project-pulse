@@ -55,8 +55,7 @@ export default function QuoteCostCalculatorTab({
     // 工程項目總計
     const engineeringTotal = categories.reduce((sum, cat) => {
       return sum + cat.items.reduce((itemSum, item) => {
-        const qty = item.unit === "kWp" && item.quantity === 0 ? capacityKwp : item.quantity;
-        return itemSum + calculateItemSubtotal({ ...item, quantity: qty });
+        return itemSum + calculateItemSubtotal(item, capacityKwp);
       }, 0);
     }, 0);
 

@@ -1,12 +1,20 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { TieredPricingType, calculateTieredPrice } from "@/lib/tieredPricing";
 
 export interface EngineeringCategory {
   categoryCode: string;
   categoryName: string;
   items: EngineeringItem[];
 }
+
+// 計費方式
+export type BillingMethod = 
+  | 'per_kw'      // 每 kW 計價 (單價 × 裝置容量)
+  | 'per_unit'    // 單位計價 (單價 × 數量)
+  | 'lump_sum'    // 一式計價 (固定金額)
+  | 'tiered';     // 階梯式計價 (依容量級距)
 
 export interface EngineeringItem {
   id: string;
@@ -17,11 +25,14 @@ export interface EngineeringItem {
   unitPrice: number;
   unit: string;
   quantity: number;
-  isLumpSum: boolean;
+  billingMethod: BillingMethod;
+  tieredPricingType?: TieredPricingType; // 階梯定價類型
   lumpSumAmount?: number;
   subtotal: number;
   sortOrder: number;
   note?: string;
+  // Legacy support
+  isLumpSum?: boolean;
 }
 
 export interface ModuleItem {
@@ -86,6 +97,8 @@ export function useEngineeringTemplates() {
             unitPrice: item.default_unit_price || 0,
             unit: item.default_unit || "式",
             quantity: item.default_quantity || 1,
+            billingMethod: item.billing_method || (item.is_lump_sum ? 'lump_sum' : 'per_kw'),
+            tieredPricingType: item.tiered_pricing_type || 'none',
             isLumpSum: item.is_lump_sum || false,
             subtotal: 0,
             sortOrder: item.sort_order || 0,
@@ -107,12 +120,33 @@ export function useEngineeringTemplates() {
   return { templates, loading };
 }
 
-// 計算小計
-export function calculateItemSubtotal(item: EngineeringItem): number {
-  if (item.isLumpSum) {
-    return item.lumpSumAmount || 0;
+// 計算小計 (需要傳入 capacityKwp 以支援 per_kw 和 tiered 計費)
+export function calculateItemSubtotal(item: EngineeringItem, capacityKwp: number = 0): number {
+  // Legacy support for isLumpSum
+  const method = item.billingMethod || (item.isLumpSum ? 'lump_sum' : 'per_unit');
+  
+  switch (method) {
+    case 'per_kw':
+      // 每 kW 計價：單價 × 裝置容量
+      return item.unitPrice * capacityKwp;
+    
+    case 'tiered':
+      // 階梯式計價：依容量級距計算
+      if (item.tieredPricingType && item.tieredPricingType !== 'none') {
+        const result = calculateTieredPrice(capacityKwp, item.tieredPricingType);
+        return result.total;
+      }
+      return 0;
+    
+    case 'lump_sum':
+      // 一式計價：固定金額
+      return item.lumpSumAmount || 0;
+    
+    case 'per_unit':
+    default:
+      // 單位計價：單價 × 數量
+      return item.unitPrice * item.quantity;
   }
-  return item.unitPrice * item.quantity;
 }
 
 // 計算模組價格
