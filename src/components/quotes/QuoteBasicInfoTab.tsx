@@ -42,7 +42,7 @@ export default function QuoteBasicInfoTab({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("projects")
-        .select("id, project_name, site_code_display, design_capacity_kwp, investor_id")
+        .select("id, project_name, site_code_display, capacity_kwp, investor_id")
         .eq("is_deleted", false)
         .order("created_at", { ascending: false })
         .limit(500);
@@ -71,11 +71,11 @@ export default function QuoteBasicInfoTab({
     
     if (project) {
       // Auto-fill capacity and investor
-      if (project.design_capacity_kwp) {
+      if (project.capacity_kwp) {
         setFormData({
           ...formData,
-          capacityKwp: Number(project.design_capacity_kwp),
-          panelCount: Math.ceil((Number(project.design_capacity_kwp) * 1000) / (formData.panelWattage || 590)),
+          capacityKwp: Number(project.capacity_kwp),
+          panelCount: Math.ceil((Number(project.capacity_kwp) * 1000) / (formData.panelWattage || 590)),
         });
       }
       if (project.investor_id) {
