@@ -22,14 +22,22 @@ import EquipmentModulesCard from "./EquipmentModulesCard";
 import EquipmentInvertersCard from "./EquipmentInvertersCard";
 import QuoteCostSummarySheet from "./QuoteCostSummarySheet";
 
+interface CostTotals {
+  engineeringTotal: number;
+  modulesTotal: number;
+  invertersTotal: number;
+}
+
 interface QuoteCostCalculatorTabProps {
   formData: Partial<QuoteParams>;
   setFormData: (data: Partial<QuoteParams>) => void;
+  onCostChange?: (costs: CostTotals) => void;
 }
 
 export default function QuoteCostCalculatorTab({
   formData,
   setFormData,
+  onCostChange,
 }: QuoteCostCalculatorTabProps) {
   const { templates, loading } = useEngineeringTemplates();
   
@@ -71,6 +79,11 @@ export default function QuoteCostCalculatorTab({
 
     return { engineeringTotal, modulesTotal, invertersTotal };
   }, [categories, modules, inverters, exchangeRate, formData.capacityKwp]);
+
+  // Notify parent of cost changes
+  useEffect(() => {
+    onCostChange?.(totals);
+  }, [totals, onCostChange]);
 
   // 更新類別
   const handleUpdateCategory = (index: number, category: EngineeringCategory) => {
