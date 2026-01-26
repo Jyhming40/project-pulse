@@ -152,9 +152,9 @@ export default function QuoteFinancialAnalysisTab({
               margin: { l: 60, r: 60, t: 30, b: 60 },
               showlegend: true,
               legend: { orientation: "h", y: -0.2 },
-              yaxis: { title: "金額 (元)", tickformat: ",.0f" },
+              yaxis: { title: { text: "金額 (元)" }, tickformat: ",.0f" },
               yaxis2: {
-                title: "累積現金流 (元)",
+                title: { text: "累積現金流 (元)" },
                 overlaying: "y",
                 side: "right",
                 tickformat: ",.0f",

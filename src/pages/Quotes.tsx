@@ -1,6 +1,5 @@
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +26,21 @@ import { format } from "date-fns";
 import { zhTW } from "date-fns/locale";
 import QuoteEditorDialog from "@/components/quotes/QuoteEditorDialog";
 
+// Temporary type until DB table is created
+interface QuoteData {
+  id: string;
+  quote_number: string;
+  project_id: string | null;
+  investor_id: string | null;
+  capacity_kwp: number | null;
+  total_price_with_tax: number | null;
+  irr_20_year: number | null;
+  quote_status: string;
+  created_at: string;
+  project?: { site_name: string; site_code_display: string } | null;
+  investor?: { company_name: string; investor_code: string } | null;
+}
+
 export default function Quotes() {
   const { isAdmin } = useAuth();
   const queryClient = useQueryClient();
@@ -34,33 +48,15 @@ export default function Quotes() {
   const [editorOpen, setEditorOpen] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | null>(null);
 
-  // Fetch quotes
-  const { data: quotes, isLoading } = useQuery({
-    queryKey: ["project-quotes"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("project_quotes")
-        .select(`
-          *,
-          project:projects(site_name, site_code_display),
-          investor:investors(company_name, investor_code)
-        `)
-        .eq("is_deleted", false)
-        .order("created_at", { ascending: false });
+  // Placeholder data until DB table is created
+  const quotes: QuoteData[] = [];
+  const isLoading = false;
 
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  // Delete mutation
+  // Delete mutation - placeholder until DB table is created
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from("project_quotes")
-        .update({ is_deleted: true, deleted_at: new Date().toISOString() })
-        .eq("id", id);
-      if (error) throw error;
+      // Will be implemented after DB table is created
+      toast.info("資料庫表尚未建立");
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project-quotes"] });
@@ -105,29 +101,9 @@ export default function Quotes() {
     setEditorOpen(true);
   };
 
-  const handleDuplicate = async (quote: any) => {
-    // Generate new quote number
-    const year = new Date().getFullYear();
-    const { count } = await supabase
-      .from("project_quotes")
-      .select("*", { count: "exact", head: true })
-      .ilike("quote_number", `Q-${year}-%`);
-    
-    const newNumber = `Q-${year}-${String((count || 0) + 1).padStart(3, "0")}`;
-
-    const { id, quote_number, created_at, updated_at, ...rest } = quote;
-    const { error } = await supabase.from("project_quotes").insert({
-      ...rest,
-      quote_number: newNumber,
-      quote_status: "draft",
-    });
-
-    if (error) {
-      toast.error("複製失敗");
-    } else {
-      queryClient.invalidateQueries({ queryKey: ["project-quotes"] });
-      toast.success("報價單已複製");
-    }
+  const handleDuplicate = async (quote: QuoteData) => {
+    // Will be implemented after DB table is created
+    toast.info("資料庫表尚未建立");
   };
 
   return (

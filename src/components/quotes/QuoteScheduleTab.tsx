@@ -158,7 +158,7 @@ export default function QuoteScheduleTab({ quoteId }: QuoteScheduleTabProps) {
               showlegend: true,
               legend: { orientation: "h", y: -0.1 },
               xaxis: {
-                title: "天數",
+                title: { text: "天數" },
                 tickformat: "d",
               },
               yaxis: {
