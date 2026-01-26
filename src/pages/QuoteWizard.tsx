@@ -30,6 +30,12 @@ const STEPS = [
   { id: "schedule", label: "工程時程", icon: Calendar, description: "施工排程規劃" },
 ];
 
+interface CostTotals {
+  engineeringTotal: number;
+  modulesTotal: number;
+  invertersTotal: number;
+}
+
 export default function QuoteWizard() {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -61,6 +67,11 @@ export default function QuoteWizard() {
   });
   const [projectId, setProjectId] = useState<string | null>(null);
   const [investorId, setInvestorId] = useState<string | null>(null);
+  const [costTotals, setCostTotals] = useState<CostTotals>({
+    engineeringTotal: 0,
+    modulesTotal: 0,
+    invertersTotal: 0,
+  });
 
   // Fetch existing quote if editing
   const { data: existingQuote, isLoading: isLoadingQuote } = useQuery({
@@ -227,6 +238,7 @@ export default function QuoteWizard() {
             setInvestorId={setInvestorId}
             onSave={handleSave}
             isSaving={isSaving}
+            costs={costTotals}
           />
         );
       case "cost":
@@ -234,6 +246,7 @@ export default function QuoteWizard() {
           <QuoteCostCalculatorTab
             formData={formData}
             setFormData={setFormData}
+            onCostChange={setCostTotals}
           />
         );
       case "financial":

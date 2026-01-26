@@ -13,6 +13,14 @@ import {
 import { Save, Loader2, Building2, MapPin, Phone, User } from "lucide-react";
 import { QuoteParams } from "@/lib/quoteCalculations";
 import { format } from "date-fns";
+import QuotePricingSummaryCard from "./QuotePricingSummaryCard";
+import QuoteSuggestionCard from "./QuoteSuggestionCard";
+
+interface CostBreakdown {
+  engineeringTotal: number;
+  modulesTotal: number;
+  invertersTotal: number;
+}
 
 interface QuoteBasicInfoTabProps {
   formData: Partial<QuoteParams>;
@@ -23,6 +31,7 @@ interface QuoteBasicInfoTabProps {
   setInvestorId: (id: string | null) => void;
   onSave: () => void;
   isSaving: boolean;
+  costs?: CostBreakdown;
 }
 
 export default function QuoteBasicInfoTab({
@@ -34,6 +43,7 @@ export default function QuoteBasicInfoTab({
   setInvestorId,
   onSave,
   isSaving,
+  costs,
 }: QuoteBasicInfoTabProps) {
   // Fetch projects with full details
   const { data: projects } = useQuery({
@@ -275,6 +285,22 @@ export default function QuoteBasicInfoTab({
             </Card>
           )}
         </div>
+      )}
+
+      {/* Pricing Summary Card */}
+      <QuotePricingSummaryCard
+        capacityKwp={formData.capacityKwp || 0}
+        pricePerKwp={formData.pricePerKwp || 0}
+        taxRate={formData.taxRate || 0.05}
+      />
+
+      {/* Quote Suggestion / Insights Card */}
+      {costs && (
+        <QuoteSuggestionCard
+          costs={costs}
+          capacityKwp={formData.capacityKwp || 0}
+          taxRate={formData.taxRate || 0.05}
+        />
       )}
 
       {/* Save Button */}
