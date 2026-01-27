@@ -114,7 +114,7 @@ export default function EngineeringCategoryCard({
                   />
                 ) : (
                   <CardTitle
-                    className="text-base cursor-pointer hover:text-primary"
+                    className="text-sm font-semibold cursor-pointer hover:text-primary"
                     onDoubleClick={(e) => {
                       e.stopPropagation();
                       setIsEditing(true);
@@ -125,7 +125,7 @@ export default function EngineeringCategoryCard({
                 )}
               </div>
               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                <Badge variant="secondary" className="font-mono">
+                <Badge variant="secondary" className="font-mono text-sm">
                   {formatCurrency(categoryTotal, 0)}
                 </Badge>
                 <Button
@@ -280,7 +280,7 @@ export default function EngineeringCategoryCard({
                           <span className="text-sm text-muted-foreground whitespace-nowrap">1 式</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-right font-medium font-mono">
+                      <TableCell className="text-right font-medium font-mono text-sm">
                         {formatCurrency(subtotal, 0)}
                       </TableCell>
                       <TableCell className="text-right text-sm text-muted-foreground font-mono">
@@ -304,10 +304,10 @@ export default function EngineeringCategoryCard({
             <Button
               variant="ghost"
               size="sm"
-              className="mt-2 text-muted-foreground"
+              className="mt-2 text-sm text-muted-foreground"
               onClick={handleAddItem}
             >
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="h-4 w-4 mr-1.5" />
               新增項目
             </Button>
           </CardContent>

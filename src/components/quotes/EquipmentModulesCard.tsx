@@ -122,8 +122,8 @@ export default function EquipmentModulesCard({
         <CollapsibleTrigger asChild>
           <CardHeader className="py-3 cursor-pointer hover:bg-muted/50 transition-colors">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Cpu className="h-5 w-5 text-blue-500" />
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Cpu className="h-4 w-4 text-blue-500" />
                 PV 模組
                 <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "" : "-rotate-90"}`} />
               </CardTitle>
@@ -134,7 +134,7 @@ export default function EquipmentModulesCard({
                     type="number"
                     value={exchangeRate}
                     onChange={(e) => onExchangeRateChange(parseFloat(e.target.value) || 30)}
-                    className="h-8 w-20 text-right"
+                    className="h-8 w-20 text-right text-sm"
                     step="0.01"
                   />
                   <Button
@@ -147,10 +147,10 @@ export default function EquipmentModulesCard({
                     <RefreshCw className={`h-4 w-4 ${isFetchingRate ? "animate-spin" : ""}`} />
                   </Button>
                 </div>
-                <Badge variant="secondary" className="font-mono">
+                <Badge variant="secondary" className="font-mono text-sm">
                   {totalCapacityKwp.toFixed(2)} kWp
                 </Badge>
-                <Badge className="font-mono bg-blue-500">
+                <Badge className="font-mono text-sm bg-blue-500">
                   {formatCurrency(totalPrice, 0)}
                 </Badge>
               </div>
@@ -208,7 +208,7 @@ export default function EquipmentModulesCard({
                           step="0.01"
                         />
                       </TableCell>
-                      <TableCell className="text-right font-medium font-mono text-blue-600">
+                      <TableCell className="text-right font-medium font-mono text-sm text-blue-600">
                         {formatCurrency(priceNtd, 0)}
                       </TableCell>
                       <TableCell>
@@ -229,10 +229,10 @@ export default function EquipmentModulesCard({
             <Button
               variant="ghost"
               size="sm"
-              className="mt-2 text-muted-foreground"
+              className="mt-2 text-sm text-muted-foreground"
               onClick={handleAddModule}
             >
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="h-4 w-4 mr-1.5" />
               新增模組型號
             </Button>
           </CardContent>

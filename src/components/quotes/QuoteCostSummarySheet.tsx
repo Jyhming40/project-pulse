@@ -54,7 +54,7 @@ export default function QuoteCostSummarySheet({
       </SheetTrigger>
       <SheetContent side="right" className="w-[340px] sm:w-[400px]">
         <SheetHeader>
-          <SheetTitle className="text-lg">成本摘要</SheetTitle>
+          <SheetTitle className="text-base font-semibold">成本摘要</SheetTitle>
         </SheetHeader>
         
         <div className="mt-6 space-y-6">
@@ -62,15 +62,15 @@ export default function QuoteCostSummarySheet({
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">工程項目成本</span>
-              <span className="font-mono">{formatCurrency(engineeringTotal, 0)}</span>
+              <span className="font-mono font-medium">{formatCurrency(engineeringTotal, 0)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">PV 模組成本</span>
-              <span className="font-mono text-blue-600">{formatCurrency(modulesTotal, 0)}</span>
+              <span className="font-mono font-medium text-blue-600">{formatCurrency(modulesTotal, 0)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">逆變器成本</span>
-              <span className="font-mono text-amber-600">{formatCurrency(invertersTotal, 0)}</span>
+              <span className="font-mono font-medium text-amber-600">{formatCurrency(invertersTotal, 0)}</span>
             </div>
           </div>
 
@@ -80,11 +80,11 @@ export default function QuoteCostSummarySheet({
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">印花稅 (千分之一)</span>
-              <span className="font-mono">{formatCurrency(stampTax, 0)}</span>
+              <span className="font-mono font-medium">{formatCurrency(stampTax, 0)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">營所稅 (2%)</span>
-              <span className="font-mono">{formatCurrency(businessTax, 0)}</span>
+              <span className="font-mono font-medium">{formatCurrency(businessTax, 0)}</span>
             </div>
           </div>
 
@@ -92,23 +92,23 @@ export default function QuoteCostSummarySheet({
 
           {/* 總計 */}
           <div className="space-y-4">
-            <div className="flex justify-between">
-              <span className="font-medium">總成本</span>
-              <span className="text-xl font-bold font-mono">{formatCurrency(grandTotal, 0)}</span>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">總成本</span>
+              <span className="text-lg font-semibold font-mono">{formatCurrency(grandTotal, 0)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="font-medium">報價金額 (未稅)</span>
-              <span className="text-xl font-bold font-mono">{formatCurrency(sellingPrice, 0)}</span>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">報價金額 (未稅)</span>
+              <span className="text-lg font-semibold font-mono">{formatCurrency(sellingPrice, 0)}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="font-medium">預估毛利</span>
-              <span className={`text-xl font-bold font-mono ${grossProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">預估毛利</span>
+              <span className={`text-lg font-semibold font-mono ${grossProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
                 {formatCurrency(grossProfit, 0)}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="font-medium">毛利率</span>
-              <span className={`text-xl font-bold ${grossMargin >= 0 ? "text-green-600" : "text-destructive"}`}>
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">毛利率</span>
+              <span className={`text-lg font-semibold ${grossMargin >= 0 ? "text-green-600" : "text-destructive"}`}>
                 {grossMargin.toFixed(1)}%
               </span>
             </div>

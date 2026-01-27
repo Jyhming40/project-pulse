@@ -27,16 +27,16 @@ export default function QuotePricingSummaryCard({
 
   return (
     <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Calculator className="h-4 w-4 text-primary" />
           報價金額摘要
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-x-8 gap-y-4">
+        <div className="grid grid-cols-2 gap-x-8 gap-y-5">
           {/* 每kW報價 (未稅) - 可編輯 */}
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <Label htmlFor="pricePerKwp" className="text-sm text-muted-foreground">
               每kW報價 (未稅)
             </Label>
@@ -49,14 +49,14 @@ export default function QuotePricingSummaryCard({
                 type="number"
                 value={pricePerKwp || ""}
                 onChange={(e) => onPricePerKwpChange(Number(e.target.value) || 0)}
-                className="pl-12 text-lg font-bold font-mono text-primary h-11"
+                className="pl-12 text-base font-semibold font-mono text-primary h-10"
                 placeholder="45000"
               />
             </div>
           </div>
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <span className="text-sm text-muted-foreground">每kW報價 (含稅)</span>
-            <p className="text-lg font-bold font-mono text-primary h-11 flex items-center">
+            <p className="text-base font-semibold font-mono text-primary h-10 flex items-center">
               {formatCurrency(pricePerKwpWithTax, 0)}
             </p>
           </div>
@@ -64,15 +64,15 @@ export default function QuotePricingSummaryCard({
           <Separator className="col-span-2" />
 
           {/* 總建置價格 */}
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <span className="text-sm text-muted-foreground">總建置價格 (未稅)</span>
-            <p className="text-xl font-bold font-mono">
+            <p className="text-lg font-semibold font-mono">
               {formatCurrency(totalPriceExcludingTax, 0)}
             </p>
           </div>
-          <div className="space-y-1">
+          <div className="space-y-1.5">
             <span className="text-sm text-muted-foreground">總建置價格 (含稅)</span>
-            <p className="text-xl font-bold font-mono">
+            <p className="text-lg font-semibold font-mono">
               {formatCurrency(totalPriceIncludingTax, 0)}
             </p>
           </div>

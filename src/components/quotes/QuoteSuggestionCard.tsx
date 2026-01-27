@@ -74,8 +74,8 @@ export default function QuoteSuggestionCard({
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base flex items-center gap-2">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-base font-semibold flex items-center gap-2">
           <Lightbulb className="h-4 w-4 text-amber-500" />
           成本分析與建議報價
         </CardTitle>
@@ -83,45 +83,45 @@ export default function QuoteSuggestionCard({
       <CardContent className="space-y-6">
         {/* 工程成本分類表 */}
         <div>
-          <h4 className="text-sm font-medium mb-2">工程成本明細</h4>
+          <h4 className="text-sm font-medium mb-3">工程成本明細</h4>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>項目</TableHead>
-                <TableHead className="text-right">金額 (未稅)</TableHead>
-                <TableHead className="text-right">每kWp</TableHead>
-                <TableHead className="text-right">金額 (含稅)</TableHead>
-                <TableHead className="text-right">每kWp</TableHead>
+                <TableHead className="text-sm">項目</TableHead>
+                <TableHead className="text-right text-sm">金額 (未稅)</TableHead>
+                <TableHead className="text-right text-sm">每kWp</TableHead>
+                <TableHead className="text-right text-sm">金額 (含稅)</TableHead>
+                <TableHead className="text-right text-sm">每kWp</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell className="font-medium">工程項目成本</TableCell>
-                <TableCell className="text-right font-mono">{formatCurrency(engineeringTotal, 0)}</TableCell>
-                <TableCell className="text-right font-mono text-muted-foreground">{formatCurrency(engineeringPerKwp, 0)}</TableCell>
-                <TableCell className="text-right font-mono">{formatCurrency(engineeringWithTax, 0)}</TableCell>
-                <TableCell className="text-right font-mono text-muted-foreground">{formatCurrency(engineeringPerKwpWithTax, 0)}</TableCell>
+                <TableCell className="text-sm font-medium">工程項目成本</TableCell>
+                <TableCell className="text-right font-mono text-sm">{formatCurrency(engineeringTotal, 0)}</TableCell>
+                <TableCell className="text-right font-mono text-sm text-muted-foreground">{formatCurrency(engineeringPerKwp, 0)}</TableCell>
+                <TableCell className="text-right font-mono text-sm">{formatCurrency(engineeringWithTax, 0)}</TableCell>
+                <TableCell className="text-right font-mono text-sm text-muted-foreground">{formatCurrency(engineeringPerKwpWithTax, 0)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="font-medium">PV 模組成本</TableCell>
-                <TableCell className="text-right font-mono text-blue-600">{formatCurrency(modulesTotal, 0)}</TableCell>
-                <TableCell className="text-right font-mono text-muted-foreground">{formatCurrency(modulesPerKwp, 0)}</TableCell>
-                <TableCell className="text-right font-mono text-blue-600">{formatCurrency(modulesWithTax, 0)}</TableCell>
-                <TableCell className="text-right font-mono text-muted-foreground">{formatCurrency(modulesPerKwpWithTax, 0)}</TableCell>
+                <TableCell className="text-sm font-medium">PV 模組成本</TableCell>
+                <TableCell className="text-right font-mono text-sm text-blue-600">{formatCurrency(modulesTotal, 0)}</TableCell>
+                <TableCell className="text-right font-mono text-sm text-muted-foreground">{formatCurrency(modulesPerKwp, 0)}</TableCell>
+                <TableCell className="text-right font-mono text-sm text-blue-600">{formatCurrency(modulesWithTax, 0)}</TableCell>
+                <TableCell className="text-right font-mono text-sm text-muted-foreground">{formatCurrency(modulesPerKwpWithTax, 0)}</TableCell>
               </TableRow>
               <TableRow>
-                <TableCell className="font-medium">逆變器成本</TableCell>
-                <TableCell className="text-right font-mono text-amber-600">{formatCurrency(invertersTotal, 0)}</TableCell>
-                <TableCell className="text-right font-mono text-muted-foreground">{formatCurrency(invertersPerKwp, 0)}</TableCell>
-                <TableCell className="text-right font-mono text-amber-600">{formatCurrency(invertersWithTax, 0)}</TableCell>
-                <TableCell className="text-right font-mono text-muted-foreground">{formatCurrency(invertersPerKwpWithTax, 0)}</TableCell>
+                <TableCell className="text-sm font-medium">逆變器成本</TableCell>
+                <TableCell className="text-right font-mono text-sm text-amber-600">{formatCurrency(invertersTotal, 0)}</TableCell>
+                <TableCell className="text-right font-mono text-sm text-muted-foreground">{formatCurrency(invertersPerKwp, 0)}</TableCell>
+                <TableCell className="text-right font-mono text-sm text-amber-600">{formatCurrency(invertersWithTax, 0)}</TableCell>
+                <TableCell className="text-right font-mono text-sm text-muted-foreground">{formatCurrency(invertersPerKwpWithTax, 0)}</TableCell>
               </TableRow>
-              <TableRow className="bg-muted/50 font-semibold">
-                <TableCell>小計</TableCell>
-                <TableCell className="text-right font-mono">{formatCurrency(totalCostExcludingTax, 0)}</TableCell>
-                <TableCell className="text-right font-mono">{formatCurrency(costPerKwpExcludingTax, 0)}</TableCell>
-                <TableCell className="text-right font-mono">{formatCurrency(totalCostIncludingTax, 0)}</TableCell>
-                <TableCell className="text-right font-mono">{formatCurrency(costPerKwpIncludingTax, 0)}</TableCell>
+              <TableRow className="bg-muted/50">
+                <TableCell className="text-sm font-semibold">小計</TableCell>
+                <TableCell className="text-right font-mono text-sm font-semibold">{formatCurrency(totalCostExcludingTax, 0)}</TableCell>
+                <TableCell className="text-right font-mono text-sm font-semibold">{formatCurrency(costPerKwpExcludingTax, 0)}</TableCell>
+                <TableCell className="text-right font-mono text-sm font-semibold">{formatCurrency(totalCostIncludingTax, 0)}</TableCell>
+                <TableCell className="text-right font-mono text-sm font-semibold">{formatCurrency(costPerKwpIncludingTax, 0)}</TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -131,16 +131,16 @@ export default function QuoteSuggestionCard({
 
         {/* 建議報價表 */}
         <div>
-          <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+          <h4 className="text-sm font-medium mb-3 flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-green-600" />
             建議報價 (依毛利率)
           </h4>
           <Table>
             <TableHeader>
               <TableRow className="bg-green-50 dark:bg-green-950/30">
-                <TableHead>項目</TableHead>
+                <TableHead className="text-sm">項目</TableHead>
                 {marginTargets.map((m) => (
-                  <TableHead key={m} className="text-right">
+                  <TableHead key={m} className="text-right text-sm">
                     毛利率 {m}%
                   </TableHead>
                 ))}
@@ -148,25 +148,25 @@ export default function QuoteSuggestionCard({
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell className="font-medium">每kWp建議報價 (未稅)</TableCell>
+                <TableCell className="text-sm font-medium">每kWp建議報價 (未稅)</TableCell>
                 {marginTargets.map((m) => (
-                  <TableCell key={m} className="text-right font-mono font-semibold text-green-700 dark:text-green-400">
+                  <TableCell key={m} className="text-right font-mono text-sm font-semibold text-green-700 dark:text-green-400">
                     {formatCurrency(calculateSuggestedPricePerKwp(m), 0)}
                   </TableCell>
                 ))}
               </TableRow>
               <TableRow>
-                <TableCell className="font-medium">總報價金額 (未稅)</TableCell>
+                <TableCell className="text-sm font-medium">總報價金額 (未稅)</TableCell>
                 {marginTargets.map((m) => (
-                  <TableCell key={m} className="text-right font-mono">
+                  <TableCell key={m} className="text-right font-mono text-sm">
                     {formatCurrency(calculateSuggestedPrice(m), 0)}
                   </TableCell>
                 ))}
               </TableRow>
               <TableRow className="bg-muted/30">
-                <TableCell className="font-medium">預計利潤</TableCell>
+                <TableCell className="text-sm font-medium">預計利潤</TableCell>
                 {marginTargets.map((m) => (
-                  <TableCell key={m} className="text-right font-mono text-primary font-semibold">
+                  <TableCell key={m} className="text-right font-mono text-sm text-primary font-semibold">
                     {formatCurrency(calculateProfit(m), 0)}
                   </TableCell>
                 ))}

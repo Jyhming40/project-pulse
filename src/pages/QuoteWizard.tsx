@@ -422,10 +422,10 @@ export default function QuoteWizard() {
                 <X className="h-5 w-5" />
               </Button>
               <div>
-                <h1 className="text-xl font-semibold">
+                <h1 className="text-lg font-semibold tracking-tight">
                   {isEditing ? "編輯報價" : "新增報價"}
                 </h1>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mt-0.5">
                   {STEPS[currentStep].description}
                 </p>
               </div>
@@ -470,14 +470,14 @@ export default function QuoteWizard() {
                   <div className="text-left hidden sm:block">
                     <div
                       className={cn(
-                        "text-sm font-medium",
+                        "text-sm font-medium leading-tight",
                         isCurrent && "text-primary",
                         !isCurrent && !isCompleted && "text-muted-foreground"
                       )}
                     >
                       {step.label}
                     </div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-sm text-muted-foreground mt-0.5">
                       步驟 {index + 1}
                     </div>
                   </div>

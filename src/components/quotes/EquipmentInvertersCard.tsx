@@ -75,16 +75,16 @@ export default function EquipmentInvertersCard({
         <CollapsibleTrigger asChild>
           <CardHeader className="py-3 cursor-pointer hover:bg-muted/50 transition-colors">
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Zap className="h-5 w-5 text-amber-500" />
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
+                <Zap className="h-4 w-4 text-amber-500" />
                 逆變器
                 <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${isOpen ? "" : "-rotate-90"}`} />
               </CardTitle>
               <div className="flex items-center gap-4">
-                <Badge variant="secondary" className="font-mono">
+                <Badge variant="secondary" className="font-mono text-sm">
                   {totalCapacityKw.toFixed(1)} kW
                 </Badge>
-                <Badge className="font-mono bg-amber-500">
+                <Badge className="font-mono text-sm bg-amber-500">
                   {formatCurrency(totalPrice, 0)}
                 </Badge>
               </div>
@@ -141,7 +141,7 @@ export default function EquipmentInvertersCard({
                           className="h-8 w-28 text-right"
                         />
                       </TableCell>
-                      <TableCell className="text-right font-medium font-mono text-amber-600">
+                      <TableCell className="text-right font-medium font-mono text-sm text-amber-600">
                         {formatCurrency(totalPriceNtd, 0)}
                       </TableCell>
                       <TableCell>
@@ -162,10 +162,10 @@ export default function EquipmentInvertersCard({
             <Button
               variant="ghost"
               size="sm"
-              className="mt-2 text-muted-foreground"
+              className="mt-2 text-sm text-muted-foreground"
               onClick={handleAddInverter}
             >
-              <Plus className="h-4 w-4 mr-1" />
+              <Plus className="h-4 w-4 mr-1.5" />
               新增逆變器型號
             </Button>
           </CardContent>

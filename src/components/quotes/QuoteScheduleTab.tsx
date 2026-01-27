@@ -113,17 +113,17 @@ export default function QuoteScheduleTab({ quoteId }: QuoteScheduleTabProps) {
           </div>
           <Input
             type="date"
-            className="w-40"
+            className="w-40 h-9"
             value={format(projectStartDate, "yyyy-MM-dd")}
             onChange={(e) => setProjectStartDate(new Date(e.target.value))}
           />
         </div>
         <div className="flex items-center gap-4">
-          <Badge variant="outline" className="text-muted-foreground">
+          <Badge variant="outline" className="text-sm text-muted-foreground">
             預計工期: {totalDays} 天
           </Badge>
           <Button variant="outline" size="sm" onClick={resetToDefaults}>
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw className="w-4 h-4 mr-1.5" />
             重設
           </Button>
         </div>
@@ -131,8 +131,8 @@ export default function QuoteScheduleTab({ quoteId }: QuoteScheduleTabProps) {
 
       {/* Gantt Chart */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Calendar className="w-4 h-4" />
             甘特圖
           </CardTitle>
@@ -181,7 +181,7 @@ export default function QuoteScheduleTab({ quoteId }: QuoteScheduleTabProps) {
         return (
           <Card key={phase}>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
+              <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
                 {label}
               </CardTitle>
@@ -202,12 +202,12 @@ export default function QuoteScheduleTab({ quoteId }: QuoteScheduleTabProps) {
                 <TableBody>
                   {items.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell className="font-mono text-xs">{item.itemCode || "-"}</TableCell>
+                      <TableCell className="font-mono text-sm">{item.itemCode || "-"}</TableCell>
                       <TableCell>
                         <div>
-                          <p className="font-medium">{item.itemName}</p>
+                          <p className="text-sm font-medium">{item.itemName}</p>
                           {item.itemDescription && (
-                            <p className="text-xs text-muted-foreground">{item.itemDescription}</p>
+                            <p className="text-sm text-muted-foreground">{item.itemDescription}</p>
                           )}
                         </div>
                       </TableCell>
@@ -221,23 +221,23 @@ export default function QuoteScheduleTab({ quoteId }: QuoteScheduleTabProps) {
                           }
                         />
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-sm text-muted-foreground">
                         {item.startDate
                           ? format(item.startDate, "yyyy/MM/dd", { locale: zhTW })
                           : "-"}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="text-sm text-muted-foreground">
                         {item.endDate
                           ? format(item.endDate, "yyyy/MM/dd", { locale: zhTW })
                           : "-"}
                       </TableCell>
                       <TableCell>
                         {item.paymentMilestone ? (
-                          <Badge variant="outline" className="text-xs whitespace-nowrap">
+                          <Badge variant="outline" className="text-sm whitespace-nowrap">
                             {item.paymentMilestone}
                           </Badge>
                         ) : (
-                          "-"
+                          <span className="text-sm text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell>
