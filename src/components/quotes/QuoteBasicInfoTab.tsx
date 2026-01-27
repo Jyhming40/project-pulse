@@ -130,14 +130,14 @@ export default function QuoteBasicInfoTab({
       <div className="grid gap-6 md:grid-cols-2">
         {/* Left Column - Project & Business Unit */}
         <Card>
-          <CardHeader>
-            <CardTitle className="text-base">案場與業務單位</CardTitle>
+          <CardHeader className="pb-4">
+            <CardTitle className="text-base font-semibold">案場與業務單位</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-5">
             <div className="space-y-2">
-              <Label>關聯案場</Label>
+              <Label className="text-sm font-medium">關聯案場</Label>
               <Select value={projectId || "__none__"} onValueChange={handleProjectChange}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue placeholder="選擇案場 (選填)" />
                 </SelectTrigger>
                 <SelectContent>
@@ -152,9 +152,9 @@ export default function QuoteBasicInfoTab({
             </div>
 
             <div className="space-y-2">
-              <Label>業務單位</Label>
+              <Label className="text-sm font-medium">業務單位</Label>
               <Select value={investorId || "__none__"} onValueChange={(v) => setInvestorId(v === "__none__" ? null : v)}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue placeholder="選擇業務單位 (選填)" />
                 </SelectTrigger>
                 <SelectContent>
@@ -173,44 +173,44 @@ export default function QuoteBasicInfoTab({
         {/* Right Column - Project Info Summary */}
         {selectedProject && (
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
                 <Building2 className="h-4 w-4 text-primary" />
                 案場資訊
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                <div>
-                  <span className="text-muted-foreground">案場編號</span>
-                  <p className="font-medium text-primary">{selectedProject.site_code_display || "-"}</p>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                <div className="space-y-1">
+                  <span className="text-sm text-muted-foreground">案場編號</span>
+                  <p className="text-sm font-medium text-primary">{selectedProject.site_code_display || "-"}</p>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">進件年度</span>
-                  <p className="font-medium">{selectedProject.intake_year || "-"}</p>
+                <div className="space-y-1">
+                  <span className="text-sm text-muted-foreground">進件年度</span>
+                  <p className="text-sm font-medium">{selectedProject.intake_year || "-"}</p>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">業績年度</span>
-                  <p className="font-medium">{selectedProject.fiscal_year || "-"}</p>
+                <div className="space-y-1">
+                  <span className="text-sm text-muted-foreground">業績年度</span>
+                  <p className="text-sm font-medium">{selectedProject.fiscal_year || "-"}</p>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">裝置類型</span>
-                  <p className="font-medium">{selectedProject.installation_type || "-"}</p>
+                <div className="space-y-1">
+                  <span className="text-sm text-muted-foreground">裝置類型</span>
+                  <p className="text-sm font-medium">{selectedProject.installation_type || "-"}</p>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">同意備案日期</span>
-                  <p className="font-medium">{formatDate(selectedProject.approval_date)}</p>
+                <div className="space-y-1">
+                  <span className="text-sm text-muted-foreground">同意備案日期</span>
+                  <p className="text-sm font-medium">{formatDate(selectedProject.approval_date)}</p>
                 </div>
-                <div>
-                  <span className="text-muted-foreground">與客戶簽訂合約日期</span>
-                  <p className="font-medium">{formatDate(selectedProject.contract_signed_at)}</p>
+                <div className="space-y-1">
+                  <span className="text-sm text-muted-foreground">與客戶簽訂合約日期</span>
+                  <p className="text-sm font-medium">{formatDate(selectedProject.contract_signed_at)}</p>
                 </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground flex items-center gap-1">
-                    <MapPin className="h-3 w-3" />
+                <div className="col-span-2 space-y-1">
+                  <span className="text-sm text-muted-foreground flex items-center gap-1">
+                    <MapPin className="h-3.5 w-3.5" />
                     地址
                   </span>
-                  <p className="font-medium">{selectedProject.address || "-"}</p>
+                  <p className="text-sm font-medium">{selectedProject.address || "-"}</p>
                 </div>
               </div>
             </CardContent>
@@ -224,29 +224,29 @@ export default function QuoteBasicInfoTab({
           {/* Contact Info */}
           {selectedProject && (
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <Phone className="h-4 w-4 text-primary" />
                   聯絡資訊
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">聯絡人</span>
-                    <p className="font-medium">{selectedProject.contact_person || "-"}</p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">聯絡人</span>
+                    <p className="text-sm font-medium">{selectedProject.contact_person || "-"}</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">聯絡電話</span>
-                    <p className="font-medium">{selectedProject.contact_phone || "-"}</p>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">聯絡電話</span>
+                    <p className="text-sm font-medium">{selectedProject.contact_phone || "-"}</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">土地所有人</span>
-                    <p className="font-medium">{selectedProject.land_owner || "-"}</p>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">土地所有人</span>
+                    <p className="text-sm font-medium">{selectedProject.land_owner || "-"}</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">所有人電話</span>
-                    <p className="font-medium">{selectedProject.land_owner_contact || "-"}</p>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">所有人電話</span>
+                    <p className="text-sm font-medium">{selectedProject.land_owner_contact || "-"}</p>
                   </div>
                 </div>
               </CardContent>
@@ -256,29 +256,29 @@ export default function QuoteBasicInfoTab({
           {/* Investor (Business Unit) Info */}
           {selectedInvestor && (
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base font-semibold flex items-center gap-2">
                   <User className="h-4 w-4 text-primary" />
                   業務單位資訊
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">公司名稱</span>
-                    <p className="font-medium">{selectedInvestor.company_name}</p>
+                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">公司名稱</span>
+                    <p className="text-sm font-medium">{selectedInvestor.company_name}</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">聯絡人</span>
-                    <p className="font-medium">{selectedInvestor.contact_person || "-"}</p>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">聯絡人</span>
+                    <p className="text-sm font-medium">{selectedInvestor.contact_person || "-"}</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">電話</span>
-                    <p className="font-medium">{selectedInvestor.phone || "-"}</p>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">電話</span>
+                    <p className="text-sm font-medium">{selectedInvestor.phone || "-"}</p>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Email</span>
-                    <p className="font-medium text-primary">{selectedInvestor.email || "-"}</p>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Email</span>
+                    <p className="text-sm font-medium text-primary">{selectedInvestor.email || "-"}</p>
                   </div>
                 </div>
               </CardContent>

@@ -154,14 +154,14 @@ export default function QuoteCostCalculatorTab({
 
       {/* 動作列 */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">工程成本明細</h3>
+        <h3 className="text-base font-semibold">工程成本明細</h3>
         <div className="flex gap-2">
           <Button variant="outline" size="sm" onClick={handleAddCategory}>
-            <FolderPlus className="h-4 w-4 mr-1" />
+            <FolderPlus className="h-4 w-4 mr-1.5" />
             新增分類
           </Button>
           <Button variant="outline" size="sm" onClick={handleReset}>
-            <RefreshCw className="h-4 w-4 mr-1" />
+            <RefreshCw className="h-4 w-4 mr-1.5" />
             重設為預設
           </Button>
         </div>
@@ -194,9 +194,9 @@ export default function QuoteCostCalculatorTab({
 
       {categories.length === 0 && (
         <div className="text-center py-12 text-muted-foreground border border-dashed rounded-lg">
-          <p className="mb-4">尚無工程項目分類</p>
+          <p className="text-sm mb-4">尚無工程項目分類</p>
           <Button onClick={handleAddCategory}>
-            <Plus className="h-4 w-4 mr-1" />
+            <Plus className="h-4 w-4 mr-1.5" />
             新增第一個分類
           </Button>
         </div>

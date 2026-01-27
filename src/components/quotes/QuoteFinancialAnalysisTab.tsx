@@ -49,74 +49,74 @@ export default function QuoteFinancialAnalysisTab({
       {/* KPI Cards */}
       <div className="grid gap-4 md:grid-cols-6">
         <Card className="bg-primary/5 border-primary/20">
-          <CardContent className="pt-6">
+          <CardContent className="pt-5 pb-4">
             <div className="flex items-center gap-2 mb-2">
               <Percent className="w-4 h-4 text-primary" />
               <span className="text-sm text-muted-foreground">20年 IRR</span>
             </div>
-            <p className="text-2xl font-bold text-primary">
+            <p className="text-xl font-semibold text-primary">
               {formatPercentage(summary.irr20Year)}
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-5 pb-4">
             <div className="flex items-center gap-2 mb-2">
               <Calendar className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">回收年限</span>
             </div>
-            <p className="text-2xl font-bold">{summary.paybackYears} 年</p>
+            <p className="text-xl font-semibold">{summary.paybackYears} 年</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-5 pb-4">
             <div className="flex items-center gap-2 mb-2">
               <DollarSign className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">20年總收益</span>
             </div>
-            <p className="text-2xl font-bold">{formatCurrency(summary.totalRevenue20Year, 0)}</p>
+            <p className="text-xl font-semibold">{formatCurrency(summary.totalRevenue20Year, 0)}</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-5 pb-4">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp className="w-4 h-4 text-success" />
               <span className="text-sm text-muted-foreground">20年淨利</span>
             </div>
-            <p className={`text-2xl font-bold ${summary.netProfit20Year >= 0 ? "text-success" : "text-destructive"}`}>
+            <p className={`text-xl font-semibold ${summary.netProfit20Year >= 0 ? "text-success" : "text-destructive"}`}>
               {formatCurrency(summary.netProfit20Year, 0)}
             </p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-5 pb-4">
             <div className="flex items-center gap-2 mb-2">
               <Percent className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">總投資報酬率</span>
             </div>
-            <p className="text-2xl font-bold">{formatPercentage(summary.totalRoi)}</p>
+            <p className="text-xl font-semibold">{formatPercentage(summary.totalRoi)}</p>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="pt-6">
+          <CardContent className="pt-5 pb-4">
             <div className="flex items-center gap-2 mb-2">
               <Zap className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">年均報酬率</span>
             </div>
-            <p className="text-2xl font-bold">{formatPercentage(summary.annualRoi)}</p>
+            <p className="text-xl font-semibold">{formatPercentage(summary.annualRoi)}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Cash Flow Chart */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">現金流量圖</CardTitle>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-semibold">現金流量圖</CardTitle>
         </CardHeader>
         <CardContent>
           <Plot
@@ -171,34 +171,34 @@ export default function QuoteFinancialAnalysisTab({
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">20年保險費用</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground font-medium">20年保險費用</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-bold">{formatCurrency(summary.totalInsurance20Year, 0)}</p>
+            <p className="text-lg font-semibold">{formatCurrency(summary.totalInsurance20Year, 0)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">20年保固費用</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground font-medium">20年保固費用</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-bold">{formatCurrency(summary.totalMaintenance20Year, 0)}</p>
+            <p className="text-lg font-semibold">{formatCurrency(summary.totalMaintenance20Year, 0)}</p>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">20年租金費用</CardTitle>
+            <CardTitle className="text-sm text-muted-foreground font-medium">20年租金費用</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-bold">{formatCurrency(summary.totalRent20Year, 0)}</p>
+            <p className="text-lg font-semibold">{formatCurrency(summary.totalRent20Year, 0)}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Yearly Projection Table */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">20年財務預測明細</CardTitle>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-base font-semibold">20年財務預測明細</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="max-h-96 overflow-auto">
@@ -219,17 +219,17 @@ export default function QuoteFinancialAnalysisTab({
               <TableBody>
                 {yearlyData.map((year: any) => (
                   <TableRow key={year.yearNumber}>
-                    <TableCell className="text-center font-medium">第 {year.yearNumber} 年</TableCell>
-                    <TableCell className="text-right">{year.estimatedGenerationKwh.toLocaleString()}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(year.electricityRevenue, 0)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(year.loanPayment, 0)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(year.maintenanceCost, 0)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(year.insuranceCost, 0)}</TableCell>
-                    <TableCell className="text-right">{formatCurrency(year.rentCost, 0)}</TableCell>
-                    <TableCell className={`text-right font-medium ${year.annualCashFlow >= 0 ? "text-success" : "text-destructive"}`}>
+                    <TableCell className="text-center text-sm font-medium">第 {year.yearNumber} 年</TableCell>
+                    <TableCell className="text-right text-sm">{year.estimatedGenerationKwh.toLocaleString()}</TableCell>
+                    <TableCell className="text-right text-sm">{formatCurrency(year.electricityRevenue, 0)}</TableCell>
+                    <TableCell className="text-right text-sm">{formatCurrency(year.loanPayment, 0)}</TableCell>
+                    <TableCell className="text-right text-sm">{formatCurrency(year.maintenanceCost, 0)}</TableCell>
+                    <TableCell className="text-right text-sm">{formatCurrency(year.insuranceCost, 0)}</TableCell>
+                    <TableCell className="text-right text-sm">{formatCurrency(year.rentCost, 0)}</TableCell>
+                    <TableCell className={`text-right text-sm font-medium ${year.annualCashFlow >= 0 ? "text-success" : "text-destructive"}`}>
                       {formatCurrency(year.annualCashFlow, 0)}
                     </TableCell>
-                    <TableCell className={`text-right font-bold ${year.cumulativeCashFlow >= 0 ? "text-success" : "text-destructive"}`}>
+                    <TableCell className={`text-right text-sm font-semibold ${year.cumulativeCashFlow >= 0 ? "text-success" : "text-destructive"}`}>
                       {formatCurrency(year.cumulativeCashFlow, 0)}
                     </TableCell>
                   </TableRow>
