@@ -263,17 +263,22 @@ export default function QuoteDocumentDialogV2({
       <html>
       <head>
         <title>報價單 - ${previewData?.quote.number || "document"}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { 
-            font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
-            font-size: 12pt;
-            line-height: 1.5;
-            color: #000;
+            font-family: 'Noto Sans TC', 'Microsoft JhengHei', 'PingFang TC', sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #1a1a1a;
+            background: white;
           }
           @page { 
             size: A4; 
-            margin: 15mm; 
+            margin: 0; 
+          }
+          @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           }
           .no-print { display: none !important; }
           input, textarea { 
@@ -281,11 +286,31 @@ export default function QuoteDocumentDialogV2({
             background: transparent !important;
             font-family: inherit;
             font-size: inherit;
+            color: inherit;
           }
-          .editable-cell { border: none !important; background: transparent !important; }
           table { border-collapse: collapse; width: 100%; }
-          th, td { border: 1px solid #333; padding: 4px 8px; }
-          th { background: #f0f0f0; }
+          /* Preserve backgrounds for print */
+          .bg-gray-800, [class*="bg-gray-800"] { background-color: #1f2937 !important; color: white !important; }
+          .bg-blue-600, [class*="bg-blue-600"] { background-color: #2563eb !important; }
+          .bg-blue-700, [class*="bg-blue-700"] { background-color: #1d4ed8 !important; }
+          .bg-green-700, [class*="bg-green-700"] { background-color: #15803d !important; color: white !important; }
+          .bg-green-50, [class*="bg-green-50"] { background-color: #f0fdf4 !important; }
+          .bg-gray-50, [class*="bg-gray-50"] { background-color: #f9fafb !important; }
+          .bg-amber-50, [class*="bg-amber-50"] { background-color: #fffbeb !important; }
+          .bg-blue-100, [class*="bg-blue-100"] { background-color: #dbeafe !important; }
+          .bg-green-100, [class*="bg-green-100"] { background-color: #dcfce7 !important; }
+          .bg-amber-200, [class*="bg-amber-200"] { background-color: #fde68a !important; }
+          .text-blue-600, [class*="text-blue-600"] { color: #2563eb !important; }
+          .text-blue-800, [class*="text-blue-800"] { color: #1e40af !important; }
+          .text-green-800, [class*="text-green-800"] { color: #166534 !important; }
+          .text-amber-800, [class*="text-amber-800"] { color: #92400e !important; }
+          .rounded-lg { border-radius: 0.5rem; }
+          .rounded-full { border-radius: 9999px; }
+          .border { border-width: 1px; border-style: solid; }
+          .border-2 { border-width: 2px; border-style: solid; }
+          .border-4 { border-width: 4px; border-style: solid; }
+          .border-double { border-style: double; }
+          .shadow-md { box-shadow: 0 4px 6px -1px rgba(0,0,0,.1); }
         </style>
       </head>
       <body>${printContent}</body>
