@@ -1,8 +1,8 @@
 /**
  * 報價單產出對話框 V2
- * 使用後端 Edge Function 產生 PDF
+ * 使用 HTML 預覽 + 瀏覽器列印產生 PDF
  */
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,24 +11,12 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Download,
-  Printer,
-  FileText,
-  User,
-  Loader2,
-  RefreshCw,
-} from "lucide-react";
+import { Printer, FileText, Download } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { EngineeringCategory, ModuleItem, InverterItem } from "@/hooks/useQuoteEngineering";
-import { formatCurrency } from "@/lib/quoteCalculations";
+import QuoteDocumentPreview, { QuotePreviewData, PaymentTermItem } from "./QuoteDocumentPreview";
 
 interface QuoteDocumentDialogProps {
   open: boolean;
@@ -44,13 +32,6 @@ interface QuoteDocumentDialogProps {
   inverters: InverterItem[];
   projectId?: string | null;
   investorId?: string | null;
-}
-
-interface PaymentTermItem {
-  name: string;
-  percentage: number;
-  condition?: string;
-  amount?: number;
 }
 
 // 預設付款條件
@@ -81,27 +62,8 @@ export default function QuoteDocumentDialogV2({
   projectId,
   investorId,
 }: QuoteDocumentDialogProps) {
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
-
-  // 客戶資訊
-  const [customerName, setCustomerName] = useState("");
-  const [customerContact, setCustomerContact] = useState("");
-  const [customerPhone, setCustomerPhone] = useState("");
-  const [siteAddress, setSiteAddress] = useState("");
-
-  // 報價資訊
-  const [quoteNumber, setQuoteNumber] = useState("");
-  const [quoteDate, setQuoteDate] = useState(new Date().toISOString().split("T")[0]);
-  const [validUntil, setValidUntil] = useState("");
-  const [salesperson, setSalesperson] = useState("");
-  const [salespersonPhone, setSalespersonPhone] = useState("");
-
-  // 付款條件
-  const [paymentTerms] = useState<PaymentTermItem[]>(DEFAULT_PAYMENT_TERMS);
-
-  // 條款
-  const [termsText, setTermsText] = useState(DEFAULT_TERMS.join("\n"));
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [previewData, setPreviewData] = useState<QuotePreviewData | null>(null);
 
   // 取得公司資訊
   const { data: appSettings } = useQuery({
@@ -165,33 +127,6 @@ export default function QuoteDocumentDialogV2({
     enabled: !!quoteId,
   });
 
-  // 初始化資料
-  useEffect(() => {
-    if (investor) {
-      setCustomerName(investor.company_name || "");
-      setCustomerContact(investor.contact_person || "");
-      setCustomerPhone(investor.phone || "");
-    }
-    if (project) {
-      setSiteAddress(project.address || "");
-    }
-    if (quote) {
-      setQuoteNumber(quote.quote_number || "");
-      if (quote.valid_until) {
-        setValidUntil(quote.valid_until);
-      }
-    }
-  }, [investor, project, quote]);
-
-  // 清理 URL
-  useEffect(() => {
-    return () => {
-      if (pdfUrl) {
-        URL.revokeObjectURL(pdfUrl);
-      }
-    };
-  }, [pdfUrl]);
-
   // 計算金額
   const calculateTotals = useMemo(() => {
     const capacityKwp = formData.capacityKwp || 0;
@@ -213,7 +148,7 @@ export default function QuoteDocumentDialogV2({
 
   // 建構項目明細
   const buildItems = useMemo(() => {
-    const items: any[] = [];
+    const items: QuotePreviewData["items"] = [];
     let orderNum = 1;
 
     // 模組
@@ -221,7 +156,7 @@ export default function QuoteDocumentDialogV2({
       items.push({
         order: orderNum++,
         category: "equipment",
-        categoryName: idx === 0 ? "太陽光電模組" : undefined,
+        categoryName: idx === 0 ? "太陽光電模組" : "",
         name: "太陽光電模組",
         spec: m.moduleModel || `${m.wattagePerPanel}W 單晶矽模組`,
         quantity: m.panelCount,
@@ -234,6 +169,7 @@ export default function QuoteDocumentDialogV2({
       items.push({
         order: orderNum++,
         category: "equipment",
+        categoryName: "",
         name: "太陽能逆變器",
         spec: inv.inverterModel || `${inv.capacityKw}kW 逆變器`,
         quantity: inv.inverterCount,
@@ -248,7 +184,7 @@ export default function QuoteDocumentDialogV2({
         items.push({
           order: orderNum++,
           category: cat.categoryCode,
-          categoryName: firstInCategory ? cat.categoryName : undefined,
+          categoryName: firstInCategory ? cat.categoryName : "",
           name: item.itemName,
           spec: item.note || "",
           quantity:
@@ -266,19 +202,16 @@ export default function QuoteDocumentDialogV2({
 
   // 計算付款金額
   const paymentTermsWithAmount = useMemo(() => {
-    return paymentTerms.map((term) => ({
+    return DEFAULT_PAYMENT_TERMS.map((term) => ({
       ...term,
       amount: calculateTotals.total * (term.percentage / 100),
     }));
-  }, [paymentTerms, calculateTotals.total]);
+  }, [calculateTotals.total]);
 
-  // 產生 PDF
-  const handleGeneratePdf = async () => {
-    setIsGenerating(true);
-    setPdfUrl(null);
-
-    try {
-      const pdfData = {
+  // 初始化預覽資料
+  useEffect(() => {
+    if (open) {
+      const data: QuotePreviewData = {
         company: {
           name: appSettings?.company_name_zh || "公司名稱",
           address: appSettings?.address || "",
@@ -291,291 +224,113 @@ export default function QuoteDocumentDialogV2({
           bankAccountName: (appSettings as any)?.bank_account_name || "",
         },
         customer: {
-          name: customerName,
-          contact: customerContact,
-          phone: customerPhone,
-          siteAddress: siteAddress,
+          name: investor?.company_name || "",
+          contact: investor?.contact_person || "",
+          phone: investor?.phone || "",
+          siteAddress: project?.address || "",
         },
         quote: {
-          number: quoteNumber,
-          date: quoteDate,
-          validUntil: validUntil,
-          salesperson: salesperson,
-          salespersonPhone: salespersonPhone,
+          number: quote?.quote_number || "",
+          date: new Date().toISOString().split("T")[0],
+          validUntil: quote?.valid_until || "",
+          salesperson: "",
+          salespersonPhone: "",
           capacityKwp: formData.capacityKwp,
         },
         items: buildItems,
         summary: calculateTotals,
         paymentTerms: paymentTermsWithAmount,
-        terms: termsText.split("\n").filter((t) => t.trim()),
+        terms: [...DEFAULT_TERMS],
       };
-
-      const { data: fnData, error } = await supabase.functions.invoke(
-        "generate-quote-pdf",
-        {
-          body: pdfData,
-        }
-      );
-
-      if (error) throw error;
-
-      // fnData 是 ArrayBuffer
-      const blob = new Blob([fnData], { type: "application/pdf" });
-      const url = URL.createObjectURL(blob);
-      setPdfUrl(url);
-
-      toast.success("PDF 產生成功！");
-    } catch (err: any) {
-      console.error("PDF generation error:", err);
-      toast.error(`產生 PDF 失敗: ${err.message || "未知錯誤"}`);
-    } finally {
-      setIsGenerating(false);
+      setPreviewData(data);
     }
-  };
+  }, [open, appSettings, investor, project, quote, buildItems, calculateTotals, paymentTermsWithAmount, formData.capacityKwp]);
 
-  // 下載 PDF
-  const handleDownload = () => {
-    if (!pdfUrl) return;
-    const a = document.createElement("a");
-    a.href = pdfUrl;
-    a.download = `報價單-${quoteNumber || "document"}.pdf`;
-    a.click();
-  };
+  // 列印功能
+  const handlePrint = useCallback(() => {
+    if (!previewRef.current) return;
 
-  // 列印 PDF
-  const handlePrint = () => {
-    if (!pdfUrl) return;
-    const printWindow = window.open(pdfUrl);
-    if (printWindow) {
-      printWindow.onload = () => {
-        printWindow.print();
-      };
+    const printContent = previewRef.current.innerHTML;
+    const printWindow = window.open("", "_blank", "width=800,height=600");
+    
+    if (!printWindow) {
+      toast.error("無法開啟列印視窗，請檢查瀏覽器設定");
+      return;
     }
-  };
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>報價單 - ${previewData?.quote.number || "document"}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+            font-size: 12pt;
+            line-height: 1.5;
+            color: #000;
+          }
+          @page { 
+            size: A4; 
+            margin: 15mm; 
+          }
+          .no-print { display: none !important; }
+          input, textarea { 
+            border: none !important; 
+            background: transparent !important;
+            font-family: inherit;
+            font-size: inherit;
+          }
+          .editable-cell { border: none !important; background: transparent !important; }
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border: 1px solid #333; padding: 4px 8px; }
+          th { background: #f0f0f0; }
+        </style>
+      </head>
+      <body>${printContent}</body>
+      </html>
+    `);
+
+    printWindow.document.close();
+    
+    // 等待內容載入後列印
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+    };
+  }, [previewData]);
+
+  if (!previewData) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
-        <DialogHeader className="flex-shrink-0">
+      <DialogContent className="max-w-5xl h-[95vh] flex flex-col p-0">
+        <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            產出報價單
+            報價單預覽與編輯
           </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            可直接編輯下方內容，完成後點擊「列印 / 另存 PDF」
+          </p>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto pr-4">
-          <div className="space-y-6 py-4">
-            {/* 客戶資訊 */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  客戶資訊
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>客戶名稱</Label>
-                  <Input
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="公司名稱"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>聯絡人</Label>
-                  <Input
-                    value={customerContact}
-                    onChange={(e) => setCustomerContact(e.target.value)}
-                    placeholder="聯絡人姓名"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>聯絡電話</Label>
-                  <Input
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="電話號碼"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>案場地點</Label>
-                  <Input
-                    value={siteAddress}
-                    onChange={(e) => setSiteAddress(e.target.value)}
-                    placeholder="案場地址"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 報價資訊 */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  報價資訊
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                <div className="space-y-2">
-                  <Label>報價單號</Label>
-                  <Input
-                    value={quoteNumber}
-                    onChange={(e) => setQuoteNumber(e.target.value)}
-                    placeholder="Q20260128-001"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>報價日期</Label>
-                  <Input
-                    type="date"
-                    value={quoteDate}
-                    onChange={(e) => setQuoteDate(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>有效日期</Label>
-                  <Input
-                    type="date"
-                    value={validUntil}
-                    onChange={(e) => setValidUntil(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>業務員</Label>
-                  <Input
-                    value={salesperson}
-                    onChange={(e) => setSalesperson(e.target.value)}
-                    placeholder="業務員姓名"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>業務分機</Label>
-                  <Input
-                    value={salespersonPhone}
-                    onChange={(e) => setSalespersonPhone(e.target.value)}
-                    placeholder="分機號碼"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>裝置容量</Label>
-                  <Input
-                    value={`${formData.capacityKwp} kW`}
-                    disabled
-                    className="bg-muted"
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 金額摘要 */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">金額摘要</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">合計(未稅)</span>
-                    <p className="font-bold">
-                      {formatCurrency(calculateTotals.subtotal, 0)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">稅金</span>
-                    <p className="font-bold">
-                      {formatCurrency(calculateTotals.tax, 0)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">總計</span>
-                    <p className="font-bold text-primary">
-                      {formatCurrency(calculateTotals.total, 0)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">每kW(未稅)</span>
-                    <p className="font-bold">
-                      {formatCurrency(calculateTotals.pricePerKwpExcludingTax, 0)}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">每kW(含稅)</span>
-                    <p className="font-bold">
-                      {formatCurrency(calculateTotals.pricePerKwpIncludingTax, 0)}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* 條款說明 */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">條款說明</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Textarea
-                  value={termsText}
-                  onChange={(e) => setTermsText(e.target.value)}
-                  placeholder="每行一條條款..."
-                  rows={5}
-                />
-                <p className="text-xs text-muted-foreground mt-2">
-                  每行一條條款，將自動編號顯示在報價單上
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* PDF 預覽區 */}
-            {pdfUrl && (
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base">PDF 預覽</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <iframe
-                    src={pdfUrl}
-                    className="w-full h-[500px] border rounded-lg"
-                    title="PDF Preview"
-                  />
-                </CardContent>
-              </Card>
-            )}
-          </div>
+        <div className="flex-1 overflow-auto bg-gray-100 p-4">
+          <QuoteDocumentPreview
+            ref={previewRef}
+            data={previewData}
+            onDataChange={setPreviewData}
+          />
         </div>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <Button
-            onClick={handleGeneratePdf}
-            disabled={isGenerating}
-            className="gap-2"
-          >
-            {isGenerating ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-            {isGenerating ? "產生中..." : pdfUrl ? "重新產生" : "產生 PDF"}
+        <DialogFooter className="flex-shrink-0 px-6 py-4 border-t gap-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            取消
           </Button>
-          <Button
-            variant="outline"
-            onClick={handleDownload}
-            disabled={!pdfUrl}
-            className="gap-2"
-          >
-            <Download className="h-4 w-4" />
-            下載
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handlePrint}
-            disabled={!pdfUrl}
-            className="gap-2"
-          >
+          <Button onClick={handlePrint} className="gap-2">
             <Printer className="h-4 w-4" />
-            列印
+            列印 / 另存 PDF
           </Button>
         </DialogFooter>
       </DialogContent>
