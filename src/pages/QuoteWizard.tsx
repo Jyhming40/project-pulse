@@ -139,7 +139,7 @@ export default function QuoteWizard() {
   });
 
   // Fetch existing engineering items
-  const { data: existingEngineeringItems } = useQuery({
+  const { data: existingEngineeringItems, isFetched: isEngineeringFetched } = useQuery({
     queryKey: ["quote-engineering-items", id],
     queryFn: async () => {
       if (!id) return [];
@@ -223,7 +223,10 @@ export default function QuoteWizard() {
 
   // Load existing engineering items into categories
   useEffect(() => {
-    if (existingEngineeringItems && existingEngineeringItems.length > 0 && !dataLoaded) {
+    // Wait for query to complete
+    if (!isEngineeringFetched || dataLoaded) return;
+    
+    if (existingEngineeringItems && existingEngineeringItems.length > 0) {
       // Group items by category
       const categoryMap = new Map<string, EngineeringCategory>();
       
@@ -257,9 +260,10 @@ export default function QuoteWizard() {
       });
       
       setCategories(Array.from(categoryMap.values()));
-      setDataLoaded(true);
     }
-  }, [existingEngineeringItems, dataLoaded]);
+    // Always set dataLoaded when fetch is complete (even if no items)
+    setDataLoaded(true);
+  }, [existingEngineeringItems, isEngineeringFetched, dataLoaded]);
 
   // Calculate projections
   const projections = formData.capacityKwp
@@ -389,7 +393,11 @@ export default function QuoteWizard() {
         // Insert new engineering items
         const allItems: any[] = [];
         let globalSortOrder = 0;
+        
+        console.log("Saving engineering items, categories:", categories.length);
+        
         categories.forEach((category) => {
+          console.log(`Category: ${category.categoryName}, items: ${category.items.length}`);
           category.items.forEach((item) => {
             allItems.push({
               quote_id: quoteId,
@@ -409,12 +417,16 @@ export default function QuoteWizard() {
           });
         });
         
+        console.log("Total engineering items to save:", allItems.length);
+        
         if (allItems.length > 0) {
           const { error: engineeringError } = await supabase
             .from("quote_engineering_items" as any)
             .insert(allItems);
           if (engineeringError) {
             console.error("Error saving engineering items:", engineeringError);
+          } else {
+            console.log("Engineering items saved successfully");
           }
         }
       }
@@ -491,6 +503,7 @@ export default function QuoteWizard() {
             setExchangeRate={setExchangeRate}
             categories={categories}
             setCategories={setCategories}
+            skipTemplateInit={isEditing && !dataLoaded}
           />
         );
       case "financial":
