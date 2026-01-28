@@ -13,7 +13,8 @@ import {
   Calendar,
   Check,
   Save,
-  X
+  X,
+  FileOutput,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ import QuoteBasicInfoTab from "@/components/quotes/QuoteBasicInfoTab";
 import QuoteCostCalculatorTab from "@/components/quotes/QuoteCostCalculatorTab";
 import QuoteFinancialAnalysisTab from "@/components/quotes/QuoteFinancialAnalysisTab";
 import QuoteScheduleTab from "@/components/quotes/QuoteScheduleTab";
+import QuoteDocumentDialog from "@/components/quotes/QuoteDocumentDialog";
 import { calculate20YearProjection, QuoteParams } from "@/lib/quoteCalculations";
 import { 
   ModuleItem, 
@@ -86,6 +88,7 @@ export default function QuoteWizard() {
     invertersTotal: 0,
   });
   const [brokerageRate, setBrokerageRate] = useState(0);
+  const [showDocumentDialog, setShowDocumentDialog] = useState(false);
 
   // Modules, inverters, and engineering categories state - lifted from QuoteCostCalculatorTab
   const [modules, setModules] = useState<ModuleItem[]>([createDefaultModule()]);
@@ -623,10 +626,21 @@ export default function QuoteWizard() {
                 </p>
               </div>
             </div>
-            <Button onClick={handleSave} disabled={isSaving}>
-              <Save className="h-4 w-4 mr-2" />
-              {isSaving ? "儲存中..." : "儲存報價"}
-            </Button>
+            <div className="flex gap-2">
+              {isEditing && id && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowDocumentDialog(true)}
+                >
+                  <FileOutput className="h-4 w-4 mr-2" />
+                  產出報價單
+                </Button>
+              )}
+              <Button onClick={handleSave} disabled={isSaving}>
+                <Save className="h-4 w-4 mr-2" />
+                {isSaving ? "儲存中..." : "儲存報價"}
+              </Button>
+            </div>
           </div>
 
           {/* Step indicators */}
@@ -722,6 +736,25 @@ export default function QuoteWizard() {
           </div>
         </div>
       </div>
+
+      {/* 報價單產出對話框 */}
+      {id && (
+        <QuoteDocumentDialog
+          open={showDocumentDialog}
+          onOpenChange={setShowDocumentDialog}
+          quoteId={id}
+          formData={{
+            capacityKwp: formData.capacityKwp || 0,
+            pricePerKwp: formData.pricePerKwp || 0,
+            taxRate: formData.taxRate || 0.05,
+          }}
+          categories={categories}
+          modules={modules}
+          inverters={inverters}
+          projectId={projectId}
+          investorId={investorId}
+        />
+      )}
     </div>
   );
 }
