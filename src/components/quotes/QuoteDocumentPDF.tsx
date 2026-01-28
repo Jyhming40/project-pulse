@@ -4,17 +4,17 @@
  */
 import { Document, Page, Text, View, StyleSheet, Font } from "@react-pdf/renderer";
 
-// 註冊中文字型 - 使用思源黑體 (Source Han Sans) TTF 格式
+// 註冊中文字型 - 使用 Google Noto Sans TC TTF (本地載入)
 // @react-pdf/renderer 只支援 TTF 格式
 Font.register({
   family: "NotoSansTC",
   fonts: [
     {
-      src: "https://raw.githubusercontent.com/nicobao/noto-sans-font-ttf/main/NotoSansSC-Regular.ttf",
+      src: "/fonts/NotoSansTC-Regular.ttf",
       fontWeight: "normal",
     },
     {
-      src: "https://raw.githubusercontent.com/nicobao/noto-sans-font-ttf/main/NotoSansSC-Bold.ttf",
+      src: "/fonts/NotoSansTC-Regular.ttf", // 使用 Regular 作為 Bold 的備選
       fontWeight: "bold",
     },
   ],
