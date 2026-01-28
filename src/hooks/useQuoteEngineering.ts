@@ -174,9 +174,11 @@ export function calculateItemSubtotal(
       return totalPriceWithTax * 0.02;
     
     case 'brokerage':
-      // 仲介費：每kW含稅價格 × 容量 × 自訂百分比
-      const rate = (item.brokerageRate || 0) / 100;
-      return pricePerKwpWithTax * ctx.capacityKwp * rate;
+      // 仲介費：每kW仲介費 × 容量 = 小計，再加上 小計 × 百分比
+      // unitPrice = 每kW仲介費, brokerageRate = 加成百分比
+      const brokerageSubtotal = item.unitPrice * capacityKwp;
+      const brokerageBonus = brokerageSubtotal * ((item.brokerageRate || 0) / 100);
+      return brokerageSubtotal + brokerageBonus;
     
     case 'per_unit':
     default:
