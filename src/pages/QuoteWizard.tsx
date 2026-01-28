@@ -408,9 +408,11 @@ export default function QuoteWizard() {
               unit_price: item.unitPrice,
               unit: item.unit || "式",
               quantity: item.quantity,
+              billing_method: item.billingMethod || 'per_unit',
+              tiered_pricing_type: item.tieredPricingType || null,
               is_lump_sum: item.billingMethod === 'lump_sum',
               lump_sum_amount: item.lumpSumAmount || null,
-              subtotal: calculateItemSubtotal(item, formData.capacityKwp || 0),
+              // Note: subtotal is a generated column, do NOT include it
               sort_order: globalSortOrder++,
               note: item.note || null,
             });
