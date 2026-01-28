@@ -27,22 +27,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { Plus, Edit2, Trash2, AlertCircle, Database, FileCode, Calculator, Info } from "lucide-react";
-import { useTieredPricing, PricingType, PricingTier } from "@/hooks/useTieredPricing";
+import { Plus, Edit2, Trash2, Calculator, Info } from "lucide-react";
+import { useTieredPricing, PricingTier } from "@/hooks/useTieredPricing";
 import { formatCurrency } from "@/lib/quoteCalculations";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { calculateTieredPrice, getTieredPricingDescription } from "@/lib/tieredPricing";
+import { getTieredPricingDescription } from "@/lib/tieredPricing";
 
 export default function TieredPricingPanel() {
   const {
     pricingTypes,
     isLoading,
-    useDatabase,
     getTiersForType,
     getStructuralDataPoints,
     getStructuralPer500kwFee,
     saveTier,
     deleteTier,
+    calculatePrice,
   } = useTieredPricing();
 
   const [activeTab, setActiveTab] = useState<string>(pricingTypes[0]?.typeCode || 'structural_engineer');
@@ -61,8 +60,8 @@ export default function TieredPricingPanel() {
   // 測試計算結果
   const testResult = useMemo(() => {
     if (testCapacity <= 0) return null;
-    return calculateTieredPrice(testCapacity, activeTab as any);
-  }, [testCapacity, activeTab]);
+    return calculatePrice(testCapacity, activeTab);
+  }, [testCapacity, activeTab, calculatePrice]);
 
   const handleEditTier = (tier: PricingTier) => {
     setEditingTier(tier);
@@ -134,34 +133,9 @@ export default function TieredPricingPanel() {
               管理工程報價中使用的階梯式定價級距（結構技師、電機技師、明群環能）
             </CardDescription>
           </div>
-          <Badge variant={useDatabase ? "default" : "secondary"} className="gap-1">
-            {useDatabase ? (
-              <>
-                <Database className="h-3 w-3" />
-                資料庫模式
-              </>
-            ) : (
-              <>
-                <FileCode className="h-3 w-3" />
-                預設模式
-              </>
-            )}
-          </Badge>
         </div>
       </CardHeader>
       <CardContent>
-        {!useDatabase && (
-          <Alert className="mb-4">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              目前使用系統預設定價資料。若需自訂級距，請聯繫系統管理員建立資料庫表格。
-              <br />
-              <span className="text-muted-foreground text-xs">
-                備註：預設資料仍可正常使用於報價計算中。
-              </span>
-            </AlertDescription>
-          </Alert>
-        )}
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4">
@@ -266,7 +240,7 @@ export default function TieredPricingPanel() {
                     <div className="flex justify-end">
                       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                         <DialogTrigger asChild>
-                          <Button size="sm" onClick={handleAddTier} disabled={!useDatabase}>
+                          <Button size="sm" onClick={handleAddTier}>
                             <Plus className="h-4 w-4 mr-1" />
                             新增級距
                           </Button>
@@ -363,7 +337,7 @@ export default function TieredPricingPanel() {
                           <TableHead className="text-right">係數</TableHead>
                           <TableHead className="text-right">每 kW 單價</TableHead>
                           <TableHead className="text-right">固定/最低收費</TableHead>
-                          {useDatabase && <TableHead className="w-24">操作</TableHead>}
+                          <TableHead className="w-24">操作</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -384,33 +358,31 @@ export default function TieredPricingPanel() {
                             <TableCell className="text-right font-mono">
                               {tier.minimumFee ? formatCurrency(tier.minimumFee, 0) : '-'}
                             </TableCell>
-                            {useDatabase && (
-                              <TableCell>
-                                <div className="flex gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7"
-                                    onClick={() => handleEditTier(tier)}
-                                  >
-                                    <Edit2 className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-destructive hover:text-destructive"
-                                    onClick={() => handleDelete(tier.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            )}
+                            <TableCell>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  onClick={() => handleEditTier(tier)}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-destructive hover:text-destructive"
+                                  onClick={() => handleDelete(tier.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
                           </TableRow>
                         ))}
                         {getTiersForType(type.typeCode).length === 0 && (
                           <TableRow>
-                            <TableCell colSpan={useDatabase ? 6 : 5} className="text-center text-muted-foreground py-8">
+                            <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                               尚無級距資料
                             </TableCell>
                           </TableRow>

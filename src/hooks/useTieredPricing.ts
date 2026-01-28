@@ -3,11 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
   TieredPricingType,
-  calculateTieredPrice as calculateFromLib,
   structuralEngineerDataPoints,
   electricalEngineerTiers,
   environmentalTiers,
   STRUCTURAL_PER_500KW_FEE,
+  PricingTier as LibPricingTier,
 } from "@/lib/tieredPricing";
 
 export interface PricingType {
@@ -102,78 +102,126 @@ const defaultTiers: PricingTier[] = [...defaultElectricalTiers, ...defaultEnviro
 // 預設結構技師內插法資料點
 const defaultStructuralDataPoints: InterpolationDataPoint[] = structuralEngineerDataPoints;
 
+// localStorage key
+const STORAGE_KEY = 'tiered_pricing_tiers';
+
+/**
+ * 從 localStorage 讀取自訂級距
+ */
+function loadTiersFromStorage(): PricingTier[] | null {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error('Error loading tiers from storage:', e);
+  }
+  return null;
+}
+
+/**
+ * 儲存級距到 localStorage
+ */
+function saveTiersToStorage(tiers: PricingTier[]): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tiers));
+  } catch (e) {
+    console.error('Error saving tiers to storage:', e);
+  }
+}
+
+/**
+ * 計算階梯式定價
+ */
+function calculateTieredPriceFromTiers(
+  capacityKw: number,
+  tiers: PricingTier[]
+): { total: number; perKwPrice: number } {
+  if (capacityKw <= 0 || tiers.length === 0) {
+    return { total: 0, perKwPrice: 0 };
+  }
+
+  const sortedTiers = [...tiers].sort((a, b) => a.sortOrder - b.sortOrder);
+  const tier = sortedTiers.find(
+    (t) => capacityKw >= t.minKw && capacityKw <= t.maxKw
+  );
+
+  if (!tier) {
+    return { total: 0, perKwPrice: 0 };
+  }
+
+  // 如果 perKwPrice 為 0 且有 minimumFee，表示這是固定費用
+  if (tier.perKwPrice === 0 && tier.minimumFee) {
+    return {
+      total: tier.minimumFee,
+      perKwPrice: 0,
+    };
+  }
+
+  // 計算總金額
+  let total = capacityKw * tier.perKwPrice;
+  
+  // 如果有最低收費且計算結果低於最低收費，使用最低收費
+  if (tier.minimumFee && total < tier.minimumFee) {
+    total = tier.minimumFee;
+  }
+
+  return {
+    total,
+    perKwPrice: tier.perKwPrice,
+  };
+}
+
+/**
+ * 結構技師內插法計算
+ */
+function interpolateStructuralPrice(capacityKw: number, dataPoints: InterpolationDataPoint[], per500kwFee: number): number {
+  if (capacityKw < 10) {
+    return 8000;
+  }
+  
+  if (capacityKw >= 500) {
+    const blocks = Math.floor(capacityKw / 500);
+    const remainder = capacityKw % 500;
+    
+    let total = blocks * per500kwFee;
+    
+    if (remainder > 0) {
+      total += interpolateStructuralPrice(remainder, dataPoints, per500kwFee);
+    }
+    
+    return total;
+  }
+  
+  for (let i = 0; i < dataPoints.length - 1; i++) {
+    const p1 = dataPoints[i];
+    const p2 = dataPoints[i + 1];
+    
+    if (capacityKw >= p1.kw && capacityKw <= p2.kw) {
+      const interpolatedPrice = p1.price + 
+        (capacityKw - p1.kw) * (p2.price - p1.price) / (p2.kw - p1.kw);
+      
+      return Math.round(interpolatedPrice);
+    }
+  }
+  
+  return dataPoints[dataPoints.length - 1].price;
+}
+
 /**
  * Hook 用於管理階梯定價類型和級距
  */
 export function useTieredPricing() {
   const [pricingTypes, setPricingTypes] = useState<PricingType[]>(defaultPricingTypes);
-  const [tiers, setTiers] = useState<PricingTier[]>(defaultTiers);
+  const [tiers, setTiers] = useState<PricingTier[]>(() => {
+    const stored = loadTiersFromStorage();
+    return stored || defaultTiers;
+  });
   const [structuralDataPoints, setStructuralDataPoints] = useState<InterpolationDataPoint[]>(defaultStructuralDataPoints);
   const [structuralPer500kwFee, setStructuralPer500kwFee] = useState(STRUCTURAL_PER_500KW_FEE);
-  const [isLoading, setIsLoading] = useState(true);
-  const [useDatabase, setUseDatabase] = useState(false);
-
-  // 嘗試從資料庫載入
-  const loadFromDatabase = useCallback(async () => {
-    try {
-      // 檢查資料庫表是否存在
-      const { data: typesData, error: typesError } = await supabase
-        .from('tiered_pricing_types' as any)
-        .select('*')
-        .eq('is_active', true)
-        .order('sort_order');
-
-      if (typesError) {
-        // 表不存在，使用預設值
-        console.log('Using default tiered pricing (table not found)');
-        setUseDatabase(false);
-        return;
-      }
-
-      if (typesData && typesData.length > 0) {
-        const { data: tiersData, error: tiersError } = await supabase
-          .from('tiered_pricing_tiers' as any)
-          .select('*')
-          .order('sort_order');
-
-        if (!tiersError && tiersData) {
-          // 轉換資料格式
-          setPricingTypes(typesData.map((t: any) => ({
-            id: t.id,
-            typeCode: t.type_code,
-            typeName: t.type_name,
-            description: t.description,
-            calculationMethod: t.calculation_method || 'tiered',
-            isActive: t.is_active,
-            isSystem: t.is_system,
-            sortOrder: t.sort_order,
-          })));
-
-          setTiers(tiersData.map((t: any) => ({
-            id: t.id,
-            pricingTypeId: t.pricing_type_id,
-            minKw: Number(t.min_kw),
-            maxKw: Number(t.max_kw),
-            coefficient: t.coefficient ? Number(t.coefficient) : undefined,
-            perKwPrice: Number(t.per_kw_price),
-            minimumFee: t.minimum_fee ? Number(t.minimum_fee) : undefined,
-            sortOrder: t.sort_order,
-          })));
-
-          setUseDatabase(true);
-        }
-      }
-    } catch (error) {
-      console.log('Using default tiered pricing (error loading from database)');
-      setUseDatabase(false);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadFromDatabase();
-  }, [loadFromDatabase]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [useDatabase] = useState(true); // 現在總是允許編輯
 
   // 取得特定類型的級距
   const getTiersForType = useCallback((typeCode: string): PricingTier[] => {
@@ -184,17 +232,28 @@ export function useTieredPricing() {
       .sort((a, b) => a.sortOrder - b.sortOrder);
   }, [pricingTypes, tiers]);
 
-  // 根據容量計算定價 (使用 lib 中的計算邏輯)
+  // 根據容量計算定價
   const calculatePrice = useCallback((capacityKw: number, typeCode: string): {
     total: number;
     perKwPrice: number;
   } => {
-    const result = calculateFromLib(capacityKw, typeCode as TieredPricingType);
-    return {
-      total: result.total,
-      perKwPrice: result.perKwPrice,
-    };
-  }, []);
+    const type = pricingTypes.find(t => t.typeCode === typeCode);
+    
+    if (!type || capacityKw <= 0) {
+      return { total: 0, perKwPrice: 0 };
+    }
+
+    if (type.calculationMethod === 'interpolation') {
+      // 結構技師使用內插法
+      const total = interpolateStructuralPrice(capacityKw, structuralDataPoints, structuralPer500kwFee);
+      const perKwPrice = capacityKw > 0 ? Math.round(total / capacityKw) : 0;
+      return { total, perKwPrice };
+    }
+
+    // 電機技師和明群環能使用階梯定價
+    const typeTiers = getTiersForType(typeCode);
+    return calculateTieredPriceFromTiers(capacityKw, typeTiers);
+  }, [pricingTypes, structuralDataPoints, structuralPer500kwFee, getTiersForType]);
 
   // 取得結構技師的內插法資料點
   const getStructuralDataPoints = useCallback((): InterpolationDataPoint[] => {
@@ -206,95 +265,74 @@ export function useTieredPricing() {
     return structuralPer500kwFee;
   }, [structuralPer500kwFee]);
 
-  // 儲存類型到資料庫
-  const savePricingType = useCallback(async (type: Partial<PricingType>) => {
-    try {
-      const payload = {
-        type_code: type.typeCode,
-        type_name: type.typeName,
-        description: type.description,
-        calculation_method: type.calculationMethod || 'tiered',
-        is_active: type.isActive ?? true,
-        is_system: type.isSystem ?? false,
-        sort_order: type.sortOrder ?? 0,
-      };
-
-      if (type.id && !['structural_engineer', 'electrical_engineer', 'environmental'].includes(type.id)) {
-        // 更新
-        const { error } = await supabase
-          .from('tiered_pricing_types' as any)
-          .update(payload)
-          .eq('id', type.id);
-        if (error) throw error;
-      } else {
-        // 新增
-        const { error } = await supabase
-          .from('tiered_pricing_types' as any)
-          .insert(payload);
-        if (error) throw error;
-      }
-
-      await loadFromDatabase();
-      toast.success('已儲存定價類型');
-    } catch (error) {
-      console.error('Error saving pricing type:', error);
-      toast.error('儲存失敗');
-    }
-  }, [loadFromDatabase]);
-
-  // 儲存級距到資料庫
+  // 儲存級距 (使用 localStorage)
   const saveTier = useCallback(async (tier: Partial<PricingTier>, typeId: string) => {
     try {
-      const payload = {
-        pricing_type_id: typeId,
-        min_kw: tier.minKw,
-        max_kw: tier.maxKw,
-        coefficient: tier.coefficient,
-        per_kw_price: tier.perKwPrice,
-        minimum_fee: tier.minimumFee,
-        sort_order: tier.sortOrder ?? 0,
-      };
-
       const isDefaultId = tier.id?.startsWith('elec_') || tier.id?.startsWith('env_');
+      
       if (tier.id && !isDefaultId) {
-        // 更新
-        const { error } = await supabase
-          .from('tiered_pricing_tiers' as any)
-          .update(payload)
-          .eq('id', tier.id);
-        if (error) throw error;
+        // 更新現有級距
+        const updatedTiers = tiers.map(t => 
+          t.id === tier.id ? { ...t, ...tier } as PricingTier : t
+        );
+        setTiers(updatedTiers);
+        saveTiersToStorage(updatedTiers);
       } else {
-        // 新增
-        const { error } = await supabase
-          .from('tiered_pricing_tiers' as any)
-          .insert(payload);
-        if (error) throw error;
+        // 新增級距
+        const newTier: PricingTier = {
+          id: `custom_${Date.now()}`,
+          pricingTypeId: typeId,
+          minKw: tier.minKw || 0,
+          maxKw: tier.maxKw || 0,
+          coefficient: tier.coefficient,
+          perKwPrice: tier.perKwPrice || 0,
+          minimumFee: tier.minimumFee,
+          sortOrder: tier.sortOrder || 0,
+        };
+        
+        // 如果是修改預設級距，先移除原有的
+        let updatedTiers = tiers;
+        if (isDefaultId) {
+          updatedTiers = tiers.filter(t => t.id !== tier.id);
+        }
+        
+        updatedTiers = [...updatedTiers, newTier];
+        setTiers(updatedTiers);
+        saveTiersToStorage(updatedTiers);
       }
 
-      await loadFromDatabase();
       toast.success('已儲存級距');
     } catch (error) {
       console.error('Error saving tier:', error);
       toast.error('儲存失敗');
     }
-  }, [loadFromDatabase]);
+  }, [tiers]);
 
   // 刪除級距
   const deleteTier = useCallback(async (tierId: string) => {
     try {
-      const { error } = await supabase
-        .from('tiered_pricing_tiers' as any)
-        .delete()
-        .eq('id', tierId);
-      if (error) throw error;
-
-      await loadFromDatabase();
+      const updatedTiers = tiers.filter(t => t.id !== tierId);
+      setTiers(updatedTiers);
+      saveTiersToStorage(updatedTiers);
       toast.success('已刪除級距');
     } catch (error) {
       console.error('Error deleting tier:', error);
       toast.error('刪除失敗');
     }
-  }, [loadFromDatabase]);
+  }, [tiers]);
+
+  // 重置為預設值
+  const resetToDefaults = useCallback(() => {
+    setTiers(defaultTiers);
+    localStorage.removeItem(STORAGE_KEY);
+    toast.success('已重置為預設級距');
+  }, []);
+
+  // 重新載入
+  const reload = useCallback(() => {
+    const stored = loadTiersFromStorage();
+    setTiers(stored || defaultTiers);
+  }, []);
 
   return {
     pricingTypes,
@@ -305,10 +343,10 @@ export function useTieredPricing() {
     calculatePrice,
     getStructuralDataPoints,
     getStructuralPer500kwFee,
-    savePricingType,
     saveTier,
     deleteTier,
-    reload: loadFromDatabase,
+    resetToDefaults,
+    reload,
   };
 }
 
