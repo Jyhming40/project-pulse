@@ -291,7 +291,7 @@ export default function QuoteBasicInfoTab({
         </div>
       )}
 
-      {/* Pricing Summary Card */}
+      {/* Pricing & Cost Summary Card */}
       <QuotePricingSummaryCard
         capacityKwp={formData.capacityKwp || 0}
         pricePerKwp={formData.pricePerKwp || 0}
@@ -299,6 +299,9 @@ export default function QuoteBasicInfoTab({
         onPricePerKwpChange={(value) => setFormData({ ...formData, pricePerKwp: value })}
         brokerageRate={brokerageRate}
         onBrokerageRateChange={onBrokerageRateChange}
+        engineeringTotal={costs?.engineeringTotal || 0}
+        modulesTotal={costs?.modulesTotal || 0}
+        invertersTotal={costs?.invertersTotal || 0}
       />
 
       {/* Quote Suggestion / Insights Card */}
