@@ -57,6 +57,20 @@ export default function TieredPricingPanel() {
   const activeType = pricingTypes.find(t => t.typeCode === activeTab);
   const isInterpolationType = activeType?.calculationMethod === 'interpolation';
 
+  // 取得基準價格（第一個有 perKwPrice > 0 的級距）用於計算係數
+  const basePrice = useMemo(() => {
+    const tiersWithPrice = currentTiers.filter(t => t.perKwPrice > 0);
+    if (tiersWithPrice.length === 0) return null;
+    // 找到第一個有效價格作為基準（100%）
+    return tiersWithPrice[0].perKwPrice;
+  }, [currentTiers]);
+
+  // 計算自動係數
+  const calculateAutoCoefficient = (perKwPrice: number): number | null => {
+    if (!basePrice || perKwPrice <= 0) return null;
+    return perKwPrice / basePrice;
+  };
+
   // 測試計算結果
   const testResult = useMemo(() => {
     if (testCapacity <= 0) return null;
@@ -286,17 +300,6 @@ export default function TieredPricingPanel() {
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-2">
-                                <Label htmlFor="coefficient">係數 (選填)</Label>
-                                <Input
-                                  id="coefficient"
-                                  type="number"
-                                  step="0.01"
-                                  value={formData.coefficient || ''}
-                                  onChange={(e) => setFormData({ ...formData, coefficient: e.target.value ? Number(e.target.value) : undefined })}
-                                  placeholder="如 1.33"
-                                />
-                              </div>
-                              <div className="space-y-2">
                                 <Label htmlFor="minimumFee">最低/固定收費 (選填)</Label>
                                 <Input
                                   id="minimumFee"
@@ -306,15 +309,15 @@ export default function TieredPricingPanel() {
                                   placeholder="如 7000"
                                 />
                               </div>
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="sortOrder">排序</Label>
-                              <Input
-                                id="sortOrder"
-                                type="number"
-                                value={formData.sortOrder || ''}
-                                onChange={(e) => setFormData({ ...formData, sortOrder: Number(e.target.value) })}
-                              />
+                              <div className="space-y-2">
+                                <Label htmlFor="sortOrder">排序</Label>
+                                <Input
+                                  id="sortOrder"
+                                  type="number"
+                                  value={formData.sortOrder || ''}
+                                  onChange={(e) => setFormData({ ...formData, sortOrder: Number(e.target.value) })}
+                                />
+                              </div>
                             </div>
                           </div>
                           <DialogFooter>
@@ -350,7 +353,9 @@ export default function TieredPricingPanel() {
                               {tier.minKw.toLocaleString()} ~ {tier.maxKw >= 99999 ? '∞' : tier.maxKw.toLocaleString()}
                             </TableCell>
                             <TableCell className="text-right">
-                              {tier.coefficient ? `${(tier.coefficient * 100).toFixed(0)}%` : '-'}
+                              {tier.perKwPrice > 0 && basePrice
+                                ? `${((tier.perKwPrice / basePrice) * 100).toFixed(0)}%`
+                                : '-'}
                             </TableCell>
                             <TableCell className="text-right font-mono">
                               {tier.perKwPrice === 0 ? '-' : formatCurrency(tier.perKwPrice, 0)}
