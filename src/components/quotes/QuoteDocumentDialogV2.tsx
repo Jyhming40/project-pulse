@@ -1,6 +1,6 @@
 /**
  * 報價單產出對話框 V2
- * 使用 HTML 預覽 + 瀏覽器列印產生 PDF
+ * 支援兩種模式：傳統預覽 / Excel 式編輯器
  */
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import {
@@ -11,12 +11,13 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Printer, FileText, Minus, Plus } from "lucide-react";
+import { Printer, FileText, Minus, Plus, Table2, FileEdit } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { EngineeringCategory, ModuleItem, InverterItem } from "@/hooks/useQuoteEngineering";
 import QuoteDocumentPreview, { QuotePreviewData, PaymentTermItem } from "./QuoteDocumentPreview";
+import ExcelQuoteEditor from "./ExcelQuoteEditor";
 
 interface QuoteDocumentDialogProps {
   open: boolean;
@@ -64,6 +65,7 @@ export default function QuoteDocumentDialogV2({
 }: QuoteDocumentDialogProps) {
   const previewRef = useRef<HTMLDivElement>(null);
   const [previewData, setPreviewData] = useState<QuotePreviewData | null>(null);
+  const [editorMode, setEditorMode] = useState<"preview" | "excel">("excel"); // 預設使用 Excel 模式
 
   // 取得公司資訊
   const { data: appSettings } = useQuery({
@@ -515,8 +517,8 @@ export default function QuoteDocumentDialogV2({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl h-[95vh] flex flex-col p-0">
-        <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b">
+      <DialogContent className="max-w-[95vw] w-[1200px] h-[90vh] flex flex-col p-0 gap-0">
+        <DialogHeader className="flex-shrink-0 px-6 py-4 border-b">
           <div className="flex items-center justify-between">
             <div>
               <DialogTitle className="flex items-center gap-2">
@@ -524,54 +526,91 @@ export default function QuoteDocumentDialogV2({
                 報價單預覽與編輯
               </DialogTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                可直接編輯下方內容，完成後點擊「列印 / 另存 PDF」
+                {editorMode === "excel" 
+                  ? "Excel 模式：直接在表格內編輯，可調整欄寬、合併儲存格"
+                  : "可直接編輯下方內容，完成後點擊「列印 / 另存 PDF」"
+                }
               </p>
             </div>
-            {/* 字體大小控制 */}
-            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
-              <span className="text-sm text-muted-foreground">字體大小</span>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => handleFontSizeChange(-0.5)}
-                disabled={(previewData.fontSize || 9) <= 6}
-              >
-                <Minus className="h-3 w-3" />
-              </Button>
-              <span className="text-sm font-medium w-10 text-center">
-                {previewData.fontSize || 9}pt
-              </span>
-              <Button
-                variant="outline"
-                size="icon"
-                className="h-7 w-7"
-                onClick={() => handleFontSizeChange(0.5)}
-                disabled={(previewData.fontSize || 9) >= 12}
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
+            <div className="flex items-center gap-3">
+              {/* 模式切換 */}
+              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+                <Button
+                  variant={editorMode === "excel" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setEditorMode("excel")}
+                  className="gap-1.5"
+                >
+                  <Table2 className="h-4 w-4" />
+                  Excel 模式
+                </Button>
+                <Button
+                  variant={editorMode === "preview" ? "default" : "ghost"}
+                  size="sm"
+                  onClick={() => setEditorMode("preview")}
+                  className="gap-1.5"
+                >
+                  <FileEdit className="h-4 w-4" />
+                  傳統模式
+                </Button>
+              </div>
+              {/* 字體大小控制 - 僅傳統模式 */}
+              {editorMode === "preview" && previewData && (
+                <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
+                  <span className="text-sm text-muted-foreground">字體大小</span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handleFontSizeChange(-0.5)}
+                    disabled={(previewData.fontSize || 9) <= 6}
+                  >
+                    <Minus className="h-3 w-3" />
+                  </Button>
+                  <span className="text-sm font-medium w-10 text-center">
+                    {previewData.fontSize || 9}pt
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => handleFontSizeChange(0.5)}
+                    disabled={(previewData.fontSize || 9) >= 12}
+                  >
+                    <Plus className="h-3 w-3" />
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-auto bg-gray-100 p-4">
-          <QuoteDocumentPreview
-            ref={previewRef}
-            data={previewData}
-            onDataChange={setPreviewData}
+        {/* 編輯區域 */}
+        {editorMode === "excel" ? (
+          <ExcelQuoteEditor 
+            companyName={appSettings?.company_name_zh || "公司名稱"}
           />
-        </div>
+        ) : (
+          <>
+            <div className="flex-1 overflow-auto bg-gray-100 p-4">
+              <QuoteDocumentPreview
+                ref={previewRef}
+                data={previewData}
+                onDataChange={setPreviewData}
+              />
+            </div>
 
-        <DialogFooter className="flex-shrink-0 px-6 py-4 border-t gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            取消
-          </Button>
-          <Button onClick={handlePrint} className="gap-2">
-            <Printer className="h-4 w-4" />
-            列印 / 另存 PDF
-          </Button>
-        </DialogFooter>
+            <DialogFooter className="flex-shrink-0 px-6 py-4 border-t gap-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                取消
+              </Button>
+              <Button onClick={handlePrint} className="gap-2">
+                <Printer className="h-4 w-4" />
+                列印 / 另存 PDF
+              </Button>
+            </DialogFooter>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );
