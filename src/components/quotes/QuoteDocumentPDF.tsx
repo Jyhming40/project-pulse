@@ -4,21 +4,27 @@
  */
 import { Document, Page, Text, View, StyleSheet, Font } from "@react-pdf/renderer";
 
-// 註冊中文字型 - 使用 Google Noto Sans TC TTF (本地載入)
-// @react-pdf/renderer 只支援 TTF 格式
+// Import TTF font as module (required for @react-pdf/renderer)
+import NotoSansTCRegular from "@/assets/fonts/NotoSansTC-Regular.ttf";
+
+// 註冊中文字型 - 使用 ES6 import 載入 TTF 字型
 Font.register({
   family: "NotoSansTC",
   fonts: [
     {
-      src: "/fonts/NotoSansTC-Regular.ttf",
+      src: NotoSansTCRegular,
       fontWeight: "normal",
     },
     {
-      src: "/fonts/NotoSansTC-Regular.ttf", // 使用 Regular 作為 Bold 的備選
+      src: NotoSansTCRegular, // 使用 Regular 作為 Bold 的備選
       fontWeight: "bold",
     },
   ],
+
 });
+
+// 禁用 hyphenation 以避免中文斷字問題
+Font.registerHyphenationCallback((word) => [word]);
 
 // PDF 樣式定義
 const styles = StyleSheet.create({
@@ -332,15 +338,15 @@ export default function QuoteDocumentPDF({ data }: { data: QuoteDocumentData }) 
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>聯絡人：</Text>
-              <Text style={styles.infoValue}>{data.customer.contact || ""}</Text>
+              <Text style={styles.infoValue}>{data.customer.contact || " "}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>聯絡電話：</Text>
-              <Text style={styles.infoValue}>{data.customer.phone || ""}</Text>
+              <Text style={styles.infoValue}>{data.customer.phone || " "}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>案場地點：</Text>
-              <Text style={styles.infoValue}>{data.customer.siteAddress || ""}</Text>
+              <Text style={styles.infoValue}>{data.customer.siteAddress || " "}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>裝置容量：</Text>
@@ -350,23 +356,23 @@ export default function QuoteDocumentPDF({ data }: { data: QuoteDocumentData }) 
           <View style={styles.infoColumn}>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>報價日期：</Text>
-              <Text style={styles.infoValue}>{formatDate(data.quote.date)}</Text>
+              <Text style={styles.infoValue}>{formatDate(data.quote.date) || " "}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>報價單號：</Text>
-              <Text style={{ ...styles.infoValue, color: "#c00" }}>{data.quote.number}</Text>
+              <Text style={{ ...styles.infoValue, color: "#c00" }}>{data.quote.number || " "}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>有效日期：</Text>
-              <Text style={styles.infoValue}>{data.quote.validUntil ? formatDate(data.quote.validUntil) : ""}</Text>
+              <Text style={styles.infoValue}>{data.quote.validUntil ? formatDate(data.quote.validUntil) : " "}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>業務員：</Text>
-              <Text style={styles.infoValue}>{data.quote.salesperson || ""}</Text>
+              <Text style={styles.infoValue}>{data.quote.salesperson || " "}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>業務分機：</Text>
-              <Text style={styles.infoValue}>{data.quote.salespersonPhone || ""}</Text>
+              <Text style={styles.infoValue}>{data.quote.salespersonPhone || " "}</Text>
             </View>
           </View>
         </View>
@@ -379,7 +385,7 @@ export default function QuoteDocumentPDF({ data }: { data: QuoteDocumentData }) 
             <Text style={[styles.tableCell, styles.colName]}>品 名</Text>
             <Text style={[styles.tableCell, styles.colSpec]}>規 格</Text>
             <Text style={[styles.tableCell, styles.colQty, styles.tableCellRight]}>數量</Text>
-            <Text style={[styles.tableCell, styles.colUnit, styles.tableCellCenter]}></Text>
+            <Text style={[styles.tableCell, styles.colUnit, styles.tableCellCenter]}>{" "}</Text>
           </View>
 
           {/* 項目列表 */}
@@ -396,15 +402,15 @@ export default function QuoteDocumentPDF({ data }: { data: QuoteDocumentData }) 
                 )}
                 <View style={[styles.tableRow, index % 2 === 1 ? styles.tableRowAlt : {}]}>
                   <Text style={[styles.tableCell, styles.colOrder, styles.tableCellCenter]}>
-                    {item.order || ""}
+                    {item.order || " "}
                   </Text>
-                  <Text style={[styles.tableCell, styles.colName]}>{item.name}</Text>
-                  <Text style={[styles.tableCell, styles.colSpec]}>{item.spec || ""}</Text>
+                  <Text style={[styles.tableCell, styles.colName]}>{item.name || " "}</Text>
+                  <Text style={[styles.tableCell, styles.colSpec]}>{item.spec || " "}</Text>
                   <Text style={[styles.tableCell, styles.colQty, styles.tableCellRight]}>
-                    {item.quantity}
+                    {item.quantity || " "}
                   </Text>
                   <Text style={[styles.tableCell, styles.colUnit, styles.tableCellCenter]}>
-                    {item.unit || ""}
+                    {item.unit || " "}
                   </Text>
                 </View>
               </View>
@@ -454,13 +460,13 @@ export default function QuoteDocumentPDF({ data }: { data: QuoteDocumentData }) 
             </View>
             {data.paymentTerms.map((term, index) => (
               <View key={index} style={styles.paymentTableRow}>
-                <Text style={[styles.tableCell, styles.paymentColName]}>{term.name}</Text>
+                <Text style={[styles.tableCell, styles.paymentColName]}>{term.name || " "}</Text>
                 <Text style={[styles.tableCell, styles.paymentColPercent, styles.tableCellCenter]}>
                   {term.percentage}%
                 </Text>
-                <Text style={[styles.tableCell, styles.paymentColCondition]}>{term.condition || ""}</Text>
+                <Text style={[styles.tableCell, styles.paymentColCondition]}>{term.condition || " "}</Text>
                 <Text style={[styles.tableCell, styles.paymentColAmount, styles.tableCellRight]}>
-                  {term.amount ? formatCurrency(term.amount) : "-"}
+                  {term.amount ? formatCurrency(term.amount) : " "}
                 </Text>
               </View>
             ))}
@@ -498,11 +504,11 @@ export default function QuoteDocumentPDF({ data }: { data: QuoteDocumentData }) 
         <View style={styles.signatureSection}>
           <View style={styles.signatureBox}>
             <Text style={styles.signatureLabel}>客戶回簽欄(簽名或蓋章)</Text>
-            <Text style={styles.signatureLine}></Text>
+            <Text style={styles.signatureLine}>{" "}</Text>
           </View>
           <View style={styles.signatureBox}>
-            <Text style={styles.signatureLabel}></Text>
-            <Text style={styles.signatureLine}>{data.company.name}</Text>
+            <Text style={styles.signatureLabel}>{" "}</Text>
+            <Text style={styles.signatureLine}>{data.company.name || " "}</Text>
           </View>
         </View>
       </Page>
