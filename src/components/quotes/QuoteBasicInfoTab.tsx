@@ -32,6 +32,8 @@ interface QuoteBasicInfoTabProps {
   onSave: () => void;
   isSaving: boolean;
   costs?: CostBreakdown;
+  brokerageRate: number;
+  onBrokerageRateChange: (value: number) => void;
 }
 
 export default function QuoteBasicInfoTab({
@@ -44,6 +46,8 @@ export default function QuoteBasicInfoTab({
   onSave,
   isSaving,
   costs,
+  brokerageRate,
+  onBrokerageRateChange,
 }: QuoteBasicInfoTabProps) {
   // Fetch projects with full details
   const { data: projects } = useQuery({
@@ -293,6 +297,8 @@ export default function QuoteBasicInfoTab({
         pricePerKwp={formData.pricePerKwp || 0}
         taxRate={formData.taxRate || 0.05}
         onPricePerKwpChange={(value) => setFormData({ ...formData, pricePerKwp: value })}
+        brokerageRate={brokerageRate}
+        onBrokerageRateChange={onBrokerageRateChange}
       />
 
       {/* Quote Suggestion / Insights Card */}
