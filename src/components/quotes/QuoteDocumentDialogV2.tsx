@@ -355,7 +355,7 @@ export default function QuoteDocumentDialogV2({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="max-w-4xl h-[90vh] flex flex-col">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -363,7 +363,7 @@ export default function QuoteDocumentDialogV2({
           </DialogTitle>
         </DialogHeader>
 
-        <ScrollArea className="flex-1 min-h-0 pr-4">
+        <div className="flex-1 overflow-y-auto pr-4">
           <div className="space-y-6 py-4">
             {/* 客戶資訊 */}
             <Card>
@@ -544,7 +544,7 @@ export default function QuoteDocumentDialogV2({
               </Card>
             )}
           </div>
-        </ScrollArea>
+        </div>
 
         <DialogFooter className="gap-2 sm:gap-0">
           <Button
