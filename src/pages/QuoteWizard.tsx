@@ -82,6 +82,7 @@ export default function QuoteWizard() {
     modulesTotal: 0,
     invertersTotal: 0,
   });
+  const [brokerageRate, setBrokerageRate] = useState(0);
 
   // Modules, inverters, and engineering categories state - lifted from QuoteCostCalculatorTab
   const [modules, setModules] = useState<ModuleItem[]>([createDefaultModule()]);
@@ -486,6 +487,8 @@ export default function QuoteWizard() {
             onSave={handleSave}
             isSaving={isSaving}
             costs={costTotals}
+            brokerageRate={brokerageRate}
+            onBrokerageRateChange={setBrokerageRate}
           />
         );
       case "cost":
