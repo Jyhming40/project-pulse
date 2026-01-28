@@ -1,6 +1,6 @@
 /**
- * 報價單 HTML 預覽元件 - 專業版面設計
- * 可編輯的報價單預覽，支援瀏覽器列印/另存 PDF
+ * 報價單 HTML 預覽元件 - 傳統簡潔版面（對照明群範本）
+ * 單頁 A4 呈現，可編輯，支援瀏覽器列印/另存 PDF
  */
 import { forwardRef } from "react";
 import { formatCurrency } from "@/lib/quoteCalculations";
@@ -129,397 +129,253 @@ const QuoteDocumentPreview = forwardRef<HTMLDivElement, QuoteDocumentPreviewProp
           fontFamily: "'Noto Sans TC', 'Microsoft JhengHei', 'PingFang TC', sans-serif",
           width: "210mm",
           minHeight: "297mm",
-          padding: "20mm",
+          padding: "12mm 15mm",
+          fontSize: "9pt",
         }}
       >
-        {/* 文件標頭 - 雙線設計 */}
-        <div className="border-b-4 border-double border-gray-800 pb-6 mb-6">
-          {/* 公司名稱與報價單標題 */}
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-2xl font-bold tracking-wide text-gray-800">
-                {data.company.name}
-              </h2>
-              <p className="text-sm text-gray-600 mt-1">{data.company.address}</p>
-              <p className="text-sm text-gray-600">
-                Tel: {data.company.phone} ｜ 統編: {data.company.taxId}
-              </p>
-            </div>
-            <div className="text-right">
-              <h1 className="text-4xl font-black tracking-widest text-gray-900 border-b-2 border-gray-800 pb-2 mb-2">
-                報 價 單
-              </h1>
-              <p className="text-lg font-medium text-gray-700">QUOTATION</p>
-            </div>
+        {/* 公司名稱 + 報價單標題 */}
+        <div className="flex justify-between items-start mb-4">
+          <div className="text-lg font-bold text-gray-800">{data.company.name}</div>
+          <div className="text-2xl font-black tracking-[0.3em] border-b-2 border-gray-800 pb-1">
+            報 價 單
           </div>
         </div>
 
-        {/* 報價資訊區塊 */}
-        <div className="grid grid-cols-2 gap-8 mb-6">
-          {/* 客戶資訊 */}
-          <div className="border border-gray-300 rounded-lg p-4 bg-gray-50/50">
-            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">
-              客戶資訊 Customer Information
-            </h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex">
-                <span className="w-20 text-gray-500 flex-shrink-0">客戶名稱</span>
+        {/* 報價資訊表頭 - 三欄式 */}
+        <table className="w-full mb-3 text-[9pt]" style={{ borderCollapse: "collapse" }}>
+          <tbody>
+            <tr>
+              <td className="py-1" style={{ width: "33%" }}>
+                <span className="text-gray-600">客編/客戶名稱：</span>
                 <input
                   type="text"
                   value={data.customer.name}
                   onChange={(e) => updateCustomer("name", e.target.value)}
-                  className="flex-1 border-b border-dashed border-gray-300 bg-transparent px-2 py-0.5 focus:border-blue-500 focus:outline-none font-medium"
-                  placeholder="請輸入客戶名稱"
+                  className="border-b border-dashed border-gray-400 bg-transparent px-1 focus:outline-none font-medium"
+                  style={{ width: "140px" }}
                 />
-              </div>
-              <div className="flex">
-                <span className="w-20 text-gray-500 flex-shrink-0">聯 絡 人</span>
+              </td>
+              <td className="py-1" style={{ width: "33%" }}></td>
+              <td className="py-1 text-right" style={{ width: "33%" }}>
+                <span className="text-gray-600">報價日期：</span>
+                <input
+                  type="text"
+                  value={data.quote.date}
+                  onChange={(e) => updateQuote("date", e.target.value)}
+                  className="border-b border-dashed border-gray-400 bg-transparent px-1 focus:outline-none"
+                  style={{ width: "100px" }}
+                />
+              </td>
+            </tr>
+            <tr>
+              <td className="py-1">
+                <span className="text-gray-600">聯絡人：</span>
                 <input
                   type="text"
                   value={data.customer.contact}
                   onChange={(e) => updateCustomer("contact", e.target.value)}
-                  className="flex-1 border-b border-dashed border-gray-300 bg-transparent px-2 py-0.5 focus:border-blue-500 focus:outline-none"
-                  placeholder="聯絡人姓名"
+                  className="border-b border-dashed border-gray-400 bg-transparent px-1 focus:outline-none"
+                  style={{ width: "100px" }}
                 />
-              </div>
-              <div className="flex">
-                <span className="w-20 text-gray-500 flex-shrink-0">聯絡電話</span>
+              </td>
+              <td className="py-1">
+                <span className="text-gray-600">聯絡電話：</span>
                 <input
                   type="text"
                   value={data.customer.phone}
                   onChange={(e) => updateCustomer("phone", e.target.value)}
-                  className="flex-1 border-b border-dashed border-gray-300 bg-transparent px-2 py-0.5 focus:border-blue-500 focus:outline-none"
-                  placeholder="電話號碼"
+                  className="border-b border-dashed border-gray-400 bg-transparent px-1 focus:outline-none"
+                  style={{ width: "120px" }}
                 />
-              </div>
-              <div className="flex">
-                <span className="w-20 text-gray-500 flex-shrink-0">案場地址</span>
+              </td>
+              <td className="py-1 text-right">
+                <span className="text-gray-600">有效日期：</span>
+                <input
+                  type="text"
+                  value={data.quote.validUntil}
+                  onChange={(e) => updateQuote("validUntil", e.target.value)}
+                  className="border-b border-dashed border-gray-400 bg-transparent px-1 focus:outline-none"
+                  style={{ width: "100px" }}
+                />
+              </td>
+            </tr>
+            <tr>
+              <td className="py-1" colSpan={2}>
+                <span className="text-gray-600">案場地點：</span>
                 <input
                   type="text"
                   value={data.customer.siteAddress}
                   onChange={(e) => updateCustomer("siteAddress", e.target.value)}
-                  className="flex-1 border-b border-dashed border-gray-300 bg-transparent px-2 py-0.5 focus:border-blue-500 focus:outline-none"
-                  placeholder="案場地址"
+                  className="border-b border-dashed border-gray-400 bg-transparent px-1 focus:outline-none"
+                  style={{ width: "320px" }}
                 />
-              </div>
-            </div>
-          </div>
-
-          {/* 報價單資訊 */}
-          <div className="border border-gray-300 rounded-lg p-4 bg-gray-50/50">
-            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-3 border-b border-gray-200 pb-2">
-              報價資訊 Quote Details
-            </h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex">
-                <span className="w-20 text-gray-500 flex-shrink-0">報價單號</span>
-                <input
-                  type="text"
-                  value={data.quote.number}
-                  onChange={(e) => updateQuote("number", e.target.value)}
-                  className="flex-1 border-b border-dashed border-gray-300 bg-transparent px-2 py-0.5 focus:border-blue-500 focus:outline-none font-mono font-medium"
-                  placeholder="報價單號"
-                />
-              </div>
-              <div className="flex">
-                <span className="w-20 text-gray-500 flex-shrink-0">報價日期</span>
-                <input
-                  type="date"
-                  value={data.quote.date}
-                  onChange={(e) => updateQuote("date", e.target.value)}
-                  className="flex-1 border-b border-dashed border-gray-300 bg-transparent px-2 py-0.5 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-              <div className="flex">
-                <span className="w-20 text-gray-500 flex-shrink-0">有效期限</span>
-                <input
-                  type="date"
-                  value={data.quote.validUntil}
-                  onChange={(e) => updateQuote("validUntil", e.target.value)}
-                  className="flex-1 border-b border-dashed border-gray-300 bg-transparent px-2 py-0.5 focus:border-blue-500 focus:outline-none"
-                />
-              </div>
-              <div className="flex">
-                <span className="w-20 text-gray-500 flex-shrink-0">業 務 員</span>
+              </td>
+              <td className="py-1 text-right">
+                <span className="text-gray-600">業務員：</span>
                 <input
                   type="text"
                   value={data.quote.salesperson}
                   onChange={(e) => updateQuote("salesperson", e.target.value)}
-                  className="flex-1 border-b border-dashed border-gray-300 bg-transparent px-2 py-0.5 focus:border-blue-500 focus:outline-none"
-                  placeholder="業務員姓名"
+                  className="border-b border-dashed border-gray-400 bg-transparent px-1 focus:outline-none"
+                  style={{ width: "80px" }}
                 />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 裝置容量醒目區塊 */}
-        <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg p-4 mb-6 flex items-center justify-between shadow-md">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center">
-              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-blue-100 text-sm">太陽光電系統總裝置容量</p>
-              <p className="text-3xl font-bold">{data.quote.capacityKwp.toFixed(2)} kWp</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-blue-100 text-sm">每 kW 單價（含稅）</p>
-            <p className="text-2xl font-bold">{formatCurrency(data.summary.pricePerKwpIncludingTax, 0)}</p>
-          </div>
-        </div>
+              </td>
+            </tr>
+            <tr>
+              <td className="py-1">
+                <span className="text-gray-600">裝置容量：(kW)</span>
+                <span className="font-bold ml-1">{data.quote.capacityKwp.toFixed(2)}</span>
+              </td>
+              <td className="py-1"></td>
+              <td className="py-1 text-right">
+                <span className="text-gray-600">業務分機：</span>
+                <input
+                  type="text"
+                  value={data.quote.salespersonPhone}
+                  onChange={(e) => updateQuote("salespersonPhone", e.target.value)}
+                  className="border-b border-dashed border-gray-400 bg-transparent px-1 focus:outline-none"
+                  style={{ width: "100px" }}
+                />
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
         {/* 項目明細表格 */}
-        <div className="mb-6">
-          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <span className="w-1 h-4 bg-blue-600 rounded-full"></span>
-            工程項目明細 Scope of Work
-          </h3>
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="bg-gray-800 text-white">
-                <th className="border border-gray-700 px-3 py-2 text-center w-12">項次</th>
-                <th className="border border-gray-700 px-3 py-2 text-left">類別</th>
-                <th className="border border-gray-700 px-3 py-2 text-left">項目名稱</th>
-                <th className="border border-gray-700 px-3 py-2 text-left">規格說明</th>
-                <th className="border border-gray-700 px-3 py-2 text-center w-24">數量</th>
-                <th className="border border-gray-700 px-3 py-2 text-center w-16">單位</th>
-                <th className="border border-gray-700 px-3 py-2 text-center w-14 no-print">操作</th>
+        <table className="w-full text-[8.5pt] mb-3" style={{ borderCollapse: "collapse" }}>
+          <thead>
+            <tr className="bg-gray-100">
+              <th className="border border-gray-400 px-2 py-1.5 text-center" style={{ width: "35px" }}>項次</th>
+              <th className="border border-gray-400 px-2 py-1.5 text-left" style={{ width: "120px" }}>品 名</th>
+              <th className="border border-gray-400 px-2 py-1.5 text-left">規 格</th>
+              <th className="border border-gray-400 px-2 py-1.5 text-center" style={{ width: "70px" }}>數量</th>
+              <th className="border border-gray-400 px-2 py-1.5 text-center no-print" style={{ width: "45px" }}>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.items.map((item, index) => (
+              <tr key={index}>
+                <td className="border border-gray-300 px-2 py-1 text-center text-gray-600">
+                  {item.order}
+                </td>
+                <td className="border border-gray-300 px-1 py-0.5">
+                  <input
+                    type="text"
+                    value={item.name}
+                    onChange={(e) => updateItem(index, "name", e.target.value)}
+                    className="w-full bg-transparent px-1 py-0.5 focus:bg-blue-50 focus:outline-none"
+                  />
+                </td>
+                <td className="border border-gray-300 px-1 py-0.5">
+                  <input
+                    type="text"
+                    value={item.spec}
+                    onChange={(e) => updateItem(index, "spec", e.target.value)}
+                    className="w-full bg-transparent px-1 py-0.5 focus:bg-blue-50 focus:outline-none text-gray-700"
+                  />
+                </td>
+                <td className="border border-gray-300 px-1 py-0.5 text-center">
+                  <input
+                    type="text"
+                    value={typeof item.quantity === "number" ? `${item.quantity} ${item.unit}` : item.quantity}
+                    onChange={(e) => updateItem(index, "quantity", e.target.value)}
+                    className="w-full bg-transparent px-1 py-0.5 text-center focus:bg-blue-50 focus:outline-none"
+                  />
+                </td>
+                <td className="border border-gray-300 px-1 py-0.5 text-center no-print">
+                  <button
+                    onClick={() => removeItem(index)}
+                    className="text-red-500 hover:text-red-700 text-xs"
+                  >
+                    刪除
+                  </button>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              {data.items.map((item, index) => (
-                <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                  <td className="border border-gray-300 px-3 py-2 text-center font-medium text-gray-600">
-                    {item.order}
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2">
-                    {item.categoryName && (
-                      <span className="inline-block bg-blue-100 text-blue-800 text-xs px-2 py-0.5 rounded font-medium">
-                        {item.categoryName}
-                      </span>
-                    )}
-                  </td>
-                  <td className="border border-gray-300 px-1 py-1">
-                    <input
-                      type="text"
-                      value={item.name}
-                      onChange={(e) => updateItem(index, "name", e.target.value)}
-                      className="w-full bg-transparent px-2 py-1 focus:bg-blue-50 focus:outline-none rounded"
-                    />
-                  </td>
-                  <td className="border border-gray-300 px-1 py-1">
-                    <input
-                      type="text"
-                      value={item.spec}
-                      onChange={(e) => updateItem(index, "spec", e.target.value)}
-                      className="w-full bg-transparent px-2 py-1 focus:bg-blue-50 focus:outline-none rounded text-gray-600"
-                    />
-                  </td>
-                  <td className="border border-gray-300 px-1 py-1 text-center">
-                    <input
-                      type="text"
-                      value={item.quantity}
-                      onChange={(e) => updateItem(index, "quantity", e.target.value)}
-                      className="w-full bg-transparent px-2 py-1 text-center focus:bg-blue-50 focus:outline-none rounded"
-                    />
-                  </td>
-                  <td className="border border-gray-300 px-1 py-1 text-center">
-                    <input
-                      type="text"
-                      value={item.unit}
-                      onChange={(e) => updateItem(index, "unit", e.target.value)}
-                      className="w-full bg-transparent px-2 py-1 text-center focus:bg-blue-50 focus:outline-none rounded"
-                    />
-                  </td>
-                  <td className="border border-gray-300 px-2 py-1 text-center no-print">
-                    <button
-                      onClick={() => removeItem(index)}
-                      className="text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-0.5 rounded text-xs"
-                    >
-                      刪除
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <button
-            onClick={addItem}
-            className="mt-2 text-blue-600 hover:text-blue-800 text-sm hover:bg-blue-50 px-3 py-1 rounded no-print"
-          >
-            + 新增項目
-          </button>
-        </div>
+            ))}
+          </tbody>
+        </table>
+        <button
+          onClick={addItem}
+          className="text-blue-600 hover:text-blue-800 text-[9pt] hover:bg-blue-50 px-2 py-0.5 rounded no-print mb-3"
+        >
+          + 新增項目
+        </button>
 
-        {/* 金額摘要 */}
-        <div className="grid grid-cols-2 gap-6 mb-6">
-          <div className="border-2 border-gray-800 rounded-lg overflow-hidden">
-            <div className="bg-gray-800 text-white px-4 py-2">
-              <h3 className="font-bold">金額摘要 Price Summary</h3>
-            </div>
-            <div className="p-4 space-y-3">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">合計（未稅）</span>
-                <span className="font-medium">{formatCurrency(data.summary.subtotal, 0)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">營業稅 (5%)</span>
-                <span className="font-medium">{formatCurrency(data.summary.tax, 0)}</span>
-              </div>
-              <div className="border-t-2 border-gray-800 pt-3 flex justify-between">
-                <span className="text-lg font-bold">總計（含稅）</span>
-                <span className="text-xl font-bold text-blue-600">
-                  {formatCurrency(data.summary.total, 0)}
-                </span>
-              </div>
+        {/* 銀行資訊 + 金額摘要 - 左右並排 */}
+        <div className="flex gap-4 mb-3 text-[8.5pt]">
+          {/* 左側：銀行資訊 */}
+          <div className="flex-1 border border-gray-300 p-2">
+            <div className="font-bold text-gray-700 mb-1">帳戶資料如下列：</div>
+            <div className="space-y-0.5">
+              <div>戶名：{data.company.bankAccountName || data.company.name}</div>
+              <div>銀行：{data.company.bankName}</div>
+              <div>分行：{data.company.bankBranch}</div>
+              <div>銀行代號：{data.company.bankCode}</div>
+              <div>帳號(TWD)：{data.company.bankAccountNumber}</div>
             </div>
           </div>
 
-          {/* 單價資訊 */}
-          <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-            <h3 className="font-bold text-gray-700 mb-3">單價參考 Unit Price Reference</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">每 kW 單價（未稅）</span>
-                <span className="font-medium">{formatCurrency(data.summary.pricePerKwpExcludingTax, 0)} /kW</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">每 kW 單價（含稅）</span>
-                <span className="font-medium">{formatCurrency(data.summary.pricePerKwpIncludingTax, 0)} /kW</span>
-              </div>
+          {/* 右側：金額摘要 */}
+          <div className="w-56 text-right">
+            <div className="flex justify-between py-1 border-b border-gray-200">
+              <span>合計(未稅)：</span>
+              <span className="font-medium">{formatCurrency(data.summary.subtotal, 0)}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b border-gray-200">
+              <span>稅金：</span>
+              <span className="font-medium">{formatCurrency(data.summary.tax, 0)}</span>
+            </div>
+            <div className="flex justify-between py-1 border-b-2 border-gray-800 font-bold">
+              <span>總計：</span>
+              <span>{formatCurrency(data.summary.total, 0)}</span>
+            </div>
+            <div className="flex justify-between py-1 text-gray-600">
+              <span>每kWp(未稅)：</span>
+              <span>{formatCurrency(data.summary.pricePerKwpExcludingTax, 0)}</span>
+            </div>
+            <div className="flex justify-between py-1 text-gray-600">
+              <span>每kWp(含稅)：</span>
+              <span>{formatCurrency(data.summary.pricePerKwpIncludingTax, 0)}</span>
             </div>
           </div>
-        </div>
-
-        {/* 付款條件 */}
-        <div className="mb-6">
-          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <span className="w-1 h-4 bg-green-600 rounded-full"></span>
-            付款條件 Payment Terms
-          </h3>
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="bg-green-700 text-white">
-                <th className="border border-green-800 px-3 py-2 text-left">期別</th>
-                <th className="border border-green-800 px-3 py-2 text-center w-20">比例</th>
-                <th className="border border-green-800 px-3 py-2 text-right w-32">金額</th>
-                <th className="border border-green-800 px-3 py-2 text-left">付款條件</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.paymentTerms.map((term, index) => (
-                <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-green-50"}>
-                  <td className="border border-gray-300 px-3 py-2 font-medium">{term.name}</td>
-                  <td className="border border-gray-300 px-3 py-2 text-center">
-                    <span className="inline-block bg-green-100 text-green-800 px-2 py-0.5 rounded font-medium">
-                      {term.percentage}%
-                    </span>
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2 text-right font-medium">
-                    {formatCurrency(term.amount || 0, 0)}
-                  </td>
-                  <td className="border border-gray-300 px-3 py-2 text-gray-600">{term.condition}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
 
         {/* 條款說明 */}
-        <div className="mb-6">
-          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider mb-3 flex items-center gap-2">
-            <span className="w-1 h-4 bg-amber-500 rounded-full"></span>
-            條款說明 Terms & Conditions
-          </h3>
-          <div className="border border-gray-300 rounded-lg p-4 bg-amber-50/50">
-            <ol className="space-y-2 text-sm">
-              {data.terms.map((term, index) => (
-                <li key={index} className="flex items-start gap-3 group">
-                  <span className="flex-shrink-0 w-6 h-6 bg-amber-200 text-amber-800 rounded-full flex items-center justify-center text-xs font-bold">
-                    {index + 1}
-                  </span>
-                  <input
-                    type="text"
-                    value={term}
-                    onChange={(e) => updateTerm(index, e.target.value)}
-                    className="flex-1 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-amber-500 px-1 py-0.5 focus:outline-none"
-                  />
-                  <button
-                    onClick={() => removeTerm(index)}
-                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 text-xs px-2 py-0.5 rounded no-print transition-opacity"
-                  >
-                    ✕
-                  </button>
-                </li>
-              ))}
-            </ol>
-            <button
-              onClick={addTerm}
-              className="mt-3 text-amber-700 hover:text-amber-900 text-sm hover:bg-amber-100 px-3 py-1 rounded no-print"
-            >
-              + 新增條款
-            </button>
-          </div>
+        <div className="text-[8pt] text-gray-700 mb-4 space-y-0.5">
+          {data.terms.map((term, index) => (
+            <div key={index} className="flex items-start gap-1 group">
+              <span className="flex-shrink-0">{index + 1}、</span>
+              <input
+                type="text"
+                value={term}
+                onChange={(e) => updateTerm(index, e.target.value)}
+                className="flex-1 bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-500 px-0.5 focus:outline-none"
+              />
+              <button
+                onClick={() => removeTerm(index)}
+                className="opacity-0 group-hover:opacity-100 text-red-500 text-xs no-print"
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={addTerm}
+            className="text-blue-600 hover:text-blue-800 text-[8pt] hover:bg-blue-50 px-2 py-0.5 rounded no-print"
+          >
+            + 新增條款
+          </button>
         </div>
-
-        {/* 銀行資訊 */}
-        {data.company.bankName && (
-          <div className="mb-8 border border-gray-300 rounded-lg overflow-hidden">
-            <div className="bg-gray-100 px-4 py-2 border-b border-gray-300">
-              <h3 className="font-bold text-gray-700 text-sm">匯款資訊 Bank Information</h3>
-            </div>
-            <div className="p-4 grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
-              <div className="flex">
-                <span className="w-20 text-gray-500">銀行名稱</span>
-                <span className="font-medium">{data.company.bankName}</span>
-              </div>
-              <div className="flex">
-                <span className="w-20 text-gray-500">分行名稱</span>
-                <span className="font-medium">{data.company.bankBranch}</span>
-              </div>
-              <div className="flex">
-                <span className="w-20 text-gray-500">銀行代碼</span>
-                <span className="font-medium font-mono">{data.company.bankCode}</span>
-              </div>
-              <div className="flex">
-                <span className="w-20 text-gray-500">帳號</span>
-                <span className="font-medium font-mono">{data.company.bankAccountNumber}</span>
-              </div>
-              <div className="flex col-span-2">
-                <span className="w-20 text-gray-500">戶名</span>
-                <span className="font-medium">{data.company.bankAccountName}</span>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* 簽章區 */}
-        <div className="border-t-2 border-gray-800 pt-6">
-          <div className="grid grid-cols-2 gap-12">
-            <div>
-              <p className="text-sm font-bold text-gray-600 mb-2">賣方（簽章）Seller</p>
-              <div className="border-b-2 border-gray-400 h-20 flex items-end pb-2">
-                <span className="text-gray-500">{data.company.name}</span>
-              </div>
-              <p className="text-xs text-gray-400 mt-2">日期 Date: _______________</p>
-            </div>
-            <div>
-              <p className="text-sm font-bold text-gray-600 mb-2">買方（簽章）Buyer</p>
-              <div className="border-b-2 border-gray-400 h-20 flex items-end pb-2">
-                <span className="text-gray-500">{data.customer.name || "________________"}</span>
-              </div>
-              <p className="text-xs text-gray-400 mt-2">日期 Date: _______________</p>
-            </div>
+        <div className="flex justify-between items-end mt-6 text-[9pt]">
+          <div>
+            <div className="text-gray-600 mb-1">客戶回簽欄(簽名或蓋章)</div>
+            <div className="border-b border-gray-400 w-48 h-12"></div>
           </div>
-        </div>
-
-        {/* 頁腳 */}
-        <div className="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-400">
-          <p>本報價單由 {data.company.name} 製作 ｜ 報價單號：{data.quote.number}</p>
+          <div className="text-right">
+            <div className="font-bold">{data.company.name}</div>
+          </div>
         </div>
       </div>
     );
