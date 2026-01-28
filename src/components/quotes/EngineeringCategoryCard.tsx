@@ -33,7 +33,8 @@ import {
   generateId 
 } from "@/hooks/useQuoteEngineering";
 import { formatCurrency } from "@/lib/quoteCalculations";
-import { TieredPricingType, calculateTieredPrice, getTieredPricingLabel } from "@/lib/tieredPricing";
+import { TieredPricingType, getTieredPricingLabel } from "@/lib/tieredPricing";
+import { useTieredPricing } from "@/hooks/useTieredPricing";
 
 interface EngineeringCategoryCardProps {
   category: EngineeringCategory;
@@ -55,12 +56,16 @@ export default function EngineeringCategoryCard({
   const [isOpen, setIsOpen] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(category.categoryName);
+  
+  // 使用自訂階梯定價 hook (讀取 localStorage 中的自訂設定)
+  const { calculatePrice } = useTieredPricing();
 
-  // 建立計費上下文
+  // 建立計費上下文，包含自訂階梯定價計算器
   const billingContext: BillingContext = {
     capacityKwp,
     pricePerKwp,
     taxRate,
+    tieredPriceCalculator: calculatePrice,
   };
 
   // 計算類別小計
@@ -176,9 +181,9 @@ export default function EngineeringCategoryCard({
                   // 判斷是否為自動計算類型
                   const isAutoCalc = ['stamp_duty', 'corp_tax', 'brokerage'].includes(method);
                   
-                  // 取得階梯定價資訊
+                  // 取得階梯定價資訊 - 使用自訂計算器
                   const tieredInfo = method === 'tiered' && item.tieredPricingType 
-                    ? calculateTieredPrice(capacityKwp, item.tieredPricingType)
+                    ? calculatePrice(capacityKwp, item.tieredPricingType)
                     : null;
                   
                   return (
