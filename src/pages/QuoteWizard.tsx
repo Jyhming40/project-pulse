@@ -22,7 +22,7 @@ import QuoteBasicInfoTab from "@/components/quotes/QuoteBasicInfoTab";
 import QuoteCostCalculatorTab from "@/components/quotes/QuoteCostCalculatorTab";
 import QuoteFinancialAnalysisTab from "@/components/quotes/QuoteFinancialAnalysisTab";
 import QuoteScheduleTab from "@/components/quotes/QuoteScheduleTab";
-import QuoteDocumentDialog from "@/components/quotes/QuoteDocumentDialog";
+import QuoteDocumentDialogV2 from "@/components/quotes/QuoteDocumentDialogV2";
 import { calculate20YearProjection, QuoteParams } from "@/lib/quoteCalculations";
 import { 
   ModuleItem, 
@@ -739,7 +739,7 @@ export default function QuoteWizard() {
 
       {/* 報價單產出對話框 */}
       {id && (
-        <QuoteDocumentDialog
+        <QuoteDocumentDialogV2
           open={showDocumentDialog}
           onOpenChange={setShowDocumentDialog}
           quoteId={id}
