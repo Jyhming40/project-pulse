@@ -53,22 +53,22 @@ export default function QuotePricingSummaryCard({
 
   return (
     <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold flex items-center gap-2">
-          <Calculator className="h-4 w-4 text-primary" />
+      <CardHeader className="pb-4">
+        <CardTitle className="text-lg font-semibold flex items-center gap-2">
+          <Calculator className="h-5 w-5 text-primary" />
           報價與成本摘要
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-5">
         {/* === 精簡版：關鍵數字 === */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
           {/* 每kW報價輸入 */}
-          <div className="space-y-1">
-            <Label htmlFor="pricePerKwp" className="text-xs text-muted-foreground">
+          <div className="space-y-2">
+            <Label htmlFor="pricePerKwp" className="text-sm font-medium text-foreground">
               每kW報價 (未稅)
             </Label>
             <div className="relative">
-              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground/70 text-sm font-medium">
                 NT$
               </span>
               <Input
@@ -76,39 +76,42 @@ export default function QuotePricingSummaryCard({
                 type="number"
                 value={pricePerKwp || ""}
                 onChange={(e) => onPricePerKwpChange(Number(e.target.value) || 0)}
-                className="pl-9 text-sm font-semibold font-mono text-primary h-9"
+                className="pl-12 text-lg font-bold font-mono text-primary h-11"
                 placeholder="45000"
               />
             </div>
           </div>
 
-          {/* 報價總額 */}
-          <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">報價總額 (未稅)</span>
-            <p className="text-lg font-bold font-mono text-foreground">
+          {/* 報價總額 - 重點突出 */}
+          <div className="space-y-2 p-3 rounded-lg bg-primary/10">
+            <span className="text-sm font-medium text-foreground">報價總額 (未稅)</span>
+            <p className="text-2xl font-bold font-mono text-primary">
               {formatCurrency(totalPriceExcludingTax, 0)}
             </p>
           </div>
 
           {/* 總成本 */}
-          <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">總成本</span>
-            <p className="text-lg font-bold font-mono text-foreground">
+          <div className="space-y-2">
+            <span className="text-sm font-medium text-foreground">總成本</span>
+            <p className="text-2xl font-bold font-mono text-foreground">
               {formatCurrency(grandTotal, 0)}
             </p>
           </div>
 
-          {/* 毛利率 - 突出顯示 */}
-          <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">毛利率</span>
-            <div className="flex items-center gap-1.5">
+          {/* 毛利率 - 最重點 */}
+          <div className={cn(
+            "space-y-2 p-3 rounded-lg",
+            isPositive ? "bg-green-500/10" : "bg-destructive/10"
+          )}>
+            <span className="text-sm font-medium text-foreground">毛利率</span>
+            <div className="flex items-center gap-2">
               {isPositive ? (
-                <TrendingUp className="h-4 w-4 text-green-600" />
+                <TrendingUp className="h-6 w-6 text-green-600" />
               ) : (
-                <TrendingDown className="h-4 w-4 text-destructive" />
+                <TrendingDown className="h-6 w-6 text-destructive" />
               )}
               <span className={cn(
-                "text-xl font-bold",
+                "text-3xl font-bold",
                 isPositive ? "text-green-600" : "text-destructive"
               )}>
                 {grossMargin.toFixed(1)}%
@@ -119,64 +122,64 @@ export default function QuotePricingSummaryCard({
 
         {/* === 展開詳情按鈕 === */}
         <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
-          <CollapsibleTrigger className="flex items-center justify-center w-full py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors gap-1">
+          <CollapsibleTrigger className="flex items-center justify-center w-full py-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors gap-1.5">
             <span>{detailsOpen ? "收起詳情" : "展開詳情"}</span>
             <ChevronDown className={cn(
-              "h-3.5 w-3.5 transition-transform duration-200",
+              "h-4 w-4 transition-transform duration-200",
               detailsOpen && "rotate-180"
             )} />
           </CollapsibleTrigger>
           
-          <CollapsibleContent className="pt-3 space-y-4">
+          <CollapsibleContent className="pt-4 space-y-5">
             <Separator />
             
             {/* 報價明細 */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">每kW (含稅)</span>
-                <span className="font-mono">{formatCurrency(pricePerKwpWithTax, 0)}</span>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-8 gap-y-3">
+              <div>
+                <span className="text-sm text-foreground/70">每kW (含稅)</span>
+                <p className="text-base font-semibold font-mono">{formatCurrency(pricePerKwpWithTax, 0)}</p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">報價 (含稅)</span>
-                <span className="font-mono">{formatCurrency(totalPriceIncludingTax, 0)}</span>
+              <div>
+                <span className="text-sm text-foreground/70">報價 (含稅)</span>
+                <p className="text-base font-semibold font-mono">{formatCurrency(totalPriceIncludingTax, 0)}</p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">預估毛利</span>
-                <span className={cn("font-mono font-medium", isPositive ? "text-green-600" : "text-destructive")}>
+              <div>
+                <span className="text-sm text-foreground/70">預估毛利</span>
+                <p className={cn("text-lg font-bold font-mono", isPositive ? "text-green-600" : "text-destructive")}>
                   {formatCurrency(grossProfit, 0)}
-                </span>
+                </p>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">容量</span>
-                <span className="font-mono">{capacityKwp.toFixed(2)} kWp</span>
+              <div>
+                <span className="text-sm text-foreground/70">容量</span>
+                <p className="text-base font-semibold font-mono">{capacityKwp.toFixed(2)} kWp</p>
               </div>
             </div>
 
             <Separator />
 
             {/* 成本明細 */}
-            <div className="space-y-2">
-              <span className="text-xs font-medium text-muted-foreground">成本明細</span>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-1.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">工程項目</span>
-                  <span className="font-mono">{formatCurrency(engineeringTotal, 0)}</span>
+            <div className="space-y-3">
+              <span className="text-sm font-semibold text-foreground">成本明細</span>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-3">
+                <div>
+                  <span className="text-sm text-foreground/70">工程項目</span>
+                  <p className="text-base font-semibold font-mono">{formatCurrency(engineeringTotal, 0)}</p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">PV 模組</span>
-                  <span className="font-mono text-blue-600">{formatCurrency(modulesTotal, 0)}</span>
+                <div>
+                  <span className="text-sm text-foreground/70">PV 模組</span>
+                  <p className="text-base font-semibold font-mono text-blue-600">{formatCurrency(modulesTotal, 0)}</p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">逆變器</span>
-                  <span className="font-mono text-amber-600">{formatCurrency(invertersTotal, 0)}</span>
+                <div>
+                  <span className="text-sm text-foreground/70">逆變器</span>
+                  <p className="text-base font-semibold font-mono text-amber-600">{formatCurrency(invertersTotal, 0)}</p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">印花稅</span>
-                  <span className="font-mono">{formatCurrency(stampTax, 0)}</span>
+                <div>
+                  <span className="text-sm text-foreground/70">印花稅</span>
+                  <p className="text-base font-semibold font-mono">{formatCurrency(stampTax, 0)}</p>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">營所稅</span>
-                  <span className="font-mono">{formatCurrency(businessTax, 0)}</span>
+                <div>
+                  <span className="text-sm text-foreground/70">營所稅</span>
+                  <p className="text-base font-semibold font-mono">{formatCurrency(businessTax, 0)}</p>
                 </div>
               </div>
             </div>
