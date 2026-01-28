@@ -333,16 +333,16 @@ export default function QuoteDocumentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl h-[90vh] flex flex-col">
-        <DialogHeader>
+      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
             產出報價單
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col overflow-hidden">
-          <TabsList className="grid grid-cols-2 w-80">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
+          <TabsList className="grid grid-cols-2 w-80 flex-shrink-0">
             <TabsTrigger value="edit" className="gap-2">
               <Settings className="h-4 w-4" />
               編輯內容
@@ -354,7 +354,7 @@ export default function QuoteDocumentDialog({
           </TabsList>
 
           {/* 編輯內容 */}
-          <TabsContent value="edit" className="flex-1 overflow-auto">
+          <TabsContent value="edit" className="flex-1 overflow-hidden mt-4">
             <ScrollArea className="h-full pr-4">
               <div className="space-y-6 py-4">
                 {/* 客戶資訊 */}
@@ -511,9 +511,9 @@ export default function QuoteDocumentDialog({
           </TabsContent>
 
           {/* PDF 預覽 */}
-          <TabsContent value="preview" className="flex-1 overflow-hidden flex flex-col">
-            <div className="flex-1 border rounded-lg overflow-hidden bg-gray-100">
-              <PDFViewer width="100%" height="100%" className="border-0">
+          <TabsContent value="preview" className="flex-1 overflow-hidden flex flex-col mt-4 min-h-0">
+            <div className="flex-1 border rounded-lg overflow-hidden bg-muted min-h-[400px]">
+              <PDFViewer width="100%" height="100%" style={{ border: 'none' }}>
                 <QuoteDocumentPDF data={pdfData} />
               </PDFViewer>
             </div>
@@ -521,8 +521,8 @@ export default function QuoteDocumentDialog({
         </Tabs>
 
         {/* 底部操作按鈕 */}
-        <Separator className="my-4" />
-        <div className="flex justify-between items-center">
+        <Separator className="mt-4 mb-4 flex-shrink-0" />
+        <div className="flex justify-between items-center flex-shrink-0">
           <div className="text-sm text-muted-foreground">
             共 {buildItems.length} 個項目
           </div>
