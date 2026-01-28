@@ -25,9 +25,12 @@ import { calculate20YearProjection, QuoteParams } from "@/lib/quoteCalculations"
 import { 
   ModuleItem, 
   InverterItem, 
+  EngineeringCategory,
+  EngineeringItem,
   createDefaultModule, 
   createDefaultInverter,
-  generateId 
+  generateId,
+  calculateItemSubtotal,
 } from "@/hooks/useQuoteEngineering";
 
 const STEPS = [
@@ -80,11 +83,12 @@ export default function QuoteWizard() {
     invertersTotal: 0,
   });
 
-  // Modules and inverters state - lifted from QuoteCostCalculatorTab
+  // Modules, inverters, and engineering categories state - lifted from QuoteCostCalculatorTab
   const [modules, setModules] = useState<ModuleItem[]>([createDefaultModule()]);
   const [inverters, setInverters] = useState<InverterItem[]>([createDefaultInverter()]);
+  const [categories, setCategories] = useState<EngineeringCategory[]>([]);
   const [exchangeRate, setExchangeRate] = useState(30);
-  const [modulesLoaded, setModulesLoaded] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
   // Fetch existing quote if editing
   const { data: existingQuote, isLoading: isLoadingQuote } = useQuery({
@@ -134,6 +138,22 @@ export default function QuoteWizard() {
     enabled: !!id,
   });
 
+  // Fetch existing engineering items
+  const { data: existingEngineeringItems } = useQuery({
+    queryKey: ["quote-engineering-items", id],
+    queryFn: async () => {
+      if (!id) return [];
+      const { data, error } = await supabase
+        .from("quote_engineering_items" as any)
+        .select("*")
+        .eq("quote_id", id)
+        .order("sort_order");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!id,
+  });
+
   // Load existing data into form
   useEffect(() => {
     if (existingQuote) {
@@ -165,7 +185,7 @@ export default function QuoteWizard() {
 
   // Load existing modules into state
   useEffect(() => {
-    if (existingModules && existingModules.length > 0 && !modulesLoaded) {
+    if (existingModules && existingModules.length > 0 && !dataLoaded) {
       const mappedModules: ModuleItem[] = existingModules.map((m: any) => ({
         id: m.id,
         moduleModel: m.module_model || "",
@@ -181,13 +201,12 @@ export default function QuoteWizard() {
       if (mappedModules.length > 0 && mappedModules[0].exchangeRate) {
         setExchangeRate(mappedModules[0].exchangeRate);
       }
-      setModulesLoaded(true);
     }
-  }, [existingModules, modulesLoaded]);
+  }, [existingModules, dataLoaded]);
 
   // Load existing inverters into state
   useEffect(() => {
-    if (existingInverters && existingInverters.length > 0 && !modulesLoaded) {
+    if (existingInverters && existingInverters.length > 0 && !dataLoaded) {
       const mappedInverters: InverterItem[] = existingInverters.map((inv: any) => ({
         id: inv.id,
         inverterModel: inv.inverter_model || "",
@@ -200,7 +219,47 @@ export default function QuoteWizard() {
       }));
       setInverters(mappedInverters);
     }
-  }, [existingInverters, modulesLoaded]);
+  }, [existingInverters, dataLoaded]);
+
+  // Load existing engineering items into categories
+  useEffect(() => {
+    if (existingEngineeringItems && existingEngineeringItems.length > 0 && !dataLoaded) {
+      // Group items by category
+      const categoryMap = new Map<string, EngineeringCategory>();
+      
+      (existingEngineeringItems as any[]).forEach((item: any) => {
+        const key = item.category_code;
+        if (!categoryMap.has(key)) {
+          categoryMap.set(key, {
+            categoryCode: item.category_code,
+            categoryName: item.category_name,
+            items: [],
+          });
+        }
+        
+        categoryMap.get(key)!.items.push({
+          id: item.id,
+          categoryCode: item.category_code,
+          categoryName: item.category_name,
+          itemCode: item.item_code,
+          itemName: item.item_name,
+          unitPrice: Number(item.unit_price) || 0,
+          unit: item.unit || "式",
+          quantity: Number(item.quantity) || 1,
+          billingMethod: item.billing_method || (item.is_lump_sum ? 'lump_sum' : 'per_kw'),
+          tieredPricingType: item.tiered_pricing_type || undefined,
+          lumpSumAmount: item.lump_sum_amount ? Number(item.lump_sum_amount) : undefined,
+          subtotal: Number(item.subtotal) || 0,
+          sortOrder: item.sort_order || 0,
+          note: item.note,
+          isLumpSum: item.is_lump_sum || false,
+        });
+      });
+      
+      setCategories(Array.from(categoryMap.values()));
+      setDataLoaded(true);
+    }
+  }, [existingEngineeringItems, dataLoaded]);
 
   // Calculate projections
   const projections = formData.capacityKwp
@@ -323,12 +382,48 @@ export default function QuoteWizard() {
             console.error("Error saving inverters:", inverterError);
           }
         }
+
+        // Delete existing engineering items
+        await supabase.from("quote_engineering_items" as any).delete().eq("quote_id", quoteId);
+        
+        // Insert new engineering items
+        const allItems: any[] = [];
+        let globalSortOrder = 0;
+        categories.forEach((category) => {
+          category.items.forEach((item) => {
+            allItems.push({
+              quote_id: quoteId,
+              category_code: category.categoryCode,
+              category_name: category.categoryName,
+              item_code: item.itemCode || null,
+              item_name: item.itemName,
+              unit_price: item.unitPrice,
+              unit: item.unit || "式",
+              quantity: item.quantity,
+              is_lump_sum: item.billingMethod === 'lump_sum',
+              lump_sum_amount: item.lumpSumAmount || null,
+              subtotal: calculateItemSubtotal(item, formData.capacityKwp || 0),
+              sort_order: globalSortOrder++,
+              note: item.note || null,
+            });
+          });
+        });
+        
+        if (allItems.length > 0) {
+          const { error: engineeringError } = await supabase
+            .from("quote_engineering_items" as any)
+            .insert(allItems);
+          if (engineeringError) {
+            console.error("Error saving engineering items:", engineeringError);
+          }
+        }
       }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["project-quotes"] });
       queryClient.invalidateQueries({ queryKey: ["quote-modules"] });
       queryClient.invalidateQueries({ queryKey: ["quote-inverters"] });
+      queryClient.invalidateQueries({ queryKey: ["quote-engineering-items"] });
       toast.success(isEditing ? "報價已更新" : "報價已建立");
       navigate("/quotes");
     },
@@ -394,6 +489,8 @@ export default function QuoteWizard() {
             setInverters={setInverters}
             exchangeRate={exchangeRate}
             setExchangeRate={setExchangeRate}
+            categories={categories}
+            setCategories={setCategories}
           />
         );
       case "financial":
