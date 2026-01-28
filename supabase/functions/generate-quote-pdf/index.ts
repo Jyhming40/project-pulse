@@ -12,9 +12,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Noto Sans TC 字型 URL - 使用 GitHub raw URL
+// Noto Sans TC 字型 URL - 使用 Supabase Storage (公開 bucket)
 const NOTO_SANS_TC_URL =
-  "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/SubsetOTF/TC/NotoSansTC-Regular.otf";
+  "https://mcvgtsoheayabjpdplcr.supabase.co/storage/v1/object/public/branding/fonts/NotoSansTC-Regular.ttf";
 
 interface QuoteDocumentData {
   company: {
