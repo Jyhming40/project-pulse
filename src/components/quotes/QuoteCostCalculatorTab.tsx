@@ -39,6 +39,9 @@ interface QuoteCostCalculatorTabProps {
   setInverters: (inverters: InverterItem[]) => void;
   exchangeRate: number;
   setExchangeRate: (rate: number) => void;
+  // Lifted state for engineering categories
+  categories: EngineeringCategory[];
+  setCategories: (categories: EngineeringCategory[]) => void;
 }
 
 export default function QuoteCostCalculatorTab({
@@ -51,11 +54,10 @@ export default function QuoteCostCalculatorTab({
   setInverters,
   exchangeRate,
   setExchangeRate,
+  categories,
+  setCategories,
 }: QuoteCostCalculatorTabProps) {
   const { templates, loading } = useEngineeringTemplates();
-  
-  // 工程項目分類
-  const [categories, setCategories] = useState<EngineeringCategory[]>([]);
 
   // 從範本初始化
   useEffect(() => {
