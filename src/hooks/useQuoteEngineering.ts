@@ -129,6 +129,8 @@ export interface BillingContext {
   capacityKwp: number;
   pricePerKwp: number;
   taxRate: number;
+  // 自訂階梯定價計算函數（可選，若提供則使用此函數而非預設）
+  tieredPriceCalculator?: (capacityKw: number, typeCode: string) => { total: number; perKwPrice: number };
 }
 
 // 計算小計 (需要傳入 context 以支援各種計費方式)
@@ -156,6 +158,12 @@ export function calculateItemSubtotal(
     case 'tiered':
       // 階梯式計價：依容量級距計算
       if (item.tieredPricingType && item.tieredPricingType !== 'none') {
+        // 優先使用自訂計算器（來自 localStorage 的設定）
+        if (ctx.tieredPriceCalculator) {
+          const result = ctx.tieredPriceCalculator(capacityKwp, item.tieredPricingType);
+          return result.total;
+        }
+        // 退回到預設的硬編碼計算
         const result = calculateTieredPrice(capacityKwp, item.tieredPricingType);
         return result.total;
       }
