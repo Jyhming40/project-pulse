@@ -88,57 +88,6 @@ export default function QuotePricingSummaryCard({
             </p>
           </div>
 
-          <Separator className="col-span-2" />
-
-          {/* 費用計算區塊 */}
-          <div className="col-span-2">
-            <p className="text-sm font-medium text-muted-foreground mb-3">附加費用</p>
-            <div className="grid grid-cols-3 gap-4">
-              {/* 印花稅 */}
-              <div className="space-y-1.5 p-3 rounded-lg bg-background/50 border">
-                <span className="text-xs text-muted-foreground">印花稅 (千分之一)</span>
-                <p className="text-sm font-semibold font-mono">
-                  {formatCurrency(stampDuty, 0)}
-                </p>
-              </div>
-
-              {/* 營所稅 */}
-              <div className="space-y-1.5 p-3 rounded-lg bg-background/50 border">
-                <span className="text-xs text-muted-foreground">營所稅 (2%)</span>
-                <p className="text-sm font-semibold font-mono">
-                  {formatCurrency(corporateIncomeTax, 0)}
-                </p>
-              </div>
-
-              {/* 仲介費 - 可自訂百分比 */}
-              <div className="space-y-1.5 p-3 rounded-lg bg-background/50 border">
-                <Label htmlFor="brokerageRate" className="text-xs text-muted-foreground">
-                  仲介費
-                </Label>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      id="brokerageRate"
-                      type="number"
-                      min={0}
-                      max={100}
-                      step={0.1}
-                      value={brokerageRate || ""}
-                      onChange={(e) => onBrokerageRateChange?.(Number(e.target.value) || 0)}
-                      className="h-8 text-sm font-mono pr-6"
-                      placeholder="0"
-                    />
-                    <span className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground text-xs">
-                      %
-                    </span>
-                  </div>
-                </div>
-                <p className="text-sm font-semibold font-mono">
-                  {formatCurrency(brokerageFee, 0)}
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
       </CardContent>
     </Card>
