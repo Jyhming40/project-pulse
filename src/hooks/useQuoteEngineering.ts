@@ -14,7 +14,10 @@ export type BillingMethod =
   | 'per_kw'      // 每 kW 計價 (單價 × 裝置容量)
   | 'per_unit'    // 單位計價 (單價 × 數量)
   | 'lump_sum'    // 一式計價 (固定金額)
-  | 'tiered';     // 階梯式計價 (依容量級距)
+  | 'tiered'      // 階梯式計價 (依容量級距)
+  | 'stamp_duty'  // 印花稅 (含稅總價 × 0.001)
+  | 'corp_tax'    // 營所稅 (含稅總價 × 0.02)
+  | 'brokerage';  // 仲介費 (每kW含稅價格 × 容量 × 自訂百分比)
 
 export interface EngineeringItem {
   id: string;
@@ -28,6 +31,7 @@ export interface EngineeringItem {
   billingMethod: BillingMethod;
   tieredPricingType?: TieredPricingType; // 階梯定價類型
   lumpSumAmount?: number;
+  brokerageRate?: number; // 仲介費百分比
   subtotal: number;
   sortOrder: number;
   note?: string;
@@ -120,10 +124,29 @@ export function useEngineeringTemplates() {
   return { templates, loading };
 }
 
-// 計算小計 (需要傳入 capacityKwp 以支援 per_kw 和 tiered 計費)
-export function calculateItemSubtotal(item: EngineeringItem, capacityKwp: number = 0): number {
+// 計費方式上下文 - 用於自動計算的項目
+export interface BillingContext {
+  capacityKwp: number;
+  pricePerKwp: number;
+  taxRate: number;
+}
+
+// 計算小計 (需要傳入 context 以支援各種計費方式)
+export function calculateItemSubtotal(
+  item: EngineeringItem, 
+  capacityKwp: number = 0,
+  context?: BillingContext
+): number {
   // Legacy support for isLumpSum
   const method = item.billingMethod || (item.isLumpSum ? 'lump_sum' : 'per_unit');
+  
+  // 取得完整上下文
+  const ctx = context || { capacityKwp, pricePerKwp: 0, taxRate: 0.05 };
+  
+  // 計算含稅總價
+  const totalPriceWithTax = ctx.capacityKwp * ctx.pricePerKwp * (1 + ctx.taxRate);
+  // 計算每kW含稅價格
+  const pricePerKwpWithTax = ctx.pricePerKwp * (1 + ctx.taxRate);
   
   switch (method) {
     case 'per_kw':
@@ -141,6 +164,19 @@ export function calculateItemSubtotal(item: EngineeringItem, capacityKwp: number
     case 'lump_sum':
       // 一式計價：固定金額
       return item.lumpSumAmount || 0;
+    
+    case 'stamp_duty':
+      // 印花稅：含稅總價 × 0.001 (千分之一)
+      return totalPriceWithTax * 0.001;
+    
+    case 'corp_tax':
+      // 營所稅：含稅總價 × 0.02 (2%)
+      return totalPriceWithTax * 0.02;
+    
+    case 'brokerage':
+      // 仲介費：每kW含稅價格 × 容量 × 自訂百分比
+      const rate = (item.brokerageRate || 0) / 100;
+      return pricePerKwpWithTax * ctx.capacityKwp * rate;
     
     case 'per_unit':
     default:

@@ -28,6 +28,7 @@ import {
   EngineeringCategory, 
   EngineeringItem, 
   BillingMethod,
+  BillingContext,
   calculateItemSubtotal, 
   generateId 
 } from "@/hooks/useQuoteEngineering";
@@ -39,6 +40,8 @@ interface EngineeringCategoryCardProps {
   onUpdate: (category: EngineeringCategory) => void;
   onDelete: () => void;
   capacityKwp?: number;
+  pricePerKwp?: number;
+  taxRate?: number;
 }
 
 export default function EngineeringCategoryCard({
@@ -46,14 +49,23 @@ export default function EngineeringCategoryCard({
   onUpdate,
   onDelete,
   capacityKwp = 0,
+  pricePerKwp = 0,
+  taxRate = 0.05,
 }: EngineeringCategoryCardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [editedName, setEditedName] = useState(category.categoryName);
 
+  // 建立計費上下文
+  const billingContext: BillingContext = {
+    capacityKwp,
+    pricePerKwp,
+    taxRate,
+  };
+
   // 計算類別小計
   const categoryTotal = category.items.reduce((sum, item) => {
-    return sum + calculateItemSubtotal(item, capacityKwp);
+    return sum + calculateItemSubtotal(item, capacityKwp, billingContext);
   }, 0);
 
   // 更新單一項目
@@ -61,7 +73,7 @@ export default function EngineeringCategoryCard({
     const newItems = [...category.items];
     newItems[index] = { ...newItems[index], ...updates };
     // 重算小計
-    newItems[index].subtotal = calculateItemSubtotal(newItems[index], capacityKwp);
+    newItems[index].subtotal = calculateItemSubtotal(newItems[index], capacityKwp, billingContext);
     onUpdate({ ...category, items: newItems });
   };
 
@@ -157,9 +169,12 @@ export default function EngineeringCategoryCard({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {category.items.map((item, index) => {
+              {category.items.map((item, index) => {
                   const method = item.billingMethod || 'per_kw';
-                  const subtotal = calculateItemSubtotal(item, capacityKwp);
+                  const subtotal = calculateItemSubtotal(item, capacityKwp, billingContext);
+                  
+                  // 判斷是否為自動計算類型
+                  const isAutoCalc = ['stamp_duty', 'corp_tax', 'brokerage'].includes(method);
                   
                   // 取得階梯定價資訊
                   const tieredInfo = method === 'tiered' && item.tieredPricingType 
@@ -191,6 +206,9 @@ export default function EngineeringCategoryCard({
                             <SelectItem value="per_unit">單位計價</SelectItem>
                             <SelectItem value="lump_sum">一式計價</SelectItem>
                             <SelectItem value="tiered">階梯定價</SelectItem>
+                            <SelectItem value="stamp_duty">印花稅</SelectItem>
+                            <SelectItem value="corp_tax">營所稅</SelectItem>
+                            <SelectItem value="brokerage">仲介費</SelectItem>
                           </SelectContent>
                         </Select>
                         {method === 'tiered' && (
@@ -235,6 +253,12 @@ export default function EngineeringCategoryCard({
                           <span className="text-sm text-muted-foreground">kW</span>
                         ) : method === 'lump_sum' ? (
                           <span className="text-sm text-muted-foreground">式</span>
+                        ) : method === 'stamp_duty' ? (
+                          <span className="text-sm text-muted-foreground">‰</span>
+                        ) : method === 'corp_tax' ? (
+                          <span className="text-sm text-muted-foreground">%</span>
+                        ) : method === 'brokerage' ? (
+                          <span className="text-sm text-muted-foreground">%</span>
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>
                         )}
@@ -255,6 +279,24 @@ export default function EngineeringCategoryCard({
                             className="h-8 w-24 text-right"
                             placeholder="金額"
                           />
+                        ) : method === 'stamp_duty' ? (
+                          <span className="text-sm text-muted-foreground">0.1%</span>
+                        ) : method === 'corp_tax' ? (
+                          <span className="text-sm text-muted-foreground">2%</span>
+                        ) : method === 'brokerage' ? (
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.1}
+                              value={item.brokerageRate || ""}
+                              onChange={(e) => handleUpdateItem(index, { brokerageRate: parseFloat(e.target.value) || 0 })}
+                              className="h-8 w-16 text-right"
+                              placeholder="0"
+                            />
+                            <span className="text-sm text-muted-foreground">%</span>
+                          </div>
                         ) : tieredInfo ? (
                           <span className="text-sm text-muted-foreground">
                             ${tieredInfo.perKwPrice}/kW
@@ -276,6 +318,8 @@ export default function EngineeringCategoryCard({
                             />
                             <span className="text-sm text-muted-foreground">{item.unit || "個"}</span>
                           </div>
+                        ) : isAutoCalc ? (
+                          <span className="text-sm text-muted-foreground whitespace-nowrap">自動</span>
                         ) : (
                           <span className="text-sm text-muted-foreground whitespace-nowrap">1 式</span>
                         )}
