@@ -27,10 +27,13 @@ import {
   InverterItem, 
   EngineeringCategory,
   EngineeringItem,
+  BillingContext,
   createDefaultModule, 
   createDefaultInverter,
   generateId,
   calculateItemSubtotal,
+  calculateModulePrice,
+  calculateInverterPrice,
 } from "@/hooks/useQuoteEngineering";
 
 const STEPS = [
@@ -299,6 +302,41 @@ export default function QuoteWizard() {
     // Always set dataLoaded when fetch is complete (even if no items)
     setDataLoaded(true);
   }, [existingEngineeringItems, isEngineeringFetched, dataLoaded]);
+
+  // Auto-calculate cost totals when data is loaded (for initial page load)
+  useEffect(() => {
+    if (!dataLoaded) return;
+    
+    const capacityKwp = formData.capacityKwp || 0;
+    const pricePerKwp = formData.pricePerKwp || 0;
+    const taxRate = formData.taxRate || 0.05;
+    
+    // Build billing context
+    const billingContext: BillingContext = {
+      capacityKwp,
+      pricePerKwp,
+      taxRate,
+    };
+    
+    // Calculate engineering total
+    const engineeringTotal = categories.reduce((sum, cat) => {
+      return sum + cat.items.reduce((itemSum, item) => {
+        return itemSum + calculateItemSubtotal(item, capacityKwp, billingContext);
+      }, 0);
+    }, 0);
+
+    // Calculate modules total
+    const modulesTotal = modules.reduce((sum, m) => {
+      return sum + calculateModulePrice({ ...m, exchangeRate });
+    }, 0);
+
+    // Calculate inverters total
+    const invertersTotal = inverters.reduce((sum, inv) => {
+      return sum + calculateInverterPrice(inv);
+    }, 0);
+
+    setCostTotals({ engineeringTotal, modulesTotal, invertersTotal });
+  }, [dataLoaded, modules, inverters, categories, exchangeRate, formData.capacityKwp, formData.pricePerKwp, formData.taxRate]);
 
   // Calculate projections
   const projections = formData.capacityKwp
