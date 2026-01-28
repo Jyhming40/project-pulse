@@ -58,6 +58,7 @@ interface QuotePreviewData {
   };
   paymentTerms: PaymentTermItem[];
   terms: string[];
+  fontSize?: number; // 字體大小 pt
 }
 
 interface QuoteDocumentPreviewProps {
@@ -121,6 +122,8 @@ const QuoteDocumentPreview = forwardRef<HTMLDivElement, QuoteDocumentPreviewProp
       onDataChange({ ...data, items: [...data.items, newItem] });
     };
 
+    const baseFontSize = data.fontSize || 9;
+
     return (
       <div
         ref={ref}
@@ -130,7 +133,7 @@ const QuoteDocumentPreview = forwardRef<HTMLDivElement, QuoteDocumentPreviewProp
           width: "210mm",
           minHeight: "297mm",
           padding: "12mm 15mm",
-          fontSize: "9pt",
+          fontSize: `${baseFontSize}pt`,
         }}
       >
         {/* 公司名稱 + 報價單標題 */}
@@ -242,19 +245,19 @@ const QuoteDocumentPreview = forwardRef<HTMLDivElement, QuoteDocumentPreviewProp
         </table>
 
         {/* 項目明細表格 */}
-        <table className="w-full text-[8.5pt] mb-3" style={{ borderCollapse: "collapse" }}>
+        <table className="w-full mb-3" style={{ borderCollapse: "collapse", fontSize: `${baseFontSize - 0.5}pt` }}>
           <thead>
             <tr className="bg-gray-100">
-              <th className="border border-gray-400 px-2 py-1.5 text-center" style={{ width: "35px" }}>項次</th>
-              <th className="border border-gray-400 px-2 py-1.5 text-left" style={{ width: "120px" }}>品 名</th>
+              <th className="border border-gray-400 px-2 py-1.5 text-center" style={{ width: "30px" }}>項次</th>
+              <th className="border border-gray-400 px-2 py-1.5 text-left" style={{ width: "100px" }}>品 名</th>
               <th className="border border-gray-400 px-2 py-1.5 text-left">規 格</th>
-              <th className="border border-gray-400 px-2 py-1.5 text-center" style={{ width: "70px" }}>數量</th>
-              <th className="border border-gray-400 px-2 py-1.5 text-center no-print" style={{ width: "45px" }}>操作</th>
+              <th className="border border-gray-400 px-2 py-1.5 text-center" style={{ width: "65px" }}>數量</th>
+              <th className="border border-gray-400 px-2 py-1.5 text-center no-print" style={{ width: "40px" }}>操作</th>
             </tr>
           </thead>
           <tbody>
             {data.items.map((item, index) => (
-              <tr key={index}>
+              <tr key={index} className="align-top">
                 <td className="border border-gray-300 px-2 py-1 text-center text-gray-600">
                   {item.order}
                 </td>
@@ -267,14 +270,15 @@ const QuoteDocumentPreview = forwardRef<HTMLDivElement, QuoteDocumentPreviewProp
                   />
                 </td>
                 <td className="border border-gray-300 px-1 py-0.5">
-                  <input
-                    type="text"
+                  <textarea
                     value={item.spec}
                     onChange={(e) => updateItem(index, "spec", e.target.value)}
-                    className="w-full bg-transparent px-1 py-0.5 focus:bg-blue-50 focus:outline-none text-gray-700"
+                    className="w-full bg-transparent px-1 py-0.5 focus:bg-blue-50 focus:outline-none text-gray-700 resize-none"
+                    rows={Math.max(1, Math.ceil(item.spec.length / 50))}
+                    style={{ minHeight: "1.5em", lineHeight: "1.4" }}
                   />
                 </td>
-                <td className="border border-gray-300 px-1 py-0.5 text-center">
+                <td className="border border-gray-300 px-1 py-0.5 text-center align-top">
                   <input
                     type="text"
                     value={typeof item.quantity === "number" ? `${item.quantity} ${item.unit}` : item.quantity}

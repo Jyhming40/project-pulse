@@ -11,7 +11,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Printer, FileText, Download } from "lucide-react";
+import { Printer, FileText, Minus, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
@@ -241,6 +241,7 @@ export default function QuoteDocumentDialogV2({
         summary: calculateTotals,
         paymentTerms: paymentTermsWithAmount,
         terms: [...DEFAULT_TERMS],
+        fontSize: 9, // 預設字體大小
       };
       setPreviewData(data);
     }
@@ -248,6 +249,7 @@ export default function QuoteDocumentDialogV2({
 
   // 生成列印專用 HTML - 傳統簡潔版
   const buildPrintHTML = useCallback((data: QuotePreviewData) => {
+    const fontSize = data.fontSize || 9;
     const formatCurrencyStr = (value: number) => {
       return new Intl.NumberFormat('zh-TW', { style: 'currency', currency: 'TWD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
     };
@@ -353,7 +355,8 @@ export default function QuoteDocumentDialogV2({
       return;
     }
 
-    // 傳統簡潔版的列印樣式
+    // 傳統簡潔版的列印樣式 - 使用動態字體大小
+    const fontSize = previewData.fontSize || 9;
     const printStyles = `
       @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
       
@@ -361,7 +364,7 @@ export default function QuoteDocumentDialogV2({
       
       html, body {
         font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
-        font-size: 9pt;
+        font-size: ${fontSize}pt;
         line-height: 1.4;
         color: #1a1a1a;
         background: white;
@@ -383,9 +386,9 @@ export default function QuoteDocumentDialogV2({
         align-items: flex-start;
         margin-bottom: 12px;
       }
-      .company-name { font-size: 14pt; font-weight: 700; }
+      .company-name { font-size: ${fontSize + 5}pt; font-weight: 700; }
       .quote-title { 
-        font-size: 18pt; 
+        font-size: ${fontSize + 9}pt; 
         font-weight: 900; 
         letter-spacing: 0.3em;
         border-bottom: 2px solid #1a1a1a;
@@ -397,7 +400,7 @@ export default function QuoteDocumentDialogV2({
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 10px;
-        font-size: 9pt;
+        font-size: ${fontSize}pt;
       }
       .info-table td { padding: 3px 0; color: #555; }
       .info-table .field-value { color: #1a1a1a; }
@@ -409,7 +412,7 @@ export default function QuoteDocumentDialogV2({
         width: 100%;
         border-collapse: collapse;
         margin-bottom: 12px;
-        font-size: 8.5pt;
+        font-size: ${fontSize - 0.5}pt;
       }
       .items-table th {
         background: #f3f4f6;
@@ -431,7 +434,7 @@ export default function QuoteDocumentDialogV2({
         display: flex;
         gap: 20px;
         margin-bottom: 12px;
-        font-size: 8.5pt;
+        font-size: ${fontSize - 0.5}pt;
       }
       .bank-info {
         flex: 1;
@@ -450,13 +453,13 @@ export default function QuoteDocumentDialogV2({
       .price-row.total {
         border-bottom: 2px solid #1a1a1a;
         font-weight: 700;
-        font-size: 10pt;
+        font-size: ${fontSize + 1}pt;
       }
-      .price-row.sub { color: #6b7280; font-size: 8pt; border-bottom: none; }
+      .price-row.sub { color: #6b7280; font-size: ${fontSize - 1}pt; border-bottom: none; }
 
       /* 條款 */
       .terms-section {
-        font-size: 8pt;
+        font-size: ${fontSize - 1}pt;
         color: #4b5563;
         margin-bottom: 16px;
         line-height: 1.6;
@@ -469,13 +472,16 @@ export default function QuoteDocumentDialogV2({
         justify-content: space-between;
         align-items: flex-end;
         margin-top: 20px;
-        font-size: 9pt;
+        font-size: ${fontSize}pt;
       }
       .signature-left {}
       .signature-label { color: #6b7280; margin-bottom: 6px; }
       .signature-line { border-bottom: 1px solid #9ca3af; width: 180px; height: 40px; }
       .signature-right { text-align: right; }
       .company-stamp { font-weight: 700; }
+
+      /* 規格多行支持 */
+      .spec-cell { white-space: pre-wrap; }
     `;
 
     const htmlContent = buildPrintHTML(previewData);
@@ -502,17 +508,51 @@ export default function QuoteDocumentDialogV2({
 
   if (!previewData) return null;
 
+  const handleFontSizeChange = (delta: number) => {
+    const newSize = Math.max(6, Math.min(12, (previewData.fontSize || 9) + delta));
+    setPreviewData({ ...previewData, fontSize: newSize });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl h-[95vh] flex flex-col p-0">
         <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4 border-b">
-          <DialogTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            報價單預覽與編輯
-          </DialogTitle>
-          <p className="text-sm text-muted-foreground">
-            可直接編輯下方內容，完成後點擊「列印 / 另存 PDF」
-          </p>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                報價單預覽與編輯
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                可直接編輯下方內容，完成後點擊「列印 / 另存 PDF」
+              </p>
+            </div>
+            {/* 字體大小控制 */}
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-1.5">
+              <span className="text-sm text-muted-foreground">字體大小</span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => handleFontSizeChange(-0.5)}
+                disabled={(previewData.fontSize || 9) <= 6}
+              >
+                <Minus className="h-3 w-3" />
+              </Button>
+              <span className="text-sm font-medium w-10 text-center">
+                {previewData.fontSize || 9}pt
+              </span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => handleFontSizeChange(0.5)}
+                disabled={(previewData.fontSize || 9) >= 12}
+              >
+                <Plus className="h-3 w-3" />
+              </Button>
+            </div>
+          </div>
         </DialogHeader>
 
         <div className="flex-1 overflow-auto bg-gray-100 p-4">
