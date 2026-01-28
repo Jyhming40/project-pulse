@@ -333,7 +333,7 @@ export default function QuoteDocumentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col overflow-hidden">
+      <DialogContent className="max-w-6xl h-[90vh] flex flex-col overflow-hidden">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
@@ -354,8 +354,8 @@ export default function QuoteDocumentDialog({
           </TabsList>
 
           {/* 編輯內容 */}
-          <TabsContent value="edit" className="flex-1 overflow-hidden mt-4">
-            <ScrollArea className="h-full pr-4">
+          <TabsContent value="edit" className="flex-1 overflow-auto mt-4" style={{ minHeight: 0 }}>
+            <ScrollArea className="h-[calc(90vh-280px)] pr-4">
               <div className="space-y-6 py-4">
                 {/* 客戶資訊 */}
                 <Card>
@@ -511,9 +511,9 @@ export default function QuoteDocumentDialog({
           </TabsContent>
 
           {/* PDF 預覽 */}
-          <TabsContent value="preview" className="flex-1 overflow-hidden flex flex-col mt-4 min-h-0">
-            <div className="flex-1 border rounded-lg overflow-hidden bg-muted min-h-[400px]">
-              <PDFViewer width="100%" height="100%" style={{ border: 'none' }}>
+          <TabsContent value="preview" className="flex-1 mt-4" style={{ minHeight: 0 }}>
+            <div className="border rounded-lg overflow-hidden bg-muted h-[calc(90vh-280px)]">
+              <PDFViewer width="100%" height="100%" showToolbar={true} style={{ border: 'none' }}>
                 <QuoteDocumentPDF data={pdfData} />
               </PDFViewer>
             </div>

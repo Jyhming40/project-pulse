@@ -360,7 +360,7 @@ export default function QuoteDocumentPDF({ data }: { data: QuoteDocumentData }) 
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>報價單號：</Text>
-              <Text style={{ ...styles.infoValue, color: "#c00" }}>{data.quote.number || " "}</Text>
+              <Text style={[styles.infoValue, { color: "#c00" }]}>{data.quote.number || " "}</Text>
             </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>有效日期：</Text>
