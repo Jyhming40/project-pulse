@@ -258,7 +258,7 @@ export default function EngineeringCategoryCard({
                         ) : method === 'corp_tax' ? (
                           <span className="text-sm text-muted-foreground">%</span>
                         ) : method === 'brokerage' ? (
-                          <span className="text-sm text-muted-foreground">%</span>
+                          <span className="text-sm text-muted-foreground">kW</span>
                         ) : (
                           <span className="text-sm text-muted-foreground">-</span>
                         )}
@@ -284,19 +284,13 @@ export default function EngineeringCategoryCard({
                         ) : method === 'corp_tax' ? (
                           <span className="text-sm text-muted-foreground">2%</span>
                         ) : method === 'brokerage' ? (
-                          <div className="flex items-center gap-1">
-                            <Input
-                              type="number"
-                              min={0}
-                              max={100}
-                              step={0.1}
-                              value={item.brokerageRate || ""}
-                              onChange={(e) => handleUpdateItem(index, { brokerageRate: parseFloat(e.target.value) || 0 })}
-                              className="h-8 w-16 text-right"
-                              placeholder="0"
-                            />
-                            <span className="text-sm text-muted-foreground">%</span>
-                          </div>
+                          <Input
+                            type="number"
+                            value={item.unitPrice || ""}
+                            onChange={(e) => handleUpdateItem(index, { unitPrice: parseFloat(e.target.value) || 0 })}
+                            className="h-8 w-24 text-right"
+                            placeholder="每kW金額"
+                          />
                         ) : tieredInfo ? (
                           <span className="text-sm text-muted-foreground">
                             ${tieredInfo.perKwPrice}/kW
@@ -317,6 +311,21 @@ export default function EngineeringCategoryCard({
                               className="h-8 w-20 text-right"
                             />
                             <span className="text-sm text-muted-foreground">{item.unit || "個"}</span>
+                          </div>
+                        ) : method === 'brokerage' ? (
+                          <div className="flex items-center justify-end gap-1">
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">{capacityKwp}kW +</span>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.1}
+                              value={item.brokerageRate || ""}
+                              onChange={(e) => handleUpdateItem(index, { brokerageRate: parseFloat(e.target.value) || 0 })}
+                              className="h-8 w-14 text-right"
+                              placeholder="0"
+                            />
+                            <span className="text-xs text-muted-foreground">%</span>
                           </div>
                         ) : isAutoCalc ? (
                           <span className="text-sm text-muted-foreground whitespace-nowrap">自動</span>
