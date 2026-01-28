@@ -9,6 +9,7 @@ import {
   EngineeringCategory,
   ModuleItem,
   InverterItem,
+  BillingContext,
   initializeFromTemplates,
   createDefaultModule,
   createDefaultInverter,
@@ -74,11 +75,20 @@ export default function QuoteCostCalculatorTab({
   // 計算各項總計
   const totals = useMemo(() => {
     const capacityKwp = formData.capacityKwp || 0;
+    const pricePerKwp = formData.pricePerKwp || 0;
+    const taxRate = formData.taxRate || 0.05;
+    
+    // 建立計費上下文
+    const billingContext: BillingContext = {
+      capacityKwp,
+      pricePerKwp,
+      taxRate,
+    };
     
     // 工程項目總計
     const engineeringTotal = categories.reduce((sum, cat) => {
       return sum + cat.items.reduce((itemSum, item) => {
-        return itemSum + calculateItemSubtotal(item, capacityKwp);
+        return itemSum + calculateItemSubtotal(item, capacityKwp, billingContext);
       }, 0);
     }, 0);
 
@@ -93,7 +103,7 @@ export default function QuoteCostCalculatorTab({
     }, 0);
 
     return { engineeringTotal, modulesTotal, invertersTotal };
-  }, [categories, modules, inverters, exchangeRate, formData.capacityKwp]);
+  }, [categories, modules, inverters, exchangeRate, formData.capacityKwp, formData.pricePerKwp, formData.taxRate]);
 
   // Notify parent of cost changes
   useEffect(() => {
@@ -196,6 +206,8 @@ export default function QuoteCostCalculatorTab({
           onUpdate={(cat) => handleUpdateCategory(index, cat)}
           onDelete={() => handleDeleteCategory(index)}
           capacityKwp={formData.capacityKwp}
+          pricePerKwp={formData.pricePerKwp}
+          taxRate={formData.taxRate}
         />
       ))}
 

@@ -241,18 +241,46 @@ export default function QuoteWizard() {
           });
         }
         
+        // 解析 item_code 以還原計費方式
+        const itemCode = item.item_code || '';
+        let billingMethod: string = item.is_lump_sum ? 'lump_sum' : 'per_kw';
+        let brokerageRate: number | undefined;
+        let tieredPricingType: string | undefined;
+        
+        // 檢查是否為自動計算類型 (格式: billing_method 或 billing_method:rate)
+        if (itemCode.startsWith('stamp_duty')) {
+          billingMethod = 'stamp_duty';
+        } else if (itemCode.startsWith('corp_tax')) {
+          billingMethod = 'corp_tax';
+        } else if (itemCode.startsWith('brokerage')) {
+          billingMethod = 'brokerage';
+          const parts = itemCode.split(':');
+          if (parts.length > 1) {
+            brokerageRate = parseFloat(parts[1]) || 0;
+          }
+        } else if (itemCode.startsWith('tiered')) {
+          billingMethod = 'tiered';
+          const parts = itemCode.split(':');
+          if (parts.length > 1) {
+            tieredPricingType = parts[1];
+          }
+        }
+        
         categoryMap.get(key)!.items.push({
           id: item.id,
           categoryCode: item.category_code,
           categoryName: item.category_name,
-          itemCode: item.item_code,
+          itemCode: ['stamp_duty', 'corp_tax', 'brokerage', 'tiered'].some(m => itemCode.startsWith(m)) 
+            ? undefined 
+            : item.item_code,
           itemName: item.item_name,
           unitPrice: Number(item.unit_price) || 0,
           unit: item.unit || "式",
           quantity: Number(item.quantity) || 1,
-          billingMethod: item.billing_method || (item.is_lump_sum ? 'lump_sum' : 'per_kw'),
-          tieredPricingType: item.tiered_pricing_type || undefined,
+          billingMethod: billingMethod as any,
+          tieredPricingType: tieredPricingType || item.tiered_pricing_type || undefined,
           lumpSumAmount: item.lump_sum_amount ? Number(item.lump_sum_amount) : undefined,
+          brokerageRate,
           subtotal: Number(item.subtotal) || 0,
           sortOrder: item.sort_order || 0,
           note: item.note,
@@ -400,16 +428,25 @@ export default function QuoteWizard() {
         categories.forEach((category) => {
           console.log(`Category: ${category.categoryName}, items: ${category.items.length}`);
           category.items.forEach((item) => {
+            // 將新計費方式映射為資料庫可支援的格式
+            // stamp_duty, corp_tax, brokerage 等自動計算項目使用 is_lump_sum = false
+            // 並通過 item_code 來區分計費方式
+            const billingMethod = item.billingMethod || 'per_kw';
+            const isAutoCalc = ['stamp_duty', 'corp_tax', 'brokerage'].includes(billingMethod);
+            
             allItems.push({
               quote_id: quoteId,
               category_code: category.categoryCode,
               category_name: category.categoryName,
-              item_code: item.itemCode || null,
+              // 使用 item_code 儲存計費方式識別碼
+              item_code: isAutoCalc || billingMethod === 'tiered' 
+                ? `${billingMethod}${item.brokerageRate ? `:${item.brokerageRate}` : ''}` 
+                : (item.itemCode || null),
               item_name: item.itemName,
               unit_price: item.unitPrice,
               unit: item.unit || "式",
               quantity: item.quantity,
-              is_lump_sum: item.billingMethod === 'lump_sum',
+              is_lump_sum: billingMethod === 'lump_sum',
               lump_sum_amount: item.lumpSumAmount || null,
               sort_order: globalSortOrder++,
               note: item.note || null,
