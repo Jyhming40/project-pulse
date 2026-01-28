@@ -12,9 +12,9 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Google Noto Sans TC 字型 URL (從 Google Fonts CDN 載入)
+// Noto Sans TC 字型 URL - 使用 GitHub raw URL
 const NOTO_SANS_TC_URL =
-  "https://fonts.gstatic.com/s/notosanstc/v35/-nFuOG829Oofr2wohFbTp9iFOSsLA_ZJ1g.ttf";
+  "https://raw.githubusercontent.com/googlefonts/noto-cjk/main/Sans/SubsetOTF/TC/NotoSansTC-Regular.otf";
 
 interface QuoteDocumentData {
   company: {
