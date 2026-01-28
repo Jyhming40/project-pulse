@@ -243,11 +243,11 @@ export default function QuoteWizard() {
         
         // 解析 item_code 以還原計費方式
         const itemCode = item.item_code || '';
-        let billingMethod: string = item.is_lump_sum ? 'lump_sum' : 'per_kw';
+        let billingMethod: string = 'per_kw'; // 預設值
         let brokerageRate: number | undefined;
         let tieredPricingType: string | undefined;
         
-        // 檢查是否為自動計算類型 (格式: billing_method 或 billing_method:rate)
+        // 檢查特殊計費方式 (格式: billing_method 或 billing_method:params)
         if (itemCode.startsWith('stamp_duty')) {
           billingMethod = 'stamp_duty';
         } else if (itemCode.startsWith('corp_tax')) {
@@ -264,13 +264,19 @@ export default function QuoteWizard() {
           if (parts.length > 1) {
             tieredPricingType = parts[1];
           }
+        } else if (itemCode === 'per_unit') {
+          billingMethod = 'per_unit';
+        } else if (item.is_lump_sum) {
+          billingMethod = 'lump_sum';
+        } else {
+          billingMethod = 'per_kw';
         }
         
         categoryMap.get(key)!.items.push({
           id: item.id,
           categoryCode: item.category_code,
           categoryName: item.category_name,
-          itemCode: ['stamp_duty', 'corp_tax', 'brokerage', 'tiered'].some(m => itemCode.startsWith(m)) 
+          itemCode: ['stamp_duty', 'corp_tax', 'brokerage', 'tiered', 'per_unit'].some(m => itemCode.startsWith(m)) 
             ? undefined 
             : item.item_code,
           itemName: item.item_name,
@@ -440,8 +446,8 @@ export default function QuoteWizard() {
               category_name: category.categoryName,
               // 使用 item_code 儲存計費方式識別碼
               item_code: isAutoCalc || billingMethod === 'tiered' 
-                ? `${billingMethod}${item.brokerageRate ? `:${item.brokerageRate}` : ''}` 
-                : (item.itemCode || null),
+                ? `${billingMethod}${item.brokerageRate ? `:${item.brokerageRate}` : ''}${item.tieredPricingType ? `:${item.tieredPricingType}` : ''}`
+                : (billingMethod === 'per_unit' ? 'per_unit' : (item.itemCode || null)),
               item_name: item.itemName,
               unit_price: item.unitPrice,
               unit: item.unit || "式",
