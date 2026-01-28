@@ -22,7 +22,7 @@ import QuoteBasicInfoTab from "@/components/quotes/QuoteBasicInfoTab";
 import QuoteCostCalculatorTab from "@/components/quotes/QuoteCostCalculatorTab";
 import QuoteFinancialAnalysisTab from "@/components/quotes/QuoteFinancialAnalysisTab";
 import QuoteScheduleTab from "@/components/quotes/QuoteScheduleTab";
-import QuoteDocumentDialogV2 from "@/components/quotes/QuoteDocumentDialogV2";
+// Quote document generation removed - to be reimplemented
 import { calculate20YearProjection, QuoteParams } from "@/lib/quoteCalculations";
 import { 
   ModuleItem, 
@@ -737,24 +737,7 @@ export default function QuoteWizard() {
         </div>
       </div>
 
-      {/* 報價單產出對話框 */}
-      {id && (
-        <QuoteDocumentDialogV2
-          open={showDocumentDialog}
-          onOpenChange={setShowDocumentDialog}
-          quoteId={id}
-          formData={{
-            capacityKwp: formData.capacityKwp || 0,
-            pricePerKwp: formData.pricePerKwp || 0,
-            taxRate: formData.taxRate || 0.05,
-          }}
-          categories={categories}
-          modules={modules}
-          inverters={inverters}
-          projectId={projectId}
-          investorId={investorId}
-        />
-      )}
+      {/* 報價單產出對話框 - 待重新實作 */}
     </div>
   );
 }
