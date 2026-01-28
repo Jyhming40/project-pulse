@@ -42,6 +42,8 @@ interface QuoteCostCalculatorTabProps {
   // Lifted state for engineering categories
   categories: EngineeringCategory[];
   setCategories: (categories: EngineeringCategory[]) => void;
+  // Control whether to initialize from templates
+  skipTemplateInit?: boolean;
 }
 
 export default function QuoteCostCalculatorTab({
@@ -56,15 +58,18 @@ export default function QuoteCostCalculatorTab({
   setExchangeRate,
   categories,
   setCategories,
+  skipTemplateInit = false,
 }: QuoteCostCalculatorTabProps) {
   const { templates, loading } = useEngineeringTemplates();
+  const [hasInitialized, setHasInitialized] = useState(false);
 
-  // 從範本初始化
+  // 從範本初始化 - 只在新增模式且尚未初始化時執行
   useEffect(() => {
-    if (!loading && templates.length > 0 && categories.length === 0) {
+    if (!loading && templates.length > 0 && categories.length === 0 && !skipTemplateInit && !hasInitialized) {
       setCategories(initializeFromTemplates(templates));
+      setHasInitialized(true);
     }
-  }, [templates, loading, categories.length]);
+  }, [templates, loading, categories.length, skipTemplateInit, hasInitialized]);
 
   // 計算各項總計
   const totals = useMemo(() => {
