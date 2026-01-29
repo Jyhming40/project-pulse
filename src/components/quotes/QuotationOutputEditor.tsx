@@ -222,10 +222,10 @@ export default function QuotationOutputEditor({
   
   // 欄寬設定 (mm)
   const [columnWidths, setColumnWidths] = useState({
-    itemNo: 30,      // 項次
-    productName: 85, // 品名
-    quantity: 45,    // 數量
-    unit: 35,        // 單位
+    itemNo: 30,       // 項次
+    productName: 100, // 品名 - 加寬預設值
+    quantity: 45,     // 數量
+    unit: 35,         // 單位
   });
 
   // 公司 Logo
@@ -630,7 +630,7 @@ export default function QuotationOutputEditor({
     
     /* Totals */
     .totals-box {
-      width: 180px;
+      width: 220px;
       flex-shrink: 0;
     }
     .totals-table {
