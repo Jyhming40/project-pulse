@@ -22,7 +22,7 @@ import QuoteBasicInfoTab from "@/components/quotes/QuoteBasicInfoTab";
 import QuoteCostCalculatorTab from "@/components/quotes/QuoteCostCalculatorTab";
 import QuoteFinancialAnalysisTab from "@/components/quotes/QuoteFinancialAnalysisTab";
 import QuoteScheduleTab from "@/components/quotes/QuoteScheduleTab";
-// Quote document generation removed - to be reimplemented
+import QuotationOutputEditor from "@/components/quotes/QuotationOutputEditor";
 import { calculate20YearProjection, QuoteParams } from "@/lib/quoteCalculations";
 import { 
   ModuleItem, 
@@ -43,6 +43,7 @@ const STEPS = [
   { id: "cost", label: "成本報價", icon: Calculator, description: "設備與工程費用" },
   { id: "financial", label: "投資分析", icon: TrendingUp, description: "IRR 與現金流" },
   { id: "schedule", label: "工程時程", icon: Calendar, description: "施工排程規劃" },
+  { id: "output", label: "報價單產出", icon: FileOutput, description: "編輯並輸出報價單" },
 ];
 
 interface CostTotals {
@@ -601,6 +602,17 @@ export default function QuoteWizard() {
         );
       case "schedule":
         return <QuoteScheduleTab quoteId={id || null} />;
+      case "output":
+        return (
+          <QuotationOutputEditor
+            capacityKwp={formData.capacityKwp || 0}
+            pricePerKwp={formData.pricePerKwp || 0}
+            taxRate={formData.taxRate || 0.05}
+            categories={categories}
+            modules={modules}
+            inverters={inverters}
+          />
+        );
       default:
         return null;
     }
@@ -627,15 +639,6 @@ export default function QuoteWizard() {
               </div>
             </div>
             <div className="flex gap-2">
-              {isEditing && id && (
-                <Button 
-                  variant="outline" 
-                  onClick={() => setShowDocumentDialog(true)}
-                >
-                  <FileOutput className="h-4 w-4 mr-2" />
-                  產出報價單
-                </Button>
-              )}
               <Button onClick={handleSave} disabled={isSaving}>
                 <Save className="h-4 w-4 mr-2" />
                 {isSaving ? "儲存中..." : "儲存報價"}
@@ -737,7 +740,7 @@ export default function QuoteWizard() {
         </div>
       </div>
 
-      {/* 報價單產出對話框 - 待重新實作 */}
+      
     </div>
   );
 }
