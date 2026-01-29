@@ -320,31 +320,18 @@ export default function QuotationOutputEditor({
 
   // 生成列印用 HTML
   const generatePrintHTML = () => {
+    // 合併規格為單一儲存格內容
     const tableRows = items.map(item => {
-      const firstSpec = item.specifications[0]?.specLine || "";
-      const otherSpecs = item.specifications.slice(1);
-      
-      let rows = `
+      const specsHtml = item.specifications.map(s => s.specLine).join('<br/>');
+      return `
         <tr>
           <td class="item-no">${item.itemNo}</td>
           <td class="product-name">${item.productName}</td>
-          <td class="spec">${firstSpec}</td>
-          <td class="quantity">${item.quantity} ${item.unit}</td>
+          <td class="spec">${specsHtml}</td>
+          <td class="quantity">${item.quantity}</td>
+          <td class="unit">${item.unit}</td>
         </tr>
       `;
-      
-      otherSpecs.forEach(spec => {
-        rows += `
-          <tr>
-            <td class="item-no"></td>
-            <td class="product-name"></td>
-            <td class="spec">${spec.specLine}</td>
-            <td class="quantity"></td>
-          </tr>
-        `;
-      });
-      
-      return rows;
     }).join('');
 
     return `
@@ -352,11 +339,11 @@ export default function QuotationOutputEditor({
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>報價單</title>
+  <title>報價單 - ${headerInfo.customerName}</title>
   <style>
     @page { 
       size: A4 portrait; 
-      margin: 10mm 12mm; 
+      margin: 12mm 15mm; 
     }
     * {
       box-sizing: border-box;
@@ -366,155 +353,245 @@ export default function QuotationOutputEditor({
     html, body {
       margin: 0;
       padding: 0;
-      width: 210mm;
-      min-height: 297mm;
-      max-height: 297mm;
-      overflow: hidden;
-      font-family: 'Microsoft JhengHei', 'Noto Sans TC', sans-serif;
-      font-size: 9pt;
-      line-height: 1.3;
+      font-family: 'Microsoft JhengHei', 'Noto Sans TC', 'Helvetica Neue', sans-serif;
+      font-size: 10pt;
+      line-height: 1.4;
+      color: #1a1a1a;
     }
     .page {
-      width: 100%;
-      height: 277mm; /* A4 height minus margins */
-      display: flex;
-      flex-direction: column;
-      page-break-after: avoid;
-      page-break-inside: avoid;
+      max-width: 180mm;
+      margin: 0 auto;
     }
+    
+    /* Header */
     .header {
       text-align: center;
-      margin-bottom: 8px;
-      flex-shrink: 0;
+      padding: 15px 0 12px;
+      border-bottom: 3px double #333;
+      margin-bottom: 15px;
     }
     .company-name {
-      font-size: 12pt;
-      font-weight: bold;
-      margin-bottom: 3px;
-    }
-    .title {
       font-size: 16pt;
       font-weight: bold;
-      letter-spacing: 8px;
+      color: #1a365d;
+      letter-spacing: 2px;
+      margin-bottom: 5px;
     }
-    .info-table {
-      width: 100%;
-      border-collapse: collapse;
-      margin-bottom: 8px;
-      flex-shrink: 0;
+    .title {
+      font-size: 22pt;
+      font-weight: bold;
+      letter-spacing: 12px;
+      color: #2d3748;
     }
-    .info-table td {
-      padding: 3px 6px;
-      border: 1px solid #999;
-      font-size: 8pt;
+    
+    /* Info Section */
+    .info-section {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 15px;
     }
-    .info-table .label {
-      background-color: #f0f0f0;
-      width: 80px;
-      font-weight: 500;
-    }
-    .quote-table-wrapper {
+    .info-block {
       flex: 1;
-      overflow: hidden;
     }
+    .info-row {
+      display: flex;
+      border-bottom: 1px solid #e2e8f0;
+      padding: 4px 0;
+    }
+    .info-row:last-child {
+      border-bottom: none;
+    }
+    .info-label {
+      width: 70px;
+      font-weight: 600;
+      color: #4a5568;
+      font-size: 9pt;
+    }
+    .info-value {
+      flex: 1;
+      font-size: 9pt;
+    }
+    .info-full {
+      background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
+      padding: 8px 12px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .capacity-label {
+      font-weight: 600;
+      color: #2d3748;
+    }
+    .capacity-value {
+      font-size: 14pt;
+      font-weight: bold;
+      color: #2b6cb0;
+    }
+    
+    /* Quote Table */
     .quote-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 8pt;
-    }
-    .quote-table th {
-      background-color: #e8e8e8;
-      border: 1px solid #333;
-      padding: 4px 6px;
-      text-align: center;
-      font-weight: bold;
+      margin-bottom: 15px;
       font-size: 9pt;
     }
-    .quote-table td {
-      border: 1px solid #333;
-      padding: 2px 5px;
+    .quote-table thead th {
+      background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+      color: #fff;
+      padding: 8px 10px;
+      text-align: center;
+      font-weight: 600;
+      font-size: 10pt;
+      border: 1px solid #1a202c;
+    }
+    .quote-table tbody td {
+      border: 1px solid #cbd5e0;
+      padding: 6px 8px;
       vertical-align: top;
-      line-height: 1.25;
+    }
+    .quote-table tbody tr:nth-child(even) {
+      background-color: #f7fafc;
+    }
+    .quote-table tbody tr:hover {
+      background-color: #edf2f7;
     }
     .quote-table .item-no {
       text-align: center;
-      width: 28px;
-      font-weight: 500;
+      width: 35px;
+      font-weight: 600;
+      color: #2b6cb0;
     }
     .quote-table .product-name {
-      width: 90px;
-      font-weight: 500;
+      width: 100px;
+      font-weight: 600;
+      color: #2d3748;
     }
     .quote-table .spec {
-      font-size: 7.5pt;
+      line-height: 1.5;
+      color: #4a5568;
     }
     .quote-table .quantity {
+      text-align: right;
+      width: 50px;
+      font-family: 'Consolas', 'Monaco', monospace;
+    }
+    .quote-table .unit {
       text-align: center;
-      width: 60px;
-      white-space: nowrap;
+      width: 45px;
     }
+    
+    /* Bottom Section */
     .bottom-section {
-      flex-shrink: 0;
-      margin-top: auto;
-    }
-    .totals-notes {
       display: flex;
-      gap: 10px;
-      margin-top: 6px;
+      gap: 15px;
+      margin-bottom: 15px;
     }
-    .notes {
+    .notes-box {
       flex: 1;
-      padding: 5px 8px;
-      border: 1px solid #999;
-      font-size: 7.5pt;
-      white-space: pre-line;
-      line-height: 1.3;
+      border: 1px solid #cbd5e0;
+      border-radius: 4px;
+      padding: 10px 12px;
+      background: #fffbeb;
     }
-    .totals {
+    .notes-title {
+      font-weight: 600;
+      font-size: 9pt;
+      color: #744210;
+      margin-bottom: 5px;
+      border-bottom: 1px solid #f6e05e;
+      padding-bottom: 3px;
+    }
+    .notes-content {
+      font-size: 8pt;
+      line-height: 1.5;
+      color: #744210;
+      white-space: pre-line;
+    }
+    
+    /* Totals */
+    .totals-box {
+      width: 200px;
       flex-shrink: 0;
     }
-    .totals table {
+    .totals-table {
+      width: 100%;
       border-collapse: collapse;
     }
-    .totals td {
-      padding: 2px 10px;
-      border: 1px solid #999;
-      font-size: 8pt;
+    .totals-table td {
+      padding: 5px 10px;
+      border: 1px solid #cbd5e0;
+      font-size: 9pt;
     }
-    .totals .label {
-      background-color: #f0f0f0;
+    .totals-table .label {
+      background: #edf2f7;
       text-align: right;
+      font-weight: 500;
+      color: #4a5568;
     }
-    .totals .value {
+    .totals-table .value {
+      text-align: right;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-weight: 600;
+    }
+    .totals-table tr.total-row td {
+      background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
+      color: #fff;
+      font-size: 11pt;
       font-weight: bold;
-      text-align: right;
-      font-family: 'Consolas', monospace;
-      min-width: 80px;
     }
-    .footer {
+    .totals-table tr.total-row .label {
+      background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
+      color: #fff;
+    }
+    
+    /* Footer Signatures */
+    .signature-section {
       display: flex;
       justify-content: space-between;
-      gap: 15px;
-      margin-top: 10px;
+      gap: 30px;
+      margin-top: 20px;
     }
     .signature-box {
       flex: 1;
-      border: 1px solid #999;
-      padding: 6px 10px;
-      min-height: 50px;
+      border: 1px solid #cbd5e0;
+      border-radius: 4px;
+      padding: 10px 15px;
+      min-height: 60px;
     }
     .signature-title {
-      font-weight: bold;
-      font-size: 8pt;
-      margin-bottom: 30px;
+      font-weight: 600;
+      font-size: 9pt;
+      color: #2d3748;
+      border-bottom: 1px dashed #a0aec0;
+      padding-bottom: 5px;
+      margin-bottom: 35px;
     }
+    .signature-line {
+      border-top: 1px solid #2d3748;
+      margin-top: 10px;
+      padding-top: 3px;
+      font-size: 8pt;
+      color: #718096;
+      text-align: center;
+    }
+    
+    /* Print Styles */
     @media print {
       body { 
-        width: 210mm; 
-        height: 297mm; 
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
-      .page {
-        height: 277mm;
+      .quote-table thead th {
+        background: #2d3748 !important;
+        color: #fff !important;
+      }
+      .totals-table tr.total-row td,
+      .totals-table tr.total-row .label {
+        background: #2b6cb0 !important;
+        color: #fff !important;
       }
     }
   </style>
@@ -526,89 +603,104 @@ export default function QuotationOutputEditor({
       <div class="title">報 價 單</div>
     </div>
     
-    <table class="info-table">
-      <tr>
-        <td class="label">客戶名稱</td>
-        <td>${headerInfo.customerName}</td>
-        <td class="label">報價日期</td>
-        <td>${headerInfo.quoteDate}</td>
-      </tr>
-      <tr>
-        <td class="label">聯絡人</td>
-        <td>${headerInfo.contactPerson}</td>
-        <td class="label">有效日期</td>
-        <td>${headerInfo.validUntil}</td>
-      </tr>
-      <tr>
-        <td class="label">聯絡電話</td>
-        <td>${headerInfo.contactPhone}</td>
-        <td class="label">業務員</td>
-        <td>${headerInfo.salesPerson}</td>
-      </tr>
-      <tr>
-        <td class="label">案場地點</td>
-        <td>${headerInfo.siteLocation}</td>
-        <td class="label">業務分機</td>
-        <td>${headerInfo.salesPhone}</td>
-      </tr>
-      <tr>
-        <td class="label">裝置容量</td>
-        <td colspan="3">${capacityKwp} kW</td>
-      </tr>
-    </table>
-    
-    <div class="quote-table-wrapper">
-      <table class="quote-table">
-        <thead>
-          <tr>
-            <th>項次</th>
-            <th>品 名</th>
-            <th>規 格</th>
-            <th>數量</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${tableRows}
-        </tbody>
-      </table>
-    </div>
-    
-    <div class="bottom-section">
-      <div class="totals-notes">
-        <div class="notes">${headerInfo.notes}</div>
-        <div class="totals">
-          <table>
-            <tr>
-              <td class="label">合計(未稅)</td>
-              <td class="value">$${totals.subtotal.toLocaleString()}</td>
-            </tr>
-            <tr>
-              <td class="label">稅金(${(taxRate * 100).toFixed(0)}%)</td>
-              <td class="value">$${totals.tax.toLocaleString()}</td>
-            </tr>
-            <tr>
-              <td class="label">總計</td>
-              <td class="value" style="font-size:10pt;">$${totals.total.toLocaleString()}</td>
-            </tr>
-            <tr>
-              <td class="label">每kWp(未稅)</td>
-              <td class="value">$${pricePerKwp.toLocaleString()}</td>
-            </tr>
-            <tr>
-              <td class="label">每kWp(含稅)</td>
-              <td class="value">$${Math.round(totals.perKwpWithTax).toLocaleString()}</td>
-            </tr>
-          </table>
+    <div class="info-section">
+      <div class="info-block">
+        <div class="info-row">
+          <span class="info-label">客戶名稱</span>
+          <span class="info-value">${headerInfo.customerName || '-'}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">聯 絡 人</span>
+          <span class="info-value">${headerInfo.contactPerson || '-'}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">聯絡電話</span>
+          <span class="info-value">${headerInfo.contactPhone || '-'}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">案場地點</span>
+          <span class="info-value">${headerInfo.siteLocation || '-'}</span>
         </div>
       </div>
-      
-      <div class="footer">
-        <div class="signature-box">
-          <div class="signature-title">客戶回簽欄(簽名或蓋章)</div>
+      <div class="info-block">
+        <div class="info-row">
+          <span class="info-label">報價日期</span>
+          <span class="info-value">${headerInfo.quoteDate}</span>
         </div>
-        <div class="signature-box">
-          <div class="signature-title">明群環能科技有限公司</div>
+        <div class="info-row">
+          <span class="info-label">有效期限</span>
+          <span class="info-value">${headerInfo.validUntil}</span>
         </div>
+        <div class="info-row">
+          <span class="info-label">業 務 員</span>
+          <span class="info-value">${headerInfo.salesPerson || '-'}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">業務分機</span>
+          <span class="info-value">${headerInfo.salesPhone || '-'}</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="info-full">
+      <span class="capacity-label">裝置容量</span>
+      <span class="capacity-value">${capacityKwp} kW</span>
+    </div>
+    
+    <table class="quote-table">
+      <thead>
+        <tr>
+          <th>項次</th>
+          <th>品 名</th>
+          <th>規 格</th>
+          <th>數量</th>
+          <th>單位</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${tableRows}
+      </tbody>
+    </table>
+    
+    <div class="bottom-section">
+      <div class="notes-box">
+        <div class="notes-title">📋 備註說明</div>
+        <div class="notes-content">${headerInfo.notes}</div>
+      </div>
+      <div class="totals-box">
+        <table class="totals-table">
+          <tr>
+            <td class="label">合計(未稅)</td>
+            <td class="value">$${totals.subtotal.toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td class="label">稅金(${(taxRate * 100).toFixed(0)}%)</td>
+            <td class="value">$${totals.tax.toLocaleString()}</td>
+          </tr>
+          <tr class="total-row">
+            <td class="label">總 計</td>
+            <td class="value">$${totals.total.toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td class="label">每kWp(未稅)</td>
+            <td class="value">$${pricePerKwp.toLocaleString()}</td>
+          </tr>
+          <tr>
+            <td class="label">每kWp(含稅)</td>
+            <td class="value">$${Math.round(totals.perKwpWithTax).toLocaleString()}</td>
+          </tr>
+        </table>
+      </div>
+    </div>
+    
+    <div class="signature-section">
+      <div class="signature-box">
+        <div class="signature-title">客戶回簽欄</div>
+        <div class="signature-line">簽名 / 蓋章</div>
+      </div>
+      <div class="signature-box">
+        <div class="signature-title">明群環能科技有限公司</div>
+        <div class="signature-line">業務代表簽章</div>
       </div>
     </div>
   </div>
