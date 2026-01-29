@@ -15,6 +15,7 @@ import {
   Save,
   X,
   FileOutput,
+  Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -23,6 +24,7 @@ import QuoteCostCalculatorTab from "@/components/quotes/QuoteCostCalculatorTab";
 import QuoteFinancialAnalysisTab from "@/components/quotes/QuoteFinancialAnalysisTab";
 import QuoteScheduleTab from "@/components/quotes/QuoteScheduleTab";
 import QuotationOutputEditor from "@/components/quotes/QuotationOutputEditor";
+import QuoteInsightReport from "@/components/quotes/QuoteInsightReport";
 import { calculate20YearProjection, QuoteParams } from "@/lib/quoteCalculations";
 import { 
   ModuleItem, 
@@ -677,6 +679,16 @@ export default function QuoteWizard() {
               </div>
             </div>
             <div className="flex gap-2">
+              <QuoteInsightReport
+                capacityKwp={formData.capacityKwp || 0}
+                pricePerKwp={formData.pricePerKwp || 0}
+                taxRate={formData.taxRate || 0.05}
+                engineeringTotal={costTotals.engineeringTotal}
+                modulesTotal={costTotals.modulesTotal}
+                invertersTotal={costTotals.invertersTotal}
+                categories={categories}
+                quoteId={id}
+              />
               <Button onClick={handleSave} disabled={isSaving}>
                 <Save className="h-4 w-4 mr-2" />
                 {isSaving ? "儲存中..." : "儲存報價"}

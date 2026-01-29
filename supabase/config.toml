@@ -74,3 +74,6 @@ verify_jwt = true
 
 [functions.ocr-extract-dates]
 verify_jwt = false
+
+[functions.quote-insight-report]
+verify_jwt = true
