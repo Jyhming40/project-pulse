@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
+import { Label } from "@/components/ui/label";
 import {
   Table,
   TableBody,
@@ -38,6 +40,7 @@ import {
   GripVertical,
   MoreVertical,
   FileText,
+  Type,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/quoteCalculations";
 import { EngineeringCategory, EngineeringItem, ModuleItem, InverterItem } from "@/hooks/useQuoteEngineering";
@@ -195,6 +198,9 @@ export default function QuotationOutputEditor({
   // 展開/收合狀態
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
+  // 列印字體大小 (pt)
+  const [printFontSize, setPrintFontSize] = useState(9);
+
   // 初始化時從範本載入
   useEffect(() => {
     if (items.length === 0) {
@@ -320,6 +326,15 @@ export default function QuotationOutputEditor({
 
   // 生成列印用 HTML
   const generatePrintHTML = () => {
+    // 動態字體大小計算
+    const baseFontSize = printFontSize;
+    const titleFontSize = Math.round(baseFontSize * 2.2);
+    const companyFontSize = Math.round(baseFontSize * 1.6);
+    const headerFontSize = Math.round(baseFontSize * 1.1);
+    const labelFontSize = Math.round(baseFontSize * 0.9);
+    const specFontSize = Math.round(baseFontSize * 0.85);
+    const notesFontSize = Math.round(baseFontSize * 0.8);
+    
     // 合併規格為單一儲存格內容
     const tableRows = items.map(item => {
       const specsHtml = item.specifications.map(s => s.specLine).join('<br/>');
@@ -343,7 +358,7 @@ export default function QuotationOutputEditor({
   <style>
     @page { 
       size: A4 portrait; 
-      margin: 12mm 15mm; 
+      margin: 10mm 12mm; 
     }
     * {
       box-sizing: border-box;
@@ -354,33 +369,33 @@ export default function QuotationOutputEditor({
       margin: 0;
       padding: 0;
       font-family: 'Microsoft JhengHei', 'Noto Sans TC', 'Helvetica Neue', sans-serif;
-      font-size: 10pt;
-      line-height: 1.4;
+      font-size: ${baseFontSize}pt;
+      line-height: 1.35;
       color: #1a1a1a;
     }
     .page {
-      max-width: 180mm;
+      max-width: 186mm;
       margin: 0 auto;
     }
     
     /* Header */
     .header {
       text-align: center;
-      padding: 15px 0 12px;
+      padding: 10px 0 8px;
       border-bottom: 3px double #333;
-      margin-bottom: 15px;
+      margin-bottom: 10px;
     }
     .company-name {
-      font-size: 16pt;
+      font-size: ${companyFontSize}pt;
       font-weight: bold;
       color: #1a365d;
       letter-spacing: 2px;
-      margin-bottom: 5px;
+      margin-bottom: 3px;
     }
     .title {
-      font-size: 22pt;
+      font-size: ${titleFontSize}pt;
       font-weight: bold;
-      letter-spacing: 12px;
+      letter-spacing: 10px;
       color: #2d3748;
     }
     
@@ -388,8 +403,8 @@ export default function QuotationOutputEditor({
     .info-section {
       display: flex;
       justify-content: space-between;
-      gap: 20px;
-      margin-bottom: 15px;
+      gap: 15px;
+      margin-bottom: 10px;
     }
     .info-block {
       flex: 1;
@@ -397,36 +412,37 @@ export default function QuotationOutputEditor({
     .info-row {
       display: flex;
       border-bottom: 1px solid #e2e8f0;
-      padding: 4px 0;
+      padding: 3px 0;
     }
     .info-row:last-child {
       border-bottom: none;
     }
     .info-label {
-      width: 70px;
+      width: 60px;
       font-weight: 600;
       color: #4a5568;
-      font-size: 9pt;
+      font-size: ${labelFontSize}pt;
     }
     .info-value {
       flex: 1;
-      font-size: 9pt;
+      font-size: ${labelFontSize}pt;
     }
     .info-full {
       background: linear-gradient(135deg, #f7fafc 0%, #edf2f7 100%);
-      padding: 8px 12px;
+      padding: 6px 10px;
       border-radius: 4px;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
       display: flex;
       align-items: center;
-      gap: 15px;
+      gap: 12px;
     }
     .capacity-label {
       font-weight: 600;
       color: #2d3748;
+      font-size: ${baseFontSize}pt;
     }
     .capacity-value {
-      font-size: 14pt;
+      font-size: ${Math.round(baseFontSize * 1.4)}pt;
       font-weight: bold;
       color: #2b6cb0;
     }
@@ -435,21 +451,22 @@ export default function QuotationOutputEditor({
     .quote-table {
       width: 100%;
       border-collapse: collapse;
-      margin-bottom: 15px;
-      font-size: 9pt;
+      margin-bottom: 10px;
+      font-size: ${baseFontSize}pt;
     }
     .quote-table thead th {
       background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
       color: #fff;
-      padding: 8px 10px;
+      padding: 6px 8px;
       text-align: center;
       font-weight: 600;
-      font-size: 10pt;
+      font-size: ${headerFontSize}pt;
       border: 1px solid #1a202c;
+      white-space: nowrap;
     }
     .quote-table tbody td {
       border: 1px solid #cbd5e0;
-      padding: 6px 8px;
+      padding: 5px 6px;
       vertical-align: top;
     }
     .quote-table tbody tr:nth-child(even) {
@@ -460,60 +477,61 @@ export default function QuotationOutputEditor({
     }
     .quote-table .item-no {
       text-align: center;
-      width: 35px;
+      width: 32px;
       font-weight: 600;
       color: #2b6cb0;
     }
     .quote-table .product-name {
-      width: 100px;
+      width: 90px;
       font-weight: 600;
       color: #2d3748;
     }
     .quote-table .spec {
-      line-height: 1.5;
+      line-height: 1.4;
       color: #4a5568;
+      font-size: ${specFontSize}pt;
     }
     .quote-table .quantity {
       text-align: right;
-      width: 50px;
+      width: 45px;
       font-family: 'Consolas', 'Monaco', monospace;
     }
     .quote-table .unit {
       text-align: center;
-      width: 45px;
+      width: 40px;
     }
     
     /* Bottom Section */
     .bottom-section {
       display: flex;
-      gap: 15px;
-      margin-bottom: 15px;
+      gap: 12px;
+      margin-bottom: 10px;
     }
     .notes-box {
       flex: 1;
       border: 1px solid #cbd5e0;
       border-radius: 4px;
-      padding: 10px 12px;
+      padding: 8px 10px;
       background: #fffbeb;
     }
     .notes-title {
       font-weight: 600;
-      font-size: 9pt;
+      font-size: ${labelFontSize}pt;
       color: #744210;
-      margin-bottom: 5px;
+      margin-bottom: 4px;
       border-bottom: 1px solid #f6e05e;
-      padding-bottom: 3px;
+      padding-bottom: 2px;
     }
     .notes-content {
-      font-size: 8pt;
-      line-height: 1.5;
+      font-size: ${notesFontSize}pt;
+      line-height: 1.4;
       color: #744210;
       white-space: pre-line;
     }
     
     /* Totals */
     .totals-box {
-      width: 200px;
+      width: 180px;
       flex-shrink: 0;
     }
     .totals-table {
@@ -521,9 +539,9 @@ export default function QuotationOutputEditor({
       border-collapse: collapse;
     }
     .totals-table td {
-      padding: 5px 10px;
+      padding: 4px 8px;
       border: 1px solid #cbd5e0;
-      font-size: 9pt;
+      font-size: ${labelFontSize}pt;
     }
     .totals-table .label {
       background: #edf2f7;
@@ -539,7 +557,7 @@ export default function QuotationOutputEditor({
     .totals-table tr.total-row td {
       background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
       color: #fff;
-      font-size: 11pt;
+      font-size: ${Math.round(baseFontSize * 1.2)}pt;
       font-weight: bold;
     }
     .totals-table tr.total-row .label {
@@ -551,29 +569,29 @@ export default function QuotationOutputEditor({
     .signature-section {
       display: flex;
       justify-content: space-between;
-      gap: 30px;
-      margin-top: 20px;
+      gap: 20px;
+      margin-top: 12px;
     }
     .signature-box {
       flex: 1;
       border: 1px solid #cbd5e0;
       border-radius: 4px;
-      padding: 10px 15px;
-      min-height: 60px;
+      padding: 8px 12px;
+      min-height: 50px;
     }
     .signature-title {
       font-weight: 600;
-      font-size: 9pt;
+      font-size: ${labelFontSize}pt;
       color: #2d3748;
       border-bottom: 1px dashed #a0aec0;
-      padding-bottom: 5px;
-      margin-bottom: 35px;
+      padding-bottom: 4px;
+      margin-bottom: 25px;
     }
     .signature-line {
       border-top: 1px solid #2d3748;
-      margin-top: 10px;
-      padding-top: 3px;
-      font-size: 8pt;
+      margin-top: 8px;
+      padding-top: 2px;
+      font-size: ${notesFontSize}pt;
       color: #718096;
       text-align: center;
     }
@@ -792,21 +810,37 @@ export default function QuotationOutputEditor({
       </Card>
 
       {/* 工具列 */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h3 className="text-base font-semibold">報價單項目</h3>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleImportFromCost}>
-            <Import className="h-4 w-4 mr-1.5" />
-            從成本導入
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleAddItem}>
-            <Plus className="h-4 w-4 mr-1.5" />
-            新增項目
-          </Button>
-          <Button variant="default" size="sm" onClick={handlePrint}>
-            <Printer className="h-4 w-4 mr-1.5" />
-            列印報價單
-          </Button>
+        <div className="flex items-center gap-4 flex-wrap">
+          {/* 字體大小控制 */}
+          <div className="flex items-center gap-2 bg-muted/50 rounded-md px-3 py-1.5">
+            <Type className="h-4 w-4 text-muted-foreground" />
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">字體大小</Label>
+            <Slider
+              value={[printFontSize]}
+              onValueChange={(value) => setPrintFontSize(value[0])}
+              min={6}
+              max={12}
+              step={0.5}
+              className="w-24"
+            />
+            <span className="text-xs font-mono w-8 text-center">{printFontSize}pt</span>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleImportFromCost}>
+              <Import className="h-4 w-4 mr-1.5" />
+              從成本導入
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleAddItem}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              新增項目
+            </Button>
+            <Button variant="default" size="sm" onClick={handlePrint}>
+              <Printer className="h-4 w-4 mr-1.5" />
+              列印報價單
+            </Button>
+          </div>
         </div>
       </div>
 
