@@ -230,6 +230,7 @@ export default function QuotationOutputEditor({
 
   // 公司 Logo
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [logoSize, setLogoSize] = useState(50); // Logo 大小 (px) - 可調整 30-80
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   // 配色主題
@@ -274,6 +275,19 @@ export default function QuotationOutputEditor({
       accent: theme.accent,
     });
   };
+
+  // 當 props 更新時同步更新 headerInfo（用於自動帶入客戶資料）
+  useEffect(() => {
+    setHeaderInfo(prev => ({
+      ...prev,
+      customerName: customerName || prev.customerName,
+      contactPerson: contactPerson || prev.contactPerson,
+      contactPhone: contactPhone || prev.contactPhone,
+      siteLocation: siteLocation || prev.siteLocation,
+      salesPerson: salesPerson || prev.salesPerson,
+      salesPhone: salesPhone || prev.salesPhone,
+    }));
+  }, [customerName, contactPerson, contactPhone, siteLocation, salesPerson, salesPhone]);
 
   // 初始化時從範本載入
   useEffect(() => {
@@ -463,7 +477,7 @@ export default function QuotationOutputEditor({
       margin-bottom: 10px;
     }
     .company-logo {
-      height: 50px;
+      height: ${logoSize}px;
       width: auto;
       object-fit: contain;
     }
@@ -908,16 +922,31 @@ export default function QuotationOutputEditor({
                 id="logo-upload"
               />
               {companyLogo ? (
-                <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-md">
-                  <img src={companyLogo} alt="Logo預覽" className="h-8 w-auto object-contain" />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
-                    onClick={handleRemoveLogo}
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-md">
+                    <img src={companyLogo} alt="Logo預覽" className="h-8 w-auto object-contain" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                      onClick={handleRemoveLogo}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  {/* Logo 大小滑桿 */}
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs text-muted-foreground whitespace-nowrap">Logo 大小</Label>
+                    <Slider
+                      value={[logoSize]}
+                      onValueChange={(value) => setLogoSize(value[0])}
+                      min={30}
+                      max={80}
+                      step={5}
+                      className="w-20"
+                    />
+                    <span className="text-xs text-muted-foreground w-8">{logoSize}px</span>
+                  </div>
                 </div>
               ) : (
                 <Button

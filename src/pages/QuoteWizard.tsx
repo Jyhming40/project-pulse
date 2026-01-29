@@ -114,6 +114,38 @@ export default function QuoteWizard() {
     enabled: !!id,
   });
 
+  // Fetch related project details (for customer info)
+  const { data: relatedProject } = useQuery({
+    queryKey: ["quote-related-project", projectId],
+    queryFn: async () => {
+      if (!projectId) return null;
+      const { data, error } = await supabase
+        .from("projects")
+        .select("project_name, site_code_display, address, contact_person, contact_phone, land_owner")
+        .eq("id", projectId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!projectId,
+  });
+
+  // Fetch related investor details (for sales info)
+  const { data: relatedInvestor } = useQuery({
+    queryKey: ["quote-related-investor", investorId],
+    queryFn: async () => {
+      if (!investorId) return null;
+      const { data, error } = await supabase
+        .from("investors")
+        .select("company_name, investor_code, contact_person, phone, email")
+        .eq("id", investorId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!investorId,
+  });
+
   // Fetch existing modules
   const { data: existingModules } = useQuery({
     queryKey: ["quote-modules", id],
@@ -605,6 +637,12 @@ export default function QuoteWizard() {
       case "output":
         return (
           <QuotationOutputEditor
+            customerName={relatedProject?.land_owner || relatedProject?.project_name || ""}
+            contactPerson={relatedProject?.contact_person || ""}
+            contactPhone={relatedProject?.contact_phone || ""}
+            siteLocation={relatedProject?.address || ""}
+            salesPerson={relatedInvestor?.contact_person || ""}
+            salesPhone={relatedInvestor?.phone || ""}
             capacityKwp={formData.capacityKwp || 0}
             pricePerKwp={formData.pricePerKwp || 0}
             taxRate={formData.taxRate || 0.05}
