@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,6 +30,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
   Plus,
   Trash2,
   FileDown,
@@ -41,9 +46,23 @@ import {
   MoreVertical,
   FileText,
   Type,
+  Upload,
+  Image,
+  Palette,
+  X,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/quoteCalculations";
 import { EngineeringCategory, EngineeringItem, ModuleItem, InverterItem } from "@/hooks/useQuoteEngineering";
+
+// 預設配色主題
+const COLOR_THEMES = [
+  { name: '經典藍', primary: '#2b6cb0', secondary: '#1a365d', accent: '#2c5282' },
+  { name: '專業綠', primary: '#276749', secondary: '#1a4731', accent: '#2f855a' },
+  { name: '商務灰', primary: '#4a5568', secondary: '#1a202c', accent: '#2d3748' },
+  { name: '活力橘', primary: '#c05621', secondary: '#7b341e', accent: '#dd6b20' },
+  { name: '沉穩紫', primary: '#6b46c1', secondary: '#44337a', accent: '#805ad5' },
+  { name: '熱情紅', primary: '#c53030', secondary: '#742a2a', accent: '#e53e3e' },
+];
 
 // 報價單項目結構
 export interface QuotationSubItem {
@@ -208,6 +227,53 @@ export default function QuotationOutputEditor({
     quantity: 45,    // 數量
     unit: 35,        // 單位
   });
+
+  // 公司 Logo
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+
+  // 配色主題
+  const [colorTheme, setColorTheme] = useState({
+    primary: '#2b6cb0',
+    secondary: '#1a365d',
+    accent: '#2c5282',
+  });
+
+  // 上傳 Logo
+  const handleLogoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // 驗證檔案類型
+    if (!file.type.startsWith('image/')) {
+      alert('請上傳圖片檔案');
+      return;
+    }
+
+    // 轉為 Base64 以便嵌入列印
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setCompanyLogo(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 移除 Logo
+  const handleRemoveLogo = () => {
+    setCompanyLogo(null);
+    if (logoInputRef.current) {
+      logoInputRef.current.value = '';
+    }
+  };
+
+  // 套用預設主題
+  const applyPresetTheme = (theme: typeof COLOR_THEMES[0]) => {
+    setColorTheme({
+      primary: theme.primary,
+      secondary: theme.secondary,
+      accent: theme.accent,
+    });
+  };
 
   // 初始化時從範本載入
   useEffect(() => {
@@ -388,15 +454,26 @@ export default function QuotationOutputEditor({
     
     /* Header */
     .header {
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
       padding: 10px 0 8px;
-      border-bottom: 3px double #333;
+      border-bottom: 3px double ${colorTheme.secondary};
       margin-bottom: 10px;
+    }
+    .company-logo {
+      height: 50px;
+      width: auto;
+      object-fit: contain;
+    }
+    .header-text {
+      text-align: center;
     }
     .company-name {
       font-size: ${companyFontSize}pt;
       font-weight: bold;
-      color: #1a365d;
+      color: ${colorTheme.secondary};
       letter-spacing: 2px;
       margin-bottom: 3px;
     }
@@ -404,7 +481,7 @@ export default function QuotationOutputEditor({
       font-size: ${titleFontSize}pt;
       font-weight: bold;
       letter-spacing: 10px;
-      color: #2d3748;
+      color: ${colorTheme.accent};
     }
     
     /* Info Section */
@@ -446,13 +523,13 @@ export default function QuotationOutputEditor({
     }
     .capacity-label {
       font-weight: 600;
-      color: #2d3748;
+      color: ${colorTheme.accent};
       font-size: ${baseFontSize}pt;
     }
     .capacity-value {
       font-size: ${Math.round(baseFontSize * 1.4)}pt;
       font-weight: bold;
-      color: #2b6cb0;
+      color: ${colorTheme.primary};
     }
     
     /* Quote Table */
@@ -463,13 +540,13 @@ export default function QuotationOutputEditor({
       font-size: ${baseFontSize}pt;
     }
     .quote-table thead th {
-      background: linear-gradient(180deg, #2d3748 0%, #1a202c 100%);
+      background: linear-gradient(180deg, ${colorTheme.accent} 0%, ${colorTheme.secondary} 100%);
       color: #fff;
       padding: 6px 8px;
       text-align: center;
       font-weight: 600;
       font-size: ${headerFontSize}pt;
-      border: 1px solid #1a202c;
+      border: 1px solid ${colorTheme.secondary};
       white-space: nowrap;
     }
     .quote-table tbody td {
@@ -487,12 +564,12 @@ export default function QuotationOutputEditor({
       text-align: center;
       width: ${columnWidths.itemNo}px;
       font-weight: 600;
-      color: #2b6cb0;
+      color: ${colorTheme.primary};
     }
     .quote-table .product-name {
       width: ${columnWidths.productName}px;
       font-weight: 600;
-      color: #2d3748;
+      color: ${colorTheme.accent};
     }
     .quote-table .spec {
       line-height: 1.4;
@@ -563,13 +640,13 @@ export default function QuotationOutputEditor({
       font-weight: 600;
     }
     .totals-table tr.total-row td {
-      background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
+      background: linear-gradient(135deg, ${colorTheme.primary} 0%, ${colorTheme.accent} 100%);
       color: #fff;
       font-size: ${Math.round(baseFontSize * 1.2)}pt;
       font-weight: bold;
     }
     .totals-table tr.total-row .label {
-      background: linear-gradient(135deg, #2b6cb0 0%, #2c5282 100%);
+      background: linear-gradient(135deg, ${colorTheme.primary} 0%, ${colorTheme.accent} 100%);
       color: #fff;
     }
     
@@ -590,13 +667,13 @@ export default function QuotationOutputEditor({
     .signature-title {
       font-weight: 600;
       font-size: ${labelFontSize}pt;
-      color: #2d3748;
+      color: ${colorTheme.accent};
       border-bottom: 1px dashed #a0aec0;
       padding-bottom: 4px;
       margin-bottom: 25px;
     }
     .signature-line {
-      border-top: 1px solid #2d3748;
+      border-top: 1px solid ${colorTheme.accent};
       margin-top: 8px;
       padding-top: 2px;
       font-size: ${notesFontSize}pt;
@@ -611,12 +688,12 @@ export default function QuotationOutputEditor({
         print-color-adjust: exact !important;
       }
       .quote-table thead th {
-        background: #2d3748 !important;
+        background: ${colorTheme.accent} !important;
         color: #fff !important;
       }
       .totals-table tr.total-row td,
       .totals-table tr.total-row .label {
-        background: #2b6cb0 !important;
+        background: ${colorTheme.primary} !important;
         color: #fff !important;
       }
     }
@@ -625,8 +702,11 @@ export default function QuotationOutputEditor({
 <body>
   <div class="page">
     <div class="header">
-      <div class="company-name">明群環能科技有限公司</div>
-      <div class="title">報 價 單</div>
+      ${companyLogo ? `<img src="${companyLogo}" class="company-logo" alt="公司Logo"/>` : ''}
+      <div class="header-text">
+        <div class="company-name">明群環能科技有限公司</div>
+        <div class="title">報 價 單</div>
+      </div>
     </div>
     
     <div class="info-section">
@@ -812,6 +892,121 @@ export default function QuotationOutputEditor({
                 onChange={(e) => setHeaderInfo(prev => ({ ...prev, validUntil: e.target.value }))}
                 className="h-8 mt-1"
               />
+            </div>
+          </div>
+          
+          {/* Logo 上傳區 */}
+          <div className="col-span-2 md:col-span-4">
+            <label className="text-xs text-muted-foreground">公司 Logo</label>
+            <div className="flex items-center gap-3 mt-1">
+              <input
+                ref={logoInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleLogoUpload}
+                className="hidden"
+                id="logo-upload"
+              />
+              {companyLogo ? (
+                <div className="flex items-center gap-2 p-2 bg-muted/30 rounded-md">
+                  <img src={companyLogo} alt="Logo預覽" className="h-8 w-auto object-contain" />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                    onClick={handleRemoveLogo}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => logoInputRef.current?.click()}
+                >
+                  <Upload className="h-4 w-4 mr-1.5" />
+                  上傳 Logo
+                </Button>
+              )}
+              
+              {/* 配色主題選擇 */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-2">
+                    <Palette className="h-4 w-4" />
+                    <span>配色主題</span>
+                    <div
+                      className="w-4 h-4 rounded-full border"
+                      style={{ backgroundColor: colorTheme.primary }}
+                    />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72" align="start">
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium">選擇配色主題</div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {COLOR_THEMES.map((theme) => (
+                        <button
+                          key={theme.name}
+                          className={`p-2 rounded-md border text-xs text-center transition-all hover:shadow-md ${
+                            colorTheme.primary === theme.primary 
+                              ? 'ring-2 ring-primary ring-offset-1' 
+                              : ''
+                          }`}
+                          onClick={() => applyPresetTheme(theme)}
+                        >
+                          <div className="flex gap-0.5 mb-1 justify-center">
+                            <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: theme.primary }} />
+                            <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: theme.secondary }} />
+                            <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: theme.accent }} />
+                          </div>
+                          <span>{theme.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <Separator />
+                    <div className="space-y-2">
+                      <div className="text-xs text-muted-foreground">自訂顏色</div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="text-xs text-muted-foreground">主色</label>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <input
+                              type="color"
+                              value={colorTheme.primary}
+                              onChange={(e) => setColorTheme(prev => ({ ...prev, primary: e.target.value }))}
+                              className="w-8 h-8 rounded cursor-pointer border"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">深色</label>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <input
+                              type="color"
+                              value={colorTheme.secondary}
+                              onChange={(e) => setColorTheme(prev => ({ ...prev, secondary: e.target.value }))}
+                              className="w-8 h-8 rounded cursor-pointer border"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs text-muted-foreground">強調</label>
+                          <div className="flex items-center gap-1 mt-0.5">
+                            <input
+                              type="color"
+                              value={colorTheme.accent}
+                              onChange={(e) => setColorTheme(prev => ({ ...prev, accent: e.target.value }))}
+                              className="w-8 h-8 rounded cursor-pointer border"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </CardContent>
