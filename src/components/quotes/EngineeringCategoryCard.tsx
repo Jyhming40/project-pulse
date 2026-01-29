@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Select,
@@ -163,7 +164,8 @@ export default function EngineeringCategoryCard({
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-8"></TableHead>
-                  <TableHead>項目名稱</TableHead>
+                  <TableHead className="min-w-[120px]">項目名稱</TableHead>
+                  <TableHead className="min-w-[200px]">規格描述</TableHead>
                   <TableHead className="w-28">計費方式</TableHead>
                   <TableHead className="w-16">單位</TableHead>
                   <TableHead className="w-24 text-right">單價</TableHead>
@@ -196,6 +198,15 @@ export default function EngineeringCategoryCard({
                           value={item.itemName}
                           onChange={(e) => handleUpdateItem(index, { itemName: e.target.value })}
                           className="h-8 border-none shadow-none focus-visible:ring-1"
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <Textarea
+                          value={item.specDescription || ""}
+                          onChange={(e) => handleUpdateItem(index, { specDescription: e.target.value })}
+                          placeholder="輸入規格細節，換行分隔多項規格"
+                          className="min-h-[32px] text-sm resize-none border-none shadow-none focus-visible:ring-1"
+                          rows={1}
                         />
                       </TableCell>
                       <TableCell>

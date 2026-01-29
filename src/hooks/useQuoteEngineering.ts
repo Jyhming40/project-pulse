@@ -35,6 +35,8 @@ export interface EngineeringItem {
   subtotal: number;
   sortOrder: number;
   note?: string;
+  // 規格描述 - 用於報價單產出
+  specDescription?: string;
   // Legacy support
   isLumpSum?: boolean;
 }
