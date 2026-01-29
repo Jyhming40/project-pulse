@@ -200,6 +200,14 @@ export default function QuotationOutputEditor({
 
   // 列印字體大小 (pt)
   const [printFontSize, setPrintFontSize] = useState(9);
+  
+  // 欄寬設定 (mm)
+  const [columnWidths, setColumnWidths] = useState({
+    itemNo: 30,      // 項次
+    productName: 85, // 品名
+    quantity: 45,    // 數量
+    unit: 35,        // 單位
+  });
 
   // 初始化時從範本載入
   useEffect(() => {
@@ -477,12 +485,12 @@ export default function QuotationOutputEditor({
     }
     .quote-table .item-no {
       text-align: center;
-      width: 32px;
+      width: ${columnWidths.itemNo}px;
       font-weight: 600;
       color: #2b6cb0;
     }
     .quote-table .product-name {
-      width: 90px;
+      width: ${columnWidths.productName}px;
       font-weight: 600;
       color: #2d3748;
     }
@@ -493,12 +501,12 @@ export default function QuotationOutputEditor({
     }
     .quote-table .quantity {
       text-align: right;
-      width: 45px;
+      width: ${columnWidths.quantity}px;
       font-family: 'Consolas', 'Monaco', monospace;
     }
     .quote-table .unit {
       text-align: center;
-      width: 40px;
+      width: ${columnWidths.unit}px;
     }
     
     /* Bottom Section */
@@ -812,21 +820,36 @@ export default function QuotationOutputEditor({
       {/* 工具列 */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <h3 className="text-base font-semibold">報價單項目</h3>
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-3 flex-wrap">
           {/* 字體大小控制 */}
           <div className="flex items-center gap-2 bg-muted/50 rounded-md px-3 py-1.5">
             <Type className="h-4 w-4 text-muted-foreground" />
-            <Label className="text-xs text-muted-foreground whitespace-nowrap">字體大小</Label>
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">字體</Label>
             <Slider
               value={[printFontSize]}
               onValueChange={(value) => setPrintFontSize(value[0])}
               min={6}
               max={12}
               step={0.5}
-              className="w-24"
+              className="w-20"
             />
-            <span className="text-xs font-mono w-8 text-center">{printFontSize}pt</span>
+            <span className="text-xs font-mono w-7 text-center">{printFontSize}</span>
           </div>
+          
+          {/* 品名欄寬控制 */}
+          <div className="flex items-center gap-2 bg-muted/50 rounded-md px-3 py-1.5">
+            <Label className="text-xs text-muted-foreground whitespace-nowrap">品名欄寬</Label>
+            <Slider
+              value={[columnWidths.productName]}
+              onValueChange={(value) => setColumnWidths(prev => ({ ...prev, productName: value[0] }))}
+              min={60}
+              max={120}
+              step={5}
+              className="w-20"
+            />
+            <span className="text-xs font-mono w-8 text-center">{columnWidths.productName}px</span>
+          </div>
+          
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleImportFromCost}>
               <Import className="h-4 w-4 mr-1.5" />
