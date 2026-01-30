@@ -2405,6 +2405,8 @@ export type Database = {
       }
       quote_engineering_items: {
         Row: {
+          billing_method: string | null
+          brokerage_rate: number | null
           category_code: string
           category_name: string
           created_at: string
@@ -2418,11 +2420,14 @@ export type Database = {
           quote_id: string
           sort_order: number | null
           subtotal: number | null
+          tiered_pricing_type: string | null
           unit: string | null
           unit_price: number | null
           updated_at: string
         }
         Insert: {
+          billing_method?: string | null
+          brokerage_rate?: number | null
           category_code: string
           category_name: string
           created_at?: string
@@ -2436,11 +2441,14 @@ export type Database = {
           quote_id: string
           sort_order?: number | null
           subtotal?: number | null
+          tiered_pricing_type?: string | null
           unit?: string | null
           unit_price?: number | null
           updated_at?: string
         }
         Update: {
+          billing_method?: string | null
+          brokerage_rate?: number | null
           category_code?: string
           category_name?: string
           created_at?: string
@@ -2454,6 +2462,7 @@ export type Database = {
           quote_id?: string
           sort_order?: number | null
           subtotal?: number | null
+          tiered_pricing_type?: string | null
           unit?: string | null
           unit_price?: number | null
           updated_at?: string
