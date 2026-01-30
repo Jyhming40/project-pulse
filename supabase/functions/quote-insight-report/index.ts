@@ -170,7 +170,11 @@ serve(async (req) => {
   }
 
   try {
-    const { quoteData } = await req.json() as { quoteData: QuoteData };
+    const { quoteData, selectedProvider, allowFallback = false } = await req.json() as { 
+      quoteData: QuoteData;
+      selectedProvider?: string;
+      allowFallback?: boolean;
+    };
     
     // Create Supabase client with service role to read AI settings
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -178,8 +182,11 @@ serve(async (req) => {
     const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
     
     // Get AI settings from database
-    const { provider, geminiKey, openaiKey } = await getAISettings(supabaseClient);
-    console.log(`Using AI provider: ${provider}`);
+    const { provider: defaultProvider, geminiKey, openaiKey } = await getAISettings(supabaseClient);
+    
+    // Use selected provider if specified, otherwise use default
+    let provider = selectedProvider || defaultProvider;
+    console.log(`Using AI provider: ${provider} (selected: ${selectedProvider}, default: ${defaultProvider})`);
 
     // Calculate cost breakdown percentages
     const totalCost = quoteData.totalCost || 1;
@@ -254,46 +261,103 @@ ${historyContext}
 
     let content: string;
     let usedProvider = provider;
+    let providerError: string | null = null;
     
     try {
       if (provider === 'gemini' && geminiKey) {
         content = await callGemini(geminiKey, systemPrompt, userPrompt);
       } else if (provider === 'openai' && openaiKey) {
         content = await callOpenAI(openaiKey, systemPrompt, userPrompt);
-      } else {
+      } else if (provider === 'lovable') {
         content = await callLovableGateway(systemPrompt, userPrompt);
-        usedProvider = 'lovable';
+      } else {
+        // No valid key for selected provider
+        providerError = `所選的 AI 模型 (${provider}) 尚未設定 API 金鑰`;
+        
+        if (!allowFallback) {
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: providerError,
+            errorType: 'NO_API_KEY',
+            failedProvider: provider,
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        
+        // Fallback to lovable if allowed
+        content = await callLovableGateway(systemPrompt, userPrompt);
+        usedProvider = 'lovable (fallback)';
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Unknown error";
       
       if (errorMessage === "RATE_LIMIT") {
-        return new Response(JSON.stringify({ error: "AI 服務請求過於頻繁，請稍後再試。" }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (errorMessage === "PAYMENT_REQUIRED") {
-        return new Response(JSON.stringify({ error: "AI 服務額度已用完，請聯繫管理員。" }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        providerError = `${provider === 'gemini' ? 'Google Gemini' : provider === 'openai' ? 'OpenAI' : 'Lovable AI'} 請求過於頻繁或額度已用完`;
+        
+        if (!allowFallback) {
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: providerError,
+            errorType: 'RATE_LIMIT',
+            failedProvider: provider,
+          }), {
+            status: 429,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
       }
       
-      // Try fallback to lovable gateway if custom API fails
-      if (provider !== 'lovable') {
+      if (errorMessage === "PAYMENT_REQUIRED") {
+        providerError = `${provider === 'lovable' ? 'Lovable AI' : provider} 額度已用完，請聯繫管理員`;
+        
+        if (!allowFallback) {
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: providerError,
+            errorType: 'PAYMENT_REQUIRED',
+            failedProvider: provider,
+          }), {
+            status: 402,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      }
+      
+      // Try fallback to lovable gateway if allowed and custom API fails
+      if (allowFallback && provider !== 'lovable') {
         console.log(`${provider} API failed, falling back to Lovable gateway`);
         try {
           content = await callLovableGateway(systemPrompt, userPrompt);
           usedProvider = 'lovable (fallback)';
         } catch (fallbackError) {
-          return new Response(JSON.stringify({ error: "AI 服務暫時無法使用" }), {
+          const fbErrorMsg = fallbackError instanceof Error ? fallbackError.message : "Unknown error";
+          return new Response(JSON.stringify({ 
+            success: false, 
+            error: "所有 AI 服務暫時無法使用",
+            errorType: 'ALL_FAILED',
+          }), {
             status: 500,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
+      } else if (!allowFallback) {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: providerError || `${provider} API 呼叫失敗`,
+          errorType: 'API_ERROR',
+          failedProvider: provider,
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       } else {
-        return new Response(JSON.stringify({ error: "AI 服務暫時無法使用" }), {
+        return new Response(JSON.stringify({ 
+          success: false, 
+          error: "AI 服務暫時無法使用",
+          errorType: 'API_ERROR',
+        }), {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

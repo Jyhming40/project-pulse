@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,23 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   Sparkles, 
   Loader2, 
@@ -20,10 +37,15 @@ import {
   AlertTriangle,
   CheckCircle,
   RefreshCw,
+  Zap,
+  AlertCircle,
+  XCircle,
 } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
 import { EngineeringCategory, BillingContext, calculateItemSubtotal } from "@/hooks/useQuoteEngineering";
+import { useAIHealthCheck, AIHealthResult } from "@/hooks/useAIHealthCheck";
+import { useAISettings } from "@/hooks/useAISettings";
 
 interface QuoteInsightReportProps {
   capacityKwp: number;
@@ -46,7 +68,17 @@ interface InsightResponse {
     provider?: string;
   };
   error?: string;
+  errorType?: string;
+  failedProvider?: string;
 }
+
+type ProviderType = "gemini" | "openai" | "lovable";
+
+const PROVIDER_LABELS: Record<ProviderType, string> = {
+  gemini: "Google Gemini",
+  openai: "OpenAI ChatGPT",
+  lovable: "Lovable Cloud AI",
+};
 
 export default function QuoteInsightReport({
   capacityKwp,
@@ -61,12 +93,31 @@ export default function QuoteInsightReport({
   const [isOpen, setIsOpen] = useState(false);
   const [report, setReport] = useState<string | null>(null);
   const [metadata, setMetadata] = useState<InsightResponse["metadata"] | null>(null);
+  const [selectedProvider, setSelectedProvider] = useState<ProviderType>("lovable");
+  const [showFallbackDialog, setShowFallbackDialog] = useState(false);
+  const [failedProviderInfo, setFailedProviderInfo] = useState<{ provider: string; error: string } | null>(null);
+
+  const { isChecking, results: healthResults, checkHealth, getStatusForProvider } = useAIHealthCheck();
+  const { defaultProvider, geminiKey, openaiKey, isLoading: isLoadingSettings } = useAISettings();
+
+  // Set initial provider from settings
+  useEffect(() => {
+    if (defaultProvider?.setting_value) {
+      setSelectedProvider(defaultProvider.setting_value as ProviderType);
+    }
+  }, [defaultProvider]);
+
+  // Check health when sheet opens
+  useEffect(() => {
+    if (isOpen) {
+      checkHealth();
+    }
+  }, [isOpen, checkHealth]);
 
   // Fetch historical quotes for comparison
   const { data: historicalQuotes } = useQuery({
     queryKey: ["historical-quotes", capacityKwp],
     queryFn: async () => {
-      // Fetch quotes with similar capacity (±50%)
       const minCapacity = capacityKwp * 0.5;
       const maxCapacity = capacityKwp * 1.5;
       
@@ -93,8 +144,7 @@ export default function QuoteInsightReport({
 
   // AI insight mutation
   const insightMutation = useMutation({
-    mutationFn: async () => {
-      // Build billing context for proper subtotal calculation
+    mutationFn: async (provider: ProviderType) => {
       const billingContext: BillingContext = {
         capacityKwp,
         pricePerKwp,
@@ -104,7 +154,6 @@ export default function QuoteInsightReport({
       const categoryData = categories.map(cat => ({
         categoryName: cat.categoryName,
         subtotal: cat.items.reduce((sum, item) => {
-          // Use the proper calculateItemSubtotal function that handles all billing methods
           return sum + calculateItemSubtotal(item, capacityKwp, billingContext);
         }, 0),
       }));
@@ -112,7 +161,7 @@ export default function QuoteInsightReport({
       const historicalData = historicalQuotes?.map(q => ({
         capacityKwp: Number(q.capacity_kwp),
         pricePerKwp: Number(q.price_per_kwp),
-        grossMarginRate: 0.15, // Default estimate since we don't have historical cost data
+        grossMarginRate: 0.15,
         createdAt: q.created_at,
       }));
 
@@ -131,6 +180,8 @@ export default function QuoteInsightReport({
             categories: categoryData,
             historicalQuotes: historicalData,
           },
+          selectedProvider: provider,
+          allowFallback: false, // Don't auto-fallback
         },
       });
 
@@ -144,8 +195,15 @@ export default function QuoteInsightReport({
       if (data?.success && data.report) {
         setReport(data.report);
         setMetadata(data.metadata || null);
+        setShowFallbackDialog(false);
+        setFailedProviderInfo(null);
       } else if (data?.error) {
-        toast.error(data.error);
+        // Show fallback dialog
+        setFailedProviderInfo({
+          provider: data.failedProvider || selectedProvider,
+          error: data.error,
+        });
+        setShowFallbackDialog(true);
       }
     },
     onError: (error) => {
@@ -156,7 +214,60 @@ export default function QuoteInsightReport({
 
   const handleGenerateReport = () => {
     setReport(null);
-    insightMutation.mutate();
+    insightMutation.mutate(selectedProvider);
+  };
+
+  const handleUseFallback = (fallbackProvider: ProviderType) => {
+    setShowFallbackDialog(false);
+    setSelectedProvider(fallbackProvider);
+    insightMutation.mutate(fallbackProvider);
+  };
+
+  const getHealthStatusIcon = (status: AIHealthResult["status"]) => {
+    switch (status) {
+      case "healthy":
+        return <CheckCircle className="h-3.5 w-3.5 text-green-500" />;
+      case "quota_exceeded":
+        return <AlertCircle className="h-3.5 w-3.5 text-amber-500" />;
+      case "no_key":
+        return <XCircle className="h-3.5 w-3.5 text-muted-foreground" />;
+      case "error":
+        return <XCircle className="h-3.5 w-3.5 text-red-500" />;
+      default:
+        return <AlertCircle className="h-3.5 w-3.5 text-muted-foreground" />;
+    }
+  };
+
+  const getHealthStatusLabel = (status: AIHealthResult["status"]) => {
+    switch (status) {
+      case "healthy":
+        return "正常";
+      case "quota_exceeded":
+        return "額度不足";
+      case "no_key":
+        return "未設定";
+      case "error":
+        return "錯誤";
+      default:
+        return "未知";
+    }
+  };
+
+  const isProviderAvailable = (provider: ProviderType): boolean => {
+    if (provider === "lovable") return true;
+    if (provider === "gemini") return geminiKey?.is_enabled && !!geminiKey?.setting_value;
+    if (provider === "openai") return openaiKey?.is_enabled && !!openaiKey?.setting_value;
+    return false;
+  };
+
+  const getAvailableFallbackProviders = (): ProviderType[] => {
+    const providers: ProviderType[] = ["gemini", "openai", "lovable"];
+    return providers.filter(p => {
+      if (p === failedProviderInfo?.provider) return false;
+      const health = getStatusForProvider(p);
+      if (health?.status === "error" || health?.status === "quota_exceeded") return false;
+      return isProviderAvailable(p);
+    });
   };
 
   const getPricePositionBadge = (position: string) => {
@@ -183,124 +294,274 @@ export default function QuoteInsightReport({
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Sparkles className="h-4 w-4" />
-          AI 洞察報告
-        </Button>
-      </SheetTrigger>
-      <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle className="flex items-center gap-2">
-            <Sparkles className="h-5 w-5 text-primary" />
-            報價洞察分析
-          </SheetTitle>
-        </SheetHeader>
-
-        <div className="mt-6 space-y-4">
-          {/* Quick Stats */}
-          <Card>
-            <CardHeader className="py-3">
-              <CardTitle className="text-sm">快速概覽</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">裝置容量</span>
-                <span className="font-medium">{capacityKwp} kWp</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">每kW未稅報價</span>
-                <span className="font-medium">${pricePerKwp.toLocaleString()}</span>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">總成本</span>
-                <span className="font-medium text-red-600">${totalCost.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">毛利金額</span>
-                <span className={`font-medium ${grossMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  ${grossMargin.toLocaleString()}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">毛利率</span>
-                <span className="font-bold text-lg">
-                  {(grossMarginRate * 100).toFixed(1)}%
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Generate Button */}
-          <Button 
-            onClick={handleGenerateReport} 
-            disabled={insightMutation.isPending}
-            className="w-full gap-2"
-          >
-            {insightMutation.isPending ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                AI 分析中...
-              </>
-            ) : report ? (
-              <>
-                <RefreshCw className="h-4 w-4" />
-                重新分析
-              </>
-            ) : (
-              <>
-                <Sparkles className="h-4 w-4" />
-                生成洞察報告
-              </>
-            )}
+    <>
+      <Sheet open={isOpen} onOpenChange={setIsOpen}>
+        <SheetTrigger asChild>
+          <Button variant="outline" size="sm" className="gap-2">
+            <Sparkles className="h-4 w-4" />
+            AI 洞察報告
           </Button>
+        </SheetTrigger>
+        <SheetContent className="w-full sm:max-w-xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-primary" />
+              報價洞察分析
+            </SheetTitle>
+          </SheetHeader>
 
-          {/* Report Content */}
-          {report && (
-            <Card className="border-primary/20">
-              <CardHeader className="py-3 bg-gradient-to-r from-primary/5 to-transparent">
-                <CardTitle className="text-sm flex flex-col gap-2">
-                  <div className="flex items-center justify-between">
-                    <span>AI 洞察報告</span>
-                    <div className="flex gap-2">
-                      {metadata?.pricePosition && getPricePositionBadge(metadata.pricePosition)}
-                      {metadata?.grossMarginRate !== undefined && getMarginHealthBadge(metadata.grossMarginRate)}
-                    </div>
-                  </div>
-                  {metadata?.provider && (
-                    <div className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
-                      <Sparkles className="h-3 w-3" />
-                      <span>
-                        由{" "}
-                        {metadata.provider === "openai" && "OpenAI ChatGPT"}
-                        {metadata.provider === "gemini" && "Google Gemini"}
-                        {metadata.provider === "lovable" && "Lovable Cloud AI"}
-                        {metadata.provider === "lovable (fallback)" && "Lovable Cloud AI (備援)"}
-                        {!["openai", "gemini", "lovable", "lovable (fallback)"].includes(metadata.provider) && metadata.provider}
-                        {" "}提供
-                      </span>
-                    </div>
-                  )}
+          <div className="mt-6 space-y-4">
+            {/* AI Model Selection */}
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm flex items-center justify-between">
+                  <span>AI 模型選擇</span>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => checkHealth()}
+                    disabled={isChecking}
+                    className="h-7 px-2"
+                  >
+                    {isChecking ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-4">
-                <div className="prose prose-sm dark:prose-invert max-w-none">
-                  <ReactMarkdown>{report}</ReactMarkdown>
+              <CardContent className="space-y-3">
+                <Select
+                  value={selectedProvider}
+                  onValueChange={(v) => setSelectedProvider(v as ProviderType)}
+                  disabled={insightMutation.isPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="選擇 AI 模型" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(["gemini", "openai", "lovable"] as ProviderType[]).map((provider) => {
+                      const health = getStatusForProvider(provider);
+                      const available = isProviderAvailable(provider);
+                      return (
+                        <SelectItem 
+                          key={provider} 
+                          value={provider}
+                          disabled={!available && provider !== "lovable"}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Zap className="h-3.5 w-3.5" />
+                            <span>{PROVIDER_LABELS[provider]}</span>
+                            {health && (
+                              <span className="flex items-center gap-1 ml-2 text-xs text-muted-foreground">
+                                {getHealthStatusIcon(health.status)}
+                                {health.responseTime && health.status === "healthy" && (
+                                  <span>{health.responseTime}ms</span>
+                                )}
+                              </span>
+                            )}
+                            {!available && provider !== "lovable" && (
+                              <span className="text-xs text-muted-foreground">(未設定)</span>
+                            )}
+                          </div>
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+
+                {/* Health Status Display */}
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  {(["gemini", "openai", "lovable"] as ProviderType[]).map((provider) => {
+                    const health = getStatusForProvider(provider);
+                    const available = isProviderAvailable(provider);
+                    return (
+                      <div 
+                        key={provider}
+                        className={`flex flex-col items-center p-2 rounded-md border ${
+                          selectedProvider === provider ? 'border-primary bg-primary/5' : 'border-border'
+                        }`}
+                      >
+                        <span className="font-medium truncate w-full text-center">
+                          {provider === "gemini" ? "Gemini" : provider === "openai" ? "OpenAI" : "Lovable"}
+                        </span>
+                        <div className="flex items-center gap-1 mt-1">
+                          {isChecking ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                          ) : health ? (
+                            <>
+                              {getHealthStatusIcon(health.status)}
+                              <span className={
+                                health.status === "healthy" ? "text-green-600" :
+                                health.status === "quota_exceeded" ? "text-amber-600" :
+                                "text-muted-foreground"
+                              }>
+                                {getHealthStatusLabel(health.status)}
+                              </span>
+                            </>
+                          ) : !available && provider !== "lovable" ? (
+                            <>
+                              <XCircle className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-muted-foreground">未設定</span>
+                            </>
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent>
             </Card>
-          )}
 
-          {/* Historical Data Info */}
-          {historicalQuotes && historicalQuotes.length > 0 && (
-            <p className="text-xs text-muted-foreground text-center">
-              📊 已載入 {historicalQuotes.length} 筆類似容量的歷史報價作為參考
-            </p>
-          )}
-        </div>
-      </SheetContent>
-    </Sheet>
+            {/* Quick Stats */}
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">快速概覽</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">裝置容量</span>
+                  <span className="font-medium">{capacityKwp} kWp</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">每kW未稅報價</span>
+                  <span className="font-medium">${pricePerKwp.toLocaleString()}</span>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">總成本</span>
+                  <span className="font-medium text-red-600">${totalCost.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">毛利金額</span>
+                  <span className={`font-medium ${grossMargin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    ${grossMargin.toLocaleString()}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">毛利率</span>
+                  <span className="font-bold text-lg">
+                    {(grossMarginRate * 100).toFixed(1)}%
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Generate Button */}
+            <Button 
+              onClick={handleGenerateReport} 
+              disabled={insightMutation.isPending}
+              className="w-full gap-2"
+            >
+              {insightMutation.isPending ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {PROVIDER_LABELS[selectedProvider]} 分析中...
+                </>
+              ) : report ? (
+                <>
+                  <RefreshCw className="h-4 w-4" />
+                  重新分析
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4" />
+                  使用 {PROVIDER_LABELS[selectedProvider]} 生成報告
+                </>
+              )}
+            </Button>
+
+            {/* Report Content */}
+            {report && (
+              <Card className="border-primary/20">
+                <CardHeader className="py-3 bg-gradient-to-r from-primary/5 to-transparent">
+                  <CardTitle className="text-sm flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <span>AI 洞察報告</span>
+                      <div className="flex gap-2">
+                        {metadata?.pricePosition && getPricePositionBadge(metadata.pricePosition)}
+                        {metadata?.grossMarginRate !== undefined && getMarginHealthBadge(metadata.grossMarginRate)}
+                      </div>
+                    </div>
+                    {metadata?.provider && (
+                      <div className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
+                        <Sparkles className="h-3 w-3" />
+                        <span>
+                          由{" "}
+                          {metadata.provider === "openai" && "OpenAI ChatGPT"}
+                          {metadata.provider === "gemini" && "Google Gemini"}
+                          {metadata.provider === "lovable" && "Lovable Cloud AI"}
+                          {metadata.provider === "lovable (fallback)" && "Lovable Cloud AI (備援)"}
+                          {!["openai", "gemini", "lovable", "lovable (fallback)"].includes(metadata.provider) && metadata.provider}
+                          {" "}提供
+                        </span>
+                      </div>
+                    )}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
+                    <ReactMarkdown>{report}</ReactMarkdown>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Historical Data Info */}
+            {historicalQuotes && historicalQuotes.length > 0 && (
+              <p className="text-xs text-muted-foreground text-center">
+                📊 已載入 {historicalQuotes.length} 筆類似容量的歷史報價作為參考
+              </p>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Fallback Dialog */}
+      <AlertDialog open={showFallbackDialog} onOpenChange={setShowFallbackDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-500" />
+              AI 模型無法使用
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p>
+                <strong>{PROVIDER_LABELS[failedProviderInfo?.provider as ProviderType] || failedProviderInfo?.provider}</strong> 目前無法使用：
+              </p>
+              <p className="text-sm bg-muted p-2 rounded-md">
+                {failedProviderInfo?.error}
+              </p>
+              <p>您可以選擇其他可用的 AI 模型繼續分析：</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="grid gap-2 py-4">
+            {getAvailableFallbackProviders().map((provider) => {
+              const health = getStatusForProvider(provider);
+              return (
+                <Button
+                  key={provider}
+                  variant="outline"
+                  className="justify-start gap-2"
+                  onClick={() => handleUseFallback(provider)}
+                >
+                  {getHealthStatusIcon(health?.status || "healthy")}
+                  <span>{PROVIDER_LABELS[provider]}</span>
+                  {health?.responseTime && (
+                    <span className="text-xs text-muted-foreground ml-auto">{health.responseTime}ms</span>
+                  )}
+                </Button>
+              );
+            })}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>取消</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
