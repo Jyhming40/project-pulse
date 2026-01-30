@@ -43,6 +43,7 @@ interface InsightResponse {
     pricePosition: string;
     grossMarginRate: number;
     hasHistoricalData: boolean;
+    provider?: string;
   };
   error?: string;
 }
@@ -255,12 +256,28 @@ export default function QuoteInsightReport({
           {report && (
             <Card className="border-primary/20">
               <CardHeader className="py-3 bg-gradient-to-r from-primary/5 to-transparent">
-                <CardTitle className="text-sm flex items-center justify-between">
-                  <span>AI 洞察報告</span>
-                  <div className="flex gap-2">
-                    {metadata?.pricePosition && getPricePositionBadge(metadata.pricePosition)}
-                    {metadata?.grossMarginRate !== undefined && getMarginHealthBadge(metadata.grossMarginRate)}
+                <CardTitle className="text-sm flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span>AI 洞察報告</span>
+                    <div className="flex gap-2">
+                      {metadata?.pricePosition && getPricePositionBadge(metadata.pricePosition)}
+                      {metadata?.grossMarginRate !== undefined && getMarginHealthBadge(metadata.grossMarginRate)}
+                    </div>
                   </div>
+                  {metadata?.provider && (
+                    <div className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
+                      <Sparkles className="h-3 w-3" />
+                      <span>
+                        由{" "}
+                        {metadata.provider === "openai" && "OpenAI ChatGPT"}
+                        {metadata.provider === "gemini" && "Google Gemini"}
+                        {metadata.provider === "lovable" && "Lovable Cloud AI"}
+                        {metadata.provider === "lovable (fallback)" && "Lovable Cloud AI (備援)"}
+                        {!["openai", "gemini", "lovable", "lovable (fallback)"].includes(metadata.provider) && metadata.provider}
+                        {" "}提供
+                      </span>
+                    </div>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="pt-4">
