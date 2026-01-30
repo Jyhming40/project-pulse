@@ -79,10 +79,10 @@ export default function EngineeringCategoryCard({
   
   // 將資料庫預設值轉換為可用格式，若無資料庫預設則用靜態預設
   const dbModuleBracketPresets = toCardPresetFormat(
-    activePresets.filter(p => p.category === 'module_bracket')
+    activePresets.filter(p => p.category === 'RACK')
   );
   const dbProtectionPresets = toCardPresetFormat(
-    activePresets.filter(p => p.category === 'protection_engineering')
+    activePresets.filter(p => p.category === 'SAFETY')
   );
   
   // 優先使用資料庫預設，若為空則使用靜態預設

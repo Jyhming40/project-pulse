@@ -40,20 +40,22 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { Plus, Pencil, Trash2, Download, FileText, Shield } from 'lucide-react';
-import { useQuoteEngineeringPresets, PresetCategory, EngineeringPreset, CreatePresetInput } from '@/hooks/useQuoteEngineeringPresets';
+import { Plus, Pencil, Trash2, Download, FileText } from 'lucide-react';
+import { 
+  useQuoteEngineeringPresets, 
+  PresetCategory, 
+  EngineeringPreset, 
+  CreatePresetInput,
+  PRESET_CATEGORY_LABELS,
+  PRESET_CATEGORY_ORDER,
+} from '@/hooks/useQuoteEngineeringPresets';
 import { Skeleton } from '@/components/ui/skeleton';
-
-const CATEGORY_LABELS: Record<PresetCategory, string> = {
-  module_bracket: '模組支架',
-  protection_engineering: '防護工程',
-};
 
 export function QuotePresetsPanel() {
   const { presets, isLoading, createPreset, updatePreset, deletePreset, initializeFromDefaults } = useQuoteEngineeringPresets();
-  const [activeCategory, setActiveCategory] = useState<PresetCategory>('module_bracket');
+  const [activeCategory, setActiveCategory] = useState<PresetCategory>('RACK');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [editingPreset, setEditingPreset] = useState<EngineeringPreset | null>(null);
 
@@ -62,7 +64,7 @@ export function QuotePresetsPanel() {
 
   // 新增表單狀態
   const [newPreset, setNewPreset] = useState<CreatePresetInput>({
-    category: 'module_bracket',
+    category: 'RACK',
     preset_key: '',
     item_name: '',
     spec_description: '',
@@ -162,29 +164,29 @@ export function QuotePresetsPanel() {
       <CardContent>
         <Tabs value={activeCategory} onValueChange={(v) => setActiveCategory(v as PresetCategory)}>
           <div className="flex items-center justify-between mb-4">
-            <TabsList>
-              <TabsTrigger value="module_bracket" className="flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                模組支架
-              </TabsTrigger>
-              <TabsTrigger value="protection_engineering" className="flex items-center gap-2">
-                <Shield className="h-4 w-4" />
-                防護工程
-              </TabsTrigger>
-            </TabsList>
+            <ScrollArea className="w-full max-w-[calc(100%-100px)]">
+              <TabsList className="inline-flex h-10 w-max">
+                {PRESET_CATEGORY_ORDER.map((cat) => (
+                  <TabsTrigger key={cat} value={cat} className="px-3">
+                    {PRESET_CATEGORY_LABELS[cat]}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
 
             <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
               <DialogTrigger asChild>
                 <Button size="sm" onClick={resetForm}>
                   <Plus className="h-4 w-4 mr-2" />
-                  新增項目
+                  新增
                 </Button>
               </DialogTrigger>
               <DialogContent className="max-w-lg">
                 <DialogHeader>
                   <DialogTitle>新增項目預設值</DialogTitle>
                   <DialogDescription>
-                    新增 {CATEGORY_LABELS[activeCategory]} 的項目名稱與規格描述
+                    新增 {PRESET_CATEGORY_LABELS[activeCategory]} 的項目名稱與規格描述
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
@@ -251,22 +253,16 @@ export function QuotePresetsPanel() {
             </Dialog>
           </div>
 
-          <TabsContent value="module_bracket" className="mt-0">
-            <PresetTable
-              presets={filteredPresets}
-              onEdit={setEditingPreset}
-              onDelete={handleDelete}
-              onToggleActive={handleToggleActive}
-            />
-          </TabsContent>
-          <TabsContent value="protection_engineering" className="mt-0">
-            <PresetTable
-              presets={filteredPresets}
-              onEdit={setEditingPreset}
-              onDelete={handleDelete}
-              onToggleActive={handleToggleActive}
-            />
-          </TabsContent>
+          {PRESET_CATEGORY_ORDER.map((cat) => (
+            <TabsContent key={cat} value={cat} className="mt-0">
+              <PresetTable
+                presets={filteredPresets}
+                onEdit={setEditingPreset}
+                onDelete={handleDelete}
+                onToggleActive={handleToggleActive}
+              />
+            </TabsContent>
+          ))}
         </Tabs>
 
         {/* 編輯對話框 */}
@@ -350,7 +346,7 @@ function PresetTable({ presets, onEdit, onDelete, onToggleActive }: PresetTableP
   if (presets.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
-        尚無項目，請點擊「新增項目」或「載入系統預設」
+        尚無項目，請點擊「新增」或「載入系統預設」
       </div>
     );
   }

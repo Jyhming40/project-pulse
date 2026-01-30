@@ -2,7 +2,35 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-export type PresetCategory = 'module_bracket' | 'protection_engineering';
+// 完整的工程類別定義 (對應 quote_engineering_templates)
+export type PresetCategory = 
+  | 'RACK'          // 模組支架
+  | 'SAFETY'        // 防護工程
+  | 'STEEL'         // 鋼構工程
+  | 'MEP'           // 機電工程
+  | 'CIVIL'         // 土木工程
+  | 'CABINET'       // 箱體
+  | 'ADMIN'         // 行政作業
+  | 'COMPANY'       // 公司管理
+  | 'ROOF_RENTAL';  // 模租鋪設
+
+// 類別代碼對應顯示名稱
+export const PRESET_CATEGORY_LABELS: Record<PresetCategory, string> = {
+  RACK: '模組支架',
+  SAFETY: '防護工程',
+  STEEL: '鋼構工程',
+  MEP: '機電工程',
+  CIVIL: '土木工程',
+  CABINET: '箱體',
+  ADMIN: '行政作業',
+  COMPANY: '公司管理',
+  ROOF_RENTAL: '模租鋪設',
+};
+
+// 類別排序順序
+export const PRESET_CATEGORY_ORDER: PresetCategory[] = [
+  'RACK', 'SAFETY', 'STEEL', 'MEP', 'CIVIL', 'CABINET', 'ADMIN', 'COMPANY', 'ROOF_RENTAL'
+];
 
 export interface EngineeringPreset {
   id: string;
@@ -147,9 +175,7 @@ export function useQuoteEngineeringPresets(category?: PresetCategory) {
   const initializeFromDefaults = useMutation({
     mutationFn: async () => {
       // 動態載入靜態預設值
-      const { MODULE_BRACKET_PRESETS, PROTECTION_ENGINEERING_PRESETS } = await import('@/config/bracketSpecPresets');
-      
-      const allPresets = [...MODULE_BRACKET_PRESETS, ...PROTECTION_ENGINEERING_PRESETS];
+      const { ALL_ENGINEERING_PRESETS } = await import('@/config/bracketSpecPresets');
       
       // 取得現有的 key
       const { data: existing } = await supabase
@@ -161,8 +187,8 @@ export function useQuoteEngineeringPresets(category?: PresetCategory) {
       let added = 0;
       let skipped = 0;
       
-      for (let i = 0; i < allPresets.length; i++) {
-        const preset = allPresets[i];
+      for (let i = 0; i < ALL_ENGINEERING_PRESETS.length; i++) {
+        const preset = ALL_ENGINEERING_PRESETS[i];
         
         if (existingKeys.has(preset.key)) {
           skipped++;
