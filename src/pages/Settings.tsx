@@ -11,7 +11,8 @@ import {
   GitBranch,
   Users,
   Calculator,
-  ClipboardList
+  ClipboardList,
+  HardDrive
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ import { DepartmentsPanel } from '@/components/settings/DepartmentsPanel';
 import { ProcessStagesPanel } from '@/components/settings/ProcessStagesPanel';
 import { StageResponsibilitiesPanel } from '@/components/settings/StageResponsibilitiesPanel';
 import { TieredPricingPanel, QuotePresetsPanel } from '@/components/settings';
+import { SettingsBackupPanel } from '@/components/settings/SettingsBackupPanel';
 
 export default function Settings() {
   const { isAdmin } = useAuth();
@@ -47,7 +49,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-10 max-w-5xl">
+        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-11 max-w-6xl">
           <TabsTrigger value="branding" className="flex items-center gap-2">
             <Palette className="w-4 h-4" />
             <span className="hidden sm:inline">公司</span>
@@ -87,6 +89,10 @@ export default function Settings() {
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Wrench className="w-4 h-4" />
             <span className="hidden sm:inline">權限</span>
+          </TabsTrigger>
+          <TabsTrigger value="backup" className="flex items-center gap-2">
+            <HardDrive className="w-4 h-4" />
+            <span className="hidden sm:inline">備份</span>
           </TabsTrigger>
         </TabsList>
 
@@ -163,6 +169,10 @@ export default function Settings() {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="backup" className="mt-6">
+          <SettingsBackupPanel />
         </TabsContent>
       </Tabs>
     </div>
