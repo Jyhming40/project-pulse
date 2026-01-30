@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import ReactMarkdown from "react-markdown";
-import { EngineeringCategory } from "@/hooks/useQuoteEngineering";
+import { EngineeringCategory, BillingContext, calculateItemSubtotal } from "@/hooks/useQuoteEngineering";
 
 interface QuoteInsightReportProps {
   capacityKwp: number;
@@ -94,13 +94,18 @@ export default function QuoteInsightReport({
   // AI insight mutation
   const insightMutation = useMutation({
     mutationFn: async () => {
+      // Build billing context for proper subtotal calculation
+      const billingContext: BillingContext = {
+        capacityKwp,
+        pricePerKwp,
+        taxRate,
+      };
+      
       const categoryData = categories.map(cat => ({
         categoryName: cat.categoryName,
         subtotal: cat.items.reduce((sum, item) => {
-          const subtotal = item.isLumpSum 
-            ? (item.lumpSumAmount || 0)
-            : (item.unitPrice || 0) * (item.quantity || 0);
-          return sum + subtotal;
+          // Use the proper calculateItemSubtotal function that handles all billing methods
+          return sum + calculateItemSubtotal(item, capacityKwp, billingContext);
         }, 0),
       }));
 
