@@ -43,6 +43,7 @@ import {
 import { formatCurrency } from "@/lib/quoteCalculations";
 import { TieredPricingType, getTieredPricingLabel } from "@/lib/tieredPricing";
 import { useTieredPricing } from "@/hooks/useTieredPricing";
+import { useQuoteEngineeringPresets, toCardPresetFormat } from "@/hooks/useQuoteEngineeringPresets";
 import {
   MODULE_BRACKET_PRESETS,
   PROTECTION_ENGINEERING_PRESETS,
@@ -72,6 +73,21 @@ export default function EngineeringCategoryCard({
   
   // 使用自訂階梯定價 hook (讀取 localStorage 中的自訂設定)
   const { calculatePrice } = useTieredPricing();
+  
+  // 取得資料庫中的預設值
+  const { activePresets } = useQuoteEngineeringPresets();
+  
+  // 將資料庫預設值轉換為可用格式，若無資料庫預設則用靜態預設
+  const dbModuleBracketPresets = toCardPresetFormat(
+    activePresets.filter(p => p.category === 'module_bracket')
+  );
+  const dbProtectionPresets = toCardPresetFormat(
+    activePresets.filter(p => p.category === 'protection_engineering')
+  );
+  
+  // 優先使用資料庫預設，若為空則使用靜態預設
+  const moduleBracketPresets = dbModuleBracketPresets.length > 0 ? dbModuleBracketPresets : MODULE_BRACKET_PRESETS;
+  const protectionPresets = dbProtectionPresets.length > 0 ? dbProtectionPresets : PROTECTION_ENGINEERING_PRESETS;
 
   // 建立計費上下文，包含自訂階梯定價計算器
   const billingContext: BillingContext = {
@@ -233,7 +249,7 @@ export default function EngineeringCategoryCard({
                                   </p>
                                   <div className="space-y-1">
                                     <p className="text-xs font-semibold text-primary px-2">模組支架</p>
-                                    {MODULE_BRACKET_PRESETS.map((preset) => (
+                                    {moduleBracketPresets.map((preset) => (
                                       <Button
                                         key={preset.key}
                                         variant="ghost"
@@ -252,17 +268,20 @@ export default function EngineeringCategoryCard({
                                   </div>
                                   <div className="space-y-1">
                                     <p className="text-xs font-semibold text-primary px-2">防護工程</p>
-                                    {PROTECTION_ENGINEERING_PRESETS.map((preset) => (
+                                    {protectionPresets.map((preset) => (
                                       <Button
                                         key={preset.key}
                                         variant="ghost"
                                         size="sm"
-                                        className="w-full justify-start text-xs h-auto py-1.5 px-2"
+                                        className={`w-full justify-start text-xs h-auto py-1.5 px-2 ${preset.isSubOption ? 'pl-6' : ''}`}
                                         onClick={() => {
                                           handleUpdateItem(index, { specDescription: preset.specDescription });
                                         }}
                                       >
-                                        {preset.label}
+                                        <span className="truncate">
+                                          {preset.parentLabel && <span className="text-muted-foreground mr-1">{preset.parentLabel}</span>}
+                                          {preset.label}
+                                        </span>
                                       </Button>
                                     ))}
                                   </div>

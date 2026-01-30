@@ -2419,6 +2419,7 @@ export type Database = {
           quantity: number | null
           quote_id: string
           sort_order: number | null
+          spec_description: string | null
           subtotal: number | null
           tiered_pricing_type: string | null
           unit: string | null
@@ -2440,6 +2441,7 @@ export type Database = {
           quantity?: number | null
           quote_id: string
           sort_order?: number | null
+          spec_description?: string | null
           subtotal?: number | null
           tiered_pricing_type?: string | null
           unit?: string | null
@@ -2461,6 +2463,7 @@ export type Database = {
           quantity?: number | null
           quote_id?: string
           sort_order?: number | null
+          spec_description?: string | null
           subtotal?: number | null
           tiered_pricing_type?: string | null
           unit?: string | null
