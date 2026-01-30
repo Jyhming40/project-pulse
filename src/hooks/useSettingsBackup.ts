@@ -4,15 +4,36 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 interface Backup {
-  name: string;
-  size: number;
+  timestamp: string;
+  excel_file: string | null;
+  json_file: string | null;
+  excel_size: number;
+  json_size: number;
   created_at: string;
+  can_restore: boolean;
 }
 
 interface BackupSchedule {
   frequency: 'manual' | 'daily' | 'weekly';
   last_backup_at: string | null;
   max_backups: number;
+}
+
+interface BackupPreview {
+  backup_info: {
+    created_at: string;
+    created_by: string;
+    backup_type: string;
+    tables: string[];
+    record_counts: Record<string, number>;
+  };
+  tables: Array<{ name: string; count: number }>;
+}
+
+interface RestoreResult {
+  success: boolean;
+  message: string;
+  results: Record<string, { success: boolean; count: number; error?: string }>;
 }
 
 export function useSettingsBackup() {
@@ -125,7 +146,60 @@ export function useSettingsBackup() {
     },
   });
 
-  // Download backup file
+  // Preview backup contents
+  const previewBackup = async (jsonFilePath: string): Promise<BackupPreview | null> => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('未登入');
+
+      const response = await supabase.functions.invoke('backup-settings', {
+        body: { action: 'preview-backup', file_path: jsonFilePath },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+      if (!response.data.success) throw new Error(response.data.error);
+
+      return response.data as BackupPreview;
+    } catch (error: any) {
+      toast.error(`預覽失敗: ${error.message}`);
+      return null;
+    }
+  };
+
+  // Restore backup
+  const restoreBackup = useMutation({
+    mutationFn: async ({ filePath, tables }: { filePath: string; tables?: string[] }): Promise<RestoreResult> => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('未登入');
+
+      const response = await supabase.functions.invoke('backup-settings', {
+        body: { action: 'restore-backup', file_path: filePath, tables },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+      return response.data as RestoreResult;
+    },
+    onSuccess: (data) => {
+      if (data.success) {
+        toast.success(data.message);
+      } else {
+        toast.warning(data.message);
+      }
+      // Invalidate all settings-related queries to refresh UI
+      queryClient.invalidateQueries({ queryKey: ['settings-backups'] });
+      queryClient.invalidateQueries({ queryKey: ['system-options'] });
+      queryClient.invalidateQueries({ queryKey: ['document-type-config'] });
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
+      queryClient.invalidateQueries({ queryKey: ['process-stages'] });
+      queryClient.invalidateQueries({ queryKey: ['progress-milestones'] });
+      queryClient.invalidateQueries({ queryKey: ['quote-presets'] });
+    },
+    onError: (error: Error) => {
+      toast.error(`還原失敗: ${error.message}`);
+    },
+  });
+
+  // Download backup file (Excel or JSON)
   const downloadBackup = async (fileName: string) => {
     setIsDownloading(true);
     try {
@@ -163,6 +237,8 @@ export function useSettingsBackup() {
     deleteBackup,
     updateSchedule,
     downloadBackup,
+    previewBackup,
+    restoreBackup,
     refetchBackups,
   };
 }
