@@ -285,8 +285,8 @@ export default function EngineeringCategoryCard({
                               value={item.specDescription || ""}
                               onChange={(e) => handleUpdateItem(index, { specDescription: e.target.value })}
                               placeholder="輸入規格細節，或點選左側工具選擇預設"
-                              className="min-h-[32px] text-sm resize-none border-none shadow-none focus-visible:ring-1 flex-1"
-                              rows={1}
+                              className="min-h-[60px] text-sm resize-y border-none shadow-none focus-visible:ring-1 flex-1"
+                              rows={2}
                             />
                           </div>
                         </div>
