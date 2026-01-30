@@ -10,6 +10,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select";
 import {
   Table,
@@ -24,7 +26,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { Plus, Trash2, ChevronDown, GripVertical } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Plus, Trash2, ChevronDown, GripVertical, Wrench } from "lucide-react";
 import { 
   EngineeringCategory, 
   EngineeringItem, 
@@ -36,6 +43,11 @@ import {
 import { formatCurrency } from "@/lib/quoteCalculations";
 import { TieredPricingType, getTieredPricingLabel } from "@/lib/tieredPricing";
 import { useTieredPricing } from "@/hooks/useTieredPricing";
+import {
+  MODULE_BRACKET_PRESETS,
+  PROTECTION_ENGINEERING_PRESETS,
+  BracketPreset,
+} from "@/config/bracketSpecPresets";
 
 interface EngineeringCategoryCardProps {
   category: EngineeringCategory;
@@ -201,13 +213,71 @@ export default function EngineeringCategoryCard({
                         />
                       </TableCell>
                       <TableCell>
-                        <Textarea
-                          value={item.specDescription || ""}
-                          onChange={(e) => handleUpdateItem(index, { specDescription: e.target.value })}
-                          placeholder="輸入規格細節，換行分隔多項規格"
-                          className="min-h-[32px] text-sm resize-none border-none shadow-none focus-visible:ring-1"
-                          rows={1}
-                        />
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-1">
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 shrink-0"
+                                  title="選擇預設規格"
+                                >
+                                  <Wrench className="h-3.5 w-3.5" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-72 p-2" align="start">
+                                <div className="space-y-2">
+                                  <p className="text-xs font-medium text-muted-foreground px-2 py-1">
+                                    選擇預設規格（將覆蓋現有內容）
+                                  </p>
+                                  <div className="space-y-1">
+                                    <p className="text-xs font-semibold text-primary px-2">模組支架</p>
+                                    {MODULE_BRACKET_PRESETS.map((preset) => (
+                                      <Button
+                                        key={preset.key}
+                                        variant="ghost"
+                                        size="sm"
+                                        className={`w-full justify-start text-xs h-auto py-1.5 px-2 ${preset.isSubOption ? 'pl-6' : ''}`}
+                                        onClick={() => {
+                                          handleUpdateItem(index, { specDescription: preset.specDescription });
+                                        }}
+                                      >
+                                        <span className="truncate">
+                                          {preset.parentLabel && <span className="text-muted-foreground mr-1">{preset.parentLabel}</span>}
+                                          {preset.label}
+                                        </span>
+                                      </Button>
+                                    ))}
+                                  </div>
+                                  <div className="space-y-1">
+                                    <p className="text-xs font-semibold text-primary px-2">防護工程</p>
+                                    {PROTECTION_ENGINEERING_PRESETS.map((preset) => (
+                                      <Button
+                                        key={preset.key}
+                                        variant="ghost"
+                                        size="sm"
+                                        className="w-full justify-start text-xs h-auto py-1.5 px-2"
+                                        onClick={() => {
+                                          handleUpdateItem(index, { specDescription: preset.specDescription });
+                                        }}
+                                      >
+                                        {preset.label}
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                            <Textarea
+                              value={item.specDescription || ""}
+                              onChange={(e) => handleUpdateItem(index, { specDescription: e.target.value })}
+                              placeholder="輸入規格細節，或點選左側工具選擇預設"
+                              className="min-h-[32px] text-sm resize-none border-none shadow-none focus-visible:ring-1 flex-1"
+                              rows={1}
+                            />
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell>
                         <Select

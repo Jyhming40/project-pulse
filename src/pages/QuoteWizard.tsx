@@ -330,6 +330,7 @@ export default function QuoteWizard() {
           sortOrder: item.sort_order || 0,
           note: item.note,
           isLumpSum: item.is_lump_sum || false,
+          specDescription: item.spec_description || undefined, // 載入規格描述
         });
       });
       
@@ -542,6 +543,7 @@ export default function QuoteWizard() {
               subtotal: calculatedSubtotal, // 儲存計算後的小計
               sort_order: globalSortOrder++,
               note: item.note || null,
+              spec_description: item.specDescription || null, // 規格描述
             });
           });
         });
