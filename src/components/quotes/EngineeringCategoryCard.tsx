@@ -43,12 +43,13 @@ import {
 import { formatCurrency } from "@/lib/quoteCalculations";
 import { TieredPricingType, getTieredPricingLabel } from "@/lib/tieredPricing";
 import { useTieredPricing } from "@/hooks/useTieredPricing";
-import { useQuoteEngineeringPresets, toCardPresetFormat } from "@/hooks/useQuoteEngineeringPresets";
-import {
-  MODULE_BRACKET_PRESETS,
-  PROTECTION_ENGINEERING_PRESETS,
-  BracketPreset,
-} from "@/config/bracketSpecPresets";
+import { 
+  useQuoteEngineeringPresets, 
+  toCardPresetFormat,
+  PresetCategory,
+  PRESET_CATEGORY_LABELS,
+  PRESET_CATEGORY_ORDER,
+} from "@/hooks/useQuoteEngineeringPresets";
 
 interface EngineeringCategoryCardProps {
   category: EngineeringCategory;
@@ -75,19 +76,18 @@ export default function EngineeringCategoryCard({
   const { calculatePrice } = useTieredPricing();
   
   // 取得資料庫中的預設值
-  const { activePresets } = useQuoteEngineeringPresets();
+  const { activePresets, isLoading: presetsLoading } = useQuoteEngineeringPresets();
   
-  // 將資料庫預設值轉換為可用格式，若無資料庫預設則用靜態預設
-  const dbModuleBracketPresets = toCardPresetFormat(
-    activePresets.filter(p => p.category === 'RACK')
-  );
-  const dbProtectionPresets = toCardPresetFormat(
-    activePresets.filter(p => p.category === 'SAFETY')
-  );
-  
-  // 優先使用資料庫預設，若為空則使用靜態預設
-  const moduleBracketPresets = dbModuleBracketPresets.length > 0 ? dbModuleBracketPresets : MODULE_BRACKET_PRESETS;
-  const protectionPresets = dbProtectionPresets.length > 0 ? dbProtectionPresets : PROTECTION_ENGINEERING_PRESETS;
+  // 將資料庫預設值按類別分組
+  const presetsByCategory = PRESET_CATEGORY_ORDER.reduce((acc, cat) => {
+    const categoryPresets = toCardPresetFormat(
+      activePresets.filter(p => p.category === cat)
+    );
+    if (categoryPresets.length > 0) {
+      acc[cat] = categoryPresets;
+    }
+    return acc;
+  }, {} as Record<PresetCategory, { key: string; label: string; parentLabel?: string; specDescription: string; category: PresetCategory; isSubOption: boolean }[]>);
 
   // 建立計費上下文，包含自訂階梯定價計算器
   const billingContext: BillingContext = {
@@ -242,49 +242,42 @@ export default function EngineeringCategoryCard({
                                   <Wrench className="h-3.5 w-3.5" />
                                 </Button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-72 p-2" align="start">
+                              <PopoverContent className="w-72 p-2 max-h-80 overflow-y-auto" align="start">
                                 <div className="space-y-2">
                                   <p className="text-xs font-medium text-muted-foreground px-2 py-1">
                                     選擇預設規格（將覆蓋現有內容）
                                   </p>
-                                  <div className="space-y-1">
-                                    <p className="text-xs font-semibold text-primary px-2">模組支架</p>
-                                    {moduleBracketPresets.map((preset) => (
-                                      <Button
-                                        key={preset.key}
-                                        variant="ghost"
-                                        size="sm"
-                                        className={`w-full justify-start text-xs h-auto py-1.5 px-2 ${preset.isSubOption ? 'pl-6' : ''}`}
-                                        onClick={() => {
-                                          handleUpdateItem(index, { specDescription: preset.specDescription });
-                                        }}
-                                      >
-                                        <span className="truncate">
-                                          {preset.parentLabel && <span className="text-muted-foreground mr-1">{preset.parentLabel}</span>}
-                                          {preset.label}
-                                        </span>
-                                      </Button>
-                                    ))}
-                                  </div>
-                                  <div className="space-y-1">
-                                    <p className="text-xs font-semibold text-primary px-2">防護工程</p>
-                                    {protectionPresets.map((preset) => (
-                                      <Button
-                                        key={preset.key}
-                                        variant="ghost"
-                                        size="sm"
-                                        className={`w-full justify-start text-xs h-auto py-1.5 px-2 ${preset.isSubOption ? 'pl-6' : ''}`}
-                                        onClick={() => {
-                                          handleUpdateItem(index, { specDescription: preset.specDescription });
-                                        }}
-                                      >
-                                        <span className="truncate">
-                                          {preset.parentLabel && <span className="text-muted-foreground mr-1">{preset.parentLabel}</span>}
-                                          {preset.label}
-                                        </span>
-                                      </Button>
-                                    ))}
-                                  </div>
+                                  {presetsLoading ? (
+                                    <p className="text-xs text-muted-foreground px-2 py-2">載入中...</p>
+                                  ) : Object.keys(presetsByCategory).length === 0 ? (
+                                    <p className="text-xs text-muted-foreground px-2 py-2">
+                                      尚無預設值，請至「系統設定 &gt; 報價」新增
+                                    </p>
+                                  ) : (
+                                    PRESET_CATEGORY_ORDER.filter(cat => presetsByCategory[cat]?.length > 0).map((cat) => (
+                                      <div key={cat} className="space-y-1">
+                                        <p className="text-xs font-semibold text-primary px-2">
+                                          {PRESET_CATEGORY_LABELS[cat]}
+                                        </p>
+                                        {presetsByCategory[cat].map((preset) => (
+                                          <Button
+                                            key={preset.key}
+                                            variant="ghost"
+                                            size="sm"
+                                            className={`w-full justify-start text-xs h-auto py-1.5 px-2 ${preset.isSubOption ? 'pl-6' : ''}`}
+                                            onClick={() => {
+                                              handleUpdateItem(index, { specDescription: preset.specDescription });
+                                            }}
+                                          >
+                                            <span className="truncate">
+                                              {preset.parentLabel && <span className="text-muted-foreground mr-1">{preset.parentLabel}</span>}
+                                              {preset.label}
+                                            </span>
+                                          </Button>
+                                        ))}
+                                      </div>
+                                    ))
+                                  )}
                                 </div>
                               </PopoverContent>
                             </Popover>
