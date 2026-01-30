@@ -93,7 +93,7 @@ export function AISettingsPanel() {
 
   const hasGeminiKey = !!geminiKey?.setting_value;
   const hasOpenaiKey = !!openaiKey?.setting_value;
-  const currentProvider = defaultProvider?.setting_value || 'gemini';
+  const currentProvider = defaultProvider?.setting_value || 'lovable';
 
   return (
     <div className="space-y-4">
@@ -116,6 +116,12 @@ export function AISettingsPanel() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="lovable">
+                  <span className="flex items-center gap-2">
+                    <Brain className="w-4 h-4 text-purple-500" />
+                    Lovable 雲端 AI（內建）
+                  </span>
+                </SelectItem>
                 <SelectItem value="gemini">
                   <span className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-blue-500" />
@@ -131,7 +137,7 @@ export function AISettingsPanel() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              選擇用於生成 AI 洞察報告的預設服務
+              選擇用於生成 AI 洞察報告的預設服務。選擇「Lovable 雲端 AI」無需設定 API Key
             </p>
           </div>
 
