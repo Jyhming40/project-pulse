@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { 
   Brain, 
   Eye, 
@@ -8,7 +8,11 @@ import {
   XCircle, 
   Loader2,
   Sparkles,
-  ExternalLink
+  ExternalLink,
+  RefreshCw,
+  AlertTriangle,
+  Zap,
+  Clock
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -25,6 +29,47 @@ import {
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAISettings } from '@/hooks/useAISettings';
+import { useAIHealthCheck, AIHealthResult } from '@/hooks/useAIHealthCheck';
+import { cn } from '@/lib/utils';
+
+function HealthStatusBadge({ result }: { result?: AIHealthResult }) {
+  if (!result) return null;
+
+  const config = {
+    healthy: {
+      icon: CheckCircle2,
+      label: "正常",
+      className: "text-green-600 border-green-200 bg-green-50 dark:bg-green-950/30",
+    },
+    error: {
+      icon: XCircle,
+      label: result.message,
+      className: "text-red-600 border-red-200 bg-red-50 dark:bg-red-950/30",
+    },
+    no_key: {
+      icon: XCircle,
+      label: "未設定",
+      className: "text-muted-foreground border-muted",
+    },
+    quota_exceeded: {
+      icon: AlertTriangle,
+      label: "額度耗盡",
+      className: "text-amber-600 border-amber-200 bg-amber-50 dark:bg-amber-950/30",
+    },
+  };
+
+  const { icon: Icon, label, className } = config[result.status];
+
+  return (
+    <Badge variant="outline" className={cn("gap-1", className)}>
+      <Icon className="w-3 h-3" />
+      {label}
+      {result.responseTime !== undefined && result.status === "healthy" && (
+        <span className="text-[10px] opacity-70">({result.responseTime}ms)</span>
+      )}
+    </Badge>
+  );
+}
 
 export function AISettingsPanel() {
   const { 
@@ -36,12 +81,27 @@ export function AISettingsPanel() {
     isUpdating 
   } = useAISettings();
 
+  const {
+    isChecking,
+    results,
+    lastChecked,
+    checkHealth,
+    getStatusForProvider,
+  } = useAIHealthCheck();
+
   const [geminiValue, setGeminiValue] = useState('');
   const [openaiValue, setOpenaiValue] = useState('');
   const [showGemini, setShowGemini] = useState(false);
   const [showOpenai, setShowOpenai] = useState(false);
   const [editingGemini, setEditingGemini] = useState(false);
   const [editingOpenai, setEditingOpenai] = useState(false);
+
+  // Auto check health on mount
+  useEffect(() => {
+    if (!isLoading) {
+      checkHealth();
+    }
+  }, [isLoading, checkHealth]);
 
   const handleSaveGemini = () => {
     if (!geminiValue.trim()) return;
@@ -52,6 +112,8 @@ export function AISettingsPanel() {
     });
     setEditingGemini(false);
     setGeminiValue('');
+    // Re-check health after saving
+    setTimeout(() => checkHealth('gemini'), 500);
   };
 
   const handleSaveOpenai = () => {
@@ -63,6 +125,8 @@ export function AISettingsPanel() {
     });
     setEditingOpenai(false);
     setOpenaiValue('');
+    // Re-check health after saving
+    setTimeout(() => checkHealth('openai'), 500);
   };
 
   const handleToggleGemini = (enabled: boolean) => {
@@ -95,19 +159,92 @@ export function AISettingsPanel() {
   const hasOpenaiKey = !!openaiKey?.setting_value;
   const currentProvider = defaultProvider?.setting_value || 'lovable';
 
+  const geminiHealth = getStatusForProvider('gemini');
+  const openaiHealth = getStatusForProvider('openai');
+  const lovableHealth = getStatusForProvider('lovable');
+
   return (
     <div className="space-y-4">
       <Card>
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Brain className="w-4 h-4" />
-            AI 服務設定
-          </CardTitle>
-          <CardDescription>
-            設定 AI 洞察報告所使用的 API 金鑰，支援 Google Gemini 與 OpenAI
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Brain className="w-4 h-4" />
+                AI 服務設定
+              </CardTitle>
+              <CardDescription>
+                設定 AI 洞察報告所使用的 API 金鑰，支援 Google Gemini 與 OpenAI
+              </CardDescription>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => checkHealth()}
+              disabled={isChecking}
+              className="gap-1.5"
+            >
+              <RefreshCw className={cn("w-4 h-4", isChecking && "animate-spin")} />
+              檢測狀態
+            </Button>
+          </div>
+          {lastChecked && (
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-2">
+              <Clock className="w-3 h-3" />
+              上次檢測：{lastChecked.toLocaleTimeString('zh-TW')}
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Health Overview */}
+          {results.length > 0 && (
+            <div className="grid grid-cols-3 gap-3">
+              {/* Lovable Cloud */}
+              <div className={cn(
+                "p-3 rounded-lg border text-center space-y-1",
+                lovableHealth?.status === "healthy" ? "border-green-200 bg-green-50/50 dark:bg-green-950/20" :
+                lovableHealth?.status === "quota_exceeded" ? "border-amber-200 bg-amber-50/50 dark:bg-amber-950/20" :
+                "border-red-200 bg-red-50/50 dark:bg-red-950/20"
+              )}>
+                <div className="flex items-center justify-center gap-1.5">
+                  <Brain className="w-4 h-4 text-purple-500" />
+                  <span className="text-sm font-medium">Lovable 雲端</span>
+                </div>
+                <HealthStatusBadge result={lovableHealth} />
+              </div>
+
+              {/* Gemini */}
+              <div className={cn(
+                "p-3 rounded-lg border text-center space-y-1",
+                geminiHealth?.status === "healthy" ? "border-green-200 bg-green-50/50 dark:bg-green-950/20" :
+                geminiHealth?.status === "quota_exceeded" ? "border-amber-200 bg-amber-50/50 dark:bg-amber-950/20" :
+                geminiHealth?.status === "no_key" ? "border-muted bg-muted/30" :
+                "border-red-200 bg-red-50/50 dark:bg-red-950/20"
+              )}>
+                <div className="flex items-center justify-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-blue-500" />
+                  <span className="text-sm font-medium">Gemini</span>
+                </div>
+                <HealthStatusBadge result={geminiHealth} />
+              </div>
+
+              {/* OpenAI */}
+              <div className={cn(
+                "p-3 rounded-lg border text-center space-y-1",
+                openaiHealth?.status === "healthy" ? "border-green-200 bg-green-50/50 dark:bg-green-950/20" :
+                openaiHealth?.status === "quota_exceeded" ? "border-amber-200 bg-amber-50/50 dark:bg-amber-950/20" :
+                openaiHealth?.status === "no_key" ? "border-muted bg-muted/30" :
+                "border-red-200 bg-red-50/50 dark:bg-red-950/20"
+              )}>
+                <div className="flex items-center justify-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-green-500" />
+                  <span className="text-sm font-medium">OpenAI</span>
+                </div>
+                <HealthStatusBadge result={openaiHealth} />
+              </div>
+            </div>
+          )}
+
           {/* Default Provider Selection */}
           <div className="space-y-2">
             <Label>預設 AI 服務</Label>
@@ -120,18 +257,33 @@ export function AISettingsPanel() {
                   <span className="flex items-center gap-2">
                     <Brain className="w-4 h-4 text-purple-500" />
                     Lovable 雲端 AI（內建）
+                    {lovableHealth?.status === "healthy" && (
+                      <Zap className="w-3 h-3 text-green-500" />
+                    )}
                   </span>
                 </SelectItem>
                 <SelectItem value="gemini">
                   <span className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-blue-500" />
                     Google Gemini
+                    {geminiHealth?.status === "healthy" && (
+                      <Zap className="w-3 h-3 text-green-500" />
+                    )}
+                    {geminiHealth?.status === "quota_exceeded" && (
+                      <AlertTriangle className="w-3 h-3 text-amber-500" />
+                    )}
                   </span>
                 </SelectItem>
                 <SelectItem value="openai">
                   <span className="flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-green-500" />
                     OpenAI ChatGPT
+                    {openaiHealth?.status === "healthy" && (
+                      <Zap className="w-3 h-3 text-green-500" />
+                    )}
+                    {openaiHealth?.status === "quota_exceeded" && (
+                      <AlertTriangle className="w-3 h-3 text-amber-500" />
+                    )}
                   </span>
                 </SelectItem>
               </SelectContent>
@@ -157,6 +309,9 @@ export function AISettingsPanel() {
                     <XCircle className="w-3 h-3" />
                     未設定
                   </Badge>
+                )}
+                {hasGeminiKey && geminiHealth && geminiHealth.status !== "no_key" && (
+                  <HealthStatusBadge result={geminiHealth} />
                 )}
               </div>
               {hasGeminiKey && (
@@ -247,6 +402,9 @@ export function AISettingsPanel() {
                     未設定
                   </Badge>
                 )}
+                {hasOpenaiKey && openaiHealth && openaiHealth.status !== "no_key" && (
+                  <HealthStatusBadge result={openaiHealth} />
+                )}
               </div>
               {hasOpenaiKey && (
                 <Switch
@@ -323,7 +481,7 @@ export function AISettingsPanel() {
             <Brain className="w-4 h-4" />
             <AlertDescription className="text-xs">
               API 金鑰將安全儲存於資料庫中。設定完成後，AI 洞察報告將使用您選擇的服務進行分析。
-              若兩個服務都已設定，系統會使用「預設 AI 服務」的設定。
+              若兩個服務都已設定，系統會使用「預設 AI 服務」的設定。若額度耗盡，將自動切換至 Lovable 雲端 AI 備援。
             </AlertDescription>
           </Alert>
         </CardContent>
