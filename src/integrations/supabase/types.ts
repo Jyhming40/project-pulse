@@ -2480,6 +2480,54 @@ export type Database = {
           },
         ]
       }
+      quote_engineering_presets: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          is_sub_option: boolean | null
+          item_name: string
+          parent_label: string | null
+          preset_key: string
+          sort_order: number | null
+          spec_description: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_sub_option?: boolean | null
+          item_name: string
+          parent_label?: string | null
+          preset_key: string
+          sort_order?: number | null
+          spec_description?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_sub_option?: boolean | null
+          item_name?: string
+          parent_label?: string | null
+          preset_key?: string
+          sort_order?: number | null
+          spec_description?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       quote_engineering_templates: {
         Row: {
           category_code: string
