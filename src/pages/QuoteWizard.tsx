@@ -282,52 +282,50 @@ export default function QuoteWizard() {
           });
         }
         
-        // 解析 item_code 以還原計費方式
-        const itemCode = item.item_code || '';
-        let billingMethod: string = 'per_kw'; // 預設值
-        let brokerageRate: number | undefined;
-        let tieredPricingType: string | undefined;
+        // 優先使用新欄位 billing_method，若無則解析 item_code (向後相容)
+        let billingMethod: string = item.billing_method || 'per_kw';
+        let brokerageRateValue: number | undefined = item.brokerage_rate ? Number(item.brokerage_rate) : undefined;
+        let tieredPricingTypeValue: string | undefined = item.tiered_pricing_type || undefined;
         
-        // 檢查特殊計費方式 (格式: billing_method 或 billing_method:params)
-        if (itemCode.startsWith('stamp_duty')) {
-          billingMethod = 'stamp_duty';
-        } else if (itemCode.startsWith('corp_tax')) {
-          billingMethod = 'corp_tax';
-        } else if (itemCode.startsWith('brokerage')) {
-          billingMethod = 'brokerage';
-          const parts = itemCode.split(':');
-          if (parts.length > 1) {
-            brokerageRate = parseFloat(parts[1]) || 0;
+        // 向後相容：解析舊的 item_code 格式
+        if (!item.billing_method) {
+          const itemCode = item.item_code || '';
+          if (itemCode.startsWith('stamp_duty')) {
+            billingMethod = 'stamp_duty';
+          } else if (itemCode.startsWith('corp_tax')) {
+            billingMethod = 'corp_tax';
+          } else if (itemCode.startsWith('brokerage')) {
+            billingMethod = 'brokerage';
+            const parts = itemCode.split(':');
+            if (parts.length > 1) {
+              brokerageRateValue = parseFloat(parts[1]) || 0;
+            }
+          } else if (itemCode.startsWith('tiered')) {
+            billingMethod = 'tiered';
+            const parts = itemCode.split(':');
+            if (parts.length > 1) {
+              tieredPricingTypeValue = parts[1];
+            }
+          } else if (itemCode === 'per_unit') {
+            billingMethod = 'per_unit';
+          } else if (item.is_lump_sum) {
+            billingMethod = 'lump_sum';
           }
-        } else if (itemCode.startsWith('tiered')) {
-          billingMethod = 'tiered';
-          const parts = itemCode.split(':');
-          if (parts.length > 1) {
-            tieredPricingType = parts[1];
-          }
-        } else if (itemCode === 'per_unit') {
-          billingMethod = 'per_unit';
-        } else if (item.is_lump_sum) {
-          billingMethod = 'lump_sum';
-        } else {
-          billingMethod = 'per_kw';
         }
         
         categoryMap.get(key)!.items.push({
           id: item.id,
           categoryCode: item.category_code,
           categoryName: item.category_name,
-          itemCode: ['stamp_duty', 'corp_tax', 'brokerage', 'tiered', 'per_unit'].some(m => itemCode.startsWith(m)) 
-            ? undefined 
-            : item.item_code,
+          itemCode: item.item_code || undefined,
           itemName: item.item_name,
           unitPrice: Number(item.unit_price) || 0,
           unit: item.unit || "式",
           quantity: Number(item.quantity) || 1,
           billingMethod: billingMethod as any,
-          tieredPricingType: tieredPricingType || item.tiered_pricing_type || undefined,
+          tieredPricingType: tieredPricingTypeValue as any,
           lumpSumAmount: item.lump_sum_amount ? Number(item.lump_sum_amount) : undefined,
-          brokerageRate,
+          brokerageRate: brokerageRateValue,
           subtotal: Number(item.subtotal) || 0,
           sortOrder: item.sort_order || 0,
           note: item.note,
@@ -501,35 +499,47 @@ export default function QuoteWizard() {
         // Delete existing engineering items
         await supabase.from("quote_engineering_items" as any).delete().eq("quote_id", quoteId);
         
-        // Insert new engineering items
+        // Insert new engineering items with correctly calculated subtotals
         const allItems: any[] = [];
         let globalSortOrder = 0;
         
+        // 建立計費上下文
+        const capacityKwp = formData.capacityKwp || 0;
+        const pricePerKwp = formData.pricePerKwp || 0;
+        const taxRate = formData.taxRate || 0.05;
+        const billingContext: BillingContext = {
+          capacityKwp,
+          pricePerKwp,
+          taxRate,
+        };
+        
         console.log("Saving engineering items, categories:", categories.length);
+        console.log("Billing context:", { capacityKwp, pricePerKwp, taxRate });
         
         categories.forEach((category) => {
           console.log(`Category: ${category.categoryName}, items: ${category.items.length}`);
           category.items.forEach((item) => {
-            // 將新計費方式映射為資料庫可支援的格式
-            // stamp_duty, corp_tax, brokerage 等自動計算項目使用 is_lump_sum = false
-            // 並通過 item_code 來區分計費方式
             const billingMethod = item.billingMethod || 'per_kw';
-            const isAutoCalc = ['stamp_duty', 'corp_tax', 'brokerage'].includes(billingMethod);
+            
+            // 計算正確的 subtotal
+            const calculatedSubtotal = calculateItemSubtotal(item, capacityKwp, billingContext);
             
             allItems.push({
               quote_id: quoteId,
               category_code: category.categoryCode,
               category_name: category.categoryName,
-              // 使用 item_code 儲存計費方式識別碼
-              item_code: isAutoCalc || billingMethod === 'tiered' 
-                ? `${billingMethod}${item.brokerageRate ? `:${item.brokerageRate}` : ''}${item.tieredPricingType ? `:${item.tieredPricingType}` : ''}`
-                : (billingMethod === 'per_unit' ? 'per_unit' : (item.itemCode || null)),
+              item_code: item.itemCode || null,
               item_name: item.itemName,
               unit_price: item.unitPrice,
               unit: item.unit || "式",
               quantity: item.quantity,
               is_lump_sum: billingMethod === 'lump_sum',
               lump_sum_amount: item.lumpSumAmount || null,
+              // 新增欄位
+              billing_method: billingMethod,
+              tiered_pricing_type: item.tieredPricingType || null,
+              brokerage_rate: item.brokerageRate || null,
+              subtotal: calculatedSubtotal, // 儲存計算後的小計
               sort_order: globalSortOrder++,
               note: item.note || null,
             });
