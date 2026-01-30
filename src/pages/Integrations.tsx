@@ -14,7 +14,8 @@ import {
   Mail,
   Send,
   RefreshCw,
-  TestTube
+  TestTube,
+  Brain
 } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +26,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { DriveConnectionPanel } from '@/components/engineering';
 import { DriveSettingsPanel } from '@/components/DriveSettingsPanel';
+import { AISettingsPanel } from '@/components/integrations/AISettingsPanel';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import {
@@ -172,6 +174,17 @@ export default function Integrations() {
             <DriveConnectionPanel />
             <DriveSettingsPanel />
           </div>
+        </section>
+
+        <Separator />
+
+        {/* AI Service Integration */}
+        <section>
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <Brain className="w-5 h-5" />
+            AI 服務整合
+          </h2>
+          <AISettingsPanel />
         </section>
 
         <Separator />
