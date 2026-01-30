@@ -84,8 +84,10 @@ export function QuotePresetsPanel() {
   };
 
   const handleAdd = () => {
+    // 自動產生項目代碼：類別_時間戳
+    const autoKey = `${activeCategory}_${Date.now()}`;
     createPreset.mutate(
-      { ...newPreset, category: activeCategory },
+      { ...newPreset, category: activeCategory, preset_key: autoKey },
       {
         onSuccess: () => {
           setIsAddDialogOpen(false);
@@ -191,16 +193,6 @@ export function QuotePresetsPanel() {
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div className="space-y-2">
-                    <Label htmlFor="preset_key">項目代碼 *</Label>
-                    <Input
-                      id="preset_key"
-                      value={newPreset.preset_key}
-                      onChange={(e) => setNewPreset({ ...newPreset, preset_key: e.target.value })}
-                      placeholder="如: galvanized_steel_bracket"
-                    />
-                    <p className="text-xs text-muted-foreground">用於系統辨識，僅限英文、數字、底線</p>
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="item_name">項目名稱 *</Label>
                     <Input
                       id="item_name"
@@ -244,7 +236,7 @@ export function QuotePresetsPanel() {
                   </Button>
                   <Button
                     onClick={handleAdd}
-                    disabled={!newPreset.preset_key || !newPreset.item_name || createPreset.isPending}
+                    disabled={!newPreset.item_name || createPreset.isPending}
                   >
                     新增
                   </Button>
