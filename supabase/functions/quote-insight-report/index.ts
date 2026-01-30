@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -27,6 +28,142 @@ interface QuoteData {
   }>;
 }
 
+interface AISettings {
+  setting_key: string;
+  setting_value: string | null;
+  is_enabled: boolean;
+}
+
+async function getAISettings(supabaseClient: any): Promise<{
+  provider: string;
+  geminiKey: string | null;
+  openaiKey: string | null;
+}> {
+  const { data, error } = await supabaseClient
+    .from('ai_settings')
+    .select('setting_key, setting_value, is_enabled');
+  
+  if (error) {
+    console.error("Failed to fetch AI settings:", error);
+    return { provider: 'lovable', geminiKey: null, openaiKey: null };
+  }
+  
+  const settings = data as AISettings[];
+  const defaultProvider = settings.find(s => s.setting_key === 'default_ai_provider');
+  const geminiSetting = settings.find(s => s.setting_key === 'gemini_api_key');
+  const openaiSetting = settings.find(s => s.setting_key === 'openai_api_key');
+  
+  const geminiKey = geminiSetting?.is_enabled ? geminiSetting?.setting_value : null;
+  const openaiKey = openaiSetting?.is_enabled ? openaiSetting?.setting_value : null;
+  
+  let provider = defaultProvider?.setting_value || 'gemini';
+  
+  // If selected provider has no key, try the other one, fallback to lovable
+  if (provider === 'gemini' && !geminiKey) {
+    provider = openaiKey ? 'openai' : 'lovable';
+  } else if (provider === 'openai' && !openaiKey) {
+    provider = geminiKey ? 'gemini' : 'lovable';
+  }
+  
+  return { provider, geminiKey, openaiKey };
+}
+
+async function callGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
+  const response = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [
+          { role: "user", parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }
+        ],
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 1500,
+        },
+      }),
+    }
+  );
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("Gemini API error:", response.status, errorText);
+    throw new Error(`Gemini API error: ${response.status}`);
+  }
+  
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || "無法生成洞察報告";
+}
+
+async function callOpenAI(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 1500,
+      temperature: 0.3,
+    }),
+  });
+  
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("OpenAI API error:", response.status, errorText);
+    throw new Error(`OpenAI API error: ${response.status}`);
+  }
+  
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "無法生成洞察報告";
+}
+
+async function callLovableGateway(systemPrompt: string, userPrompt: string): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  
+  if (!LOVABLE_API_KEY) {
+    throw new Error("LOVABLE_API_KEY is not configured");
+  }
+  
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      max_tokens: 1500,
+      temperature: 0.3,
+    }),
+  });
+  
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error("RATE_LIMIT");
+    }
+    if (response.status === 402) {
+      throw new Error("PAYMENT_REQUIRED");
+    }
+    const errorText = await response.text();
+    console.error("AI gateway error:", response.status, errorText);
+    throw new Error("AI gateway error");
+  }
+  
+  const data = await response.json();
+  return data.choices?.[0]?.message?.content || "無法生成洞察報告";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -34,11 +171,15 @@ serve(async (req) => {
 
   try {
     const { quoteData } = await req.json() as { quoteData: QuoteData };
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
+    // Create Supabase client with service role to read AI settings
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+    
+    // Get AI settings from database
+    const { provider, geminiKey, openaiKey } = await getAISettings(supabaseClient);
+    console.log(`Using AI provider: ${provider}`);
 
     // Calculate cost breakdown percentages
     const totalCost = quoteData.totalCost || 1;
@@ -111,46 +252,53 @@ ${historyContext}
 
 請提供專業洞察報告：`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
-        max_tokens: 1500,
-        temperature: 0.3,
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
+    let content: string;
+    let usedProvider = provider;
+    
+    try {
+      if (provider === 'gemini' && geminiKey) {
+        content = await callGemini(geminiKey, systemPrompt, userPrompt);
+      } else if (provider === 'openai' && openaiKey) {
+        content = await callOpenAI(openaiKey, systemPrompt, userPrompt);
+      } else {
+        content = await callLovableGateway(systemPrompt, userPrompt);
+        usedProvider = 'lovable';
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error";
+      
+      if (errorMessage === "RATE_LIMIT") {
         return new Response(JSON.stringify({ error: "AI 服務請求過於頻繁，請稍後再試。" }), {
           status: 429,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (response.status === 402) {
+      if (errorMessage === "PAYMENT_REQUIRED") {
         return new Response(JSON.stringify({ error: "AI 服務額度已用完，請聯繫管理員。" }), {
           status: 402,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const errorText = await response.text();
-      console.error("AI gateway error:", response.status, errorText);
-      return new Response(JSON.stringify({ error: "AI 服務暫時無法使用" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      
+      // Try fallback to lovable gateway if custom API fails
+      if (provider !== 'lovable') {
+        console.log(`${provider} API failed, falling back to Lovable gateway`);
+        try {
+          content = await callLovableGateway(systemPrompt, userPrompt);
+          usedProvider = 'lovable (fallback)';
+        } catch (fallbackError) {
+          return new Response(JSON.stringify({ error: "AI 服務暫時無法使用" }), {
+            status: 500,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+      } else {
+        return new Response(JSON.stringify({ error: "AI 服務暫時無法使用" }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
     }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || "無法生成洞察報告";
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -159,6 +307,7 @@ ${historyContext}
         pricePosition,
         grossMarginRate: quoteData.grossMarginRate,
         hasHistoricalData: !!quoteData.historicalQuotes?.length,
+        provider: usedProvider,
       }
     }), {
       status: 200,
