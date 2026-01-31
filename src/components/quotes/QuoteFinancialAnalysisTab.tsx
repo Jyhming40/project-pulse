@@ -26,10 +26,15 @@ import {
   Info,
   PiggyBank,
   Building2,
+  ToggleLeft,
 } from "lucide-react";
 import { QuoteParams, formatCurrency, formatPercentage } from "@/lib/quoteCalculations";
 import { Plot } from "@/lib/plotly";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+
+// 收益模式類型
+type RevenueMode = 'self_consumption' | 'feed_in_tariff';
 
 interface QuoteFinancialAnalysisTabProps {
   formData: QuoteParams;
@@ -37,6 +42,49 @@ interface QuoteFinancialAnalysisTabProps {
     projections: any[];
     summary: any;
   } | null;
+}
+
+// 根據收益模式取得對應用語
+function getRevenueLabels(mode: RevenueMode) {
+  if (mode === 'feed_in_tariff') {
+    return {
+      modeName: '躉售電力',
+      modeDescription: '將太陽能發電售予台電公司',
+      annualRevenue: '每年躉售收入',
+      totalRevenue: '20年躉售總收入',
+      rateLabel: '躉購費率',
+      rateDescription: '本年度躉購費率 (含高效能加成)',
+      rateUnit: '元/度',
+      chartLabel: '每年躉售收入',
+      netProfitLabel: '20年躉售淨利',
+      savingsLabel: '累計躉售收入',
+      periodCashFlowLabel: '每年躉售收入',
+      costComparisonTitle: '太陽光電每度電成本分析',
+      costComparisonDescription: '自發電成本與躉購費率比較',
+      tableHeader: '每年躉售收入 (A)',
+      tableHeaderCumulative: '累計躉售收入',
+      footnote2: '「躉售收入評估」欄位數據，係依據本年度公告躉購費率評估。',
+    };
+  }
+  
+  return {
+    modeName: '自用節電',
+    modeDescription: '自發自用節省電費支出',
+    annualRevenue: '每年節省電費',
+    totalRevenue: '20年節省電費總額',
+    rateLabel: '目前每度電費',
+    rateDescription: '參考用戶電費帳單平均電價',
+    rateUnit: '元/度',
+    chartLabel: '每年節省電費',
+    netProfitLabel: '20年節省淨額',
+    savingsLabel: '累計節省電費',
+    periodCashFlowLabel: '每年節省電費',
+    costComparisonTitle: '太陽光電每度電成本分析',
+    costComparisonDescription: '自發電成本與台電電價比較',
+    tableHeader: '每年節省電費 (A)',
+    tableHeaderCumulative: '累計節省電費',
+    footnote2: '「節省電力評估」欄位數據，係參考用戶提供之電費帳單平均數據評估。',
+  };
 }
 
 // 自投資模式的年度預測
@@ -191,11 +239,19 @@ export default function QuoteFinancialAnalysisTab({
   const [showTable, setShowTable] = useState(true);
   const [roofRentalRate, setRoofRentalRate] = useState(12); // 預設 12%
   
+  // 收益模式切換
+  const [revenueMode, setRevenueMode] = useState<RevenueMode>('self_consumption');
+  const labels = getRevenueLabels(revenueMode);
+  
   // 可調整的條件設定參數
   const [sunshineHours, setSunshineHours] = useState(formData.sunshineHours || 3.2);
   const [sunshineDays, setSunshineDays] = useState(365);
   const [electricityRate, setElectricityRate] = useState(formData.tariffRate || 4.5);
+  const [fitRate, setFitRate] = useState(formData.tariffRate || 4.2); // 躉購費率
   const [insuranceRate, setInsuranceRate] = useState((formData.insuranceRate || 0.0055) * 100);
+  
+  // 根據模式選擇使用的費率
+  const effectiveRate = revenueMode === 'feed_in_tariff' ? fitRate : electricityRate;
   
   // 計算投資總額（從 formData 取得）
   const totalInvestment = useMemo(() => {
@@ -206,9 +262,9 @@ export default function QuoteFinancialAnalysisTab({
   const adjustedParams = useMemo(() => ({
     ...formData,
     sunshineHours,
-    tariffRate: electricityRate,
+    tariffRate: effectiveRate,
     insuranceRate: insuranceRate / 100,
-  }), [formData, sunshineHours, electricityRate, insuranceRate]);
+  }), [formData, sunshineHours, effectiveRate, insuranceRate]);
   
   // 計算自投資結果 - 考慮自定義的日照天數
   const selfInvestResult = useMemo(() => {
@@ -250,6 +306,43 @@ export default function QuoteFinancialAnalysisTab({
 
   return (
     <div className="space-y-6">
+      {/* 收益模式切換 */}
+      <Card className="border-2 border-primary/20">
+        <CardContent className="pt-4 pb-4">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <ToggleLeft className="h-5 w-5 text-primary" />
+              <div>
+                <h3 className="font-semibold">收益模式</h3>
+                <p className="text-sm text-muted-foreground">{labels.modeDescription}</p>
+              </div>
+            </div>
+            <ToggleGroup 
+              type="single" 
+              value={revenueMode} 
+              onValueChange={(v) => v && setRevenueMode(v as RevenueMode)}
+              className="justify-start"
+            >
+              <ToggleGroupItem 
+                value="self_consumption" 
+                aria-label="自用節電模式"
+                className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-4"
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                自用節電
+              </ToggleGroupItem>
+              <ToggleGroupItem 
+                value="feed_in_tariff" 
+                aria-label="躉售電力模式"
+                className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-4"
+              >
+                <DollarSign className="h-4 w-4 mr-2" />
+                躉售電力
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+        </CardContent>
+      </Card>
       {/* 條件設定 - 可編輯 */}
       <Card className="bg-muted/30">
         <CardHeader className="pb-3">
@@ -303,18 +396,37 @@ export default function QuoteFinancialAnalysisTab({
               </div>
             </div>
             
-            {/* 每度電費 - 可編輯 */}
+            {/* 費率設定 - 根據模式切換 */}
             <div className="space-y-1">
-              <Label htmlFor="electricityRate" className="text-muted-foreground text-xs">目前每度電費</Label>
+              <Label htmlFor="rateInput" className="text-muted-foreground text-xs">
+                {labels.rateLabel}
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-3 w-3 inline ml-1 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="text-xs max-w-48">{labels.rateDescription}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </Label>
               <div className="flex items-center gap-1">
                 <span className="text-primary font-semibold">$</span>
                 <Input
-                  id="electricityRate"
+                  id="rateInput"
                   type="number"
                   step="0.001"
                   min="0"
-                  value={electricityRate}
-                  onChange={(e) => setElectricityRate(parseFloat(e.target.value) || 0)}
+                  value={revenueMode === 'feed_in_tariff' ? fitRate : electricityRate}
+                  onChange={(e) => {
+                    const val = parseFloat(e.target.value) || 0;
+                    if (revenueMode === 'feed_in_tariff') {
+                      setFitRate(val);
+                    } else {
+                      setElectricityRate(val);
+                    }
+                  }}
                   className="h-8 w-24 text-right font-semibold text-primary"
                 />
               </div>
@@ -411,7 +523,7 @@ export default function QuoteFinancialAnalysisTab({
           <CardContent className="pt-5 pb-4">
             <div className="flex items-center gap-2 mb-2">
               <PiggyBank className="w-4 h-4 text-muted-foreground" />
-              <span className="text-sm text-muted-foreground">20年節省淨額</span>
+              <span className="text-sm text-muted-foreground">{labels.netProfitLabel}</span>
             </div>
             <p className={`text-2xl font-bold ${summary.netProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
               {formatCurrency(summary.netProfit, 0)}
@@ -493,7 +605,9 @@ export default function QuoteFinancialAnalysisTab({
               </div>
               <Separator className="w-full my-4" />
               <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-1">相較台電電價 (${summary.gridRate.toFixed(3)}/度)</p>
+                <p className="text-sm text-muted-foreground mb-1">
+                  相較{revenueMode === 'feed_in_tariff' ? '躉購費率' : '台電電價'} (${summary.gridRate.toFixed(3)}/度)
+                </p>
                 <div className="flex items-center justify-center gap-2">
                   <p className="text-4xl font-bold text-green-600">{summary.savingsVsGrid.toFixed(1)}%</p>
                   <TooltipProvider>
@@ -502,12 +616,16 @@ export default function QuoteFinancialAnalysisTab({
                         <Info className="h-4 w-4 text-muted-foreground" />
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>自發電成本僅為台電電價的 {summary.savingsVsGrid.toFixed(1)}%</p>
+                        <p>自發電成本僅為{revenueMode === 'feed_in_tariff' ? '躉購費率' : '台電電價'}的 {summary.savingsVsGrid.toFixed(1)}%</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </div>
-                <p className="text-sm text-muted-foreground mt-2">節省 {(100 - summary.savingsVsGrid).toFixed(1)}% 電費成本</p>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {revenueMode === 'feed_in_tariff' 
+                    ? `每度電成本僅 ${summary.savingsVsGrid.toFixed(1)}%，獲利空間大` 
+                    : `節省 ${(100 - summary.savingsVsGrid).toFixed(1)}% 電費成本`}
+                </p>
               </div>
             </div>
           </div>
@@ -557,7 +675,7 @@ export default function QuoteFinancialAnalysisTab({
               <h4 className="font-medium text-sm text-muted-foreground">收益資訊</h4>
               <div className="space-y-2">
                 <div className="flex justify-between">
-                  <span>20年節省淨額 (總節省電費-總持有成本)</span>
+                  <span>{labels.netProfitLabel} ({labels.totalRevenue}-總持有成本)</span>
                   <span className={`font-mono font-semibold ${summary.netProfit >= 0 ? 'text-green-600' : 'text-destructive'}`}>
                     {formatCurrency(summary.netProfit, 0)}
                   </span>
@@ -660,7 +778,7 @@ export default function QuoteFinancialAnalysisTab({
                 x: years,
                 y: savings,
                 type: "bar",
-                name: "每年節省電費",
+                name: labels.chartLabel,
                 marker: { color: "hsl(173, 58%, 45%)" },
               },
               {
@@ -732,8 +850,8 @@ export default function QuoteFinancialAnalysisTab({
                     <TableRow>
                       <TableHead className="text-center w-16">年數</TableHead>
                       <TableHead className="text-right">預估發電度數</TableHead>
-                      <TableHead className="text-right">每年節省電費 (A)</TableHead>
-                      <TableHead className="text-right">累計節省電費</TableHead>
+                      <TableHead className="text-right">{labels.tableHeader}</TableHead>
+                      <TableHead className="text-right">{labels.tableHeaderCumulative}</TableHead>
                       <TableHead className="text-center w-20">保固費%</TableHead>
                       <TableHead className="text-right">每年保固費 (C)</TableHead>
                       <TableHead className="text-right">保險費用 (D)</TableHead>
@@ -806,7 +924,7 @@ export default function QuoteFinancialAnalysisTab({
               {/* 說明文字 */}
               <div className="p-4 bg-muted/30 text-xs text-muted-foreground space-y-1 border-t">
                 <p>1、「預估發電度數」欄位數據，係假設模組效率每年衰減 {((formData.annualDegradationRate || 0.01) * 100).toFixed(0)}% 評估。</p>
-                <p>2、「節省電力評估」欄位數據，係參考用戶提供之電費帳單平均數據評估。</p>
+                <p>2、{labels.footnote2}</p>
                 <p>3、「保固費」欄位數據，係以本系統台電費為依據：1~5年全系統保固、6~10年電費之{formData.maintenanceRate6To10 || 6}%、11~15年電費之{formData.maintenanceRate11To15 || 7}%、16~20年電費之{formData.maintenanceRate16To20 || 8}%。</p>
                 <p>4、「保險費用」欄位數據，係以總工程款{((formData.insuranceRate || 0.0055) * 100).toFixed(2)}%預估，實際依產物保險公司依據產業、環境現況評估。</p>
               </div>
