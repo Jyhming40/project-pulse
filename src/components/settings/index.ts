@@ -6,3 +6,4 @@ export { StageResponsibilitiesPanel } from './StageResponsibilitiesPanel';
 export { SystemOptionsPanel } from './SystemOptionsPanel';
 export { default as TieredPricingPanel } from './TieredPricingPanel';
 export { QuotePresetsPanel } from './QuotePresetsPanel';
+export { default as FitRatesPanel } from './FitRatesPanel';

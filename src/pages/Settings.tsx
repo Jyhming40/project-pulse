@@ -27,6 +27,7 @@ import { DepartmentsPanel } from '@/components/settings/DepartmentsPanel';
 import { ProcessStagesPanel } from '@/components/settings/ProcessStagesPanel';
 import { StageResponsibilitiesPanel } from '@/components/settings/StageResponsibilitiesPanel';
 import { TieredPricingPanel, QuotePresetsPanel } from '@/components/settings';
+import FitRatesPanel from '@/components/settings/FitRatesPanel';
 import { SettingsBackupPanel } from '@/components/settings/SettingsBackupPanel';
 
 export default function Settings() {
@@ -137,8 +138,9 @@ export default function Settings() {
           <StageResponsibilitiesPanel />
         </TabsContent>
 
-        <TabsContent value="pricing" className="mt-6">
+        <TabsContent value="pricing" className="mt-6 space-y-6">
           <TieredPricingPanel />
+          <FitRatesPanel />
         </TabsContent>
 
         <TabsContent value="quotePresets" className="mt-6">
