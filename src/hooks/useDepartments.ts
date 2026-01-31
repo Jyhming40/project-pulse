@@ -11,6 +11,12 @@ export interface Department {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  // Bank account information
+  bank_name: string | null;
+  bank_branch: string | null;
+  bank_code: string | null;
+  bank_account_number: string | null;
+  bank_account_name: string | null;
 }
 
 export function useDepartments() {
@@ -25,7 +31,8 @@ export function useDepartments() {
         .order('sort_order', { ascending: true });
       
       if (error) throw error;
-      return data as Department[];
+      // Cast to unknown first to handle extended fields not yet in generated types
+      return (data || []) as unknown as Department[];
     },
   });
 

@@ -95,6 +95,14 @@ interface QuotationOutputEditorProps {
   categories: EngineeringCategory[];
   modules: ModuleItem[];
   inverters: InverterItem[];
+  // 銀行帳戶資訊（來自業務單位/部門）
+  bankInfo?: {
+    bankName?: string;
+    bankBranch?: string;
+    bankCode?: string;
+    bankAccountNumber?: string;
+    bankAccountName?: string;
+  };
   // 儲存回調
   onSave?: (items: QuotationItem[], headerInfo: QuotationHeaderInfo) => void;
 }
@@ -196,6 +204,7 @@ export default function QuotationOutputEditor({
   categories,
   modules,
   inverters,
+  bankInfo,
   onSave,
 }: QuotationOutputEditorProps) {
   // 報價單表頭資訊
@@ -708,6 +717,44 @@ export default function QuotationOutputEditor({
       text-align: center;
     }
     
+    /* Bank Info Section */
+    .bank-info {
+      margin-top: 12px;
+      padding: 10px 12px;
+      background: linear-gradient(135deg, #ebf8ff 0%, #e6fffa 100%);
+      border: 1px solid #81e6d9;
+      border-radius: 6px;
+    }
+    .bank-info-title {
+      font-weight: 600;
+      font-size: ${labelFontSize}pt;
+      color: ${colorTheme.accent};
+      margin-bottom: 6px;
+      border-bottom: 1px solid #81e6d9;
+      padding-bottom: 4px;
+    }
+    .bank-info-content {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 16px;
+      font-size: ${labelFontSize}pt;
+    }
+    .bank-row {
+      display: flex;
+      gap: 4px;
+    }
+    .bank-label {
+      color: #4a5568;
+      font-weight: 500;
+      min-width: 60px;
+    }
+    .bank-account {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: ${colorTheme.primary};
+    }
+    
     /* Print Styles */
     @media print {
       body { 
@@ -722,6 +769,10 @@ export default function QuotationOutputEditor({
       .totals-table tr.total-row .label {
         background: ${colorTheme.primary} !important;
         color: #fff !important;
+      }
+      .bank-info {
+        background: #ebf8ff !important;
+        border-color: #81e6d9 !important;
       }
     }
   </style>
@@ -825,6 +876,18 @@ export default function QuotationOutputEditor({
         </table>
       </div>
     </div>
+    
+    ${bankInfo?.bankAccountNumber ? `
+    <div class="bank-info">
+      <div class="bank-info-title">📌 匯款帳戶資訊</div>
+      <div class="bank-info-content">
+        <div class="bank-row"><span class="bank-label">銀行：</span><span>${bankInfo.bankName || ''} ${bankInfo.bankBranch ? `(${bankInfo.bankBranch})` : ''}</span></div>
+        <div class="bank-row"><span class="bank-label">銀行代碼：</span><span>${bankInfo.bankCode || ''}</span></div>
+        <div class="bank-row"><span class="bank-label">戶名：</span><span>${bankInfo.bankAccountName || ''}</span></div>
+        <div class="bank-row"><span class="bank-label">帳號：</span><span class="bank-account">${bankInfo.bankAccountNumber}</span></div>
+      </div>
+    </div>
+    ` : ''}
     
     <div class="signature-section">
       <div class="signature-box">
