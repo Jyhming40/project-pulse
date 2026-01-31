@@ -236,6 +236,12 @@ export default function QuoteCostCalculatorTab({
         onUpdate={setModules}
         exchangeRate={exchangeRate}
         onExchangeRateChange={setExchangeRate}
+        onCapacityChange={(capacity) => {
+          // 同步模組容量至 formData
+          if (capacity !== formData.capacityKwp) {
+            setFormData({ ...formData, capacityKwp: capacity });
+          }
+        }}
       />
 
       {/* 主要設備：逆變器 */}

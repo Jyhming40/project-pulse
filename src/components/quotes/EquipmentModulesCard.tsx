@@ -26,6 +26,7 @@ interface EquipmentModulesCardProps {
   onUpdate: (modules: ModuleItem[]) => void;
   exchangeRate: number;
   onExchangeRateChange: (rate: number) => void;
+  onCapacityChange?: (capacityKwp: number) => void;
 }
 
 // Fetch latest USD/TWD exchange rate
@@ -47,6 +48,7 @@ export default function EquipmentModulesCard({
   onUpdate,
   exchangeRate,
   onExchangeRateChange,
+  onCapacityChange,
 }: EquipmentModulesCardProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [isFetchingRate, setIsFetchingRate] = useState(false);
@@ -85,6 +87,11 @@ export default function EquipmentModulesCard({
   const totalCapacityKwp = modules.reduce((sum, m) => {
     return sum + (m.wattagePerPanel * m.panelCount) / 1000;
   }, 0);
+
+  // 當容量變化時通知父組件
+  useEffect(() => {
+    onCapacityChange?.(totalCapacityKwp);
+  }, [totalCapacityKwp, onCapacityChange]);
 
   // 更新單一模組
   const handleUpdateModule = (index: number, updates: Partial<ModuleItem>) => {
@@ -205,7 +212,7 @@ export default function EquipmentModulesCard({
                           value={module.pricePerWattUsd}
                           onChange={(e) => handleUpdateModule(index, { pricePerWattUsd: parseFloat(e.target.value) || 0 })}
                           className="h-8 w-28 text-right"
-                          step="0.01"
+                          step="0.0001"
                         />
                       </TableCell>
                       <TableCell className="text-right font-medium font-mono text-sm text-blue-600">
