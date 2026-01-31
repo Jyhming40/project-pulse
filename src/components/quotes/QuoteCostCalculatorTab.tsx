@@ -109,9 +109,9 @@ export default function QuoteCostCalculatorTab({
       });
     });
 
-    // 模組總計
+    // 模組總計 - 使用每個模組自身的匯率，不覆蓋
     const modulesTotal = modules.reduce((sum, m) => {
-      return sum + calculateModulePrice({ ...m, exchangeRate });
+      return sum + calculateModulePrice(m);
     }, 0);
 
     // 逆變器總計

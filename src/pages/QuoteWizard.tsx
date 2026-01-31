@@ -363,9 +363,9 @@ export default function QuoteWizard() {
       }, 0);
     }, 0);
 
-    // Calculate modules total
+    // Calculate modules total - 使用每個模組自身的匯率，不覆蓋
     const modulesTotal = modules.reduce((sum, m) => {
-      return sum + calculateModulePrice({ ...m, exchangeRate });
+      return sum + calculateModulePrice(m);
     }, 0);
 
     // Calculate inverters total
