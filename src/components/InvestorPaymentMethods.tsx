@@ -25,8 +25,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from 'sonner';
 import { CodebookSelect } from '@/components/CodebookSelect';
+import { taiwanBanks, getBankNameByCode } from '@/config/taiwanBanks';
 import type { Database } from '@/integrations/supabase/types';
 
 type InvestorPaymentMethod = Database['public']['Tables']['investor_payment_methods']['Row'];
@@ -321,20 +329,38 @@ export function InvestorPaymentMethods({ investorId, investorCode, onExport }: I
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
+                    <Label htmlFor="bank_code">銀行代碼</Label>
+                    <Select
+                      value={formData.bank_code || ''}
+                      onValueChange={(value) => {
+                        const bankName = getBankNameByCode(value);
+                        setFormData({ 
+                          ...formData, 
+                          bank_code: value,
+                          bank_name: bankName || formData.bank_name 
+                        });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="選擇銀行" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[300px]">
+                        {taiwanBanks.map((bank) => (
+                          <SelectItem key={bank.code} value={bank.code}>
+                            {bank.code} - {bank.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="bank_name">銀行名稱</Label>
                     <Input
                       id="bank_name"
                       value={formData.bank_name || ''}
                       onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="bank_code">銀行代碼</Label>
-                    <Input
-                      id="bank_code"
-                      value={formData.bank_code || ''}
-                      onChange={(e) => setFormData({ ...formData, bank_code: e.target.value })}
-                      placeholder="3碼"
+                      readOnly
+                      className="bg-muted"
                     />
                   </div>
                 </div>
