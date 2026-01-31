@@ -627,6 +627,7 @@ export default function QuoteWizard() {
       case "cost":
         return (
           <QuoteCostCalculatorTab
+            quoteId={id || ""}
             formData={formData}
             setFormData={setFormData}
             onCostChange={setCostTotals}
