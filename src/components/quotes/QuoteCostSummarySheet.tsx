@@ -28,16 +28,11 @@ export default function QuoteCostSummarySheet({
 }: QuoteCostSummarySheetProps) {
   const [open, setOpen] = useState(false);
   
+  // 總成本 = 工程項目 + PV模組 + 逆變器
+  // 注意：印花稅和營所稅如果已在工程項目中以項目形式存在，則已包含在 engineeringTotal
   const totalCost = engineeringTotal + modulesTotal + invertersTotal;
-  const totalCostWithTax = totalCost * (1 + taxRate);
   
-  // 印花稅 (含稅總價之千分之一)
-  const stampTax = totalCostWithTax * 0.001;
-  // 營所稅 (含稅總價之2%)
-  const businessTax = totalCostWithTax * 0.02;
-  
-  const grandTotal = totalCost + stampTax + businessTax;
-  const grossProfit = sellingPrice - grandTotal;
+  const grossProfit = sellingPrice - totalCost;
   const grossMargin = sellingPrice > 0 ? (grossProfit / sellingPrice) * 100 : 0;
 
   return (
@@ -76,25 +71,11 @@ export default function QuoteCostSummarySheet({
 
           <Separator />
 
-          {/* 其他費用 */}
-          <div className="space-y-3">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">印花稅 (千分之一)</span>
-              <span className="font-mono font-medium">{formatCurrency(stampTax, 0)}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">營所稅 (2%)</span>
-              <span className="font-mono font-medium">{formatCurrency(businessTax, 0)}</span>
-            </div>
-          </div>
-
-          <Separator />
-
           {/* 總計 */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">總成本</span>
-              <span className="text-lg font-semibold font-mono">{formatCurrency(grandTotal, 0)}</span>
+              <span className="text-lg font-semibold font-mono">{formatCurrency(totalCost, 0)}</span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">報價金額 (未稅)</span>
@@ -113,6 +94,13 @@ export default function QuoteCostSummarySheet({
               </span>
             </div>
           </div>
+
+          <Separator />
+
+          {/* 說明 */}
+          <p className="text-xs text-muted-foreground">
+            印花稅、營所稅等費用如已在工程項目中設定，將自動納入「工程項目成本」計算。
+          </p>
         </div>
       </SheetContent>
     </Sheet>
