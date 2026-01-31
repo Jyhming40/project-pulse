@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -101,6 +102,13 @@ export default function QuoteBasicInfoTab({
 
   // Fetch company bank accounts
   const { activeAccounts: bankAccounts, defaultAccount } = useCompanyBankAccounts();
+
+  // Auto-select default bank account when none is selected
+  useEffect(() => {
+    if (!bankAccountId && defaultAccount?.id) {
+      setBankAccountId(defaultAccount.id);
+    }
+  }, [bankAccountId, defaultAccount, setBankAccountId]);
 
   // Get selected bank account
   const selectedBankAccount = bankAccounts?.find((b) => b.id === bankAccountId) || defaultAccount;
