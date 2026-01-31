@@ -44,7 +44,7 @@ import {
 } from "@/hooks/useQuoteEngineering";
 
 const STEPS = [
-  { id: "basic", label: "基本資訊", icon: FileText, description: "案場與投資方" },
+  { id: "basic", label: "基本資訊", icon: FileText, description: "案場與業務單位" },
   { id: "cost", label: "成本報價", icon: Calculator, description: "設備與工程費用" },
   { id: "financial", label: "投資分析", icon: TrendingUp, description: "IRR 與現金流" },
   { id: "schedule", label: "工程時程", icon: Calendar, description: "施工排程規劃" },

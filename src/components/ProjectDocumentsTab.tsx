@@ -598,7 +598,7 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                     <Alert className="mt-2">
                       <AlertCircle className="h-4 w-4" />
                       <AlertDescription>
-                        請先設定投資方，才能建立 Drive 資料夾結構
+                        請先設定業務單位，才能建立 Drive 資料夾結構
                       </AlertDescription>
                     </Alert>
                   )}

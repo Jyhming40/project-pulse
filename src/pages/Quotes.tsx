@@ -266,7 +266,7 @@ export default function Quotes() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="搜尋報價單號、案場名稱、投資方..."
+              placeholder="搜尋報價單號、案場名稱、業務單位..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
@@ -283,7 +283,7 @@ export default function Quotes() {
               <TableRow>
                 <TableHead>報價單號</TableHead>
                 <TableHead>案場</TableHead>
-                <TableHead>投資方</TableHead>
+                <TableHead>業務單位</TableHead>
                 <TableHead className="text-right">容量 (kWp)</TableHead>
                 <TableHead className="text-right">報價金額</TableHead>
                 <TableHead className="text-right">IRR</TableHead>

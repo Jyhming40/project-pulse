@@ -53,7 +53,7 @@ export const tableDisplayNames: Record<string, string> = {
   investors: '投資人',
   investor_contacts: '投資人聯絡人',
   investor_payment_methods: '付款方式',
-  investor_year_counters: '投資方年度計數器',
+  investor_year_counters: '業務單位年度計數器',
   // Partners
   partners: '外包夥伴',
   partner_contacts: '夥伴聯絡人',

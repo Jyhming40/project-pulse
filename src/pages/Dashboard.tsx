@@ -185,13 +185,13 @@ export default function Dashboard() {
               {/* Filters */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">投資方</Label>
+                  <Label className="text-xs text-muted-foreground">業務單位</Label>
                   <Select value={selectedInvestor} onValueChange={setSelectedInvestor}>
                     <SelectTrigger className="h-9">
                       <SelectValue placeholder="全部" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">全部投資方</SelectItem>
+                      <SelectItem value="all">全部業務單位</SelectItem>
                       {investors.map(inv => (
                         <SelectItem key={inv.id} value={inv.id}>
                           [{inv.investor_code}] {inv.company_name}

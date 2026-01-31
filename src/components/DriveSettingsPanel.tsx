@@ -406,7 +406,7 @@ export function DriveSettingsPanel() {
         <Alert>
           <Info className="w-4 h-4" />
           <AlertDescription className="text-xs">
-            資料夾結構：MQ-Documents → 投資方名稱 → 案場資料夾 → 子資料夾模板
+            資料夾結構：MQ-Documents → 業務單位名稱 → 案場資料夾 → 子資料夾模板
           </AlertDescription>
         </Alert>
 

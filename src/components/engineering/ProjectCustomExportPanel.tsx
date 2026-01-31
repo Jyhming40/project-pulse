@@ -547,7 +547,7 @@ export function ProjectCustomExportPanel() {
                               {project.project_code} - {project.project_name}
                             </p>
                             <p className="text-xs text-muted-foreground truncate">
-                              {project.investors?.company_name || '無投資方'} • {project.city} {project.district}
+                              {project.investors?.company_name || '無業務單位'} • {project.city} {project.district}
                             </p>
                           </div>
                           <Badge variant="outline" className="shrink-0 text-xs">

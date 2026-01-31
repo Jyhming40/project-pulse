@@ -85,7 +85,7 @@ export function ImportExportDialog({
   } = useDataImport();
 
   const preview = type === 'projects' ? projectPreview : type === 'investors' ? investorPreview : documentPreview;
-  const title = type === 'projects' ? '案場' : type === 'investors' ? '投資方' : '文件';
+  const title = type === 'projects' ? '案場' : type === 'investors' ? '業務單位' : '文件';
   const constraintType: ImportType = type;
 
   const handleExport = () => {
