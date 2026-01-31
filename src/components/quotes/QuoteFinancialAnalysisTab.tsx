@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   Table,
@@ -27,11 +28,14 @@ import {
   PiggyBank,
   Building2,
   ToggleLeft,
+  RefreshCw,
+  Database,
 } from "lucide-react";
 import { QuoteParams, formatCurrency, formatPercentage } from "@/lib/quoteCalculations";
 import { Plot } from "@/lib/plotly";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useFitRates } from "@/hooks/useFitRates";
 
 // 收益模式類型
 type RevenueMode = 'self_consumption' | 'feed_in_tariff';
@@ -243,12 +247,30 @@ export default function QuoteFinancialAnalysisTab({
   const [revenueMode, setRevenueMode] = useState<RevenueMode>('self_consumption');
   const labels = getRevenueLabels(revenueMode);
   
+  // 躉購費率查詢
+  const { lookupRate, currentYear, isLoading: isLoadingRates } = useFitRates();
+  const [fitRateSource, setFitRateSource] = useState<'system' | 'manual'>('system');
+  
   // 可調整的條件設定參數
   const [sunshineHours, setSunshineHours] = useState(formData.sunshineHours || 3.2);
   const [sunshineDays, setSunshineDays] = useState(365);
   const [electricityRate, setElectricityRate] = useState(formData.tariffRate || 4.5);
   const [fitRate, setFitRate] = useState(formData.tariffRate || 4.2); // 躉購費率
   const [insuranceRate, setInsuranceRate] = useState((formData.insuranceRate || 0.0055) * 100);
+  const [includeHighEfficiency, setIncludeHighEfficiency] = useState(true);
+  
+  // 自動查詢躉購費率
+  const systemFitRate = useMemo(() => {
+    if (!formData.capacityKwp) return null;
+    return lookupRate(formData.capacityKwp, 'rooftop', undefined, includeHighEfficiency);
+  }, [formData.capacityKwp, lookupRate, includeHighEfficiency]);
+  
+  // 當系統費率可用且來源為系統時，自動更新費率
+  useEffect(() => {
+    if (systemFitRate && fitRateSource === 'system') {
+      setFitRate(systemFitRate.totalRate);
+    }
+  }, [systemFitRate, fitRateSource]);
   
   // 根據模式選擇使用的費率
   const effectiveRate = revenueMode === 'feed_in_tariff' ? fitRate : electricityRate;
@@ -416,13 +438,14 @@ export default function QuoteFinancialAnalysisTab({
                 <Input
                   id="rateInput"
                   type="number"
-                  step="0.001"
+                  step="0.0001"
                   min="0"
                   value={revenueMode === 'feed_in_tariff' ? fitRate : electricityRate}
                   onChange={(e) => {
                     const val = parseFloat(e.target.value) || 0;
                     if (revenueMode === 'feed_in_tariff') {
                       setFitRate(val);
+                      setFitRateSource('manual'); // 使用者手動修改
                     } else {
                       setElectricityRate(val);
                     }
@@ -430,6 +453,35 @@ export default function QuoteFinancialAnalysisTab({
                   className="h-8 w-24 text-right font-semibold text-primary"
                 />
               </div>
+              {/* 躉售模式顯示系統費率資訊 */}
+              {revenueMode === 'feed_in_tariff' && (
+                <div className="flex items-center gap-2 mt-1">
+                  {systemFitRate ? (
+                    <>
+                      <Badge 
+                        variant={fitRateSource === 'system' ? 'default' : 'secondary'} 
+                        className="text-xs cursor-pointer"
+                        onClick={() => {
+                          if (systemFitRate) {
+                            setFitRate(systemFitRate.totalRate);
+                            setFitRateSource('system');
+                          }
+                        }}
+                      >
+                        <Database className="h-3 w-3 mr-1" />
+                        系統 ${systemFitRate.totalRate.toFixed(4)}
+                      </Badge>
+                      {fitRateSource === 'manual' && (
+                        <span className="text-xs text-muted-foreground">(已覆寫)</span>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      {isLoadingRates ? '載入中...' : '無系統費率資料'}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
             
             {/* 每 kWp 單價 - 只讀 */}
@@ -470,6 +522,27 @@ export default function QuoteFinancialAnalysisTab({
                     <span className="text-xs text-muted-foreground">%</span>
                   </div>
                 </div>
+                
+                {/* 高效能模組加成 - 僅躉售模式顯示 */}
+                {revenueMode === 'feed_in_tariff' && systemFitRate && (
+                  <div className="space-y-1">
+                    <Label className="text-muted-foreground text-xs">高效能模組加成</Label>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant={includeHighEfficiency ? "default" : "outline"}
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={() => setIncludeHighEfficiency(!includeHighEfficiency)}
+                      >
+                        {includeHighEfficiency ? '已含' : '未含'}
+                      </Button>
+                      <span className="text-xs text-muted-foreground">
+                        +${systemFitRate.highEfficiencyBonus.toFixed(4)}/度
+                      </span>
+                    </div>
+                  </div>
+                )}
                 
                 {/* 年衰減率 - 顯示為資訊 */}
                 <div>
