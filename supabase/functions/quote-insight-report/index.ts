@@ -174,21 +174,37 @@ const FOCUS_AREA_PROMPTS: Record<string, string> = {
   equipment: "分析模組與逆變器的價格合理性，評估設備選型與成本效益",
 };
 
+// Output format instructions
+const OUTPUT_FORMAT_PROMPTS: Record<string, string> = {
+  narrative: `請以詳細的段落文字敘述方式呈現報告，每個洞察點用 emoji 開頭，使用流暢的敘述語氣進行分析。`,
+  table: `請盡量使用 Markdown 表格呈現報告，包含：
+1. 成本結構比較表（項目、金額、佔比、市場參考）
+2. 關鍵指標摘要表（指標、數值、評估、建議）
+3. 風險評估表（風險項目、等級、說明）
+每個表格後可加簡短說明。`,
+  mixed: `請使用圖文混合方式呈現報告：
+1. 先用一個總覽表格列出關鍵數據
+2. 再用段落文字詳細分析重點項目
+3. 最後用一個風險/建議表格總結
+結合表格的結構性與文字的詳細說明。`,
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { quoteData, selectedProvider, allowFallback = false, focusAreas = [] } = await req.json() as { 
+    const { quoteData, selectedProvider, allowFallback = false, focusAreas = [], outputFormat = "narrative" } = await req.json() as { 
       quoteData: QuoteData;
       selectedProvider?: string;
       allowFallback?: boolean;
       focusAreas?: string[];
+      outputFormat?: string;
     };
     
-    // Log focus areas for debugging
-    console.log(`Received focusAreas: ${JSON.stringify(focusAreas)}`);
+    // Log parameters for debugging
+    console.log(`Received focusAreas: ${JSON.stringify(focusAreas)}, outputFormat: ${outputFormat}`);
     
     // Create Supabase client with service role to read AI settings
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -258,15 +274,20 @@ ${focusPrompts.join('\n')}
       }
     }
 
+    // Build output format instructions
+    const formatInstructions = OUTPUT_FORMAT_PROMPTS[outputFormat] || OUTPUT_FORMAT_PROMPTS.narrative;
+    
     const systemPrompt = `你是一位資深太陽能光電產業報價分析師，專精於台灣市場的成本分析與投資評估。請根據提供的報價數據，提供簡潔專業的洞察報告。
 
-輸出格式要求：
+【輸出格式要求】
+${formatInstructions}
+
+【基本規範】
 1. 使用繁體中文
 2. 提供 3-5 點關鍵洞察
-3. 每點用 emoji 開頭使報告易讀
-4. 洞察需具體、可執行，避免籠統建議
-5. 若發現異常指標，請明確指出風險等級（高/中/低）
-6. 最後總結一句報價合理性評估${focusInstructions}`;
+3. 洞察需具體、可執行，避免籠統建議
+4. 若發現異常指標，請明確指出風險等級（高/中/低）
+5. 最後總結一句報價合理性評估${focusInstructions}`;
 
     const userPrompt = `請分析以下太陽能光電專案報價：
 

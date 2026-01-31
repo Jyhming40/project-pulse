@@ -80,3 +80,15 @@ verify_jwt = true
 
 [functions.backup-settings]
 verify_jwt = true
+
+[functions.ai-assistant]
+verify_jwt = false
+
+[functions.check-ai-health]
+verify_jwt = true
+
+[functions.generate-quote-pdf]
+verify_jwt = true
+
+[functions.batch-sync-admin-milestones]
+verify_jwt = true
