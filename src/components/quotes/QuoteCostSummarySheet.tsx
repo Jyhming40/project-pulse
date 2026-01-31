@@ -8,8 +8,19 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { Calculator } from "lucide-react";
+import { Calculator, Info } from "lucide-react";
 import { formatCurrency } from "@/lib/quoteCalculations";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+interface OverheadBreakdown {
+  stampDuty: number;
+  corpTax: number;
+}
 
 interface QuoteCostSummarySheetProps {
   engineeringTotal: number;
@@ -17,6 +28,7 @@ interface QuoteCostSummarySheetProps {
   invertersTotal: number;
   sellingPrice: number;
   taxRate?: number;
+  overheadBreakdown?: OverheadBreakdown;
 }
 
 export default function QuoteCostSummarySheet({
@@ -25,15 +37,33 @@ export default function QuoteCostSummarySheet({
   invertersTotal,
   sellingPrice,
   taxRate = 0.05,
+  overheadBreakdown,
 }: QuoteCostSummarySheetProps) {
   const [open, setOpen] = useState(false);
   
-  // 總成本 = 工程項目 + PV模組 + 逆變器
-  // 注意：印花稅和營所稅如果已在工程項目中以項目形式存在，則已包含在 engineeringTotal
-  const totalCost = engineeringTotal + modulesTotal + invertersTotal;
+  // 公司管銷費用總計
+  const overheadTotal = overheadBreakdown 
+    ? (overheadBreakdown.stampDuty + overheadBreakdown.corpTax)
+    : 0;
   
-  const grossProfit = sellingPrice - totalCost;
+  // 直接工程成本 = 工程項目總計 - 公司管銷費用
+  const directEngineeringCost = engineeringTotal - overheadTotal;
+  
+  // 直接成本 = 直接工程成本 + PV模組 + 逆變器
+  const directCost = directEngineeringCost + modulesTotal + invertersTotal;
+  
+  // 總成本（含公司管銷）= 直接成本 + 公司管銷
+  const totalCost = directCost + overheadTotal;
+  
+  // 毛利計算：基於直接成本
+  const grossProfit = sellingPrice - directCost;
   const grossMargin = sellingPrice > 0 ? (grossProfit / sellingPrice) * 100 : 0;
+  
+  // 淨利計算：基於總成本（含管銷）
+  const netProfit = sellingPrice - totalCost;
+  const netMargin = sellingPrice > 0 ? (netProfit / sellingPrice) * 100 : 0;
+
+  const hasOverhead = overheadTotal > 0;
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -53,11 +83,12 @@ export default function QuoteCostSummarySheet({
         </SheetHeader>
         
         <div className="mt-6 space-y-6">
-          {/* 成本明細 */}
+          {/* 直接成本明細 */}
           <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground">直接成本</p>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">工程項目成本</span>
-              <span className="font-mono font-medium">{formatCurrency(engineeringTotal, 0)}</span>
+              <span className="font-mono font-medium">{formatCurrency(directEngineeringCost, 0)}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">PV 模組成本</span>
@@ -67,22 +98,71 @@ export default function QuoteCostSummarySheet({
               <span className="text-muted-foreground">逆變器成本</span>
               <span className="font-mono font-medium text-amber-600">{formatCurrency(invertersTotal, 0)}</span>
             </div>
+            <div className="flex justify-between text-sm pt-1 border-t border-dashed">
+              <span className="font-medium">直接成本小計</span>
+              <span className="font-mono font-semibold">{formatCurrency(directCost, 0)}</span>
+            </div>
           </div>
+
+          {/* 公司管銷費用（獨立區塊） */}
+          {hasOverhead && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">公司管銷費用</p>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px]">
+                        <p className="text-xs">
+                          營所稅、印花稅等屬於公司層級的費用，獨立於工程成本顯示，以便更清楚區分毛利與淨利。
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                {overheadBreakdown?.stampDuty ? (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">印花稅 (千分之一)</span>
+                    <span className="font-mono font-medium text-orange-600">
+                      {formatCurrency(overheadBreakdown.stampDuty, 0)}
+                    </span>
+                  </div>
+                ) : null}
+                {overheadBreakdown?.corpTax ? (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">營所稅 (2%)</span>
+                    <span className="font-mono font-medium text-orange-600">
+                      {formatCurrency(overheadBreakdown.corpTax, 0)}
+                    </span>
+                  </div>
+                ) : null}
+                <div className="flex justify-between text-sm pt-1 border-t border-dashed">
+                  <span className="font-medium">管銷費用小計</span>
+                  <span className="font-mono font-semibold text-orange-600">{formatCurrency(overheadTotal, 0)}</span>
+                </div>
+              </div>
+            </>
+          )}
 
           <Separator />
 
           {/* 總計 */}
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">總成本</span>
-              <span className="text-lg font-semibold font-mono">{formatCurrency(totalCost, 0)}</span>
-            </div>
-            <div className="flex justify-between items-center">
               <span className="text-sm font-medium">報價金額 (未稅)</span>
               <span className="text-lg font-semibold font-mono">{formatCurrency(sellingPrice, 0)}</span>
             </div>
+            
+            {/* 毛利（基於直接成本） */}
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium">預估毛利</span>
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium">預估毛利</span>
+                <span className="text-xs text-muted-foreground">(扣直接成本)</span>
+              </div>
               <span className={`text-lg font-semibold font-mono ${grossProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
                 {formatCurrency(grossProfit, 0)}
               </span>
@@ -93,13 +173,38 @@ export default function QuoteCostSummarySheet({
                 {grossMargin.toFixed(1)}%
               </span>
             </div>
+            
+            {/* 淨利（含管銷） */}
+            {hasOverhead && (
+              <>
+                <Separator className="my-2" />
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-medium">預估淨利</span>
+                    <span className="text-xs text-muted-foreground">(扣管銷後)</span>
+                  </div>
+                  <span className={`text-lg font-semibold font-mono ${netProfit >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+                    {formatCurrency(netProfit, 0)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium">淨利率</span>
+                  <span className={`text-lg font-semibold ${netMargin >= 0 ? "text-emerald-600" : "text-destructive"}`}>
+                    {netMargin.toFixed(1)}%
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           <Separator />
 
           {/* 說明 */}
           <p className="text-xs text-muted-foreground">
-            印花稅、營所稅等費用如已在工程項目中設定，將自動納入「工程項目成本」計算。
+            {hasOverhead 
+              ? "毛利 = 報價金額 - 直接成本；淨利 = 毛利 - 公司管銷費用。此分類有助於更準確評估專案獲利能力。"
+              : "如需區分公司管銷費用，可在工程項目中新增「印花稅」或「營所稅」項目。"
+            }
           </p>
         </div>
       </SheetContent>
