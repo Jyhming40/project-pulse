@@ -27,6 +27,7 @@ import QuoteScheduleTab from "@/components/quotes/QuoteScheduleTab";
 import QuotationOutputEditor from "@/components/quotes/QuotationOutputEditor";
 import QuoteBudgetTrackingTab from "@/components/quotes/QuoteBudgetTrackingTab";
 import QuoteInsightReport from "@/components/quotes/QuoteInsightReport";
+import QuoteCostSummarySheet from "@/components/quotes/QuoteCostSummarySheet";
 import { calculate20YearProjection, QuoteParams } from "@/lib/quoteCalculations";
 import { 
   ModuleItem, 
@@ -827,7 +828,16 @@ export default function QuoteWizard() {
         </div>
       </div>
 
-      
+      {/* 預算摘要側邊欄 */}
+      <QuoteCostSummarySheet
+        engineeringTotal={costTotals.engineeringTotal}
+        modulesTotal={costTotals.modulesTotal}
+        invertersTotal={costTotals.invertersTotal}
+        sellingPrice={(formData.capacityKwp || 0) * (formData.pricePerKwp || 0)}
+        taxRate={formData.taxRate}
+        overheadBreakdown={overheadBreakdown}
+        projectExpenseBreakdown={projectExpenseBreakdown}
+      />
     </div>
   );
 }
