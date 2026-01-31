@@ -21,9 +21,11 @@ import {
   MapPin,
   FileText,
   Save,
-  RefreshCw
+  RefreshCw,
+  CreditCard
 } from 'lucide-react';
 import { toast } from 'sonner';
+import CompanyBankAccountsPanel from '@/components/branding/CompanyBankAccountsPanel';
 
 export default function BrandingSettings() {
   const { 
@@ -188,6 +190,10 @@ export default function BrandingSettings() {
           <TabsTrigger value="branding" className="gap-2">
             <ImageIcon className="w-4 h-4" />
             Logo 與圖示
+          </TabsTrigger>
+          <TabsTrigger value="bank" className="gap-2">
+            <CreditCard className="w-4 h-4" />
+            銀行帳戶
           </TabsTrigger>
           <TabsTrigger value="theme" className="gap-2">
             <Palette className="w-4 h-4" />
@@ -493,6 +499,11 @@ export default function BrandingSettings() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Bank Accounts */}
+        <TabsContent value="bank">
+          <CompanyBankAccountsPanel />
         </TabsContent>
 
         {/* Theme */}

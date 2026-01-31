@@ -89,7 +89,7 @@ export default function QuoteWizard() {
   });
   const [projectId, setProjectId] = useState<string | null>(null);
   const [investorId, setInvestorId] = useState<string | null>(null);
-  const [departmentId, setDepartmentId] = useState<string | null>(null);
+  const [bankAccountId, setBankAccountId] = useState<string | null>(null);
   const [costTotals, setCostTotals] = useState<CostTotals>({
     engineeringTotal: 0,
     modulesTotal: 0,
@@ -155,30 +155,27 @@ export default function QuoteWizard() {
     enabled: !!investorId,
   });
 
-  // Fetch selected department with bank info
-  const { data: selectedDepartment } = useQuery({
-    queryKey: ["quote-related-department", departmentId],
+  // Fetch selected bank account
+  const { data: selectedBankAccount } = useQuery({
+    queryKey: ["quote-related-bank-account", bankAccountId],
     queryFn: async () => {
-      if (!departmentId) return null;
-      const { data, error } = await supabase
-        .from("departments")
+      if (!bankAccountId) return null;
+      const { data, error } = await (supabase as any)
+        .from("company_bank_accounts")
         .select("*")
-        .eq("id", departmentId)
+        .eq("id", bankAccountId)
         .maybeSingle();
       if (error) throw error;
-      // Cast to extended type with bank fields
       return data as {
         id: string;
-        code: string;
-        name: string;
-        bank_name?: string | null;
+        bank_code: string;
+        bank_name: string;
         bank_branch?: string | null;
-        bank_code?: string | null;
-        bank_account_number?: string | null;
-        bank_account_name?: string | null;
+        bank_account_number: string;
+        bank_account_name: string;
       } | null;
     },
-    enabled: !!departmentId,
+    enabled: !!bankAccountId,
   });
 
   // Fetch existing modules
@@ -650,8 +647,8 @@ export default function QuoteWizard() {
             setProjectId={setProjectId}
             investorId={investorId}
             setInvestorId={setInvestorId}
-            departmentId={departmentId}
-            setDepartmentId={setDepartmentId}
+            bankAccountId={bankAccountId}
+            setBankAccountId={setBankAccountId}
             onSave={handleSave}
             isSaving={isSaving}
             costs={costTotals}
@@ -705,12 +702,12 @@ export default function QuoteWizard() {
             categories={categories}
             modules={modules}
             inverters={inverters}
-            bankInfo={selectedDepartment ? {
-              bankName: selectedDepartment.bank_name || undefined,
-              bankBranch: selectedDepartment.bank_branch || undefined,
-              bankCode: selectedDepartment.bank_code || undefined,
-              bankAccountNumber: selectedDepartment.bank_account_number || undefined,
-              bankAccountName: selectedDepartment.bank_account_name || undefined,
+            bankInfo={selectedBankAccount ? {
+              bankName: selectedBankAccount.bank_name || undefined,
+              bankBranch: selectedBankAccount.bank_branch || undefined,
+              bankCode: selectedBankAccount.bank_code || undefined,
+              bankAccountNumber: selectedBankAccount.bank_account_number || undefined,
+              bankAccountName: selectedBankAccount.bank_account_name || undefined,
             } : undefined}
           />
         );
