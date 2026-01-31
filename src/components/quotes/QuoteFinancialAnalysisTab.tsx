@@ -262,7 +262,10 @@ export default function QuoteFinancialAnalysisTab({
   // 自動查詢躉購費率
   const systemFitRate = useMemo(() => {
     if (!formData.capacityKwp) return null;
-    return lookupRate(formData.capacityKwp, 'rooftop', undefined, includeHighEfficiency);
+    return lookupRate(formData.capacityKwp, 'rooftop', undefined, undefined, {
+      includeHighEfficiency,
+      includeRooftopGridFee: false, // 併網工程費通常不計入財務分析
+    });
   }, [formData.capacityKwp, lookupRate, includeHighEfficiency]);
   
   // 當系統費率可用且來源為系統時，自動更新費率
