@@ -423,9 +423,12 @@ export default function QuotationOutputEditor({
     const specFontSize = Math.round(baseFontSize * 0.85);
     const notesFontSize = Math.round(baseFontSize * 0.8);
     
-    // 合併規格為單一儲存格內容
+    // 合併規格為單一儲存格內容 - 使用懸掛縮排讓第二行以後對齊
     const tableRows = items.map(item => {
-      const specsHtml = item.specifications.map(s => s.specLine).join('<br/>');
+      // 每個規格項目用 <div class="spec-item"> 包裹，實現懸掛縮排
+      const specsHtml = item.specifications.map(s => 
+        `<div class="spec-item">${s.specLine}</div>`
+      ).join('');
       return `
         <tr>
           <td class="item-no">${item.itemNo}</td>
@@ -586,9 +589,19 @@ export default function QuotationOutputEditor({
       color: ${colorTheme.accent};
     }
     .quote-table .spec {
-      line-height: 1.4;
+      line-height: 1.5;
       color: #4a5568;
       font-size: ${specFontSize}pt;
+      padding: 4px 6px;
+    }
+    /* 懸掛縮排：● 項目換行時第二行以後會縮排對齊 */
+    .quote-table .spec-item {
+      text-indent: -1em;
+      padding-left: 1em;
+      margin-bottom: 2px;
+    }
+    .quote-table .spec-item:last-child {
+      margin-bottom: 0;
     }
     .quote-table .quantity {
       text-align: right;
