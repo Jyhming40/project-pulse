@@ -597,8 +597,30 @@ export default function QuoteInsightReport({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown>{report}</ReactMarkdown>
+                  <div className="prose prose-sm dark:prose-invert max-w-none prose-table:w-full prose-table:border-collapse prose-td:border prose-td:border-border prose-td:p-2 prose-th:border prose-th:border-border prose-th:p-2 prose-th:bg-muted/50 prose-th:text-left">
+                    <div className="overflow-x-auto">
+                      <ReactMarkdown
+                        components={{
+                          table: ({ children }) => (
+                            <table className="w-full border-collapse text-sm my-4">{children}</table>
+                          ),
+                          thead: ({ children }) => (
+                            <thead className="bg-muted/50">{children}</thead>
+                          ),
+                          th: ({ children }) => (
+                            <th className="border border-border px-3 py-2 text-left font-medium">{children}</th>
+                          ),
+                          td: ({ children }) => (
+                            <td className="border border-border px-3 py-2">{children}</td>
+                          ),
+                          tr: ({ children }) => (
+                            <tr className="even:bg-muted/20">{children}</tr>
+                          ),
+                        }}
+                      >
+                        {report}
+                      </ReactMarkdown>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
