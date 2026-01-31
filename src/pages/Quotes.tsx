@@ -50,6 +50,103 @@ export default function Quotes() {
     },
   });
 
+  // Duplicate mutation
+  const duplicateMutation = useMutation({
+    mutationFn: async (quoteId: string) => {
+      // 1. Fetch original quote
+      const { data: original, error: fetchError } = await supabase
+        .from("project_quotes")
+        .select("*")
+        .eq("id", quoteId)
+        .single();
+      if (fetchError || !original) throw new Error("找不到原始報價單");
+
+      // 2. Generate new quote number
+      const now = new Date();
+      const dateStr = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`;
+      const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
+      const newQuoteNumber = `Q-${dateStr}-${randomSuffix}`;
+
+      // 3. Create new quote (excluding id, created_at, updated_at, quote_number)
+      const { id, created_at, updated_at, quote_number, is_finalized, finalized_at, finalized_by, ...quoteData } = original;
+      const { data: newQuote, error: insertError } = await supabase
+        .from("project_quotes")
+        .insert({
+          ...quoteData,
+          quote_number: newQuoteNumber,
+          quote_status: "draft",
+          is_finalized: false,
+          finalized_at: null,
+          finalized_by: null,
+        })
+        .select()
+        .single();
+      if (insertError || !newQuote) throw new Error("建立報價單失敗");
+
+      // 4. Copy related modules
+      const { data: modules } = await supabase
+        .from("quote_modules")
+        .select("*")
+        .eq("quote_id", quoteId);
+      if (modules && modules.length > 0) {
+        const newModules = modules.map(({ id, quote_id, created_at, updated_at, price_ntd, ...m }) => ({
+          ...m,
+          quote_id: newQuote.id,
+        }));
+        await supabase.from("quote_modules").insert(newModules);
+      }
+
+      // 5. Copy related inverters
+      const { data: inverters } = await supabase
+        .from("quote_inverters")
+        .select("*")
+        .eq("quote_id", quoteId);
+      if (inverters && inverters.length > 0) {
+        const newInverters = inverters.map(({ id, quote_id, created_at, updated_at, total_price_ntd, ...inv }) => ({
+          ...inv,
+          quote_id: newQuote.id,
+        }));
+        await supabase.from("quote_inverters").insert(newInverters);
+      }
+
+      // 6. Copy related engineering items
+      const { data: engItems } = await supabase
+        .from("quote_engineering_items")
+        .select("*")
+        .eq("quote_id", quoteId);
+      if (engItems && engItems.length > 0) {
+        const newEngItems = engItems.map(({ id, quote_id, created_at, updated_at, ...item }) => ({
+          ...item,
+          quote_id: newQuote.id,
+        }));
+        await supabase.from("quote_engineering_items").insert(newEngItems);
+      }
+
+      // 7. Copy related line items
+      const { data: lineItems } = await supabase
+        .from("quote_line_items")
+        .select("*")
+        .eq("quote_id", quoteId);
+      if (lineItems && lineItems.length > 0) {
+        const newLineItems = lineItems.map(({ id, quote_id, created_at, updated_at, ...item }) => ({
+          ...item,
+          quote_id: newQuote.id,
+        }));
+        await supabase.from("quote_line_items").insert(lineItems);
+      }
+
+      return newQuote;
+    },
+    onSuccess: (newQuote) => {
+      queryClient.invalidateQueries({ queryKey: ["project-quotes"] });
+      toast.success("報價單已複製");
+      navigate(`/quotes/${newQuote.id}`);
+    },
+    onError: (error: Error) => {
+      toast.error(`複製失敗: ${error.message}`);
+    },
+  });
+
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -245,9 +342,12 @@ export default function Quotes() {
                             <Eye className="w-4 h-4 mr-2" />
                             檢視 / 編輯
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => toast.info("資料庫表尚未建立")}>
+                          <DropdownMenuItem 
+                            onClick={() => duplicateMutation.mutate(quote.id)}
+                            disabled={duplicateMutation.isPending}
+                          >
                             <Copy className="w-4 h-4 mr-2" />
-                            複製報價
+                            {duplicateMutation.isPending ? "複製中..." : "複製報價"}
                           </DropdownMenuItem>
                           {isAdmin && (
                             <DropdownMenuItem
