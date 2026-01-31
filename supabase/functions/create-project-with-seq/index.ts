@@ -85,7 +85,7 @@ serve(async (req) => {
 
     if (!body.investor_id) {
       return new Response(
-        JSON.stringify({ error: '必須選擇投資方' }),
+        JSON.stringify({ error: '必須選擇業務單位' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -107,14 +107,14 @@ serve(async (req) => {
     if (investorError || !investor) {
       console.error('Investor fetch error:', investorError);
       return new Response(
-        JSON.stringify({ error: '找不到投資方資料' }),
+        JSON.stringify({ error: '找不到業務單位資料' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     if (!investor.investor_code) {
       return new Response(
-        JSON.stringify({ error: '投資方尚未設定代碼，請先在投資方資料補齊代碼' }),
+        JSON.stringify({ error: '業務單位尚未設定代碼，請先在業務單位資料補齊代碼' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }

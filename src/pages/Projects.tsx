@@ -294,7 +294,7 @@ export default function Projects() {
   // Create project via Edge Function (for atomic sequence generation)
   const handleCreateProject = async () => {
     if (!formData.investor_id) {
-      toast.error('請選擇投資方');
+      toast.error('請選擇業務單位');
       return;
     }
     if (!formData.project_name) {
@@ -305,7 +305,7 @@ export default function Projects() {
     // Check if investor has a code
     const selectedInvestor = investors.find(inv => inv.id === formData.investor_id);
     if (!selectedInvestor?.investor_code) {
-      toast.error('投資方尚未設定代碼', { description: '請先在投資方資料補齊代碼' });
+      toast.error('業務單位尚未設定代碼', { description: '請先在業務單位資料補齊代碼' });
       return;
     }
     

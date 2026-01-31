@@ -291,13 +291,13 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                     </CardContent>
                   </Card>
 
-                  {/* 投資方資訊 */}
+                  {/* 業務單位資訊 */}
                   {investor && (
                     <Card>
                       <CardHeader className="py-3">
                         <CardTitle className="text-sm flex items-center gap-2">
                           <Zap className="w-4 h-4 text-primary" />
-                          投資方資訊
+                          業務單位資訊
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-3 pt-0">
@@ -464,7 +464,7 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                     <CardHeader className="py-3">
                       <CardTitle className="text-sm flex items-center gap-2">
                         <Zap className="w-4 h-4 text-primary" />
-                        投資方摘要
+                        業務單位摘要
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="pt-0">
@@ -493,11 +493,11 @@ export function ProjectDetailDrawer({ projectId, open, onOpenChange }: ProjectDe
                               navigate(`/investors`);
                             }}
                           >
-                            檢視完整投資方資料
+                            檢視完整業務單位資料
                           </Button>
                         </div>
                       ) : (
-                        <p className="text-xs text-muted-foreground text-center py-4">尚未關聯投資方</p>
+                        <p className="text-xs text-muted-foreground text-center py-4">尚未關聯業務單位</p>
                       )}
                     </CardContent>
                   </Card>

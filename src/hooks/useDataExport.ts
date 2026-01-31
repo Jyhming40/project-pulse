@@ -24,7 +24,7 @@ type ExportFormat = 'xlsx' | 'csv';
 const projectColumns = [
   { key: 'project_code', label: '案場編號' },
   { key: 'project_name', label: '案場名稱' },
-  { key: 'investor_name', label: '投資方' },
+  { key: 'investor_name', label: '業務單位' },
   { key: 'status', label: '狀態' },
   { key: 'capacity_kwp', label: '容量(kWp)' },
   { key: 'feeder_code', label: '饋線代號' },
@@ -45,9 +45,9 @@ const projectColumns = [
 ];
 
 const investorColumns = [
-  { key: 'investor_code', label: '投資方編號' },
+  { key: 'investor_code', label: '單位編號' },
   { key: 'company_name', label: '公司名稱' },
-  { key: 'investor_type', label: '投資方類型' },
+  { key: 'investor_type', label: '單位類型' },
   { key: 'owner_name', label: '負責人' },
   { key: 'owner_title', label: '負責人職稱' },
   { key: 'tax_id', label: '統一編號' },
@@ -59,8 +59,8 @@ const investorColumns = [
 ];
 
 const investorContactColumns = [
-  { key: 'investor_code', label: '投資方編號' },
-  { key: 'investor_name', label: '投資方名稱' },
+  { key: 'investor_code', label: '單位編號' },
+  { key: 'investor_name', label: '單位名稱' },
   { key: 'contact_name', label: '聯絡人姓名' },
   { key: 'title', label: '職稱' },
   { key: 'department', label: '部門' },
@@ -75,8 +75,8 @@ const investorContactColumns = [
 ];
 
 const investorPaymentMethodColumns = [
-  { key: 'investor_code', label: '投資方編號' },
-  { key: 'investor_name', label: '投資方名稱' },
+  { key: 'investor_code', label: '單位編號' },
+  { key: 'investor_name', label: '單位名稱' },
   { key: 'method_type', label: '付款方式' },
   { key: 'bank_name', label: '銀行名稱' },
   { key: 'bank_code', label: '銀行代碼' },
@@ -176,8 +176,8 @@ export function useDataExport() {
 
   const exportInvestors = useCallback((investors: Investor[], format: ExportFormat) => {
     try {
-      exportData(investors, investorColumns, '投資方列表', '投資方資料', format);
-      toast.success(`已匯出 ${investors.length} 筆投資方資料`);
+      exportData(investors, investorColumns, '業務單位列表', '業務單位資料', format);
+      toast.success(`已匯出 ${investors.length} 筆業務單位資料`);
     } catch (error) {
       console.error('Export error:', error);
       toast.error('匯出失敗', { description: error instanceof Error ? error.message : '未知錯誤' });
@@ -191,7 +191,7 @@ export function useDataExport() {
         investor_code: contact.investors?.investor_code || '',
         investor_name: contact.investors?.company_name || '',
       }));
-      exportData(transformedContacts, investorContactColumns, '聯絡人列表', '投資方聯絡人', format);
+      exportData(transformedContacts, investorContactColumns, '聯絡人列表', '業務單位聯絡人', format);
       toast.success(`已匯出 ${contacts.length} 筆聯絡人資料`);
     } catch (error) {
       console.error('Export error:', error);
@@ -206,7 +206,7 @@ export function useDataExport() {
         investor_code: method.investors?.investor_code || '',
         investor_name: method.investors?.company_name || '',
       }));
-      exportData(transformedMethods, investorPaymentMethodColumns, '支付方式列表', '投資方支付方式', format);
+      exportData(transformedMethods, investorPaymentMethodColumns, '支付方式列表', '業務單位支付方式', format);
       toast.success(`已匯出 ${methods.length} 筆支付方式資料`);
     } catch (error) {
       console.error('Export error:', error);
@@ -247,18 +247,18 @@ export function useDataExport() {
           break;
         case 'investors':
           columns = investorColumns;
-          sheetName = '投資方範本';
-          filename = '投資方匯入範本';
+          sheetName = '業務單位範本';
+          filename = '業務單位匯入範本';
           break;
         case 'investor_contacts':
           columns = investorContactColumns;
           sheetName = '聯絡人範本';
-          filename = '投資方聯絡人匯入範本';
+          filename = '業務單位聯絡人匯入範本';
           break;
         case 'investor_payment_methods':
           columns = investorPaymentMethodColumns;
           sheetName = '支付方式範本';
-          filename = '投資方支付方式匯入範本';
+          filename = '業務單位支付方式匯入範本';
           break;
         default:
           columns = documentColumns;

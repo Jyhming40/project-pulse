@@ -141,9 +141,9 @@ export function ProjectBackupDialog({
                 <AlertDescription>
                   將匯出包含以下工作表的 Excel 檔案：
                   <ul className="list-disc list-inside mt-2 text-sm">
-                    <li><strong>投資方</strong>：投資方基本資料</li>
-                    <li><strong>投資方聯絡人</strong>：投資方聯絡人資料</li>
-                    <li><strong>投資方付款方式</strong>：付款方式設定</li>
+                    <li><strong>業務單位</strong>：業務單位基本資料</li>
+                    <li><strong>業務單位聯絡人</strong>：業務單位聯絡人資料</li>
+                    <li><strong>業務單位付款方式</strong>：付款方式設定</li>
                     <li><strong>廠商</strong>：合作廠商資料</li>
                     <li><strong>案場主表</strong>：所有案場基本資料</li>
                     <li><strong>狀態歷程</strong>：專案狀態變更紀錄</li>
@@ -180,7 +180,7 @@ export function ProjectBackupDialog({
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 text-sm">
                     <div className="border rounded p-2 text-center">
                       <p className="text-lg font-bold text-primary">{progress.exportStats.investors}</p>
-                      <p className="text-xs text-muted-foreground">投資方</p>
+                      <p className="text-xs text-muted-foreground">業務單位</p>
                     </div>
                     <div className="border rounded p-2 text-center">
                       <p className="text-lg font-bold text-primary">{progress.exportStats.investorContacts}</p>
@@ -285,7 +285,7 @@ export function ProjectBackupDialog({
                     {/* Breakdown by Sheet */}
                     <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 text-xs">
                       <div className="border rounded p-2">
-                        <p className="font-medium mb-1">投資方</p>
+                        <p className="font-medium mb-1">業務單位</p>
                         <p className="text-success">+{importSummary.investors.inserted}</p>
                         <p className="text-info">↻{importSummary.investors.updated}</p>
                         <p className="text-destructive">✗{importSummary.investors.errors}</p>

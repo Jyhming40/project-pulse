@@ -142,7 +142,7 @@ export default function Investors() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investors'] });
-      toast.success('投資方建立成功');
+      toast.success('業務單位建立成功');
       setIsCreateOpen(false);
       setFormData({});
     },
@@ -159,7 +159,7 @@ export default function Investors() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['investors'] });
-      toast.success('投資方更新成功');
+      toast.success('業務單位更新成功');
       setEditingInvestor(null);
       setFormData({});
     },
@@ -313,8 +313,8 @@ export default function Investors() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-display font-bold text-foreground">投資方管理</h1>
-          <p className="text-muted-foreground mt-1">共 {investors.length} 個投資方</p>
+  <h1 className="text-2xl font-display font-bold text-foreground">業務單位管理</h1>
+          <p className="text-muted-foreground mt-1">共 {investors.length} 個業務單位</p>
         </div>
         <div className="flex gap-2">
           {canEdit && (
@@ -326,7 +326,7 @@ export default function Investors() {
           {canEdit && (
             <Button onClick={() => setIsCreateOpen(true)}>
               <Plus className="w-4 h-4 mr-2" />
-              新增投資方
+              新增業務單位
             </Button>
           )}
         </div>
@@ -355,7 +355,7 @@ export default function Investors() {
                   aria-label="全選"
                 />
               </TableHead>
-              <SortableTableHead sortKey="investor_code" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investor_code').direction} sortIndex={getSortInfo('investor_code').index} onSort={handleSort}>投資方編號</SortableTableHead>
+              <SortableTableHead sortKey="investor_code" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investor_code').direction} sortIndex={getSortInfo('investor_code').index} onSort={handleSort}>單位編號</SortableTableHead>
               <SortableTableHead sortKey="company_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('company_name').direction} sortIndex={getSortInfo('company_name').index} onSort={handleSort}>公司名稱</SortableTableHead>
               <SortableTableHead sortKey="investor_type" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investor_type').direction} sortIndex={getSortInfo('investor_type').index} onSort={handleSort}>類型</SortableTableHead>
               <SortableTableHead sortKey="owner_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('owner_name').direction} sortIndex={getSortInfo('owner_name').index} onSort={handleSort}>負責人</SortableTableHead>
@@ -461,7 +461,7 @@ export default function Investors() {
                 </Badge>
               )}
             </DialogTitle>
-            <DialogDescription>投資方編號：{viewingInvestor?.investor_code}</DialogDescription>
+            <DialogDescription>單位編號：{viewingInvestor?.investor_code}</DialogDescription>
           </DialogHeader>
           
           {viewingInvestor && (
@@ -488,7 +488,7 @@ export default function Investors() {
               <TabsContent value="info" className="mt-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-muted-foreground">投資方編號</p>
+                    <p className="text-sm text-muted-foreground">單位編號</p>
                     <p className="font-mono">{viewingInvestor.investor_code}</p>
                   </div>
                   <div>
@@ -503,7 +503,7 @@ export default function Investors() {
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">投資方類型</p>
+                    <p className="text-sm text-muted-foreground">單位類型</p>
                     <p>{viewingInvestor.investor_type || '-'}</p>
                   </div>
                   <div>
@@ -589,16 +589,16 @@ export default function Investors() {
       >
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingInvestor ? '編輯投資方' : '新增投資方'}</DialogTitle>
+            <DialogTitle>{editingInvestor ? '編輯業務單位' : '新增業務單位'}</DialogTitle>
             <DialogDescription>
-              {editingInvestor ? '修改投資方資料' : '填寫投資方基本資訊'}
+              {editingInvestor ? '修改業務單位資料' : '填寫業務單位基本資訊'}
             </DialogDescription>
           </DialogHeader>
 
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="investor_code">投資方代碼 *</Label>
+                <Label htmlFor="investor_code">單位代碼 *</Label>
                 <Input
                   id="investor_code"
                   value={formData.investor_code || ''}
@@ -633,7 +633,7 @@ export default function Investors() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="investor_type">投資方類型</Label>
+                <Label htmlFor="investor_type">單位類型</Label>
                 <CodebookSelect
                   category="investor_type"
                   value={formData.investor_type || undefined}
@@ -785,13 +785,13 @@ export default function Investors() {
       <BatchUpdateDialog
         open={isBatchUpdateOpen}
         onOpenChange={setIsBatchUpdateOpen}
-        title="批次修改投資方"
+        title="批次修改業務單位"
         selectedCount={batchSelect.selectedCount}
         selectedItems={batchSelect.selectedItems}
         fields={[
           {
             key: 'investor_type',
-            label: '投資方類型',
+            label: '單位類型',
             type: 'select',
             options: investorTypeOptions,
           },
@@ -810,7 +810,7 @@ export default function Investors() {
         open={isBatchDeleteOpen}
         onOpenChange={setIsBatchDeleteOpen}
         selectedCount={batchSelect.selectedCount}
-        itemLabel="筆投資方"
+        itemLabel="筆業務單位"
         requireReason={false}
         onConfirm={handleBatchDelete}
         isLoading={isDeleting}
