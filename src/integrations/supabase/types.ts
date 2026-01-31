@@ -3058,42 +3058,66 @@ export type Database = {
       }
       system_tariff_rates: {
         Row: {
+          agriculture_bonus: number | null
           capacity_max_kwp: number
           capacity_min_kwp: number
           created_at: string
           effective_year: number
+          fishery_bonus: number | null
           high_efficiency_bonus: number | null
+          highway_service_bonus: number | null
           id: string
           installation_type: string | null
           is_active: boolean | null
+          module_recycling_fee: number | null
           note: string | null
+          period: number | null
           rate_per_kwh: number
+          rooftop_grid_fee: number | null
+          school_metal_plate_bonus: number | null
+          school_sports_bonus: number | null
           updated_at: string
         }
         Insert: {
+          agriculture_bonus?: number | null
           capacity_max_kwp: number
           capacity_min_kwp: number
           created_at?: string
           effective_year: number
+          fishery_bonus?: number | null
           high_efficiency_bonus?: number | null
+          highway_service_bonus?: number | null
           id?: string
           installation_type?: string | null
           is_active?: boolean | null
+          module_recycling_fee?: number | null
           note?: string | null
+          period?: number | null
           rate_per_kwh: number
+          rooftop_grid_fee?: number | null
+          school_metal_plate_bonus?: number | null
+          school_sports_bonus?: number | null
           updated_at?: string
         }
         Update: {
+          agriculture_bonus?: number | null
           capacity_max_kwp?: number
           capacity_min_kwp?: number
           created_at?: string
           effective_year?: number
+          fishery_bonus?: number | null
           high_efficiency_bonus?: number | null
+          highway_service_bonus?: number | null
           id?: string
           installation_type?: string | null
           is_active?: boolean | null
+          module_recycling_fee?: number | null
           note?: string | null
+          period?: number | null
           rate_per_kwh?: number
+          rooftop_grid_fee?: number | null
+          school_metal_plate_bonus?: number | null
+          school_sports_bonus?: number | null
           updated_at?: string
         }
         Relationships: []
