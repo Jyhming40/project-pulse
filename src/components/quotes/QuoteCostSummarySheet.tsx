@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Slider } from "@/components/ui/slider";
 import {
   Sheet,
   SheetContent,
@@ -40,6 +41,7 @@ export default function QuoteCostSummarySheet({
   overheadBreakdown,
 }: QuoteCostSummarySheetProps) {
   const [open, setOpen] = useState(false);
+  const [riskReserveRate, setRiskReserveRate] = useState(3); // 預設 3%
   
   // 公司管銷費用總計
   const overheadTotal = overheadBreakdown 
@@ -49,9 +51,8 @@ export default function QuoteCostSummarySheet({
   // 直接成本 = 全部工程成本 - 公司管銷 + PV模組 + 逆變器
   const directCost = (engineeringTotal - overheadTotal) + modulesTotal + invertersTotal;
   
-  // 風險預留 (3%)
-  const riskReserveRate = 0.03;
-  const riskReserve = directCost * riskReserveRate;
+  // 風險預留 (動態百分比)
+  const riskReserve = directCost * (riskReserveRate / 100);
   
   // 預估毛利 = 專案總收 - 直接成本 - 風險預留
   const grossProfit = sellingPrice - directCost - riskReserve;
@@ -120,25 +121,42 @@ export default function QuoteCostSummarySheet({
             </div>
             
             {/* 風險預留 */}
-            <div className="flex justify-between items-center bg-orange-50 dark:bg-orange-950/30 rounded-md px-3 py-2">
-              <div className="flex items-center gap-1.5">
-                <span className="text-sm font-medium text-orange-700 dark:text-orange-400">風險預留 ({(riskReserveRate * 100).toFixed(0)}%)</span>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Info className="h-3.5 w-3.5 text-orange-500 cursor-help" />
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[200px]">
-                      <p className="text-xs">
-                        預留應對施工風險、材料損耗、不可預見費用等緩衝金額。
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+            <div className="bg-orange-50 dark:bg-orange-950/30 rounded-md px-3 py-3 space-y-2">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-medium text-orange-700 dark:text-orange-400">
+                    風險預留 ({riskReserveRate}%)
+                  </span>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-3.5 w-3.5 text-orange-500 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-[200px]">
+                        <p className="text-xs">
+                          預留應對施工風險、材料損耗、不可預見費用等緩衝金額。
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <span className="font-mono font-medium text-orange-700 dark:text-orange-400">
+                  {formatCurrency(riskReserve, 0)}
+                </span>
               </div>
-              <span className="font-mono font-medium text-orange-700 dark:text-orange-400">
-                {formatCurrency(riskReserve, 0)}
-              </span>
+              {/* 滑桿調整 */}
+              <div className="flex items-center gap-3 pt-1">
+                <span className="text-xs text-orange-600 dark:text-orange-400 w-6">0%</span>
+                <Slider
+                  value={[riskReserveRate]}
+                  onValueChange={(value) => setRiskReserveRate(value[0])}
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  className="flex-1 [&_[role=slider]]:bg-orange-500 [&_[role=slider]]:border-orange-600 [&_.bg-primary]:bg-orange-400"
+                />
+                <span className="text-xs text-orange-600 dark:text-orange-400 w-8">10%</span>
+              </div>
             </div>
           </div>
 
