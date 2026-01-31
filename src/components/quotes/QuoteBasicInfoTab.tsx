@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ import { format } from "date-fns";
 import QuotePricingSummaryCard from "./QuotePricingSummaryCard";
 import QuoteSuggestionCard from "./QuoteSuggestionCard";
 import { useCompanyBankAccounts, CompanyBankAccount } from "@/hooks/useCompanyBankAccounts";
+import { ProjectSearchCombobox, ProjectOption } from "@/components/projects/ProjectSearchCombobox";
 
 interface CostBreakdown {
   engineeringTotal: number;
@@ -117,22 +118,35 @@ export default function QuoteBasicInfoTab({
   const selectedProject = projects?.find((p) => p.id === projectId);
   const selectedInvestor = investors?.find((i) => i.id === investorId);
 
-  // Handle project selection
-  const handleProjectChange = (id: string) => {
-    const project = projects?.find((p) => p.id === id);
-    setProjectId(id === "__none__" ? null : id);
+  // Transform projects to ProjectOption format for the combobox
+  const projectOptions: ProjectOption[] = useMemo(() => {
+    if (!projects) return [];
+    return projects.map((p) => ({
+      id: p.id,
+      project_name: p.site_code_display || p.project_name,
+      project_code: p.project_name,
+      created_at: new Date().toISOString(), // For sorting purposes
+    }));
+  }, [projects]);
+
+  // Handle project selection from combobox
+  const handleProjectSelect = (id: string | null) => {
+    setProjectId(id);
     
-    if (project) {
-      // Auto-fill capacity and investor
-      if (project.capacity_kwp) {
-        setFormData({
-          ...formData,
-          capacityKwp: Number(project.capacity_kwp),
-          panelCount: Math.ceil((Number(project.capacity_kwp) * 1000) / (formData.panelWattage || 590)),
-        });
-      }
-      if (project.investor_id) {
-        setInvestorId(project.investor_id);
+    if (id) {
+      const project = projects?.find((p) => p.id === id);
+      if (project) {
+        // Auto-fill capacity and investor
+        if (project.capacity_kwp) {
+          setFormData({
+            ...formData,
+            capacityKwp: Number(project.capacity_kwp),
+            panelCount: Math.ceil((Number(project.capacity_kwp) * 1000) / (formData.panelWattage || 590)),
+          });
+        }
+        if (project.investor_id) {
+          setInvestorId(project.investor_id);
+        }
       }
     }
   };
@@ -159,19 +173,12 @@ export default function QuoteBasicInfoTab({
           <CardContent className="space-y-5">
             <div className="space-y-2">
               <Label className="text-sm font-medium">關聯案場</Label>
-              <Select value={projectId || "__none__"} onValueChange={handleProjectChange}>
-                <SelectTrigger className="h-10">
-                  <SelectValue placeholder="選擇案場 (選填)" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">不關聯案場</SelectItem>
-                  {projects?.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.site_code_display || p.project_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <ProjectSearchCombobox
+                projects={projectOptions}
+                value={projectId}
+                onValueChange={handleProjectSelect}
+                placeholder="搜尋或選擇案場..."
+              />
             </div>
 
             <div className="space-y-2">
