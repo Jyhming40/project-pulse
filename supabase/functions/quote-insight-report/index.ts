@@ -187,6 +187,9 @@ serve(async (req) => {
       focusAreas?: string[];
     };
     
+    // Log focus areas for debugging
+    console.log(`Received focusAreas: ${JSON.stringify(focusAreas)}`);
+    
     // Create Supabase client with service role to read AI settings
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -236,12 +239,22 @@ serve(async (req) => {
     // Build focus area instructions
     let focusInstructions = "";
     if (focusAreas && focusAreas.length > 0) {
+      console.log(`Building focus instructions for areas: ${JSON.stringify(focusAreas)}`);
       const focusPrompts = focusAreas
         .filter(area => FOCUS_AREA_PROMPTS[area])
-        .map(area => `- ${FOCUS_AREA_PROMPTS[area]}`);
+        .map(area => {
+          console.log(`Adding focus area: ${area} -> ${FOCUS_AREA_PROMPTS[area]}`);
+          return `- ${FOCUS_AREA_PROMPTS[area]}`;
+        });
       
       if (focusPrompts.length > 0) {
-        focusInstructions = `\n\n特別分析重點（請優先關注）：\n${focusPrompts.join('\n')}`;
+        focusInstructions = `
+
+【重要分析重點 - 請務必詳細分析以下主題】
+${focusPrompts.join('\n')}
+
+請在報告中針對上述每個分析重點，提供獨立的段落進行深入分析。`;
+        console.log(`Focus instructions built: ${focusInstructions}`);
       }
     }
 
