@@ -15,7 +15,7 @@ import { QuoteParams } from "@/lib/quoteCalculations";
 import { format } from "date-fns";
 import QuotePricingSummaryCard from "./QuotePricingSummaryCard";
 import QuoteSuggestionCard from "./QuoteSuggestionCard";
-import { Department } from "@/hooks/useDepartments";
+import { useCompanyBankAccounts, CompanyBankAccount } from "@/hooks/useCompanyBankAccounts";
 
 interface CostBreakdown {
   engineeringTotal: number;
@@ -30,8 +30,8 @@ interface QuoteBasicInfoTabProps {
   setProjectId: (id: string | null) => void;
   investorId: string | null;
   setInvestorId: (id: string | null) => void;
-  departmentId: string | null;
-  setDepartmentId: (id: string | null) => void;
+  bankAccountId: string | null;
+  setBankAccountId: (id: string | null) => void;
   onSave: () => void;
   isSaving: boolean;
   costs?: CostBreakdown;
@@ -46,8 +46,8 @@ export default function QuoteBasicInfoTab({
   setProjectId,
   investorId,
   setInvestorId,
-  departmentId,
-  setDepartmentId,
+  bankAccountId,
+  setBankAccountId,
   onSave,
   isSaving,
   costs,
@@ -99,22 +99,11 @@ export default function QuoteBasicInfoTab({
     },
   });
 
-  // Fetch departments with bank info
-  const { data: departments } = useQuery({
-    queryKey: ["departments-for-quote"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("departments")
-        .select("*")
-        .eq("is_active", true)
-        .order("sort_order");
-      if (error) throw error;
-      return data as unknown as Department[];
-    },
-  });
+  // Fetch company bank accounts
+  const { activeAccounts: bankAccounts, defaultAccount } = useCompanyBankAccounts();
 
-  // Get selected department
-  const selectedDepartment = departments?.find((d) => d.id === departmentId);
+  // Get selected bank account
+  const selectedBankAccount = bankAccounts?.find((b) => b.id === bankAccountId) || defaultAccount;
 
   // Get selected project and investor
   const selectedProject = projects?.find((p) => p.id === projectId);
@@ -197,29 +186,28 @@ export default function QuoteBasicInfoTab({
             <div className="space-y-2">
               <Label className="text-sm font-medium flex items-center gap-1">
                 <CreditCard className="h-3.5 w-3.5" />
-                收款部門（報價單銀行帳戶）
+                收款帳戶（報價單銀行資訊）
               </Label>
-              <Select value={departmentId || "__none__"} onValueChange={(v) => setDepartmentId(v === "__none__" ? null : v)}>
+              <Select 
+                value={bankAccountId || (defaultAccount?.id) || "__none__"} 
+                onValueChange={(v) => setBankAccountId(v === "__none__" ? null : v)}
+              >
                 <SelectTrigger className="h-10">
-                  <SelectValue placeholder="選擇收款部門 (選填)" />
+                  <SelectValue placeholder="選擇收款帳戶" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__">不指定部門</SelectItem>
-                  {departments?.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.name}
-                      {d.bank_account_number && (
-                        <span className="ml-2 text-muted-foreground text-xs">
-                          ({d.bank_name})
-                        </span>
-                      )}
+                  <SelectItem value="__none__">不顯示匯款資訊</SelectItem>
+                  {bankAccounts?.map((b) => (
+                    <SelectItem key={b.id} value={b.id}>
+                      {b.bank_name} - {b.bank_account_number}
+                      {b.is_default && " (預設)"}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {selectedDepartment?.bank_account_number && (
+              {selectedBankAccount && (
                 <p className="text-xs text-muted-foreground mt-1">
-                  帳戶：{selectedDepartment.bank_name} {selectedDepartment.bank_account_number}
+                  戶名：{selectedBankAccount.bank_account_name}
                 </p>
               )}
             </div>

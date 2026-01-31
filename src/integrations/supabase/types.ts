@@ -234,6 +234,11 @@ export type Database = {
       }
       departments: {
         Row: {
+          bank_account_name: string | null
+          bank_account_number: string | null
+          bank_branch: string | null
+          bank_code: string | null
+          bank_name: string | null
           code: string
           created_at: string | null
           created_by: string | null
@@ -246,6 +251,11 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_branch?: string | null
+          bank_code?: string | null
+          bank_name?: string | null
           code: string
           created_at?: string | null
           created_by?: string | null
@@ -258,6 +268,11 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          bank_account_name?: string | null
+          bank_account_number?: string | null
+          bank_branch?: string | null
+          bank_code?: string | null
+          bank_name?: string | null
           code?: string
           created_at?: string | null
           created_by?: string | null
@@ -1950,6 +1965,7 @@ export type Database = {
           capacity_kwp: number
           created_at: string
           created_by: string | null
+          department_id: string | null
           finalized_at: string | null
           finalized_by: string | null
           high_efficiency_bonus: number | null
@@ -1996,6 +2012,7 @@ export type Database = {
           capacity_kwp?: number
           created_at?: string
           created_by?: string | null
+          department_id?: string | null
           finalized_at?: string | null
           finalized_by?: string | null
           high_efficiency_bonus?: number | null
@@ -2042,6 +2059,7 @@ export type Database = {
           capacity_kwp?: number
           created_at?: string
           created_by?: string | null
+          department_id?: string | null
           finalized_at?: string | null
           finalized_by?: string | null
           high_efficiency_bonus?: number | null
@@ -2079,6 +2097,13 @@ export type Database = {
           valid_until?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "project_quotes_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "project_quotes_investor_id_fkey"
             columns: ["investor_id"]
