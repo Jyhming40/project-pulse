@@ -35,7 +35,7 @@ import { QuoteParams, formatCurrency, formatPercentage } from "@/lib/quoteCalcul
 import { Plot } from "@/lib/plotly";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useFitRates } from "@/hooks/useFitRates";
+import { useFitRates, SPECIAL_CONDITION_LABELS, type SpecialCondition } from "@/hooks/useFitRates";
 
 // 收益模式類型
 type RevenueMode = 'self_consumption' | 'feed_in_tariff';
@@ -248,7 +248,7 @@ export default function QuoteFinancialAnalysisTab({
   const labels = getRevenueLabels(revenueMode);
   
   // 躉購費率查詢
-  const { lookupRate, currentYear, isLoading: isLoadingRates } = useFitRates();
+  const { lookupRate, currentYear, currentPeriod, isLoading: isLoadingRates } = useFitRates();
   const [fitRateSource, setFitRateSource] = useState<'system' | 'manual'>('system');
   
   // 可調整的條件設定參數
@@ -257,16 +257,26 @@ export default function QuoteFinancialAnalysisTab({
   const [electricityRate, setElectricityRate] = useState(formData.tariffRate || 4.5);
   const [fitRate, setFitRate] = useState(formData.tariffRate || 4.2); // 躉購費率
   const [insuranceRate, setInsuranceRate] = useState((formData.insuranceRate || 0.0055) * 100);
-  const [includeHighEfficiency, setIncludeHighEfficiency] = useState(true);
+  
+  // 各項加成條件開關 - 可由報價單控制
+  const [includeHighEfficiency, setIncludeHighEfficiency] = useState(true); // VPC 認證模組
+  const [includeRooftopGridFee, setIncludeRooftopGridFee] = useState(false); // 屋頂型併網工程費
+  const [specialCondition, setSpecialCondition] = useState<'fishery' | 'agriculture' | 'highway_service' | 'school_sports' | 'school_metal_plate' | null>(null);
+  
+  // 判斷是否符合併網工程費條件（屋頂型 且 容量 < 500kWp）
+  const isEligibleForRooftopGridFee = useMemo(() => {
+    return (formData.capacityKwp || 0) < 500; // 屋頂型假設，且容量小於500kWp
+  }, [formData.capacityKwp]);
   
   // 自動查詢躉購費率
   const systemFitRate = useMemo(() => {
     if (!formData.capacityKwp) return null;
     return lookupRate(formData.capacityKwp, 'rooftop', undefined, undefined, {
       includeHighEfficiency,
-      includeRooftopGridFee: false, // 併網工程費通常不計入財務分析
+      includeRooftopGridFee: includeRooftopGridFee && isEligibleForRooftopGridFee,
+      specialCondition,
     });
-  }, [formData.capacityKwp, lookupRate, includeHighEfficiency]);
+  }, [formData.capacityKwp, lookupRate, includeHighEfficiency, includeRooftopGridFee, isEligibleForRooftopGridFee, specialCondition]);
   
   // 當系統費率可用且來源為系統時，自動更新費率
   useEffect(() => {
@@ -456,27 +466,86 @@ export default function QuoteFinancialAnalysisTab({
                   className="h-8 w-24 text-right font-semibold text-primary"
                 />
               </div>
-              {/* 躉售模式顯示系統費率資訊 */}
+              {/* 躉售模式顯示系統費率資訊與明細 */}
               {revenueMode === 'feed_in_tariff' && (
-                <div className="flex items-center gap-2 mt-1">
+                <div className="mt-1 space-y-2">
                   {systemFitRate ? (
                     <>
-                      <Badge 
-                        variant={fitRateSource === 'system' ? 'default' : 'secondary'} 
-                        className="text-xs cursor-pointer"
-                        onClick={() => {
-                          if (systemFitRate) {
-                            setFitRate(systemFitRate.totalRate);
-                            setFitRateSource('system');
-                          }
-                        }}
-                      >
-                        <Database className="h-3 w-3 mr-1" />
-                        系統 ${systemFitRate.totalRate.toFixed(4)}
-                      </Badge>
-                      {fitRateSource === 'manual' && (
-                        <span className="text-xs text-muted-foreground">(已覆寫)</span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant={fitRateSource === 'system' ? 'default' : 'secondary'} 
+                          className="text-xs cursor-pointer"
+                          onClick={() => {
+                            if (systemFitRate) {
+                              setFitRate(systemFitRate.totalRate);
+                              setFitRateSource('system');
+                            }
+                          }}
+                        >
+                          <Database className="h-3 w-3 mr-1" />
+                          系統 ${systemFitRate.totalRate.toFixed(4)}
+                        </Badge>
+                        {fitRateSource === 'manual' && (
+                          <span className="text-xs text-muted-foreground">(已覆寫)</span>
+                        )}
+                      </div>
+                      {/* 費率組成明細 */}
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="text-xs text-muted-foreground cursor-help bg-muted/50 rounded px-2 py-1 inline-block">
+                              <span className="font-mono">
+                                {systemFitRate.baseRate.toFixed(4)}
+                                {includeHighEfficiency && systemFitRate.highEfficiencyBonus > 0 && (
+                                  <span className="text-green-600"> + {systemFitRate.highEfficiencyBonus.toFixed(4)}</span>
+                                )}
+                                {includeRooftopGridFee && systemFitRate.rooftopGridFee > 0 && (
+                                  <span className="text-blue-600"> + {systemFitRate.rooftopGridFee.toFixed(4)}</span>
+                                )}
+                                {systemFitRate.specialBonus > 0 && (
+                                  <span className="text-amber-600"> + {systemFitRate.specialBonus.toFixed(4)}</span>
+                                )}
+                                <span className="text-foreground font-semibold"> = {systemFitRate.totalRate.toFixed(4)}</span>
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="bottom" className="max-w-xs">
+                            <div className="space-y-1 text-xs">
+                              <p className="font-semibold">費率組成明細 ({currentYear}年第{currentPeriod}期)</p>
+                              <div className="flex justify-between">
+                                <span>基本費率：</span>
+                                <span className="font-mono">${systemFitRate.baseRate.toFixed(4)}</span>
+                              </div>
+                              {includeHighEfficiency && systemFitRate.highEfficiencyBonus > 0 && (
+                                <div className="flex justify-between text-green-600">
+                                  <span>高效能模組加成 (VPC)：</span>
+                                  <span className="font-mono">+${systemFitRate.highEfficiencyBonus.toFixed(4)}</span>
+                                </div>
+                              )}
+                              {includeRooftopGridFee && systemFitRate.rooftopGridFee > 0 && (
+                                <div className="flex justify-between text-blue-600">
+                                  <span>屋頂型併網工程費：</span>
+                                  <span className="font-mono">+${systemFitRate.rooftopGridFee.toFixed(4)}</span>
+                                </div>
+                              )}
+                              {systemFitRate.specialBonus > 0 && systemFitRate.specialBonusType && (
+                                <div className="flex justify-between text-amber-600">
+                                  <span>{SPECIAL_CONDITION_LABELS[systemFitRate.specialBonusType]}：</span>
+                                  <span className="font-mono">+${systemFitRate.specialBonus.toFixed(4)}</span>
+                                </div>
+                              )}
+                              <Separator className="my-1" />
+                              <div className="flex justify-between font-semibold">
+                                <span>合計費率：</span>
+                                <span className="font-mono">${systemFitRate.totalRate.toFixed(4)}/度</span>
+                              </div>
+                              <p className="text-muted-foreground pt-1">
+                                ※ 模組回收費 ${systemFitRate.moduleRecyclingFee.toFixed(4)}/度 僅供參考，不計入收益
+                              </p>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     </>
                   ) : (
                     <span className="text-xs text-muted-foreground">
@@ -506,7 +575,7 @@ export default function QuoteFinancialAnalysisTab({
               <ChevronDown className="h-4 w-4" />
               進階參數設定
             </CollapsibleTrigger>
-            <CollapsibleContent className="pt-3">
+            <CollapsibleContent className="pt-3 space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-muted/50 rounded-lg">
                 {/* 保險費率 */}
                 <div className="space-y-1">
@@ -526,27 +595,6 @@ export default function QuoteFinancialAnalysisTab({
                   </div>
                 </div>
                 
-                {/* 高效能模組加成 - 僅躉售模式顯示 */}
-                {revenueMode === 'feed_in_tariff' && systemFitRate && (
-                  <div className="space-y-1">
-                    <Label className="text-muted-foreground text-xs">高效能模組加成</Label>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        type="button"
-                        variant={includeHighEfficiency ? "default" : "outline"}
-                        size="sm"
-                        className="h-7 text-xs"
-                        onClick={() => setIncludeHighEfficiency(!includeHighEfficiency)}
-                      >
-                        {includeHighEfficiency ? '已含' : '未含'}
-                      </Button>
-                      <span className="text-xs text-muted-foreground">
-                        +${systemFitRate.highEfficiencyBonus.toFixed(4)}/度
-                      </span>
-                    </div>
-                  </div>
-                )}
-                
                 {/* 年衰減率 - 顯示為資訊 */}
                 <div>
                   <Label className="text-muted-foreground text-xs">年發電衰減率</Label>
@@ -564,6 +612,96 @@ export default function QuoteFinancialAnalysisTab({
                   </p>
                 </div>
               </div>
+              
+              {/* 躉購費率加成條件 - 僅躉售模式顯示 */}
+              {revenueMode === 'feed_in_tariff' && (
+                <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg space-y-3">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-4 w-4 text-primary" />
+                    <Label className="text-sm font-medium">躉購費率加成條件</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-xs">依據經濟部公告之「再生能源電能躉購費率及其計算公式」，各項加成需符合相應條件方可適用。</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {/* 高效能模組加成 (VPC) */}
+                    <div className="flex items-center justify-between p-2 bg-background rounded border">
+                      <div>
+                        <p className="text-xs font-medium">高效能模組加成</p>
+                        <p className="text-[10px] text-muted-foreground">需使用 VPC 認證模組</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant={includeHighEfficiency ? "default" : "outline"}
+                        size="sm"
+                        className="h-7 text-xs min-w-16"
+                        onClick={() => setIncludeHighEfficiency(!includeHighEfficiency)}
+                      >
+                        {includeHighEfficiency ? '適用' : '不適用'}
+                      </Button>
+                    </div>
+                    
+                    {/* 屋頂型併網工程費 */}
+                    <div className="flex items-center justify-between p-2 bg-background rounded border">
+                      <div>
+                        <p className="text-xs font-medium">屋頂型併網工程費</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          屋頂型且容量{'<'}500kWp
+                          {!isEligibleForRooftopGridFee && <span className="text-destructive ml-1">(不符合)</span>}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant={includeRooftopGridFee && isEligibleForRooftopGridFee ? "default" : "outline"}
+                        size="sm"
+                        className="h-7 text-xs min-w-16"
+                        disabled={!isEligibleForRooftopGridFee}
+                        onClick={() => setIncludeRooftopGridFee(!includeRooftopGridFee)}
+                      >
+                        {includeRooftopGridFee && isEligibleForRooftopGridFee ? '適用' : '不適用'}
+                      </Button>
+                    </div>
+                    
+                    {/* 特殊條件選擇 */}
+                    <div className="flex items-center justify-between p-2 bg-background rounded border md:col-span-2 lg:col-span-1">
+                      <div>
+                        <p className="text-xs font-medium">特殊條件加成</p>
+                        <p className="text-[10px] text-muted-foreground">農漁業/高速公路/學校等</p>
+                      </div>
+                      <select
+                        value={specialCondition || ''}
+                        onChange={(e) => setSpecialCondition((e.target.value || null) as SpecialCondition | null)}
+                        className="h-7 text-xs px-2 border rounded bg-background min-w-24"
+                      >
+                        <option value="">無</option>
+                        <option value="fishery">漁業環境友善</option>
+                        <option value="agriculture">農業經營結合綠能</option>
+                        <option value="highway_service">高速公路服務區</option>
+                        <option value="school_sports">學校光電運動場</option>
+                        <option value="school_metal_plate">學校金屬浪板</option>
+                      </select>
+                    </div>
+                  </div>
+                  
+                  {/* 條件說明 */}
+                  <div className="text-[10px] text-muted-foreground space-y-0.5 pt-1 border-t">
+                    <p>• <strong>VPC 認證</strong>：模組需通過台灣自願性產品驗證 (VPC)</p>
+                    <p>• <strong>屋頂型併網工程費</strong>：屋頂型設備且容量低於 500kWp 始適用</p>
+                    <p>• <strong>漁業環境友善</strong>：結合漁業經營之太陽光電設施</p>
+                    <p>• <strong>農業經營結合綠能</strong>：農業設施或農業用地結合綠能設置</p>
+                    <p>• <strong>高速公路服務區</strong>：高速公路服務區停車場土地設置</p>
+                    <p>• <strong>學校光電運動場</strong>：學校光電球場型態設施</p>
+                  </div>
+                </div>
+              )}
             </CollapsibleContent>
           </Collapsible>
         </CardContent>
