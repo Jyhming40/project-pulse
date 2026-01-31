@@ -2421,6 +2421,7 @@ export type Database = {
           sort_order: number | null
           spec_description: string | null
           subtotal: number | null
+          tiered_bonus_rate: number | null
           tiered_pricing_type: string | null
           unit: string | null
           unit_price: number | null
@@ -2443,6 +2444,7 @@ export type Database = {
           sort_order?: number | null
           spec_description?: string | null
           subtotal?: number | null
+          tiered_bonus_rate?: number | null
           tiered_pricing_type?: string | null
           unit?: string | null
           unit_price?: number | null
@@ -2465,6 +2467,7 @@ export type Database = {
           sort_order?: number | null
           spec_description?: string | null
           subtotal?: number | null
+          tiered_bonus_rate?: number | null
           tiered_pricing_type?: string | null
           unit?: string | null
           unit_price?: number | null
