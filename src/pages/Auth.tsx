@@ -36,7 +36,7 @@ export default function AuthPage() {
   // Determine which logo to use based on theme
   const logoUrl = mode === 'dark' ? settings?.logo_dark_url : settings?.logo_light_url;
   const systemName = settings?.system_name_zh || '明群環能';
-  const companyName = settings?.company_name_zh || '案場與投資方管理系統';
+  const companyName = settings?.company_name_zh || '案場與業務單位管理系統';
 
   // Form states
   const [email, setEmail] = useState('');

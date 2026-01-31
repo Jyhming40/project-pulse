@@ -29,55 +29,55 @@ const constraintData: Record<ImportType, ConstraintInfo> = {
     tableName: '案場',
     uniqueKeys: [
       { columns: ['project_code'], description: '案場編號必須唯一' },
-      { columns: ['site_code_display'], description: '案場代碼（年度+投資方+序號）自動生成，必須唯一' },
+      { columns: ['site_code_display'], description: '案場代碼（年度+業務單位+序號）自動生成，必須唯一' },
     ],
     foreignKeys: [
-      { column: 'investor_id', references: 'investors.id', description: '投資方必須存在於系統中' },
+      { column: 'investor_id', references: 'investors.id', description: '業務單位必須存在於系統中' },
     ],
     notes: [
       '匯入時以「案場編號」(project_code) 作為重複判斷依據',
       'site_code_display 由系統根據 intake_year、investor_code、seq 自動生成',
-      '若指定投資方名稱，系統會自動查詢對應的 investor_id',
+      '若指定業務單位名稱，系統會自動查詢對應的 investor_id',
     ],
   },
   investors: {
     table: 'investors',
-    tableName: '投資方',
+    tableName: '業務單位',
     uniqueKeys: [
-      { columns: ['investor_code'], description: '投資方編號必須唯一（自動轉為大寫）' },
+      { columns: ['investor_code'], description: '業務單位編號必須唯一（自動轉為大寫）' },
     ],
     foreignKeys: [],
     notes: [
-      '匯入時以「投資方編號」(investor_code) 作為重複判斷依據',
-      '投資方編號會自動轉換為大寫字母',
+      '匯入時以「業務單位編號」(investor_code) 作為重複判斷依據',
+      '業務單位編號會自動轉換為大寫字母',
     ],
   },
   investor_contacts: {
     table: 'investor_contacts',
-    tableName: '投資方聯絡人',
+    tableName: '業務單位聯絡人',
     uniqueKeys: [
-      { columns: ['investor_id', 'contact_name'], description: '同一投資方下聯絡人姓名必須唯一' },
+      { columns: ['investor_id', 'contact_name'], description: '同一業務單位下聯絡人姓名必須唯一' },
     ],
     foreignKeys: [
-      { column: 'investor_id', references: 'investors.id', description: '投資方必須存在於系統中' },
+      { column: 'investor_id', references: 'investors.id', description: '業務單位必須存在於系統中' },
     ],
     notes: [
-      '匯入時以「投資方編號 + 聯絡人姓名」作為重複判斷依據',
-      '必須先匯入或建立投資方，才能匯入該投資方的聯絡人',
+      '匯入時以「業務單位編號 + 聯絡人姓名」作為重複判斷依據',
+      '必須先匯入或建立業務單位，才能匯入該業務單位的聯絡人',
     ],
   },
   investor_payment_methods: {
     table: 'investor_payment_methods',
-    tableName: '投資方支付方式',
+    tableName: '業務單位支付方式',
     uniqueKeys: [
-      { columns: ['investor_id', 'method_type', 'account_number'], description: '同一投資方下相同付款方式與帳號必須唯一' },
+      { columns: ['investor_id', 'method_type', 'account_number'], description: '同一業務單位下相同付款方式與帳號必須唯一' },
     ],
     foreignKeys: [
-      { column: 'investor_id', references: 'investors.id', description: '投資方必須存在於系統中' },
+      { column: 'investor_id', references: 'investors.id', description: '業務單位必須存在於系統中' },
     ],
     notes: [
-      '匯入時以「投資方編號 + 付款方式 + 帳號」作為重複判斷依據',
-      '必須先匯入或建立投資方，才能匯入該投資方的支付方式',
+      '匯入時以「業務單位編號 + 付款方式 + 帳號」作為重複判斷依據',
+      '必須先匯入或建立業務單位，才能匯入該業務單位的支付方式',
     ],
   },
   documents: {

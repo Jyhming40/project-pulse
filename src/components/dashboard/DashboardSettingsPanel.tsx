@@ -240,7 +240,7 @@ export function DashboardSettingsPanel({
 
             <div className="space-y-3">
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground">投資方</Label>
+                <Label className="text-xs text-muted-foreground">業務單位</Label>
                 <Select
                   value={localFilters.investor}
                   onValueChange={(v) => handleFilterChange('investor', v)}
@@ -249,7 +249,7 @@ export function DashboardSettingsPanel({
                     <SelectValue placeholder="全部" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">全部投資方</SelectItem>
+                    <SelectItem value="all">全部業務單位</SelectItem>
                     {investors.map((inv) => (
                       <SelectItem key={inv.id} value={inv.id}>
                         [{inv.investor_code}] {inv.company_name}

@@ -155,9 +155,9 @@ export function DuplicateScannerSettingsPanel({ onSettingsChange }: DuplicateSca
           <div className="p-3 rounded-lg bg-muted/50 border text-sm space-y-2">
             <p className="font-medium">說明</p>
             <ul className="text-muted-foreground space-y-1 text-xs">
-              <li>• <strong>高可信度</strong>：案場編號完全相同，或投資方+年份+序號完全相同（皆非空）</li>
+              <li>• <strong>高可信度</strong>：案場編號完全相同，或業務單位+年份+序號完全相同（皆非空）</li>
               <li>• <strong>中可信度</strong>：地址或名稱相似度達到門檻值</li>
-              <li>• <strong>低可信度</strong>：同投資方且同鄉鎮市區且容量接近</li>
+              <li>• <strong>低可信度</strong>：同業務單位且同鄉鎮市區且容量接近</li>
             </ul>
           </div>
         </div>

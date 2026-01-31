@@ -183,7 +183,7 @@ export function InvestorDataPanel() {
                   聯絡人資料
                 </CardTitle>
                 <CardDescription>
-                  匯出所有投資方的聯絡人資料，共 {allContacts.length} 筆
+                  匯出所有業務單位的聯絡人資料，共 {allContacts.length} 筆
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -225,7 +225,7 @@ export function InvestorDataPanel() {
                   支付方式資料
                 </CardTitle>
                 <CardDescription>
-                  匯出所有投資方的支付方式資料，共 {allPaymentMethods.length} 筆
+                  匯出所有業務單位的支付方式資料，共 {allPaymentMethods.length} 筆
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -435,7 +435,7 @@ export function InvestorDataPanel() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>投資方</TableHead>
+                                <TableHead>業務單位</TableHead>
                                 <TableHead>姓名</TableHead>
                                 <TableHead>電話</TableHead>
                                 <TableHead>Email</TableHead>
@@ -584,7 +584,7 @@ export function InvestorDataPanel() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>投資方</TableHead>
+                                <TableHead>業務單位</TableHead>
                                 <TableHead>類型</TableHead>
                                 <TableHead>銀行</TableHead>
                                 <TableHead>帳號</TableHead>

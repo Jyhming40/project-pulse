@@ -789,7 +789,7 @@ export default function Projects() {
               )}
               <SortableTableHead sortKey="site_code_display" currentSortKey={sortConfig.key} currentDirection={getSortInfo('site_code_display').direction} sortIndex={getSortInfo('site_code_display').index} onSort={handleSort}>案場編號</SortableTableHead>
               <SortableTableHead sortKey="project_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('project_name').direction} sortIndex={getSortInfo('project_name').index} onSort={handleSort}>案場名稱</SortableTableHead>
-              <SortableTableHead sortKey="investors.company_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investors.company_name').direction} sortIndex={getSortInfo('investors.company_name').index} onSort={handleSort}>投資方</SortableTableHead>
+              <SortableTableHead sortKey="investors.company_name" currentSortKey={sortConfig.key} currentDirection={getSortInfo('investors.company_name').direction} sortIndex={getSortInfo('investors.company_name').index} onSort={handleSort}>業務單位</SortableTableHead>
               <SortableTableHead sortKey="status" currentSortKey={sortConfig.key} currentDirection={getSortInfo('status').direction} sortIndex={getSortInfo('status').index} onSort={handleSort}>狀態</SortableTableHead>
               <SortableTableHead sortKey="doc_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('doc_progress').direction} sortIndex={getSortInfo('doc_progress').index} onSort={handleSort}>文件</SortableTableHead>
               <SortableTableHead sortKey="overall_progress" currentSortKey={sortConfig.key} currentDirection={getSortInfo('overall_progress').direction} sortIndex={getSortInfo('overall_progress').index} onSort={handleSort}>總進度</SortableTableHead>
@@ -1038,13 +1038,13 @@ export default function Projects() {
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="investor_id">投資方 *</Label>
+                  <Label htmlFor="investor_id">業務單位 *</Label>
                   <Select 
                     value={formData.investor_id || ''} 
                     onValueChange={handleInvestorChange}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="選擇投資方" />
+                      <SelectValue placeholder="選擇業務單位" />
                     </SelectTrigger>
                     <SelectContent>
                       {investors.map(inv => (
@@ -1055,10 +1055,10 @@ export default function Projects() {
                     </SelectContent>
                   </Select>
                   {selectedInvestorCode && (
-                    <p className="text-xs text-primary">投資方代碼：{selectedInvestorCode}</p>
+                    <p className="text-xs text-primary">業務單位代碼：{selectedInvestorCode}</p>
                   )}
                   {formData.investor_id && !selectedInvestorCode && (
-                    <p className="text-xs text-destructive">⚠️ 此投資方尚未設定代碼</p>
+                    <p className="text-xs text-destructive">⚠️ 此業務單位尚未設定代碼</p>
                   )}
                 </div>
                 <div className="space-y-2">
@@ -1111,13 +1111,13 @@ export default function Projects() {
             {editingProject && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="investor_id">投資方</Label>
+                  <Label htmlFor="investor_id">業務單位</Label>
                   <Select 
                     value={formData.investor_id || ''} 
                     onValueChange={(value) => setFormData({ ...formData, investor_id: value })}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="選擇投資方" />
+                      <SelectValue placeholder="選擇業務單位" />
                     </SelectTrigger>
                     <SelectContent>
                       {investors.map(inv => (

@@ -201,7 +201,7 @@ export default function MilestoneNotificationSettings({ milestones }: MilestoneN
   const recipientTypes = [
     { key: 'admins', label: '系統管理員', icon: Users, description: '所有管理員帳號' },
     { key: 'project_creator', label: '專案建立者', icon: UserCircle, description: '建立該專案的人員' },
-    { key: 'investor_contacts', label: '投資方聯絡人', icon: Building2, description: '專案所屬投資方的主要聯絡人' },
+    { key: 'investor_contacts', label: '業務單位聯絡人', icon: Building2, description: '專案所屬業務單位的主要聯絡人' },
   ];
 
   // Filter active milestones and sort by type

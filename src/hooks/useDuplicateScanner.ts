@@ -408,7 +408,7 @@ export function useDuplicateScanner() {
 
             // Auxiliary conditions (add to matched list but don't determine confidence alone)
             if (sameInvestor) {
-              matchedCriteria.push({ name: '同投資方', matched: true, value: p1.investor_name || p1.investor_code || '' });
+              matchedCriteria.push({ name: '同業務單位', matched: true, value: p1.investor_name || p1.investor_code || '' });
             }
 
             if (sameTownship) {
@@ -432,7 +432,7 @@ export function useDuplicateScanner() {
           // Low confidence: same investor + same township + capacity within 15%
           // But must NOT have extremely low similarity (already filtered by hard exclusion)
           if (sameInvestor && sameTownship && capacityDiff <= 15) {
-            matchedCriteria.push({ name: '同投資方', matched: true, value: p1.investor_name || '' });
+            matchedCriteria.push({ name: '同業務單位', matched: true, value: p1.investor_name || '' });
             matchedCriteria.push({ name: '同鄉鎮市區', matched: true, value: `${p1.city}${p1.district}` });
             matchedCriteria.push({ name: '容量接近', matched: true, value: `差距 ${capacityDiff.toFixed(1)}%` });
             
@@ -454,8 +454,8 @@ export function useDuplicateScanner() {
 
         // Add remaining unmatched criteria for display
         if (confidenceLevel) {
-          if (!sameInvestor && !matchedCriteria.some(c => c.name === '同投資方')) {
-            unmatchedCriteria.push({ name: '同投資方', matched: false });
+          if (!sameInvestor && !matchedCriteria.some(c => c.name === '同業務單位')) {
+            unmatchedCriteria.push({ name: '同業務單位', matched: false });
           }
           if (capacityDiff > 15 && !matchedCriteria.some(c => c.name === '容量接近')) {
             unmatchedCriteria.push({ name: '容量接近', matched: false, value: `差距 ${capacityDiff.toFixed(1)}%` });

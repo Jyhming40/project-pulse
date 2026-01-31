@@ -82,7 +82,7 @@ const projectColumns = [
 
 const projectLabels: Record<string, string> = {
   id: 'ID', project_code: '案場編號', project_name: '案場名稱', site_code_display: '案場代碼',
-  investor_code: '投資方代碼', status: '狀態', capacity_kwp: '容量(kWp)', actual_installed_capacity: '實際容量',
+  investor_code: '業務單位代碼', status: '狀態', capacity_kwp: '容量(kWp)', actual_installed_capacity: '實際容量',
   feeder_code: '饋線代號', city: '縣市', district: '鄉鎮區', address: '地址', coordinates: '座標',
   land_owner: '地主', land_owner_contact: '地主聯絡方式', contact_person: '聯絡人', contact_phone: '聯絡電話',
   fiscal_year: '年度', intake_year: '收件年度', seq: '序號', approval_date: '同意備案日',
@@ -120,7 +120,7 @@ const documentFileLabels: Record<string, string> = {
 // Investor columns
 const investorColumns = ['id', 'investor_code', 'company_name', 'investor_type', 'owner_name', 'owner_title', 'tax_id', 'address', 'phone', 'email', 'contact_person', 'note', 'created_at', 'updated_at'];
 const investorLabels: Record<string, string> = {
-  id: 'ID', investor_code: '投資方代碼', company_name: '公司名稱', investor_type: '投資方類型',
+  id: 'ID', investor_code: '業務單位代碼', company_name: '公司名稱', investor_type: '業務單位類型',
   owner_name: '負責人', owner_title: '負責人職稱', tax_id: '統一編號', address: '地址',
   phone: '電話', email: 'Email', contact_person: '聯絡人', note: '備註',
   created_at: '建立時間', updated_at: '更新時間'
@@ -129,7 +129,7 @@ const investorLabels: Record<string, string> = {
 // Investor contact columns
 const investorContactColumns = ['id', 'investor_code', 'contact_name', 'title', 'department', 'phone', 'mobile', 'email', 'line_id', 'role_tags', 'is_primary', 'is_active', 'note', 'created_at', 'updated_at'];
 const investorContactLabels: Record<string, string> = {
-  id: 'ID', investor_code: '投資方代碼', contact_name: '聯絡人姓名', title: '職稱', department: '部門',
+  id: 'ID', investor_code: '業務單位代碼', contact_name: '聯絡人姓名', title: '職稱', department: '部門',
   phone: '電話', mobile: '手機', email: 'Email', line_id: 'Line ID', role_tags: '角色標籤',
   is_primary: '主要聯絡人', is_active: '啟用', note: '備註', created_at: '建立時間', updated_at: '更新時間'
 };
@@ -137,7 +137,7 @@ const investorContactLabels: Record<string, string> = {
 // Investor payment method columns
 const investorPaymentColumns = ['id', 'investor_code', 'method_type', 'bank_name', 'bank_code', 'branch_name', 'account_name', 'account_number', 'is_default', 'note', 'created_at', 'updated_at'];
 const investorPaymentLabels: Record<string, string> = {
-  id: 'ID', investor_code: '投資方代碼', method_type: '付款方式', bank_name: '銀行名稱',
+  id: 'ID', investor_code: '業務單位代碼', method_type: '付款方式', bank_name: '銀行名稱',
   bank_code: '銀行代碼', branch_name: '分行名稱', account_name: '戶名', account_number: '帳號',
   is_default: '預設', note: '備註', created_at: '建立時間', updated_at: '更新時間'
 };
@@ -276,17 +276,17 @@ export function useProjectBackup() {
 
     try {
       // 1. Fetch investors
-      setProgress({ current: 1, total: 12, phase: 'exporting', currentSheet: '投資方' });
+      setProgress({ current: 1, total: 12, phase: 'exporting', currentSheet: '業務單位' });
       const investors = await fetchAllRecords<Investor>('investors', '*', 'created_at');
       const investorIdToCode = new Map<string, string>();
       investors.forEach(i => investorIdToCode.set(i.id, i.investor_code));
 
       // 2. Fetch investor contacts
-      setProgress({ current: 2, total: 12, phase: 'exporting', currentSheet: '投資方聯絡人' });
+      setProgress({ current: 2, total: 12, phase: 'exporting', currentSheet: '業務單位聯絡人' });
       const investorContacts = await fetchAllRecords<InvestorContact>('investor_contacts', '*', 'created_at');
 
       // 3. Fetch investor payment methods
-      setProgress({ current: 3, total: 12, phase: 'exporting', currentSheet: '投資方付款方式' });
+      setProgress({ current: 3, total: 12, phase: 'exporting', currentSheet: '業務單位付款方式' });
       const investorPayments = await fetchAllRecords<InvestorPaymentMethod>('investor_payment_methods', '*', 'created_at');
 
       // 4. Fetch partners
@@ -360,7 +360,7 @@ export function useProjectBackup() {
         });
         return row;
       });
-      XLSX.utils.book_append_sheet(workbook, createSheet(investorData, investorColumns, investorLabels), '投資方');
+      XLSX.utils.book_append_sheet(workbook, createSheet(investorData, investorColumns, investorLabels), '業務單位');
 
       // 2. Investor contacts sheet
       const contactData = investorContacts.map(c => {
@@ -376,7 +376,7 @@ export function useProjectBackup() {
         });
         return row;
       });
-      XLSX.utils.book_append_sheet(workbook, createSheet(contactData, investorContactColumns, investorContactLabels), '投資方聯絡人');
+      XLSX.utils.book_append_sheet(workbook, createSheet(contactData, investorContactColumns, investorContactLabels), '業務單位聯絡人');
 
       // 3. Investor payment methods sheet
       const paymentData = investorPayments.map(p => {
@@ -390,7 +390,7 @@ export function useProjectBackup() {
         });
         return row;
       });
-      XLSX.utils.book_append_sheet(workbook, createSheet(paymentData, investorPaymentColumns, investorPaymentLabels), '投資方付款方式');
+      XLSX.utils.book_append_sheet(workbook, createSheet(paymentData, investorPaymentColumns, investorPaymentLabels), '業務單位付款方式');
 
       // 4. Partners sheet
       const partnerData = partners.map(p => {
@@ -546,7 +546,7 @@ export function useProjectBackup() {
 
       setProgress({ current: 12, total: 12, phase: 'done', exportStats });
       toast.success('備份匯出完成', {
-        description: `投資方 ${investors.length}、廠商 ${partners.length}、案場 ${projects.length}、權限 ${modulePermissions.length} 筆`
+        description: `業務單位 ${investors.length}、廠商 ${partners.length}、案場 ${projects.length}、權限 ${modulePermissions.length} 筆`
       });
     } catch (error) {
       console.error('Export error:', error);
@@ -567,9 +567,9 @@ export function useProjectBackup() {
     };
 
     // Add all sheets in order
-    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(investorColumns, investorLabels), '投資方');
-    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(investorContactColumns, investorContactLabels), '投資方聯絡人');
-    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(investorPaymentColumns, investorPaymentLabels), '投資方付款方式');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(investorColumns, investorLabels), '業務單位');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(investorContactColumns, investorContactLabels), '業務單位聯絡人');
+    XLSX.utils.book_append_sheet(workbook, createTemplateSheet(investorPaymentColumns, investorPaymentLabels), '業務單位付款方式');
     XLSX.utils.book_append_sheet(workbook, createTemplateSheet(partnerColumns, partnerLabels), '廠商');
     XLSX.utils.book_append_sheet(workbook, createTemplateSheet(projectColumns, projectLabels), '案場主表');
     XLSX.utils.book_append_sheet(workbook, createTemplateSheet(statusHistoryColumns, statusHistoryLabels), '狀態歷程');
@@ -642,9 +642,9 @@ export function useProjectBackup() {
       });
 
       // 1. Import Investors
-      const investorSheetName = workbook.SheetNames.find(s => s === '投資方');
+      const investorSheetName = workbook.SheetNames.find(s => s === '業務單位');
       if (investorSheetName) {
-        setProgress({ current: 1, total: 11, phase: 'importing', currentSheet: '投資方' });
+        setProgress({ current: 1, total: 11, phase: 'importing', currentSheet: '業務單位' });
         const sheet = workbook.Sheets[investorSheetName];
         const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
         const reversedLabels = reverseLabels(investorLabels);
@@ -675,12 +675,12 @@ export function useProjectBackup() {
 
             // Validate required fields
             if (!investorCode) {
-              summary.errorList.push({ row: rowNum, sheet: '投資方', message: '缺少投資方代碼', errorType: 'validation' });
+              summary.errorList.push({ row: rowNum, sheet: '業務單位', message: '缺少業務單位代碼', errorType: 'validation' });
               summary.investors.errors++;
               continue;
             }
             if (!mapped.company_name) {
-              summary.errorList.push({ row: rowNum, sheet: '投資方', field: 'company_name', message: '缺少公司名稱', errorType: 'validation', code: investorCode });
+              summary.errorList.push({ row: rowNum, sheet: '業務單位', field: 'company_name', message: '缺少公司名稱', errorType: 'validation', code: investorCode });
               summary.investors.errors++;
               continue;
             }
@@ -694,7 +694,7 @@ export function useProjectBackup() {
 
             if (existingId) {
               if (mode === 'insert') {
-                summary.errorList.push({ row: rowNum, sheet: '投資方', message: '投資方已存在（僅新增模式）', errorType: 'unique_constraint', code: investorCode });
+                summary.errorList.push({ row: rowNum, sheet: '業務單位', message: '業務單位已存在（僅新增模式）', errorType: 'unique_constraint', code: investorCode });
                 summary.investors.errors++;
               } else if (mode === 'skip') {
                 summary.investors.skipped++;
@@ -702,7 +702,7 @@ export function useProjectBackup() {
               } else {
                 const { error } = await supabase.from('investors').update(mapped as any).eq('id', existingId);
                 if (error) {
-                  summary.errorList.push({ row: rowNum, sheet: '投資方', message: error.message, errorType: 'unknown', code: investorCode });
+                  summary.errorList.push({ row: rowNum, sheet: '業務單位', message: error.message, errorType: 'unknown', code: investorCode });
                   summary.investors.errors++;
                 } else {
                   summary.investors.updated++;
@@ -712,7 +712,7 @@ export function useProjectBackup() {
             } else {
               const { data: inserted, error } = await supabase.from('investors').insert(mapped as any).select('id').single();
               if (error) {
-                summary.errorList.push({ row: rowNum, sheet: '投資方', message: error.message, errorType: 'unknown', code: investorCode });
+                summary.errorList.push({ row: rowNum, sheet: '業務單位', message: error.message, errorType: 'unknown', code: investorCode });
                 summary.investors.errors++;
               } else if (inserted) {
                 summary.investors.inserted++;
@@ -720,16 +720,16 @@ export function useProjectBackup() {
               }
             }
           } catch (err) {
-            summary.errorList.push({ row: rowNum, sheet: '投資方', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.errorList.push({ row: rowNum, sheet: '業務單位', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
             summary.investors.errors++;
           }
         }
       }
 
       // 2. Import Investor Contacts
-      const contactSheetName = workbook.SheetNames.find(s => s === '投資方聯絡人');
+      const contactSheetName = workbook.SheetNames.find(s => s === '業務單位聯絡人');
       if (contactSheetName) {
-        setProgress({ current: 2, total: 11, phase: 'importing', currentSheet: '投資方聯絡人' });
+        setProgress({ current: 2, total: 11, phase: 'importing', currentSheet: '業務單位聯絡人' });
         const sheet = workbook.Sheets[contactSheetName];
         const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
         const reversedLabels = reverseLabels(investorContactLabels);
@@ -761,19 +761,19 @@ export function useProjectBackup() {
             });
 
             if (!investorCode) {
-              summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', message: '缺少投資方代碼', errorType: 'validation' });
+              summary.errorList.push({ row: rowNum, sheet: '業務單位聯絡人', message: '缺少業務單位代碼', errorType: 'validation' });
               summary.investorContacts.errors++;
               continue;
             }
             if (!mapped.contact_name) {
-              summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', field: 'contact_name', message: '缺少聯絡人姓名', errorType: 'validation', code: investorCode });
+              summary.errorList.push({ row: rowNum, sheet: '業務單位聯絡人', field: 'contact_name', message: '缺少聯絡人姓名', errorType: 'validation', code: investorCode });
               summary.investorContacts.errors++;
               continue;
             }
 
             const investorId = investorCodeToId.get(investorCode);
             if (!investorId) {
-              summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', message: `找不到投資方代碼「${investorCode}」`, errorType: 'not_found', code: investorCode });
+              summary.errorList.push({ row: rowNum, sheet: '業務單位聯絡人', message: `找不到業務單位代碼「${investorCode}」`, errorType: 'not_found', code: investorCode });
               summary.investorContacts.errors++;
               continue;
             }
@@ -783,14 +783,14 @@ export function useProjectBackup() {
 
             if (existingId) {
               if (mode === 'insert') {
-                summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', message: '記錄已存在（僅新增模式）', errorType: 'unique_constraint', code: investorCode });
+                summary.errorList.push({ row: rowNum, sheet: '業務單位聯絡人', message: '記錄已存在（僅新增模式）', errorType: 'unique_constraint', code: investorCode });
                 summary.investorContacts.errors++;
               } else if (mode === 'skip') {
                 summary.investorContacts.skipped++;
               } else {
                 const { error } = await supabase.from('investor_contacts').update(mapped).eq('id', existingId);
                 if (error) {
-                  summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', message: error.message, errorType: 'unknown', code: investorCode });
+                  summary.errorList.push({ row: rowNum, sheet: '業務單位聯絡人', message: error.message, errorType: 'unknown', code: investorCode });
                   summary.investorContacts.errors++;
                 } else {
                   summary.investorContacts.updated++;
@@ -799,23 +799,23 @@ export function useProjectBackup() {
             } else {
               const { error } = await supabase.from('investor_contacts').insert(mapped as any);
               if (error) {
-                summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', message: error.message, errorType: 'unknown', code: investorCode });
+                summary.errorList.push({ row: rowNum, sheet: '業務單位聯絡人', message: error.message, errorType: 'unknown', code: investorCode });
                 summary.investorContacts.errors++;
               } else {
                 summary.investorContacts.inserted++;
               }
             }
           } catch (err) {
-            summary.errorList.push({ row: rowNum, sheet: '投資方聯絡人', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.errorList.push({ row: rowNum, sheet: '業務單位聯絡人', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
             summary.investorContacts.errors++;
           }
         }
       }
 
       // 3. Import Investor Payment Methods
-      const paymentSheetName = workbook.SheetNames.find(s => s === '投資方付款方式');
+      const paymentSheetName = workbook.SheetNames.find(s => s === '業務單位付款方式');
       if (paymentSheetName) {
-        setProgress({ current: 3, total: 11, phase: 'importing', currentSheet: '投資方付款方式' });
+        setProgress({ current: 3, total: 11, phase: 'importing', currentSheet: '業務單位付款方式' });
         const sheet = workbook.Sheets[paymentSheetName];
         const rows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, { raw: false, dateNF: 'yyyy-mm-dd' });
         const reversedLabels = reverseLabels(investorPaymentLabels);
@@ -844,19 +844,19 @@ export function useProjectBackup() {
             });
 
             if (!investorCode) {
-              summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', message: '缺少投資方代碼', errorType: 'validation' });
+              summary.errorList.push({ row: rowNum, sheet: '業務單位付款方式', message: '缺少業務單位代碼', errorType: 'validation' });
               summary.investorPaymentMethods.errors++;
               continue;
             }
             if (!mapped.method_type) {
-              summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', field: 'method_type', message: '缺少付款方式', errorType: 'validation', code: investorCode });
+              summary.errorList.push({ row: rowNum, sheet: '業務單位付款方式', field: 'method_type', message: '缺少付款方式', errorType: 'validation', code: investorCode });
               summary.investorPaymentMethods.errors++;
               continue;
             }
 
             const investorId = investorCodeToId.get(investorCode);
             if (!investorId) {
-              summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', message: `找不到投資方代碼「${investorCode}」`, errorType: 'not_found', code: investorCode });
+              summary.errorList.push({ row: rowNum, sheet: '業務單位付款方式', message: `找不到業務單位代碼「${investorCode}」`, errorType: 'not_found', code: investorCode });
               summary.investorPaymentMethods.errors++;
               continue;
             }
@@ -866,14 +866,14 @@ export function useProjectBackup() {
 
             if (existingId) {
               if (mode === 'insert') {
-                summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', message: '記錄已存在（僅新增模式）', errorType: 'unique_constraint', code: investorCode });
+                summary.errorList.push({ row: rowNum, sheet: '業務單位付款方式', message: '記錄已存在（僅新增模式）', errorType: 'unique_constraint', code: investorCode });
                 summary.investorPaymentMethods.errors++;
               } else if (mode === 'skip') {
                 summary.investorPaymentMethods.skipped++;
               } else {
                 const { error } = await supabase.from('investor_payment_methods').update(mapped).eq('id', existingId);
                 if (error) {
-                  summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', message: error.message, errorType: 'unknown', code: investorCode });
+                  summary.errorList.push({ row: rowNum, sheet: '業務單位付款方式', message: error.message, errorType: 'unknown', code: investorCode });
                   summary.investorPaymentMethods.errors++;
                 } else {
                   summary.investorPaymentMethods.updated++;
@@ -882,14 +882,14 @@ export function useProjectBackup() {
             } else {
               const { error } = await supabase.from('investor_payment_methods').insert(mapped as any);
               if (error) {
-                summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', message: error.message, errorType: 'unknown', code: investorCode });
+                summary.errorList.push({ row: rowNum, sheet: '業務單位付款方式', message: error.message, errorType: 'unknown', code: investorCode });
                 summary.investorPaymentMethods.errors++;
               } else {
                 summary.investorPaymentMethods.inserted++;
               }
             }
           } catch (err) {
-            summary.errorList.push({ row: rowNum, sheet: '投資方付款方式', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
+            summary.errorList.push({ row: rowNum, sheet: '業務單位付款方式', message: err instanceof Error ? err.message : '未知錯誤', errorType: 'unknown' });
             summary.investorPaymentMethods.errors++;
           }
         }
@@ -1036,7 +1036,7 @@ export function useProjectBackup() {
               if (investorId) {
                 mapped.investor_id = investorId;
               } else {
-                summary.errorList.push({ row: rowNum, sheet: '案場主表', field: 'investor_code', message: `找不到投資方代碼「${investorCode}」`, errorType: 'not_found', code: mapped.project_code });
+                summary.errorList.push({ row: rowNum, sheet: '案場主表', field: 'investor_code', message: `找不到業務單位代碼「${investorCode}」`, errorType: 'not_found', code: mapped.project_code });
                 summary.projects.errors++;
                 continue;
               }
