@@ -7,6 +7,13 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Popover,
   PopoverContent,
   PopoverTrigger,
@@ -23,15 +30,22 @@ import {
   Sparkles,
   Minimize2,
   Maximize2,
+  Zap,
+  CheckCircle,
+  AlertCircle,
+  XCircle,
+  Settings2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import ReactMarkdown from "react-markdown";
+import { useAISettings } from "@/hooks/useAISettings";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  provider?: string;
 }
 
 // Route context mapping for AI awareness
@@ -85,6 +99,19 @@ const QUICK_ACTIONS: Record<string, string[]> = {
 
 // Mode types
 type AssistantMode = "chat" | "summary" | "help";
+type ProviderType = "gemini" | "openai" | "lovable";
+
+const PROVIDER_LABELS: Record<ProviderType, string> = {
+  gemini: "Google Gemini",
+  openai: "OpenAI ChatGPT",
+  lovable: "Lovable Cloud AI",
+};
+
+const PROVIDER_SHORT_LABELS: Record<ProviderType, string> = {
+  gemini: "Gemini",
+  openai: "OpenAI",
+  lovable: "Lovable",
+};
 
 export default function GlobalAIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
@@ -93,8 +120,19 @@ export default function GlobalAIAssistant() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<AssistantMode>("chat");
+  const [selectedProvider, setSelectedProvider] = useState<ProviderType>("lovable");
+  const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
+
+  const { defaultProvider, geminiKey, openaiKey, isLoading: isLoadingSettings } = useAISettings();
+
+  // Set initial provider from settings
+  useEffect(() => {
+    if (defaultProvider?.setting_value) {
+      setSelectedProvider(defaultProvider.setting_value as ProviderType);
+    }
+  }, [defaultProvider]);
 
   // Get current route context
   const currentContext = ROUTE_CONTEXT[location.pathname] || 
@@ -105,17 +143,18 @@ export default function GlobalAIAssistant() {
 
   const quickActions = QUICK_ACTIONS[location.pathname] || QUICK_ACTIONS.default;
 
+  // Check if provider is available
+  const isProviderAvailable = (provider: ProviderType): boolean => {
+    if (provider === "lovable") return true;
+    if (provider === "gemini") return geminiKey?.is_enabled && !!geminiKey?.setting_value;
+    if (provider === "openai") return openaiKey?.is_enabled && !!openaiKey?.setting_value;
+    return false;
+  };
+
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
-
-  // Reset messages when changing pages
-  useEffect(() => {
-    if (messages.length > 0 && !isOpen) {
-      // Keep history but could reset if needed
-    }
-  }, [location.pathname]);
 
   const generateId = () => Math.random().toString(36).substring(7);
 
@@ -149,6 +188,7 @@ export default function GlobalAIAssistant() {
           ],
           currentPage: location.pathname,
           mode,
+          selectedProvider,
         },
       });
 
@@ -161,6 +201,7 @@ export default function GlobalAIAssistant() {
         role: "assistant",
         content: response.data?.content || "抱歉，我無法處理您的請求。請稍後再試。",
         timestamp: new Date(),
+        provider: response.data?.provider,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -176,7 +217,7 @@ export default function GlobalAIAssistant() {
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, messages, currentContext, location.pathname, mode]);
+  }, [input, isLoading, messages, currentContext, location.pathname, mode, selectedProvider]);
 
   const handleQuickAction = (action: string) => {
     handleSend(action);
@@ -206,6 +247,17 @@ export default function GlobalAIAssistant() {
       default:
         return "對話";
     }
+  };
+
+  const getProviderStatusIcon = (provider: ProviderType) => {
+    if (provider === "lovable") {
+      return <CheckCircle className="h-3 w-3 text-green-500" />;
+    }
+    const available = isProviderAvailable(provider);
+    if (available) {
+      return <CheckCircle className="h-3 w-3 text-green-500" />;
+    }
+    return <XCircle className="h-3 w-3 text-muted-foreground" />;
   };
 
   return (
@@ -247,6 +299,14 @@ export default function GlobalAIAssistant() {
                       variant="ghost"
                       size="icon"
                       className="h-7 w-7 text-primary-foreground hover:bg-primary-foreground/20"
+                      onClick={() => setShowSettings(!showSettings)}
+                    >
+                      <Settings2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 text-primary-foreground hover:bg-primary-foreground/20"
                       onClick={() => setIsExpanded(!isExpanded)}
                     >
                       {isExpanded ? (
@@ -260,6 +320,50 @@ export default function GlobalAIAssistant() {
               </CardHeader>
 
               <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+                {/* Settings Panel (collapsible) */}
+                {showSettings && (
+                  <div className="p-3 border-b bg-muted/50 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium">AI 模型</span>
+                      <Badge variant="outline" className="text-xs gap-1">
+                        <Zap className="h-3 w-3" />
+                        {PROVIDER_SHORT_LABELS[selectedProvider]}
+                      </Badge>
+                    </div>
+                    <Select
+                      value={selectedProvider}
+                      onValueChange={(v) => setSelectedProvider(v as ProviderType)}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="選擇 AI 模型" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(["gemini", "openai", "lovable"] as ProviderType[]).map((provider) => {
+                          const available = isProviderAvailable(provider);
+                          return (
+                            <SelectItem 
+                              key={provider} 
+                              value={provider}
+                              disabled={!available && provider !== "lovable"}
+                            >
+                              <div className="flex items-center gap-2">
+                                {getProviderStatusIcon(provider)}
+                                <span>{PROVIDER_LABELS[provider]}</span>
+                                {!available && provider !== "lovable" && (
+                                  <span className="text-xs text-muted-foreground">(未設定)</span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[10px] text-muted-foreground">
+                      可在「系統設定 &gt; 外部整合」設定 API 金鑰
+                    </p>
+                  </div>
+                )}
+
                 {/* Mode Selector */}
                 <div className="flex gap-1 p-2 border-b bg-muted/30">
                   {(["chat", "summary", "help"] as AssistantMode[]).map((m) => (
@@ -284,6 +388,10 @@ export default function GlobalAIAssistant() {
                         <Lightbulb className="h-8 w-8 mx-auto mb-2 opacity-50" />
                         <p>您好！我是 AI 助理</p>
                         <p className="text-xs mt-1">在「{currentContext.name}」頁面為您服務</p>
+                        <p className="text-[10px] mt-2 flex items-center justify-center gap-1">
+                          <Zap className="h-3 w-3" />
+                          使用 {PROVIDER_LABELS[selectedProvider]}
+                        </p>
                       </div>
                       
                       <Separator />
@@ -322,8 +430,18 @@ export default function GlobalAIAssistant() {
                             }`}
                           >
                             {message.role === "assistant" ? (
-                              <div className="prose prose-sm dark:prose-invert max-w-none">
-                                <ReactMarkdown>{message.content}</ReactMarkdown>
+                              <div className="space-y-1">
+                                <div className="prose prose-sm dark:prose-invert max-w-none">
+                                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                                </div>
+                                {message.provider && (
+                                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground pt-1 border-t border-border/50 mt-2">
+                                    <Sparkles className="h-2.5 w-2.5" />
+                                    {message.provider === "gemini" && "Gemini"}
+                                    {message.provider === "openai" && "OpenAI"}
+                                    {message.provider === "lovable" && "Lovable AI"}
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               message.content
