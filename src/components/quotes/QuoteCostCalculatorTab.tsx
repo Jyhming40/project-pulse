@@ -22,7 +22,7 @@ import { useTieredPricing } from "@/hooks/useTieredPricing";
 import EngineeringCategoryCard from "./EngineeringCategoryCard";
 import EquipmentModulesCard from "./EquipmentModulesCard";
 import EquipmentInvertersCard from "./EquipmentInvertersCard";
-import BudgetVsActualSheet from "./BudgetVsActualSheet";
+
 
 interface CostTotals {
   engineeringTotal: number;
@@ -30,11 +30,22 @@ interface CostTotals {
   invertersTotal: number;
 }
 
+interface OverheadBreakdown {
+  stampDuty: number;
+  corpTax: number;
+}
+
+interface ProjectExpenseBreakdown {
+  brokerage: number;
+  maintenanceReserve: number;
+}
+
 interface QuoteCostCalculatorTabProps {
   quoteId: string;
   formData: Partial<QuoteParams>;
   setFormData: (data: Partial<QuoteParams>) => void;
   onCostChange?: (costs: CostTotals) => void;
+  onBreakdownChange?: (overhead: OverheadBreakdown, projectExpense: ProjectExpenseBreakdown) => void;
   // Lifted state for modules and inverters
   modules: ModuleItem[];
   setModules: (modules: ModuleItem[]) => void;
@@ -54,6 +65,7 @@ export default function QuoteCostCalculatorTab({
   formData,
   setFormData,
   onCostChange,
+  onBreakdownChange,
   modules,
   setModules,
   inverters,
@@ -147,6 +159,11 @@ export default function QuoteCostCalculatorTab({
     onCostChange?.(totals);
   }, [totals, onCostChange]);
 
+  // Notify parent of breakdown changes
+  useEffect(() => {
+    onBreakdownChange?.(overheadBreakdown, projectExpenseBreakdown);
+  }, [overheadBreakdown, projectExpenseBreakdown, onBreakdownChange]);
+
   // 更新類別
   const handleUpdateCategory = (index: number, category: EngineeringCategory) => {
     const newCategories = [...categories];
@@ -197,17 +214,6 @@ export default function QuoteCostCalculatorTab({
 
   return (
     <div className="space-y-4">
-      {/* 右側抽屜式成本摘要 (預算 vs 實際) */}
-      <BudgetVsActualSheet
-        quoteId={quoteId}
-        engineeringTotal={totals.engineeringTotal}
-        modulesTotal={totals.modulesTotal}
-        invertersTotal={totals.invertersTotal}
-        sellingPrice={sellingPrice}
-        taxRate={formData.taxRate}
-        overheadBreakdown={overheadBreakdown}
-        projectExpenseBreakdown={projectExpenseBreakdown}
-      />
 
       {/* 動作列 */}
       <div className="flex items-center justify-between">

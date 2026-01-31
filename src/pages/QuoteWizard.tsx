@@ -15,6 +15,7 @@ import {
   Save,
   X,
   FileOutput,
+  ClipboardCheck,
   Sparkles,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -24,6 +25,7 @@ import QuoteCostCalculatorTab from "@/components/quotes/QuoteCostCalculatorTab";
 import QuoteFinancialAnalysisTab from "@/components/quotes/QuoteFinancialAnalysisTab";
 import QuoteScheduleTab from "@/components/quotes/QuoteScheduleTab";
 import QuotationOutputEditor from "@/components/quotes/QuotationOutputEditor";
+import QuoteBudgetTrackingTab from "@/components/quotes/QuoteBudgetTrackingTab";
 import QuoteInsightReport from "@/components/quotes/QuoteInsightReport";
 import { calculate20YearProjection, QuoteParams } from "@/lib/quoteCalculations";
 import { 
@@ -46,6 +48,7 @@ const STEPS = [
   { id: "financial", label: "投資分析", icon: TrendingUp, description: "IRR 與現金流" },
   { id: "schedule", label: "工程時程", icon: Calendar, description: "施工排程規劃" },
   { id: "output", label: "報價單產出", icon: FileOutput, description: "編輯並輸出報價單" },
+  { id: "tracking", label: "成本追蹤", icon: ClipboardCheck, description: "預算 vs 實際" },
 ];
 
 interface CostTotals {
@@ -90,6 +93,8 @@ export default function QuoteWizard() {
     modulesTotal: 0,
     invertersTotal: 0,
   });
+  const [overheadBreakdown, setOverheadBreakdown] = useState({ stampDuty: 0, corpTax: 0 });
+  const [projectExpenseBreakdown, setProjectExpenseBreakdown] = useState({ brokerage: 0, maintenanceReserve: 0 });
   const [brokerageRate, setBrokerageRate] = useState(0);
   const [showDocumentDialog, setShowDocumentDialog] = useState(false);
 
@@ -631,6 +636,10 @@ export default function QuoteWizard() {
             formData={formData}
             setFormData={setFormData}
             onCostChange={setCostTotals}
+            onBreakdownChange={(overhead, projectExpense) => {
+              setOverheadBreakdown(overhead);
+              setProjectExpenseBreakdown(projectExpense);
+            }}
             modules={modules}
             setModules={setModules}
             inverters={inverters}
@@ -666,6 +675,19 @@ export default function QuoteWizard() {
             categories={categories}
             modules={modules}
             inverters={inverters}
+          />
+        );
+      case "tracking":
+        return (
+          <QuoteBudgetTrackingTab
+            quoteId={id || ""}
+            engineeringTotal={costTotals.engineeringTotal}
+            modulesTotal={costTotals.modulesTotal}
+            invertersTotal={costTotals.invertersTotal}
+            sellingPrice={(formData.capacityKwp || 0) * (formData.pricePerKwp || 0)}
+            taxRate={formData.taxRate}
+            overheadBreakdown={overheadBreakdown}
+            projectExpenseBreakdown={projectExpenseBreakdown}
           />
         );
       default:
