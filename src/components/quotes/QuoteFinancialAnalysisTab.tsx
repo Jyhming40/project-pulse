@@ -52,8 +52,8 @@ interface SelfInvestYearData {
   cumulativeCashFlow: number;
 }
 
-// 計算自投資模式的 20 年預測
-function calculateSelfInvestProjection(params: QuoteParams, totalInvestment: number) {
+// 計算自投資模式的 20 年預測（支援自訂日照天數）
+function calculateSelfInvestProjectionWithDays(params: QuoteParams, totalInvestment: number, sunshineDays: number = 365) {
   const data: SelfInvestYearData[] = [];
   const cashFlows: number[] = [-totalInvestment]; // 初始投資為負
   
@@ -67,13 +67,13 @@ function calculateSelfInvestProjection(params: QuoteParams, totalInvestment: num
   const yearlyInsurance = totalInvestment * (params.insuranceRate || 0.0055);
   
   for (let year = 1; year <= 20; year++) {
-    // 發電量 (每年衰減 1%)
-    const baseGeneration = (params.capacityKwp || 0) * (params.sunshineHours || 3.8) * 365;
+    // 發電量 (每年衰減 1%) - 使用自訂日照天數
+    const baseGeneration = (params.capacityKwp || 0) * (params.sunshineHours || 3.2) * sunshineDays;
     const degradation = Math.pow(1 - (params.annualDegradationRate || 0.01), year - 1);
     const generationKwh = baseGeneration * degradation;
     
     // 節省電費 (以台電電價計算)
-    const electricitySaving = generationKwh * (params.tariffRate || 4.09);
+    const electricitySaving = generationKwh * (params.tariffRate || 4.5);
     cumulativeSaving += electricitySaving;
     
     // 保固費率 (1-5年: 0%, 6-10年: 6%, 11-15年: 7%, 16-20年: 8%)
@@ -131,7 +131,7 @@ function calculateSelfInvestProjection(params: QuoteParams, totalInvestment: num
   const costPerKwh = totalGeneration > 0 ? totalCost / totalGeneration : 0;
   
   // 與台電電價比較
-  const gridRate = params.tariffRate || 4.09;
+  const gridRate = params.tariffRate || 4.5;
   const savingsVsGrid = gridRate > 0 ? (costPerKwh / gridRate) * 100 : 0;
   
   return {
@@ -191,15 +191,29 @@ export default function QuoteFinancialAnalysisTab({
   const [showTable, setShowTable] = useState(true);
   const [roofRentalRate, setRoofRentalRate] = useState(12); // 預設 12%
   
+  // 可調整的條件設定參數
+  const [sunshineHours, setSunshineHours] = useState(formData.sunshineHours || 3.2);
+  const [sunshineDays, setSunshineDays] = useState(365);
+  const [electricityRate, setElectricityRate] = useState(formData.tariffRate || 4.5);
+  const [insuranceRate, setInsuranceRate] = useState((formData.insuranceRate || 0.0055) * 100);
+  
   // 計算投資總額（從 formData 取得）
   const totalInvestment = useMemo(() => {
     return (formData.capacityKwp || 0) * (formData.pricePerKwp || 0);
   }, [formData.capacityKwp, formData.pricePerKwp]);
   
-  // 使用自投資模式計算
+  // 使用自投資模式計算 - 使用本地調整後的參數
+  const adjustedParams = useMemo(() => ({
+    ...formData,
+    sunshineHours,
+    tariffRate: electricityRate,
+    insuranceRate: insuranceRate / 100,
+  }), [formData, sunshineHours, electricityRate, insuranceRate]);
+  
+  // 計算自投資結果 - 考慮自定義的日照天數
   const selfInvestResult = useMemo(() => {
-    return calculateSelfInvestProjection(formData as QuoteParams, totalInvestment);
-  }, [formData, totalInvestment]);
+    return calculateSelfInvestProjectionWithDays(adjustedParams as QuoteParams, totalInvestment, sunshineDays);
+  }, [adjustedParams, totalInvestment, sunshineDays]);
   
   // 屋頂出租評估
   const roofRentalResult = useMemo(() => {
@@ -236,41 +250,134 @@ export default function QuoteFinancialAnalysisTab({
 
   return (
     <div className="space-y-6">
-      {/* 條件設定摘要 */}
+      {/* 條件設定 - 可編輯 */}
       <Card className="bg-muted/30">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Sun className="h-4 w-4" />
             條件設定
+            <Badge variant="outline" className="ml-2 text-xs">可調整</Badge>
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
+            {/* 裝置容量 - 只讀 */}
             <div>
-              <span className="text-muted-foreground">裝置容量</span>
-              <p className="font-semibold">{(formData.capacityKwp || 0).toLocaleString()} kWp</p>
+              <Label className="text-muted-foreground text-xs">裝置容量</Label>
+              <p className="font-semibold mt-1">{(formData.capacityKwp || 0).toLocaleString()} kWp</p>
             </div>
-            <div>
-              <span className="text-muted-foreground">日照時數</span>
-              <p className="font-semibold">{formData.sunshineHours || 3.8} 小時</p>
+            
+            {/* 日照時數 - 可編輯 */}
+            <div className="space-y-1">
+              <Label htmlFor="sunshineHours" className="text-muted-foreground text-xs">日照時數</Label>
+              <div className="flex items-center gap-1">
+                <Input
+                  id="sunshineHours"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="10"
+                  value={sunshineHours}
+                  onChange={(e) => setSunshineHours(parseFloat(e.target.value) || 0)}
+                  className="h-8 w-20 text-right font-semibold"
+                />
+                <span className="text-xs text-muted-foreground">小時</span>
+              </div>
             </div>
-            <div>
-              <span className="text-muted-foreground">日照天數</span>
-              <p className="font-semibold">365 天</p>
+            
+            {/* 日照天數 - 可編輯 */}
+            <div className="space-y-1">
+              <Label htmlFor="sunshineDays" className="text-muted-foreground text-xs">日照天數</Label>
+              <div className="flex items-center gap-1">
+                <Input
+                  id="sunshineDays"
+                  type="number"
+                  step="1"
+                  min="1"
+                  max="365"
+                  value={sunshineDays}
+                  onChange={(e) => setSunshineDays(parseInt(e.target.value) || 365)}
+                  className="h-8 w-20 text-right font-semibold"
+                />
+                <span className="text-xs text-muted-foreground">天</span>
+              </div>
             </div>
-            <div>
-              <span className="text-muted-foreground">目前每度電費</span>
-              <p className="font-semibold text-primary">${(formData.tariffRate || 4.09).toFixed(3)}</p>
+            
+            {/* 每度電費 - 可編輯 */}
+            <div className="space-y-1">
+              <Label htmlFor="electricityRate" className="text-muted-foreground text-xs">目前每度電費</Label>
+              <div className="flex items-center gap-1">
+                <span className="text-primary font-semibold">$</span>
+                <Input
+                  id="electricityRate"
+                  type="number"
+                  step="0.001"
+                  min="0"
+                  value={electricityRate}
+                  onChange={(e) => setElectricityRate(parseFloat(e.target.value) || 0)}
+                  className="h-8 w-24 text-right font-semibold text-primary"
+                />
+              </div>
             </div>
+            
+            {/* 每 kWp 單價 - 只讀 */}
             <div>
-              <span className="text-muted-foreground">每 kWp 單價 (未稅)</span>
-              <p className="font-semibold">{formatCurrency(formData.pricePerKwp || 0, 0)}</p>
+              <Label className="text-muted-foreground text-xs">每 kWp 單價 (未稅)</Label>
+              <p className="font-semibold mt-1">{formatCurrency(formData.pricePerKwp || 0, 0)}</p>
             </div>
+            
+            {/* 總裝置金額 - 只讀 */}
             <div>
-              <span className="text-muted-foreground">總裝置金額 (未稅)</span>
-              <p className="font-semibold text-lg">{formatCurrency(totalInvestment, 0)}</p>
+              <Label className="text-muted-foreground text-xs">總裝置金額 (未稅)</Label>
+              <p className="font-semibold text-lg mt-1">{formatCurrency(totalInvestment, 0)}</p>
             </div>
           </div>
+          
+          {/* 進階參數 */}
+          <Collapsible className="mt-4">
+            <CollapsibleTrigger className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <ChevronDown className="h-4 w-4" />
+              進階參數設定
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-3">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-3 bg-muted/50 rounded-lg">
+                {/* 保險費率 */}
+                <div className="space-y-1">
+                  <Label htmlFor="insuranceRate" className="text-muted-foreground text-xs">年保險費率</Label>
+                  <div className="flex items-center gap-1">
+                    <Input
+                      id="insuranceRate"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      max="5"
+                      value={insuranceRate}
+                      onChange={(e) => setInsuranceRate(parseFloat(e.target.value) || 0)}
+                      className="h-8 w-20 text-right font-semibold"
+                    />
+                    <span className="text-xs text-muted-foreground">%</span>
+                  </div>
+                </div>
+                
+                {/* 年衰減率 - 顯示為資訊 */}
+                <div>
+                  <Label className="text-muted-foreground text-xs">年發電衰減率</Label>
+                  <p className="font-semibold mt-1">{((formData.annualDegradationRate || 0.01) * 100).toFixed(1)}%</p>
+                </div>
+                
+                {/* 維運費率說明 */}
+                <div className="col-span-2">
+                  <Label className="text-muted-foreground text-xs">維運費率 (佔電費收益%)</Label>
+                  <p className="text-xs mt-1">
+                    1-5年: <span className="font-semibold">0%</span>、
+                    6-10年: <span className="font-semibold">6%</span>、
+                    11-15年: <span className="font-semibold">7%</span>、
+                    16-20年: <span className="font-semibold">8%</span>
+                  </p>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
         </CardContent>
       </Card>
 
