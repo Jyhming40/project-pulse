@@ -10,11 +10,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Save, Loader2, Building2, MapPin, Phone, User } from "lucide-react";
+import { Save, Loader2, Building2, MapPin, Phone, User, CreditCard } from "lucide-react";
 import { QuoteParams } from "@/lib/quoteCalculations";
 import { format } from "date-fns";
 import QuotePricingSummaryCard from "./QuotePricingSummaryCard";
 import QuoteSuggestionCard from "./QuoteSuggestionCard";
+import { Department } from "@/hooks/useDepartments";
 
 interface CostBreakdown {
   engineeringTotal: number;
@@ -29,6 +30,8 @@ interface QuoteBasicInfoTabProps {
   setProjectId: (id: string | null) => void;
   investorId: string | null;
   setInvestorId: (id: string | null) => void;
+  departmentId: string | null;
+  setDepartmentId: (id: string | null) => void;
   onSave: () => void;
   isSaving: boolean;
   costs?: CostBreakdown;
@@ -43,6 +46,8 @@ export default function QuoteBasicInfoTab({
   setProjectId,
   investorId,
   setInvestorId,
+  departmentId,
+  setDepartmentId,
   onSave,
   isSaving,
   costs,
@@ -93,6 +98,23 @@ export default function QuoteBasicInfoTab({
       return data;
     },
   });
+
+  // Fetch departments with bank info
+  const { data: departments } = useQuery({
+    queryKey: ["departments-for-quote"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("departments")
+        .select("*")
+        .eq("is_active", true)
+        .order("sort_order");
+      if (error) throw error;
+      return data as unknown as Department[];
+    },
+  });
+
+  // Get selected department
+  const selectedDepartment = departments?.find((d) => d.id === departmentId);
 
   // Get selected project and investor
   const selectedProject = projects?.find((p) => p.id === projectId);
@@ -156,7 +178,7 @@ export default function QuoteBasicInfoTab({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-medium">業務單位</Label>
+              <Label className="text-sm font-medium">業務單位（投資方）</Label>
               <Select value={investorId || "__none__"} onValueChange={(v) => setInvestorId(v === "__none__" ? null : v)}>
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="選擇業務單位 (選填)" />
@@ -170,6 +192,36 @@ export default function QuoteBasicInfoTab({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1">
+                <CreditCard className="h-3.5 w-3.5" />
+                收款部門（報價單銀行帳戶）
+              </Label>
+              <Select value={departmentId || "__none__"} onValueChange={(v) => setDepartmentId(v === "__none__" ? null : v)}>
+                <SelectTrigger className="h-10">
+                  <SelectValue placeholder="選擇收款部門 (選填)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">不指定部門</SelectItem>
+                  {departments?.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                      {d.bank_account_number && (
+                        <span className="ml-2 text-muted-foreground text-xs">
+                          ({d.bank_name})
+                        </span>
+                      )}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedDepartment?.bank_account_number && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  帳戶：{selectedDepartment.bank_name} {selectedDepartment.bank_account_number}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

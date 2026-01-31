@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Pencil, Trash2, GripVertical, Building2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
   DialogContent,
@@ -22,9 +23,17 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { useDepartments, Department } from '@/hooks/useDepartments';
 import { Skeleton } from '@/components/ui/skeleton';
+import { taiwanBanks, getBankNameByCode } from '@/config/taiwanBanks';
 
 interface DepartmentFormData {
   code: string;
@@ -32,6 +41,12 @@ interface DepartmentFormData {
   description: string;
   sort_order: number;
   is_active: boolean;
+  // Bank account fields
+  bank_name: string;
+  bank_branch: string;
+  bank_code: string;
+  bank_account_number: string;
+  bank_account_name: string;
 }
 
 const initialFormData: DepartmentFormData = {
@@ -40,6 +55,11 @@ const initialFormData: DepartmentFormData = {
   description: '',
   sort_order: 0,
   is_active: true,
+  bank_name: '',
+  bank_branch: '',
+  bank_code: '',
+  bank_account_number: '',
+  bank_account_name: '',
 };
 
 export function DepartmentsPanel() {
@@ -66,6 +86,11 @@ export function DepartmentsPanel() {
       description: dept.description || '',
       sort_order: dept.sort_order,
       is_active: dept.is_active,
+      bank_name: dept.bank_name || '',
+      bank_branch: dept.bank_branch || '',
+      bank_code: dept.bank_code || '',
+      bank_account_number: dept.bank_account_number || '',
+      bank_account_name: dept.bank_account_name || '',
     });
     setIsDialogOpen(true);
   };
@@ -244,6 +269,80 @@ export function DepartmentsPanel() {
                   onCheckedChange={(checked) => setFormData({ ...formData, is_active: checked })}
                 />
                 <Label htmlFor="is_active">啟用</Label>
+              </div>
+            </div>
+
+            {/* Bank Account Section */}
+            <Separator className="my-4" />
+            <div className="space-y-3">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <Building2 className="h-4 w-4" />
+                銀行帳戶資訊（報價單用）
+              </Label>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bank_code">銀行代碼</Label>
+                  <Select
+                    value={formData.bank_code}
+                    onValueChange={(value) => {
+                      const bankName = getBankNameByCode(value);
+                      setFormData({ 
+                        ...formData, 
+                        bank_code: value,
+                        bank_name: bankName || formData.bank_name 
+                      });
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="選擇銀行" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-60">
+                      {taiwanBanks.map((bank) => (
+                        <SelectItem key={bank.code} value={bank.code}>
+                          {bank.code} - {bank.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bank_name">銀行名稱</Label>
+                  <Input
+                    id="bank_name"
+                    value={formData.bank_name}
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="bank_branch">分行名稱</Label>
+                  <Input
+                    id="bank_branch"
+                    value={formData.bank_branch}
+                    onChange={(e) => setFormData({ ...formData, bank_branch: e.target.value })}
+                    placeholder="台北分行"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="bank_account_name">戶名</Label>
+                  <Input
+                    id="bank_account_name"
+                    value={formData.bank_account_name}
+                    onChange={(e) => setFormData({ ...formData, bank_account_name: e.target.value })}
+                    placeholder="明群環能科技有限公司"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bank_account_number">銀行帳號</Label>
+                <Input
+                  id="bank_account_number"
+                  value={formData.bank_account_number}
+                  onChange={(e) => setFormData({ ...formData, bank_account_number: e.target.value })}
+                  placeholder="1234567890123"
+                />
               </div>
             </div>
           </div>
