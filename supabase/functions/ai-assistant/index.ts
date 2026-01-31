@@ -16,6 +16,7 @@ interface RequestBody {
   currentPage: string;
   mode: "chat" | "summary" | "help";
   selectedProvider?: "gemini" | "openai" | "lovable";
+  selectedModel?: string;
 }
 
 interface AISettings {
@@ -107,7 +108,19 @@ async function getAISettings(supabaseClient: any): Promise<{
   };
 }
 
-async function callGemini(apiKey: string, messages: Message[]): Promise<string> {
+// Map model ID to Gemini API model name
+function getGeminiModelName(modelId: string): string {
+  const mapping: Record<string, string> = {
+    "google/gemini-3-flash-preview": "gemini-2.0-flash",
+    "google/gemini-3-pro-preview": "gemini-2.0-flash", // fallback
+    "google/gemini-2.5-pro": "gemini-1.5-pro",
+    "google/gemini-2.5-flash": "gemini-1.5-flash",
+    "google/gemini-2.5-flash-lite": "gemini-1.5-flash",
+  };
+  return mapping[modelId] || "gemini-2.0-flash";
+}
+
+async function callGemini(apiKey: string, messages: Message[], modelId?: string): Promise<string> {
   // Convert messages to Gemini format
   const contents = messages.map(m => ({
     role: m.role === "assistant" ? "model" : "user",
@@ -123,8 +136,10 @@ async function callGemini(apiKey: string, messages: Message[]): Promise<string> 
     }
   }
   
+  const geminiModel = getGeminiModelName(modelId || "google/gemini-3-flash-preview");
+  
   const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${geminiModel}:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -148,7 +163,20 @@ async function callGemini(apiKey: string, messages: Message[]): Promise<string> 
   return data.candidates?.[0]?.content?.parts?.[0]?.text || "抱歉，我無法回答這個問題。";
 }
 
-async function callOpenAI(apiKey: string, messages: Message[]): Promise<string> {
+// Map model ID to OpenAI model name
+function getOpenAIModelName(modelId: string): string {
+  const mapping: Record<string, string> = {
+    "openai/gpt-5": "gpt-4o",
+    "openai/gpt-5.2": "gpt-4o",
+    "openai/gpt-5-mini": "gpt-4o-mini",
+    "openai/gpt-5-nano": "gpt-4o-mini",
+  };
+  return mapping[modelId] || "gpt-4o-mini";
+}
+
+async function callOpenAI(apiKey: string, messages: Message[], modelId?: string): Promise<string> {
+  const openaiModel = getOpenAIModelName(modelId || "openai/gpt-5-mini");
+  
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -156,7 +184,7 @@ async function callOpenAI(apiKey: string, messages: Message[]): Promise<string> 
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
+      model: openaiModel,
       messages,
       max_tokens: 1000,
       temperature: 0.5,
@@ -173,12 +201,15 @@ async function callOpenAI(apiKey: string, messages: Message[]): Promise<string> 
   return data.choices?.[0]?.message?.content || "抱歉，我無法回答這個問題。";
 }
 
-async function callLovableGateway(messages: Message[]): Promise<string> {
+async function callLovableGateway(messages: Message[], modelId?: string): Promise<string> {
   const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
   
   if (!LOVABLE_API_KEY) {
     throw new Error("LOVABLE_API_KEY is not configured");
   }
+  
+  // Use provided model or default
+  const model = modelId || "google/gemini-3-flash-preview";
   
   const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
     method: "POST",
@@ -187,7 +218,7 @@ async function callLovableGateway(messages: Message[]): Promise<string> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "google/gemini-3-flash-preview",
+      model,
       messages,
       max_tokens: 1000,
       temperature: 0.5,
@@ -216,7 +247,7 @@ serve(async (req) => {
   }
 
   try {
-    const { messages, currentPage, mode = "chat", selectedProvider = "lovable" } = await req.json() as RequestBody;
+    const { messages, currentPage, mode = "chat", selectedProvider = "lovable", selectedModel } = await req.json() as RequestBody;
 
     // Create Supabase client to read AI settings
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -252,15 +283,16 @@ ${pageKnowledge}
 
     let content: string;
     let usedProvider = selectedProvider;
+    let usedModel = selectedModel || "google/gemini-3-flash-preview";
 
     try {
       if (selectedProvider === "gemini" && geminiKey) {
-        content = await callGemini(geminiKey, enhancedMessages);
+        content = await callGemini(geminiKey, enhancedMessages, selectedModel);
       } else if (selectedProvider === "openai" && openaiKey) {
-        content = await callOpenAI(openaiKey, enhancedMessages);
+        content = await callOpenAI(openaiKey, enhancedMessages, selectedModel);
       } else {
         // Default to Lovable gateway
-        content = await callLovableGateway(enhancedMessages);
+        content = await callLovableGateway(enhancedMessages, selectedModel);
         usedProvider = "lovable";
       }
     } catch (error) {
@@ -289,8 +321,9 @@ ${pageKnowledge}
       if (selectedProvider !== "lovable") {
         console.log(`${selectedProvider} API failed, falling back to Lovable gateway`);
         try {
-          content = await callLovableGateway(enhancedMessages);
+          content = await callLovableGateway(enhancedMessages, "google/gemini-3-flash-preview");
           usedProvider = "lovable";
+          usedModel = "google/gemini-3-flash-preview";
         } catch (fallbackError) {
           throw error; // Re-throw original error if fallback also fails
         }
@@ -303,6 +336,7 @@ ${pageKnowledge}
       success: true, 
       content,
       provider: usedProvider,
+      model: usedModel,
     }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

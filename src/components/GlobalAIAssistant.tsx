@@ -46,6 +46,7 @@ interface Message {
   content: string;
   timestamp: Date;
   provider?: string;
+  model?: string;
 }
 
 // Route context mapping for AI awareness
@@ -101,6 +102,34 @@ const QUICK_ACTIONS: Record<string, string[]> = {
 type AssistantMode = "chat" | "summary" | "help";
 type ProviderType = "gemini" | "openai" | "lovable";
 
+// Available models for each provider
+interface ModelOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
+const PROVIDER_MODELS: Record<ProviderType, ModelOption[]> = {
+  gemini: [
+    { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash (預覽)", description: "快速平衡，適合一般用途" },
+    { id: "google/gemini-3-pro-preview", label: "Gemini 3 Pro (預覽)", description: "下一代強效推理" },
+    { id: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro", description: "頂級效能，複雜推理" },
+    { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "平衡效能與速度" },
+    { id: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", description: "最快速、低成本" },
+  ],
+  openai: [
+    { id: "openai/gpt-5", label: "GPT-5", description: "最強推理能力" },
+    { id: "openai/gpt-5.2", label: "GPT-5.2", description: "最新增強版" },
+    { id: "openai/gpt-5-mini", label: "GPT-5 Mini", description: "平衡效能與成本" },
+    { id: "openai/gpt-5-nano", label: "GPT-5 Nano", description: "極速低成本" },
+  ],
+  lovable: [
+    { id: "google/gemini-3-flash-preview", label: "Gemini 3 Flash (預設)", description: "系統預設模型" },
+    { id: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash", description: "平衡效能與速度" },
+    { id: "openai/gpt-5-mini", label: "GPT-5 Mini", description: "OpenAI 平衡選項" },
+  ],
+};
+
 const PROVIDER_LABELS: Record<ProviderType, string> = {
   gemini: "Google Gemini",
   openai: "OpenAI ChatGPT",
@@ -113,6 +142,15 @@ const PROVIDER_SHORT_LABELS: Record<ProviderType, string> = {
   lovable: "Lovable",
 };
 
+// Get model label for display
+const getModelLabel = (modelId: string): string => {
+  for (const models of Object.values(PROVIDER_MODELS)) {
+    const found = models.find(m => m.id === modelId);
+    if (found) return found.label;
+  }
+  return modelId;
+};
+
 export default function GlobalAIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -121,18 +159,28 @@ export default function GlobalAIAssistant() {
   const [isLoading, setIsLoading] = useState(false);
   const [mode, setMode] = useState<AssistantMode>("chat");
   const [selectedProvider, setSelectedProvider] = useState<ProviderType>("lovable");
+  const [selectedModel, setSelectedModel] = useState<string>("google/gemini-3-flash-preview");
   const [showSettings, setShowSettings] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const location = useLocation();
 
   const { defaultProvider, geminiKey, openaiKey, isLoading: isLoadingSettings } = useAISettings();
 
-  // Set initial provider from settings
+  // Set initial provider and model from settings
   useEffect(() => {
     if (defaultProvider?.setting_value) {
-      setSelectedProvider(defaultProvider.setting_value as ProviderType);
+      const provider = defaultProvider.setting_value as ProviderType;
+      setSelectedProvider(provider);
+      // Set default model for the provider
+      setSelectedModel(PROVIDER_MODELS[provider][0].id);
     }
   }, [defaultProvider]);
+
+  // Update model when provider changes
+  const handleProviderChange = (provider: ProviderType) => {
+    setSelectedProvider(provider);
+    setSelectedModel(PROVIDER_MODELS[provider][0].id);
+  };
 
   // Get current route context
   const currentContext = ROUTE_CONTEXT[location.pathname] || 
@@ -189,6 +237,7 @@ export default function GlobalAIAssistant() {
           currentPage: location.pathname,
           mode,
           selectedProvider,
+          selectedModel,
         },
       });
 
@@ -202,6 +251,7 @@ export default function GlobalAIAssistant() {
         content: response.data?.content || "抱歉，我無法處理您的請求。請稍後再試。",
         timestamp: new Date(),
         provider: response.data?.provider,
+        model: response.data?.model,
       };
 
       setMessages(prev => [...prev, assistantMessage]);
@@ -217,7 +267,7 @@ export default function GlobalAIAssistant() {
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, messages, currentContext, location.pathname, mode, selectedProvider]);
+  }, [input, isLoading, messages, currentContext, location.pathname, mode, selectedProvider, selectedModel]);
 
   const handleQuickAction = (action: string) => {
     handleSend(action);
@@ -322,42 +372,69 @@ export default function GlobalAIAssistant() {
               <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
                 {/* Settings Panel (collapsible) */}
                 {showSettings && (
-                  <div className="p-3 border-b bg-muted/50 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium">AI 模型</span>
-                      <Badge variant="outline" className="text-xs gap-1">
-                        <Zap className="h-3 w-3" />
-                        {PROVIDER_SHORT_LABELS[selectedProvider]}
-                      </Badge>
+                  <div className="p-3 border-b bg-muted/50 space-y-3">
+                    {/* Provider Selection */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium">AI 提供者</span>
+                        <Badge variant="outline" className="text-xs gap-1">
+                          <Zap className="h-3 w-3" />
+                          {PROVIDER_SHORT_LABELS[selectedProvider]}
+                        </Badge>
+                      </div>
+                      <Select
+                        value={selectedProvider}
+                        onValueChange={(v) => handleProviderChange(v as ProviderType)}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="選擇 AI 提供者" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(["gemini", "openai", "lovable"] as ProviderType[]).map((provider) => {
+                            const available = isProviderAvailable(provider);
+                            return (
+                              <SelectItem 
+                                key={provider} 
+                                value={provider}
+                                disabled={!available && provider !== "lovable"}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {getProviderStatusIcon(provider)}
+                                  <span>{PROVIDER_LABELS[provider]}</span>
+                                  {!available && provider !== "lovable" && (
+                                    <span className="text-xs text-muted-foreground">(未設定)</span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <Select
-                      value={selectedProvider}
-                      onValueChange={(v) => setSelectedProvider(v as ProviderType)}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="選擇 AI 模型" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {(["gemini", "openai", "lovable"] as ProviderType[]).map((provider) => {
-                          const available = isProviderAvailable(provider);
-                          return (
-                            <SelectItem 
-                              key={provider} 
-                              value={provider}
-                              disabled={!available && provider !== "lovable"}
-                            >
-                              <div className="flex items-center gap-2">
-                                {getProviderStatusIcon(provider)}
-                                <span>{PROVIDER_LABELS[provider]}</span>
-                                {!available && provider !== "lovable" && (
-                                  <span className="text-xs text-muted-foreground">(未設定)</span>
-                                )}
+
+                    {/* Model Version Selection */}
+                    <div className="space-y-1.5">
+                      <span className="text-xs font-medium">模型版本</span>
+                      <Select
+                        value={selectedModel}
+                        onValueChange={setSelectedModel}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <SelectValue placeholder="選擇模型版本" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {PROVIDER_MODELS[selectedProvider].map((model) => (
+                            <SelectItem key={model.id} value={model.id}>
+                              <div className="flex flex-col items-start">
+                                <span>{model.label}</span>
+                                <span className="text-[10px] text-muted-foreground">{model.description}</span>
                               </div>
                             </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <p className="text-[10px] text-muted-foreground">
                       可在「系統設定 &gt; 外部整合」設定 API 金鑰
                     </p>
@@ -390,7 +467,7 @@ export default function GlobalAIAssistant() {
                         <p className="text-xs mt-1">在「{currentContext.name}」頁面為您服務</p>
                         <p className="text-[10px] mt-2 flex items-center justify-center gap-1">
                           <Zap className="h-3 w-3" />
-                          使用 {PROVIDER_LABELS[selectedProvider]}
+                          使用 {getModelLabel(selectedModel)}
                         </p>
                       </div>
                       
@@ -434,12 +511,16 @@ export default function GlobalAIAssistant() {
                                 <div className="prose prose-sm dark:prose-invert max-w-none">
                                   <ReactMarkdown>{message.content}</ReactMarkdown>
                                 </div>
-                                {message.provider && (
+                                {(message.provider || message.model) && (
                                   <div className="flex items-center gap-1 text-[10px] text-muted-foreground pt-1 border-t border-border/50 mt-2">
                                     <Sparkles className="h-2.5 w-2.5" />
-                                    {message.provider === "gemini" && "Gemini"}
-                                    {message.provider === "openai" && "OpenAI"}
-                                    {message.provider === "lovable" && "Lovable AI"}
+                                    {message.model ? getModelLabel(message.model) : (
+                                      <>
+                                        {message.provider === "gemini" && "Gemini"}
+                                        {message.provider === "openai" && "OpenAI"}
+                                        {message.provider === "lovable" && "Lovable AI"}
+                                      </>
+                                    )}
                                   </div>
                                 )}
                               </div>
