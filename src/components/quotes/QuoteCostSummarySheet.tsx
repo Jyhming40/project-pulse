@@ -95,7 +95,7 @@ export default function QuoteCostSummarySheet({
           className="fixed right-4 top-1/2 -translate-y-1/2 z-40 shadow-lg bg-background hover:bg-primary hover:text-primary-foreground"
         >
           <Calculator className="h-4 w-4 mr-1" />
-          成本摘要
+          預算摘要
         </Button>
       </SheetTrigger>
       <SheetContent side="right" className="w-[380px] sm:w-[440px] overflow-y-auto">
@@ -357,7 +357,7 @@ export default function QuoteCostSummarySheet({
 
           {/* 說明備註 */}
           <p className="text-xs text-muted-foreground leading-relaxed pt-1">
-            此為預估值，實際利潤以結案結算為準。淨利 = 總收 − 直接成本 − 專案支出 − 公司管銷。
+            此為「預算」摘要，實際成本追蹤請至第 6 步「成本追蹤」頁面查看比對分析。
           </p>
         </div>
       </SheetContent>
