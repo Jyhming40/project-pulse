@@ -77,7 +77,7 @@ export default function QuoteCostCalculatorTab({
   }, [templates, loading, categories.length, skipTemplateInit, hasInitialized]);
 
   // 計算各項總計
-  const totals = useMemo(() => {
+  const { totals, overheadBreakdown } = useMemo(() => {
     const capacityKwp = formData.capacityKwp || 0;
     const pricePerKwp = formData.pricePerKwp || 0;
     const taxRate = formData.taxRate || 0.05;
@@ -90,12 +90,24 @@ export default function QuoteCostCalculatorTab({
       tieredPriceCalculator: calculatePrice,
     };
     
-    // 工程項目總計
-    const engineeringTotal = categories.reduce((sum, cat) => {
-      return sum + cat.items.reduce((itemSum, item) => {
-        return itemSum + calculateItemSubtotal(item, capacityKwp, billingContext);
-      }, 0);
-    }, 0);
+    // 工程項目總計 & 公司管銷費用分離
+    let engineeringTotal = 0;
+    let stampDuty = 0;
+    let corpTax = 0;
+    
+    categories.forEach((cat) => {
+      cat.items.forEach((item) => {
+        const subtotal = calculateItemSubtotal(item, capacityKwp, billingContext);
+        engineeringTotal += subtotal;
+        
+        // 識別公司管銷項目
+        if (item.billingMethod === 'stamp_duty') {
+          stampDuty += subtotal;
+        } else if (item.billingMethod === 'corp_tax') {
+          corpTax += subtotal;
+        }
+      });
+    });
 
     // 模組總計
     const modulesTotal = modules.reduce((sum, m) => {
@@ -107,8 +119,11 @@ export default function QuoteCostCalculatorTab({
       return sum + calculateInverterPrice(inv);
     }, 0);
 
-    return { engineeringTotal, modulesTotal, invertersTotal };
-  }, [categories, modules, inverters, exchangeRate, formData.capacityKwp, formData.pricePerKwp, formData.taxRate]);
+    return { 
+      totals: { engineeringTotal, modulesTotal, invertersTotal },
+      overheadBreakdown: { stampDuty, corpTax },
+    };
+  }, [categories, modules, inverters, exchangeRate, formData.capacityKwp, formData.pricePerKwp, formData.taxRate, calculatePrice]);
 
   // Notify parent of cost changes
   useEffect(() => {
@@ -172,6 +187,7 @@ export default function QuoteCostCalculatorTab({
         invertersTotal={totals.invertersTotal}
         sellingPrice={sellingPrice}
         taxRate={formData.taxRate}
+        overheadBreakdown={overheadBreakdown}
       />
 
       {/* 動作列 */}
