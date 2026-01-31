@@ -597,24 +597,57 @@ export default function QuoteInsightReport({
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="pt-4">
-                  <div className="prose prose-sm dark:prose-invert max-w-none prose-table:w-full prose-table:border-collapse prose-td:border prose-td:border-border prose-td:p-2 prose-th:border prose-th:border-border prose-th:p-2 prose-th:bg-muted/50 prose-th:text-left">
+                  <div className="prose prose-sm dark:prose-invert max-w-none">
                     <div className="overflow-x-auto">
                       <ReactMarkdown
                         components={{
                           table: ({ children }) => (
-                            <table className="w-full border-collapse text-sm my-4">{children}</table>
+                            <div className="my-4 overflow-x-auto rounded-lg border border-border">
+                              <table className="w-full border-collapse text-sm min-w-[400px]">{children}</table>
+                            </div>
                           ),
                           thead: ({ children }) => (
-                            <thead className="bg-muted/50">{children}</thead>
+                            <thead className="bg-muted/60 dark:bg-muted/30">{children}</thead>
                           ),
                           th: ({ children }) => (
-                            <th className="border border-border px-3 py-2 text-left font-medium">{children}</th>
+                            <th className="border-b border-border px-3 py-2.5 text-left font-semibold text-foreground whitespace-nowrap">{children}</th>
                           ),
                           td: ({ children }) => (
-                            <td className="border border-border px-3 py-2">{children}</td>
+                            <td className="border-b border-border/50 px-3 py-2">{children}</td>
                           ),
-                          tr: ({ children }) => (
-                            <tr className="even:bg-muted/20">{children}</tr>
+                          tr: ({ children, ...props }) => {
+                            // Check if this is in tbody by looking at children types
+                            const isBodyRow = !(props as any).node?.children?.some((c: any) => c.tagName === 'th');
+                            return (
+                              <tr className={isBodyRow ? "even:bg-muted/30 hover:bg-muted/50 transition-colors" : ""}>
+                                {children}
+                              </tr>
+                            );
+                          },
+                          // Style other markdown elements for consistency
+                          p: ({ children }) => (
+                            <p className="mb-3 leading-relaxed">{children}</p>
+                          ),
+                          ul: ({ children }) => (
+                            <ul className="mb-4 space-y-1 list-disc list-inside">{children}</ul>
+                          ),
+                          ol: ({ children }) => (
+                            <ol className="mb-4 space-y-1 list-decimal list-inside">{children}</ol>
+                          ),
+                          li: ({ children }) => (
+                            <li className="leading-relaxed">{children}</li>
+                          ),
+                          strong: ({ children }) => (
+                            <strong className="font-semibold text-foreground">{children}</strong>
+                          ),
+                          h1: ({ children }) => (
+                            <h1 className="text-lg font-bold mt-4 mb-2 text-foreground">{children}</h1>
+                          ),
+                          h2: ({ children }) => (
+                            <h2 className="text-base font-bold mt-4 mb-2 text-foreground">{children}</h2>
+                          ),
+                          h3: ({ children }) => (
+                            <h3 className="text-sm font-bold mt-3 mb-1.5 text-foreground">{children}</h3>
                           ),
                         }}
                       >

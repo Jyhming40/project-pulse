@@ -69,18 +69,22 @@ async function getAISettings(supabaseClient: any): Promise<{
 }
 
 async function callGemini(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
+  // Use multi-turn conversation format for better instruction following
   const response = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        },
         contents: [
-          { role: "user", parts: [{ text: systemPrompt + "\n\n" + userPrompt }] }
+          { role: "user", parts: [{ text: userPrompt }] }
         ],
         generationConfig: {
           temperature: 0.3,
-          maxOutputTokens: 1500,
+          maxOutputTokens: 2000,
         },
       }),
     }
@@ -93,7 +97,67 @@ async function callGemini(apiKey: string, systemPrompt: string, userPrompt: stri
   }
   
   const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "無法生成洞察報告";
+  const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "無法生成洞察報告";
+  
+  // Post-process to ensure proper markdown table formatting
+  return normalizeMarkdownTables(rawText);
+}
+
+// Helper to normalize markdown tables that might have formatting issues
+function normalizeMarkdownTables(text: string): string {
+  const lines = text.split('\n');
+  const result: string[] = [];
+  let inTable = false;
+  let tableStarted = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmedLine = line.trim();
+    
+    // Detect table row (contains | and looks like a table)
+    const isTableRow = trimmedLine.includes('|') && 
+                       (trimmedLine.startsWith('|') || trimmedLine.endsWith('|')) &&
+                       trimmedLine.split('|').filter(s => s.trim()).length >= 2;
+    
+    if (isTableRow) {
+      // If this is the first row of a new table, ensure blank line before
+      if (!inTable && result.length > 0 && result[result.length - 1].trim() !== '') {
+        result.push('');
+      }
+      
+      inTable = true;
+      
+      // Clean up the table row - ensure proper spacing
+      const cells = trimmedLine.split('|').map(cell => cell.trim());
+      const cleanedRow = '| ' + cells.filter(c => c !== '').join(' | ') + ' |';
+      result.push(cleanedRow);
+      
+      // Check if we need to add a separator row after header
+      if (!tableStarted) {
+        tableStarted = true;
+        // Look ahead to see if next line is a separator
+        const nextLine = lines[i + 1]?.trim() || '';
+        const isSeparator = /^\|[\s\-:|]+\|$/.test(nextLine) || /^[\s\-:|]+$/.test(nextLine);
+        
+        if (!isSeparator) {
+          // Add separator row based on column count
+          const colCount = cells.filter(c => c !== '').length;
+          const separator = '| ' + Array(colCount).fill('---').join(' | ') + ' |';
+          result.push(separator);
+        }
+      }
+    } else {
+      if (inTable && trimmedLine !== '') {
+        // End of table, add blank line after
+        result.push('');
+        inTable = false;
+        tableStarted = false;
+      }
+      result.push(line);
+    }
+  }
+  
+  return result.join('\n');
 }
 
 async function callOpenAI(apiKey: string, systemPrompt: string, userPrompt: string): Promise<string> {
