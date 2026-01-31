@@ -151,6 +151,57 @@ export type Database = {
         }
         Relationships: []
       }
+      company_bank_accounts: {
+        Row: {
+          bank_account_name: string
+          bank_account_number: string
+          bank_branch: string | null
+          bank_code: string
+          bank_name: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          is_default: boolean | null
+          note: string | null
+          sort_order: number | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          bank_account_name: string
+          bank_account_number: string
+          bank_branch?: string | null
+          bank_code: string
+          bank_name: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          note?: string | null
+          sort_order?: number | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          bank_account_name?: string
+          bank_account_number?: string
+          bank_branch?: string | null
+          bank_code?: string
+          bank_name?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_default?: boolean | null
+          note?: string | null
+          sort_order?: number | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       construction_status_history: {
         Row: {
           changed_at: string
@@ -1962,6 +2013,7 @@ export type Database = {
           actual_maintenance_reserve: number | null
           actual_modules_cost: number | null
           annual_degradation_rate: number | null
+          bank_account_id: string | null
           capacity_kwp: number
           created_at: string
           created_by: string | null
@@ -2009,6 +2061,7 @@ export type Database = {
           actual_maintenance_reserve?: number | null
           actual_modules_cost?: number | null
           annual_degradation_rate?: number | null
+          bank_account_id?: string | null
           capacity_kwp?: number
           created_at?: string
           created_by?: string | null
@@ -2056,6 +2109,7 @@ export type Database = {
           actual_maintenance_reserve?: number | null
           actual_modules_cost?: number | null
           annual_degradation_rate?: number | null
+          bank_account_id?: string | null
           capacity_kwp?: number
           created_at?: string
           created_by?: string | null
@@ -2097,6 +2151,13 @@ export type Database = {
           valid_until?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "project_quotes_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "company_bank_accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "project_quotes_department_id_fkey"
             columns: ["department_id"]

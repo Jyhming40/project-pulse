@@ -252,6 +252,10 @@ export default function QuoteWizard() {
       });
       setProjectId(existingQuote.project_id);
       setInvestorId(existingQuote.investor_id);
+      // 載入已儲存的銀行帳戶
+      if (existingQuote.bank_account_id) {
+        setBankAccountId(existingQuote.bank_account_id);
+      }
     }
   }, [existingQuote]);
 
@@ -431,6 +435,7 @@ export default function QuoteWizard() {
       const quoteData = {
         project_id: projectId,
         investor_id: investorId,
+        bank_account_id: bankAccountId,
         capacity_kwp: formData.capacityKwp,
         panel_wattage: formData.panelWattage,
         panel_count: formData.panelCount,
