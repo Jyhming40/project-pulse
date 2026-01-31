@@ -27,7 +27,7 @@ export function ProjectFilterBar({
   filters,
   filterGroups,
   className,
-  searchPlaceholder = "搜尋案場名稱、編號、地址、投資方...",
+  searchPlaceholder = "搜尋案場名稱、編號、地址、業務單位...",
   searchStorageKey = "projects-search-history",
   riskProjectCount,
 }: ProjectFilterBarProps) {

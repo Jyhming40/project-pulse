@@ -227,7 +227,7 @@ const handler = async (req: Request): Promise<Response> => {
                 </tr>
                 ${investor ? `
                 <tr>
-                  <td style="padding: 8px 0; color: #6b7280;">投資方：</td>
+                  <td style="padding: 8px 0; color: #6b7280;">業務單位：</td>
                   <td style="padding: 8px 0; color: #111827;">${investor.company_name}</td>
                 </tr>
                 ` : ''}

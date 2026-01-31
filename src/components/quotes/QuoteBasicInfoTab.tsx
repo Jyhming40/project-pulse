@@ -182,7 +182,7 @@ export default function QuoteBasicInfoTab({
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-medium">業務單位（投資方）</Label>
+              <Label className="text-sm font-medium">業務單位</Label>
               <Select value={investorId || "__none__"} onValueChange={(v) => setInvestorId(v === "__none__" ? null : v)}>
                 <SelectTrigger className="h-10">
                   <SelectValue placeholder="選擇業務單位 (選填)" />

@@ -49,7 +49,7 @@ type InvestorInsertWithRow = InvestorInsert & { _rowIndex?: number };
 const projectColumnMap: Record<string, keyof ProjectInsertWithInvestor> = {
   '案場編號': 'project_code',
   '案場名稱': 'project_name',
-  '投資方': 'investor_name',
+  '業務單位': 'investor_name',
   '狀態': 'status',
   '容量(kWp)': 'capacity_kwp',
   '饋線代號': 'feeder_code',
@@ -70,9 +70,9 @@ const projectColumnMap: Record<string, keyof ProjectInsertWithInvestor> = {
 };
 
 const investorColumnMap: Record<string, keyof InvestorInsertWithRow> = {
-  '投資方編號': 'investor_code',
+  '單位編號': 'investor_code',
   '公司名稱': 'company_name',
-  '投資方類型': 'investor_type',
+  '單位類型': 'investor_type',
   '負責人': 'owner_name',
   '負責人職稱': 'owner_title',
   '統一編號': 'tax_id',
@@ -84,8 +84,8 @@ const investorColumnMap: Record<string, keyof InvestorInsertWithRow> = {
 };
 
 const investorContactColumnMap: Record<string, keyof InvestorContactInsertWithCode> = {
-  '投資方編號': 'investor_code',
-  '投資方名稱': 'investor_name',
+  '單位編號': 'investor_code',
+  '單位名稱': 'investor_name',
   '聯絡人姓名': 'contact_name',
   '職稱': 'title',
   '部門': 'department',
@@ -100,8 +100,8 @@ const investorContactColumnMap: Record<string, keyof InvestorContactInsertWithCo
 };
 
 const investorPaymentMethodColumnMap: Record<string, keyof InvestorPaymentMethodInsertWithCode> = {
-  '投資方編號': 'investor_code',
-  '投資方名稱': 'investor_name',
+  '單位編號': 'investor_code',
+  '單位名稱': 'investor_name',
   '付款方式': 'method_type',
   '銀行名稱': 'bank_name',
   '銀行代碼': 'bank_code',
@@ -291,19 +291,19 @@ function validateProject(data: Partial<ProjectInsertWithInvestor>, rowIndex: num
 }
 
 function validateInvestor(data: Partial<InvestorInsertWithRow>, rowIndex: number): string | null {
-  if (!data.investor_code) return `第 ${rowIndex} 行：缺少投資方編號`;
+  if (!data.investor_code) return `第 ${rowIndex} 行：缺少單位編號`;
   if (!data.company_name) return `第 ${rowIndex} 行：缺少公司名稱`;
   return null;
 }
 
 function validateInvestorContact(data: Partial<InvestorContactInsertWithCode>, rowIndex: number): string | null {
-  if (!data.investor_code) return `第 ${rowIndex} 行：缺少投資方編號`;
+  if (!data.investor_code) return `第 ${rowIndex} 行：缺少單位編號`;
   if (!data.contact_name) return `第 ${rowIndex} 行：缺少聯絡人姓名`;
   return null;
 }
 
 function validateInvestorPaymentMethod(data: Partial<InvestorPaymentMethodInsertWithCode>, rowIndex: number, validMethodTypes: string[]): string | null {
-  if (!data.investor_code) return `第 ${rowIndex} 行：缺少投資方編號`;
+  if (!data.investor_code) return `第 ${rowIndex} 行：缺少單位編號`;
   if (!data.method_type) return `第 ${rowIndex} 行：缺少付款方式`;
   if (validMethodTypes.length > 0 && !validMethodTypes.includes(data.method_type as string)) {
     return `第 ${rowIndex} 行：無效的付款方式「${data.method_type}」`;
@@ -427,7 +427,7 @@ export function useDataImport() {
             if (investorId) {
               mapped.investor_id = investorId;
             } else {
-              errors.push({ row: rowIndex, message: `第 ${rowIndex} 行：找不到投資方「${mapped.investor_name}」` });
+              errors.push({ row: rowIndex, message: `第 ${rowIndex} 行：找不到業務單位「${mapped.investor_name}」` });
               return;
             }
           }
@@ -513,7 +513,7 @@ export function useDataImport() {
             if (investorId) {
               mapped.investor_id = investorId;
             } else {
-              errors.push({ row: rowIndex, message: `第 ${rowIndex} 行：找不到投資方編號「${mapped.investor_code}」` });
+              errors.push({ row: rowIndex, message: `第 ${rowIndex} 行：找不到單位編號「${mapped.investor_code}」` });
               return;
             }
           }
@@ -573,7 +573,7 @@ export function useDataImport() {
             if (investorId) {
               mapped.investor_id = investorId;
             } else {
-              errors.push({ row: rowIndex, message: `第 ${rowIndex} 行：找不到投資方編號「${mapped.investor_code}」` });
+              errors.push({ row: rowIndex, message: `第 ${rowIndex} 行：找不到單位編號「${mapped.investor_code}」` });
               return;
             }
           }
@@ -784,7 +784,7 @@ export function useDataImport() {
               row: rowIndex,
               status: 'error',
               code,
-              message: '唯一鍵衝突：投資方編號已存在',
+              message: '唯一鍵衝突：單位編號已存在',
               errorType: 'unique_constraint',
               field: 'investor_code',
             });
@@ -859,7 +859,7 @@ export function useDataImport() {
               row: rowIndex,
               status: 'error',
               code,
-              message: '唯一鍵衝突：此投資方已有同名聯絡人',
+              message: '唯一鍵衝突：此業務單位已有同名聯絡人',
               errorType: 'unique_constraint',
               field: 'investor_id, contact_name',
             });
@@ -934,7 +934,7 @@ export function useDataImport() {
               row: rowIndex,
               status: 'error',
               code,
-              message: '唯一鍵衝突：此投資方已有相同付款方式',
+              message: '唯一鍵衝突：此業務單位已有相同付款方式',
               errorType: 'unique_constraint',
               field: 'investor_id, method_type, account_number',
             });

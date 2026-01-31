@@ -138,9 +138,9 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
     ],
   },
   investor_type: {
-    label: '投資方類型',
+    label: '業務單位類型',
     icon: Users,
-    description: '投資方分類（自有投資、租賃等）',
+    description: '業務單位分類（自有投資、租賃等）',
     usageMapping: [
       { table: 'investors', column: 'investor_type' },
     ],
@@ -189,7 +189,7 @@ export const codebookCategoryConfig: Record<CodebookCategory, CategoryConfig> = 
   contact_role_tag: {
     label: '聯絡人角色',
     icon: UserCheck,
-    description: '投資方聯絡人角色標籤',
+    description: '業務單位聯絡人角色標籤',
     usageMapping: [
       { table: 'investor_contacts', column: 'role_tags' },
     ],

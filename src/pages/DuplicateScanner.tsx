@@ -50,7 +50,7 @@ const confidenceLevelConfig: Record<ConfidenceLevel, { label: string; color: str
   low: { 
     label: '低可信度', 
     color: 'bg-muted text-muted-foreground',
-    description: '同投資方、同鄉鎮市區、容量相近'
+    description: '同業務單位、同鄉鎮市區、容量相近'
   },
 };
 
@@ -221,7 +221,7 @@ export default function DuplicateScanner() {
           <div className="text-sm">
             <p className="font-medium text-info">掃描說明</p>
             <p className="text-muted-foreground mt-1">
-              系統會根據案場代碼、投資方、地址相似度≥80%、名稱相似度≥75%、同鄉鎮市區等條件比對疑似重複的案場。
+              系統會根據案場代碼、業務單位、地址相似度≥80%、名稱相似度≥75%、同鄉鎮市區等條件比對疑似重複的案場。
               地址相似度與名稱相似度皆低於40%的配對將被排除。所有刪除操作皆為 Soft Delete，可於回收區復原。
             </p>
           </div>
@@ -413,7 +413,7 @@ export default function DuplicateScanner() {
                     <TableHead className="w-[50px]">選擇保留</TableHead>
                     <TableHead>案場編號</TableHead>
                     <TableHead>案場名稱</TableHead>
-                    <TableHead>投資方</TableHead>
+                    <TableHead>業務單位</TableHead>
                     <TableHead>地址</TableHead>
                     <TableHead className="text-right">容量</TableHead>
                     <TableHead>建檔時間</TableHead>

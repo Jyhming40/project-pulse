@@ -1053,7 +1053,7 @@ export default function ProjectDetail() {
         </TabsContent>
 
         {/* ========================================== */}
-        {/* 金流 / 投資資訊 Tab - 投資方資訊 */}
+        {/* 金流 / 投資資訊 Tab - 業務單位資訊 */}
         {/* ========================================== */}
         <TabsContent value="financial" className="space-y-6 mt-6">
           {/* Investor Info */}
@@ -1061,7 +1061,7 @@ export default function ProjectDetail() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center gap-2">
                 <User className="w-5 h-5 text-primary" />
-                投資方資訊
+                業務單位資訊
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1092,12 +1092,12 @@ export default function ProjectDetail() {
                       onClick={() => navigate(`/investors/${project.investor_id}`)}
                     >
                       <User className="w-4 h-4 mr-2" />
-                      查看投資方詳情
+                      查看業務單位詳情
                     </Button>
                   </div>
                 </>
               ) : (
-                <p className="text-muted-foreground">尚未指定投資方</p>
+                <p className="text-muted-foreground">尚未指定業務單位</p>
               )}
             </CardContent>
           </Card>

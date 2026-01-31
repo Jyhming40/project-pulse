@@ -60,10 +60,10 @@ const projectManagementItems = [
 ];
 
 // ==========================================
-// 3. 投資 / 客戶 - 投資方與業主管理
+// 3. 業務單位 - 業務單位與業主管理
 // ==========================================
 const investorItems = [
-  { to: '/investors', icon: Users, label: '投資方 / 業主', module: MODULES.INVESTORS },
+  { to: '/investors', icon: Users, label: '業務單位 / 業主', module: MODULES.INVESTORS },
 ];
 
 // ==========================================
@@ -281,9 +281,9 @@ export default function Layout({ children }: LayoutProps) {
             isInProjects
           )}
 
-          {/* 3. 投資 / 客戶 */}
+          {/* 3. 業務單位 */}
           {renderCollapsibleSection(
-            '投資 / 客戶',
+            '業務單位',
             investorItems,
             Briefcase,
             investorOpen,

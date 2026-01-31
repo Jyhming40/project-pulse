@@ -128,15 +128,15 @@ const FIELD_CATEGORIES: Record<string, CategoryDef> = {
     ]
   },
   investor: {
-    label: '投資方資訊',
+    label: '業務單位資訊',
     icon: Users,
     fields: [
-      { key: 'investor_code', label: '投資方編號' },
-      { key: 'investor_name', label: '投資方名稱' },
-      { key: 'investor_type', label: '投資方類型' },
-      { key: 'investor_contact_person', label: '投資方聯絡人' },
-      { key: 'investor_phone', label: '投資方電話' },
-      { key: 'investor_email', label: '投資方 Email' },
+      { key: 'investor_code', label: '單位編號' },
+      { key: 'investor_name', label: '單位名稱' },
+      { key: 'investor_type', label: '單位類型' },
+      { key: 'investor_contact_person', label: '單位聯絡人' },
+      { key: 'investor_phone', label: '單位電話' },
+      { key: 'investor_email', label: '單位 Email' },
     ]
   },
   documents: {
