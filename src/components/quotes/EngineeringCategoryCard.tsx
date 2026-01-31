@@ -1,4 +1,19 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  KeyboardSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +46,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Plus, Trash2, ChevronDown, GripVertical, Wrench } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Wrench } from "lucide-react";
 import { 
   EngineeringCategory, 
   EngineeringItem, 
@@ -50,6 +65,7 @@ import {
   PRESET_CATEGORY_LABELS,
   PRESET_CATEGORY_ORDER,
 } from "@/hooks/useQuoteEngineeringPresets";
+import { SortableEngineeringRow } from "./SortableEngineeringRow";
 
 interface EngineeringCategoryCardProps {
   category: EngineeringCategory;
@@ -140,6 +156,32 @@ export default function EngineeringCategoryCard({
     setIsEditing(false);
   };
 
+  // 拖曳排序 sensors - 支援滑鼠、觸控、鍵盤
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+    useSensor(KeyboardSensor)
+  );
+
+  // 拖曳排序處理
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const oldIndex = category.items.findIndex(item => item.id === active.id);
+    const newIndex = category.items.findIndex(item => item.id === over.id);
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const newItems = arrayMove(category.items, oldIndex, newIndex);
+      // 更新 sortOrder
+      const updatedItems = newItems.map((item, idx) => ({ ...item, sortOrder: idx }));
+      onUpdate({ ...category, items: updatedItems });
+    }
+  };
+
+  // 項目 ID 列表供 SortableContext 使用
+  const itemIds = useMemo(() => category.items.map(item => item.id), [category.items]);
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <Card className="border-l-4 border-l-primary/50">
@@ -188,270 +230,271 @@ export default function EngineeringCategoryCard({
         </CollapsibleTrigger>
         <CollapsibleContent>
           <CardContent className="pt-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-8"></TableHead>
-                  <TableHead className="min-w-[120px]">項目名稱</TableHead>
-                  <TableHead className="min-w-[200px]">規格描述</TableHead>
-                  <TableHead className="w-28">計費方式</TableHead>
-                  <TableHead className="w-16">單位</TableHead>
-                  <TableHead className="w-24 text-right">單價</TableHead>
-                  <TableHead className="w-32 text-right whitespace-nowrap">數量/容量</TableHead>
-                  <TableHead className="w-28 text-right">小計</TableHead>
-                  <TableHead className="w-24 text-right whitespace-nowrap">每kW單價</TableHead>
-                  <TableHead className="w-10"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-              {category.items.map((item, index) => {
-                  const method = item.billingMethod || 'per_kw';
-                  const subtotal = calculateItemSubtotal(item, capacityKwp, billingContext);
-                  
-                  // 判斷是否為自動計算類型
-                  const isAutoCalc = ['stamp_duty', 'corp_tax', 'brokerage'].includes(method);
-                  
-                  // 取得階梯定價資訊 - 使用自訂計算器
-                  const tieredInfo = method === 'tiered' && item.tieredPricingType 
-                    ? calculatePrice(capacityKwp, item.tieredPricingType)
-                    : null;
-                  
-                  return (
-                    <TableRow key={item.id}>
-                      <TableCell className="text-muted-foreground">
-                        <GripVertical className="h-4 w-4 cursor-move" />
-                      </TableCell>
-                      <TableCell>
-                        <Input
-                          value={item.itemName}
-                          onChange={(e) => handleUpdateItem(index, { itemName: e.target.value })}
-                          className="h-8 border-none shadow-none focus-visible:ring-1"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <div className="flex items-center gap-1">
-                            <Popover>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-7 w-7 shrink-0"
-                                  title="選擇預設規格"
-                                >
-                                  <Wrench className="h-3.5 w-3.5" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-72 p-2 max-h-80 overflow-y-auto" align="start">
-                                <div className="space-y-2">
-                                  <p className="text-xs font-medium text-muted-foreground px-2 py-1">
-                                    選擇預設規格（將覆蓋現有內容）
-                                  </p>
-                                  {presetsLoading ? (
-                                    <p className="text-xs text-muted-foreground px-2 py-2">載入中...</p>
-                                  ) : Object.keys(presetsByCategory).length === 0 ? (
-                                    <p className="text-xs text-muted-foreground px-2 py-2">
-                                      尚無預設值，請至「系統設定 &gt; 報價」新增
-                                    </p>
-                                  ) : (
-                                    PRESET_CATEGORY_ORDER.filter(cat => presetsByCategory[cat]?.length > 0).map((cat) => (
-                                      <div key={cat} className="space-y-1">
-                                        <p className="text-xs font-semibold text-primary px-2">
-                                          {PRESET_CATEGORY_LABELS[cat]}
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-8"></TableHead>
+                    <TableHead className="min-w-[120px]">項目名稱</TableHead>
+                    <TableHead className="min-w-[200px]">規格描述</TableHead>
+                    <TableHead className="w-28">計費方式</TableHead>
+                    <TableHead className="w-16">單位</TableHead>
+                    <TableHead className="w-24 text-right">單價</TableHead>
+                    <TableHead className="w-32 text-right whitespace-nowrap">數量/容量</TableHead>
+                    <TableHead className="w-28 text-right">小計</TableHead>
+                    <TableHead className="w-24 text-right whitespace-nowrap">每kW單價</TableHead>
+                    <TableHead className="w-10"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <SortableContext items={itemIds} strategy={verticalListSortingStrategy}>
+                  <TableBody>
+                    {category.items.map((item, index) => {
+                      const method = item.billingMethod || 'per_kw';
+                      const subtotal = calculateItemSubtotal(item, capacityKwp, billingContext);
+                      
+                      // 判斷是否為自動計算類型
+                      const isAutoCalc = ['stamp_duty', 'corp_tax', 'brokerage'].includes(method);
+                      
+                      // 取得階梯定價資訊 - 使用自訂計算器
+                      const tieredInfo = method === 'tiered' && item.tieredPricingType 
+                        ? calculatePrice(capacityKwp, item.tieredPricingType)
+                        : null;
+                      
+                      return (
+                        <SortableEngineeringRow key={item.id} id={item.id}>
+                          <TableCell>
+                            <Input
+                              value={item.itemName}
+                              onChange={(e) => handleUpdateItem(index, { itemName: e.target.value })}
+                              className="h-8 border-none shadow-none focus-visible:ring-1"
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <div className="flex items-center gap-1">
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-7 w-7 shrink-0"
+                                      title="選擇預設規格"
+                                    >
+                                      <Wrench className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-72 p-2 max-h-80 overflow-y-auto" align="start">
+                                    <div className="space-y-2">
+                                      <p className="text-xs font-medium text-muted-foreground px-2 py-1">
+                                        選擇預設規格（將覆蓋現有內容）
+                                      </p>
+                                      {presetsLoading ? (
+                                        <p className="text-xs text-muted-foreground px-2 py-2">載入中...</p>
+                                      ) : Object.keys(presetsByCategory).length === 0 ? (
+                                        <p className="text-xs text-muted-foreground px-2 py-2">
+                                          尚無預設值，請至「系統設定 &gt; 報價」新增
                                         </p>
-                                        {presetsByCategory[cat].map((preset) => (
-                                          <Button
-                                            key={preset.key}
-                                            variant="ghost"
-                                            size="sm"
-                                            className={`w-full justify-start text-xs h-auto py-1.5 px-2 ${preset.isSubOption ? 'pl-6' : ''}`}
-                                            onClick={() => {
-                                              handleUpdateItem(index, { specDescription: preset.specDescription });
-                                            }}
-                                          >
-                                            <span className="truncate">
-                                              {preset.parentLabel && <span className="text-muted-foreground mr-1">{preset.parentLabel}</span>}
-                                              {preset.label}
-                                            </span>
-                                          </Button>
-                                        ))}
-                                      </div>
-                                    ))
-                                  )}
-                                </div>
-                              </PopoverContent>
-                            </Popover>
-                            <Textarea
-                              value={item.specDescription || ""}
-                              onChange={(e) => handleUpdateItem(index, { specDescription: e.target.value })}
-                              placeholder="輸入規格細節，或點選左側工具選擇預設"
-                              className="min-h-[60px] text-sm resize-y border-none shadow-none focus-visible:ring-1 flex-1"
-                              rows={2}
-                            />
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={method}
-                          onValueChange={(value: BillingMethod) => handleUpdateItem(index, { billingMethod: value })}
-                        >
-                          <SelectTrigger className="h-8 w-28">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="per_kw">每kW計價</SelectItem>
-                            <SelectItem value="per_unit">單位計價</SelectItem>
-                            <SelectItem value="lump_sum">一式計價</SelectItem>
-                            <SelectItem value="tiered">階梯定價</SelectItem>
-                            <SelectItem value="stamp_duty">印花稅</SelectItem>
-                            <SelectItem value="corp_tax">營所稅</SelectItem>
-                            <SelectItem value="brokerage">仲介費</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {method === 'tiered' && (
-                          <Select
-                            value={item.tieredPricingType || 'none'}
-                            onValueChange={(value: TieredPricingType) => handleUpdateItem(index, { tieredPricingType: value })}
-                          >
-                            <SelectTrigger className="h-7 w-28 mt-1 text-xs">
-                              <SelectValue placeholder="選擇級距" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="structural_engineer">結構技師</SelectItem>
-                              <SelectItem value="electrical_engineer">電機技師</SelectItem>
-                              <SelectItem value="environmental">明群環能</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {method === 'per_unit' ? (
-                          <Select
-                            value={item.unit || "個"}
-                            onValueChange={(value) => handleUpdateItem(index, { unit: value })}
-                          >
-                            <SelectTrigger className="h-8 w-16">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="個">個</SelectItem>
-                              <SelectItem value="台">台</SelectItem>
-                              <SelectItem value="組">組</SelectItem>
-                              <SelectItem value="式">式</SelectItem>
-                              <SelectItem value="座">座</SelectItem>
-                              <SelectItem value="片">片</SelectItem>
-                              <SelectItem value="批">批</SelectItem>
-                              <SelectItem value="趟">趟</SelectItem>
-                              <SelectItem value="m">m</SelectItem>
-                              <SelectItem value="m²">m²</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : method === 'per_kw' ? (
-                          <span className="text-sm text-muted-foreground">kW</span>
-                        ) : method === 'lump_sum' ? (
-                          <span className="text-sm text-muted-foreground">式</span>
-                        ) : method === 'stamp_duty' ? (
-                          <span className="text-sm text-muted-foreground">‰</span>
-                        ) : method === 'corp_tax' ? (
-                          <span className="text-sm text-muted-foreground">%</span>
-                        ) : method === 'brokerage' ? (
-                          <span className="text-sm text-muted-foreground">kW</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {method === 'per_kw' || method === 'per_unit' ? (
-                          <Input
-                            type="number"
-                            value={item.unitPrice}
-                            onChange={(e) => handleUpdateItem(index, { unitPrice: parseFloat(e.target.value) || 0 })}
-                            className="h-8 w-24 text-right"
-                          />
-                        ) : method === 'lump_sum' ? (
-                          <Input
-                            type="number"
-                            value={item.lumpSumAmount || 0}
-                            onChange={(e) => handleUpdateItem(index, { lumpSumAmount: parseFloat(e.target.value) || 0 })}
-                            className="h-8 w-24 text-right"
-                            placeholder="金額"
-                          />
-                        ) : method === 'stamp_duty' ? (
-                          <span className="text-sm text-muted-foreground">0.1%</span>
-                        ) : method === 'corp_tax' ? (
-                          <span className="text-sm text-muted-foreground">2%</span>
-                        ) : method === 'brokerage' ? (
-                          <Input
-                            type="number"
-                            value={item.unitPrice || ""}
-                            onChange={(e) => handleUpdateItem(index, { unitPrice: parseFloat(e.target.value) || 0 })}
-                            className="h-8 w-24 text-right"
-                            placeholder="每kW金額"
-                          />
-                        ) : tieredInfo ? (
-                          <span className="text-sm text-muted-foreground">
-                            ${tieredInfo.perKwPrice}/kW
-                          </span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {method === 'per_kw' || method === 'tiered' ? (
-                          <span className="text-sm font-medium whitespace-nowrap">{capacityKwp} kW</span>
-                        ) : method === 'per_unit' ? (
-                          <div className="flex items-center justify-end gap-1">
-                            <Input
-                              type="number"
-                              value={item.quantity}
-                              onChange={(e) => handleUpdateItem(index, { quantity: parseFloat(e.target.value) || 0 })}
-                              className="h-8 w-20 text-right"
-                            />
-                            <span className="text-sm text-muted-foreground">{item.unit || "個"}</span>
-                          </div>
-                        ) : method === 'brokerage' ? (
-                          <div className="flex items-center justify-end gap-1">
-                            <span className="text-xs text-muted-foreground whitespace-nowrap">{capacityKwp}kW +</span>
-                            <Input
-                              type="number"
-                              min={0}
-                              max={100}
-                              step={0.1}
-                              value={item.brokerageRate || ""}
-                              onChange={(e) => handleUpdateItem(index, { brokerageRate: parseFloat(e.target.value) || 0 })}
-                              className="h-8 w-14 text-right"
-                              placeholder="0"
-                            />
-                            <span className="text-xs text-muted-foreground">%</span>
-                          </div>
-                        ) : isAutoCalc ? (
-                          <span className="text-sm text-muted-foreground whitespace-nowrap">自動</span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground whitespace-nowrap">1 式</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-medium font-mono text-sm">
-                        {formatCurrency(subtotal, 0)}
-                      </TableCell>
-                      <TableCell className="text-right text-sm text-muted-foreground font-mono">
-                        {capacityKwp > 0 ? formatCurrency(subtotal / capacityKwp, 0) : '-'}
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => handleDeleteItem(index)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
+                                      ) : (
+                                        PRESET_CATEGORY_ORDER.filter(cat => presetsByCategory[cat]?.length > 0).map((cat) => (
+                                          <div key={cat} className="space-y-1">
+                                            <p className="text-xs font-semibold text-primary px-2">
+                                              {PRESET_CATEGORY_LABELS[cat]}
+                                            </p>
+                                            {presetsByCategory[cat].map((preset) => (
+                                              <Button
+                                                key={preset.key}
+                                                variant="ghost"
+                                                size="sm"
+                                                className={`w-full justify-start text-xs h-auto py-1.5 px-2 ${preset.isSubOption ? 'pl-6' : ''}`}
+                                                onClick={() => {
+                                                  handleUpdateItem(index, { specDescription: preset.specDescription });
+                                                }}
+                                              >
+                                                <span className="truncate">
+                                                  {preset.parentLabel && <span className="text-muted-foreground mr-1">{preset.parentLabel}</span>}
+                                                  {preset.label}
+                                                </span>
+                                              </Button>
+                                            ))}
+                                          </div>
+                                        ))
+                                      )}
+                                    </div>
+                                  </PopoverContent>
+                                </Popover>
+                                <Textarea
+                                  value={item.specDescription || ""}
+                                  onChange={(e) => handleUpdateItem(index, { specDescription: e.target.value })}
+                                  placeholder="輸入規格細節，或點選左側工具選擇預設"
+                                  className="min-h-[60px] text-sm resize-y border-none shadow-none focus-visible:ring-1 flex-1"
+                                  rows={2}
+                                />
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Select
+                              value={method}
+                              onValueChange={(value: BillingMethod) => handleUpdateItem(index, { billingMethod: value })}
+                            >
+                              <SelectTrigger className="h-8 w-28">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="per_kw">每kW計價</SelectItem>
+                                <SelectItem value="per_unit">單位計價</SelectItem>
+                                <SelectItem value="lump_sum">一式計價</SelectItem>
+                                <SelectItem value="tiered">階梯定價</SelectItem>
+                                <SelectItem value="stamp_duty">印花稅</SelectItem>
+                                <SelectItem value="corp_tax">營所稅</SelectItem>
+                                <SelectItem value="brokerage">仲介費</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {method === 'tiered' && (
+                              <Select
+                                value={item.tieredPricingType || 'none'}
+                                onValueChange={(value: TieredPricingType) => handleUpdateItem(index, { tieredPricingType: value })}
+                              >
+                                <SelectTrigger className="h-7 w-28 mt-1 text-xs">
+                                  <SelectValue placeholder="選擇級距" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="structural_engineer">結構技師</SelectItem>
+                                  <SelectItem value="electrical_engineer">電機技師</SelectItem>
+                                  <SelectItem value="environmental">明群環能</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {method === 'per_unit' ? (
+                              <Select
+                                value={item.unit || "個"}
+                                onValueChange={(value) => handleUpdateItem(index, { unit: value })}
+                              >
+                                <SelectTrigger className="h-8 w-16">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="個">個</SelectItem>
+                                  <SelectItem value="台">台</SelectItem>
+                                  <SelectItem value="組">組</SelectItem>
+                                  <SelectItem value="式">式</SelectItem>
+                                  <SelectItem value="座">座</SelectItem>
+                                  <SelectItem value="片">片</SelectItem>
+                                  <SelectItem value="批">批</SelectItem>
+                                  <SelectItem value="趟">趟</SelectItem>
+                                  <SelectItem value="m">m</SelectItem>
+                                  <SelectItem value="m²">m²</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : method === 'per_kw' ? (
+                              <span className="text-sm text-muted-foreground">kW</span>
+                            ) : method === 'lump_sum' ? (
+                              <span className="text-sm text-muted-foreground">式</span>
+                            ) : method === 'stamp_duty' ? (
+                              <span className="text-sm text-muted-foreground">‰</span>
+                            ) : method === 'corp_tax' ? (
+                              <span className="text-sm text-muted-foreground">%</span>
+                            ) : method === 'brokerage' ? (
+                              <span className="text-sm text-muted-foreground">kW</span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            {method === 'per_kw' || method === 'per_unit' ? (
+                              <Input
+                                type="number"
+                                value={item.unitPrice}
+                                onChange={(e) => handleUpdateItem(index, { unitPrice: parseFloat(e.target.value) || 0 })}
+                                className="h-8 w-24 text-right"
+                              />
+                            ) : method === 'lump_sum' ? (
+                              <Input
+                                type="number"
+                                value={item.lumpSumAmount || 0}
+                                onChange={(e) => handleUpdateItem(index, { lumpSumAmount: parseFloat(e.target.value) || 0 })}
+                                className="h-8 w-24 text-right"
+                                placeholder="金額"
+                              />
+                            ) : method === 'stamp_duty' ? (
+                              <span className="text-sm text-muted-foreground">0.1%</span>
+                            ) : method === 'corp_tax' ? (
+                              <span className="text-sm text-muted-foreground">2%</span>
+                            ) : method === 'brokerage' ? (
+                              <Input
+                                type="number"
+                                value={item.unitPrice || ""}
+                                onChange={(e) => handleUpdateItem(index, { unitPrice: parseFloat(e.target.value) || 0 })}
+                                className="h-8 w-24 text-right"
+                                placeholder="每kW金額"
+                              />
+                            ) : tieredInfo ? (
+                              <span className="text-sm text-muted-foreground">
+                                ${tieredInfo.perKwPrice}/kW
+                              </span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {method === 'per_kw' || method === 'tiered' ? (
+                              <span className="text-sm font-medium whitespace-nowrap">{capacityKwp} kW</span>
+                            ) : method === 'per_unit' ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <Input
+                                  type="number"
+                                  value={item.quantity}
+                                  onChange={(e) => handleUpdateItem(index, { quantity: parseFloat(e.target.value) || 0 })}
+                                  className="h-8 w-20 text-right"
+                                />
+                                <span className="text-sm text-muted-foreground">{item.unit || "個"}</span>
+                              </div>
+                            ) : method === 'brokerage' ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-xs text-muted-foreground whitespace-nowrap">{capacityKwp}kW +</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  step={0.1}
+                                  value={item.brokerageRate || ""}
+                                  onChange={(e) => handleUpdateItem(index, { brokerageRate: parseFloat(e.target.value) || 0 })}
+                                  className="h-8 w-14 text-right"
+                                  placeholder="0"
+                                />
+                                <span className="text-xs text-muted-foreground">%</span>
+                              </div>
+                            ) : isAutoCalc ? (
+                              <span className="text-sm text-muted-foreground whitespace-nowrap">自動</span>
+                            ) : (
+                              <span className="text-sm text-muted-foreground whitespace-nowrap">1 式</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right font-medium font-mono text-sm">
+                            {formatCurrency(subtotal, 0)}
+                          </TableCell>
+                          <TableCell className="text-right text-sm text-muted-foreground font-mono">
+                            {capacityKwp > 0 ? formatCurrency(subtotal / capacityKwp, 0) : '-'}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => handleDeleteItem(index)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </SortableEngineeringRow>
+                      );
+                    })}
+                  </TableBody>
+                </SortableContext>
+              </Table>
+            </DndContext>
             <Button
               variant="ghost"
               size="sm"
