@@ -22,7 +22,7 @@ import { useTieredPricing } from "@/hooks/useTieredPricing";
 import EngineeringCategoryCard from "./EngineeringCategoryCard";
 import EquipmentModulesCard from "./EquipmentModulesCard";
 import EquipmentInvertersCard from "./EquipmentInvertersCard";
-import QuoteCostSummarySheet from "./QuoteCostSummarySheet";
+import BudgetVsActualSheet from "./BudgetVsActualSheet";
 
 interface CostTotals {
   engineeringTotal: number;
@@ -31,6 +31,7 @@ interface CostTotals {
 }
 
 interface QuoteCostCalculatorTabProps {
+  quoteId: string;
   formData: Partial<QuoteParams>;
   setFormData: (data: Partial<QuoteParams>) => void;
   onCostChange?: (costs: CostTotals) => void;
@@ -49,6 +50,7 @@ interface QuoteCostCalculatorTabProps {
 }
 
 export default function QuoteCostCalculatorTab({
+  quoteId,
   formData,
   setFormData,
   onCostChange,
@@ -195,8 +197,9 @@ export default function QuoteCostCalculatorTab({
 
   return (
     <div className="space-y-4">
-      {/* 右側抽屜式成本摘要 */}
-      <QuoteCostSummarySheet
+      {/* 右側抽屜式成本摘要 (預算 vs 實際) */}
+      <BudgetVsActualSheet
+        quoteId={quoteId}
         engineeringTotal={totals.engineeringTotal}
         modulesTotal={totals.modulesTotal}
         invertersTotal={totals.invertersTotal}
