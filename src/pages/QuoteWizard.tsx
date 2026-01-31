@@ -324,6 +324,7 @@ export default function QuoteWizard() {
           quantity: Number(item.quantity) || 1,
           billingMethod: billingMethod as any,
           tieredPricingType: tieredPricingTypeValue as any,
+          tieredBonusRate: item.tiered_bonus_rate ? Number(item.tiered_bonus_rate) : undefined,
           lumpSumAmount: item.lump_sum_amount ? Number(item.lump_sum_amount) : undefined,
           brokerageRate: brokerageRateValue,
           subtotal: Number(item.subtotal) || 0,
@@ -539,6 +540,7 @@ export default function QuoteWizard() {
               // 新增欄位
               billing_method: billingMethod,
               tiered_pricing_type: item.tieredPricingType || null,
+              tiered_bonus_rate: item.tieredBonusRate || null,
               brokerage_rate: item.brokerageRate || null,
               subtotal: calculatedSubtotal, // 儲存計算後的小計
               sort_order: globalSortOrder++,
