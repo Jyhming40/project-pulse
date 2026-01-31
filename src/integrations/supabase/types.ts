@@ -1941,10 +1941,17 @@ export type Database = {
       }
       project_quotes: {
         Row: {
+          actual_brokerage_cost: number | null
+          actual_engineering_cost: number | null
+          actual_inverters_cost: number | null
+          actual_maintenance_reserve: number | null
+          actual_modules_cost: number | null
           annual_degradation_rate: number | null
           capacity_kwp: number
           created_at: string
           created_by: string | null
+          finalized_at: string | null
+          finalized_by: string | null
           high_efficiency_bonus: number | null
           id: string
           insurance_rate: number | null
@@ -1952,6 +1959,7 @@ export type Database = {
           inverter_count: number | null
           investor_id: string | null
           irr_20_year: number | null
+          is_finalized: boolean | null
           loan_interest_rate: number | null
           loan_percentage: number | null
           loan_term_months: number | null
@@ -1979,10 +1987,17 @@ export type Database = {
           valid_until: string | null
         }
         Insert: {
+          actual_brokerage_cost?: number | null
+          actual_engineering_cost?: number | null
+          actual_inverters_cost?: number | null
+          actual_maintenance_reserve?: number | null
+          actual_modules_cost?: number | null
           annual_degradation_rate?: number | null
           capacity_kwp?: number
           created_at?: string
           created_by?: string | null
+          finalized_at?: string | null
+          finalized_by?: string | null
           high_efficiency_bonus?: number | null
           id?: string
           insurance_rate?: number | null
@@ -1990,6 +2005,7 @@ export type Database = {
           inverter_count?: number | null
           investor_id?: string | null
           irr_20_year?: number | null
+          is_finalized?: boolean | null
           loan_interest_rate?: number | null
           loan_percentage?: number | null
           loan_term_months?: number | null
@@ -2017,10 +2033,17 @@ export type Database = {
           valid_until?: string | null
         }
         Update: {
+          actual_brokerage_cost?: number | null
+          actual_engineering_cost?: number | null
+          actual_inverters_cost?: number | null
+          actual_maintenance_reserve?: number | null
+          actual_modules_cost?: number | null
           annual_degradation_rate?: number | null
           capacity_kwp?: number
           created_at?: string
           created_by?: string | null
+          finalized_at?: string | null
+          finalized_by?: string | null
           high_efficiency_bonus?: number | null
           id?: string
           insurance_rate?: number | null
@@ -2028,6 +2051,7 @@ export type Database = {
           inverter_count?: number | null
           investor_id?: string | null
           irr_20_year?: number | null
+          is_finalized?: boolean | null
           loan_interest_rate?: number | null
           loan_percentage?: number | null
           loan_term_months?: number | null
@@ -2405,6 +2429,7 @@ export type Database = {
       }
       quote_engineering_items: {
         Row: {
+          actual_cost: number | null
           billing_method: string | null
           brokerage_rate: number | null
           category_code: string
@@ -2428,6 +2453,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          actual_cost?: number | null
           billing_method?: string | null
           brokerage_rate?: number | null
           category_code: string
@@ -2451,6 +2477,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          actual_cost?: number | null
           billing_method?: string | null
           brokerage_rate?: number | null
           category_code?: string
@@ -2640,6 +2667,7 @@ export type Database = {
       }
       quote_inverters: {
         Row: {
+          actual_cost: number | null
           capacity_kw: number
           created_at: string
           id: string
@@ -2653,6 +2681,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          actual_cost?: number | null
           capacity_kw?: number
           created_at?: string
           id?: string
@@ -2666,6 +2695,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          actual_cost?: number | null
           capacity_kw?: number
           created_at?: string
           id?: string
@@ -2743,6 +2773,7 @@ export type Database = {
       }
       quote_modules: {
         Row: {
+          actual_cost: number | null
           created_at: string
           exchange_rate: number | null
           id: string
@@ -2757,6 +2788,7 @@ export type Database = {
           wattage_per_panel: number
         }
         Insert: {
+          actual_cost?: number | null
           created_at?: string
           exchange_rate?: number | null
           id?: string
@@ -2771,6 +2803,7 @@ export type Database = {
           wattage_per_panel?: number
         }
         Update: {
+          actual_cost?: number | null
           created_at?: string
           exchange_rate?: number | null
           id?: string
