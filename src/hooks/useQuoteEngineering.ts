@@ -30,6 +30,7 @@ export interface EngineeringItem {
   quantity: number;
   billingMethod: BillingMethod;
   tieredPricingType?: TieredPricingType; // 階梯定價類型
+  tieredBonusRate?: number; // 階梯定價加成百分比
   lumpSumAmount?: number;
   brokerageRate?: number; // 仲介費百分比
   subtotal: number;
@@ -160,14 +161,19 @@ export function calculateItemSubtotal(
     case 'tiered':
       // 階梯式計價：依容量級距計算
       if (item.tieredPricingType && item.tieredPricingType !== 'none') {
+        let tieredTotal = 0;
         // 優先使用自訂計算器（來自 localStorage 的設定）
         if (ctx.tieredPriceCalculator) {
           const result = ctx.tieredPriceCalculator(capacityKwp, item.tieredPricingType);
-          return result.total;
+          tieredTotal = result.total;
+        } else {
+          // 退回到預設的硬編碼計算
+          const result = calculateTieredPrice(capacityKwp, item.tieredPricingType);
+          tieredTotal = result.total;
         }
-        // 退回到預設的硬編碼計算
-        const result = calculateTieredPrice(capacityKwp, item.tieredPricingType);
-        return result.total;
+        // 加上加成百分比
+        const tieredBonus = tieredTotal * ((item.tieredBonusRate || 0) / 100);
+        return tieredTotal + tieredBonus;
       }
       return 0;
     
