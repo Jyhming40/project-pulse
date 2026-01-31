@@ -46,7 +46,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Plus, Trash2, ChevronDown, Wrench } from "lucide-react";
+import { Plus, Trash2, ChevronDown, Wrench, Pencil } from "lucide-react";
 import { 
   EngineeringCategory, 
   EngineeringItem, 
@@ -201,15 +201,23 @@ export default function EngineeringCategoryCard({
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
-                  <CardTitle
-                    className="text-sm font-semibold cursor-pointer hover:text-primary"
-                    onDoubleClick={(e) => {
-                      e.stopPropagation();
-                      setIsEditing(true);
-                    }}
-                  >
-                    {category.categoryName}
-                  </CardTitle>
+                  <div className="flex items-center gap-1.5">
+                    <CardTitle className="text-sm font-semibold">
+                      {category.categoryName}
+                    </CardTitle>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 text-muted-foreground hover:text-foreground"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setIsEditing(true);
+                      }}
+                      title="編輯分類名稱"
+                    >
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  </div>
                 )}
               </div>
               <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
