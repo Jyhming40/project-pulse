@@ -46,22 +46,15 @@ export default function QuoteCostSummarySheet({
     ? (overheadBreakdown.stampDuty + overheadBreakdown.corpTax)
     : 0;
   
-  // 直接工程成本 = 工程項目總計 - 公司管銷費用
+  // 直接工程成本 = 工程項目總計 - 公司管銷費用（用於明細顯示）
   const directEngineeringCost = engineeringTotal - overheadTotal;
   
-  // 直接成本 = 直接工程成本 + PV模組 + 逆變器
-  const directCost = directEngineeringCost + modulesTotal + invertersTotal;
+  // 總成本 = 全部工程成本 + PV模組 + 逆變器（含管銷）
+  const totalCost = engineeringTotal + modulesTotal + invertersTotal;
   
-  // 總成本（含公司管銷）= 直接成本 + 公司管銷
-  const totalCost = directCost + overheadTotal;
-  
-  // 毛利計算：基於直接成本
-  const grossProfit = sellingPrice - directCost;
+  // 毛利計算：基於總成本（含管銷），反映真實獲利
+  const grossProfit = sellingPrice - totalCost;
   const grossMargin = sellingPrice > 0 ? (grossProfit / sellingPrice) * 100 : 0;
-  
-  // 淨利計算：基於總成本（含管銷）
-  const netProfit = sellingPrice - totalCost;
-  const netMargin = sellingPrice > 0 ? (netProfit / sellingPrice) * 100 : 0;
 
   const hasOverhead = overheadTotal > 0;
 
@@ -98,13 +91,9 @@ export default function QuoteCostSummarySheet({
               <span className="text-muted-foreground">逆變器成本</span>
               <span className="font-mono font-medium text-amber-600">{formatCurrency(invertersTotal, 0)}</span>
             </div>
-            <div className="flex justify-between text-sm pt-1 border-t border-dashed">
-              <span className="font-medium">直接成本小計</span>
-              <span className="font-mono font-semibold">{formatCurrency(directCost, 0)}</span>
-            </div>
           </div>
 
-          {/* 公司管銷費用（獨立區塊） */}
+          {/* 公司管銷費用（獨立區塊，僅顯示明細） */}
           {hasOverhead && (
             <>
               <Separator />
@@ -157,12 +146,14 @@ export default function QuoteCostSummarySheet({
               <span className="text-lg font-semibold font-mono">{formatCurrency(sellingPrice, 0)}</span>
             </div>
             
-            {/* 毛利（基於直接成本） */}
             <div className="flex justify-between items-center">
-              <div className="flex items-center gap-1">
-                <span className="text-sm font-medium">預估毛利</span>
-                <span className="text-xs text-muted-foreground">(扣直接成本)</span>
-              </div>
+              <span className="text-sm font-medium">總成本</span>
+              <span className="text-lg font-semibold font-mono">{formatCurrency(totalCost, 0)}</span>
+            </div>
+            
+            {/* 毛利（基於總成本，含管銷） */}
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium">預估毛利</span>
               <span className={`text-lg font-semibold font-mono ${grossProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
                 {formatCurrency(grossProfit, 0)}
               </span>
@@ -173,38 +164,14 @@ export default function QuoteCostSummarySheet({
                 {grossMargin.toFixed(1)}%
               </span>
             </div>
-            
-            {/* 淨利（含管銷） */}
-            {hasOverhead && (
-              <>
-                <Separator className="my-2" />
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm font-medium">預估淨利</span>
-                    <span className="text-xs text-muted-foreground">(扣管銷後)</span>
-                  </div>
-                  <span className={`text-lg font-semibold font-mono ${netProfit >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-                    {formatCurrency(netProfit, 0)}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium">淨利率</span>
-                  <span className={`text-lg font-semibold ${netMargin >= 0 ? "text-emerald-600" : "text-destructive"}`}>
-                    {netMargin.toFixed(1)}%
-                  </span>
-                </div>
-              </>
-            )}
           </div>
 
           <Separator />
 
           {/* 說明 */}
           <p className="text-xs text-muted-foreground">
-            {hasOverhead 
-              ? "毛利 = 報價金額 - 直接成本；淨利 = 毛利 - 公司管銷費用。此分類有助於更準確評估專案獲利能力。"
-              : "如需區分公司管銷費用，可在工程項目中新增「印花稅」或「營所稅」項目。"
-            }
+            毛利 = 報價金額 - 總成本（含管銷費用）。
+            {hasOverhead && " 上方管銷明細顯示印花稅與營所稅的個別金額。"}
           </p>
         </div>
       </SheetContent>
