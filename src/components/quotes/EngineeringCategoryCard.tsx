@@ -439,8 +439,23 @@ export default function EngineeringCategoryCard({
                             )}
                           </TableCell>
                           <TableCell className="text-right">
-                            {method === 'per_kw' || method === 'tiered' ? (
+                            {method === 'per_kw' ? (
                               <span className="text-sm font-medium whitespace-nowrap">{capacityKwp} kW</span>
+                            ) : method === 'tiered' ? (
+                              <div className="flex items-center justify-end gap-1">
+                                <span className="text-xs text-muted-foreground whitespace-nowrap">{capacityKwp}kW +</span>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  max={100}
+                                  step={0.1}
+                                  value={item.tieredBonusRate || ""}
+                                  onChange={(e) => handleUpdateItem(index, { tieredBonusRate: parseFloat(e.target.value) || 0 })}
+                                  className="h-8 w-14 text-right"
+                                  placeholder="0"
+                                />
+                                <span className="text-xs text-muted-foreground">%</span>
+                              </div>
                             ) : method === 'per_unit' ? (
                               <div className="flex items-center justify-end gap-1">
                                 <Input
