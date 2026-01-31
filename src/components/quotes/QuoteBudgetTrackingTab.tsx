@@ -18,6 +18,8 @@ import {
   Target,
   Wallet,
   PiggyBank,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { formatCurrency } from "@/lib/quoteCalculations";
 import {
@@ -26,8 +28,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 interface OverheadBreakdown {
   stampDuty: number;
@@ -118,6 +122,48 @@ function CostCompareRow({ label, budget, actual, onActualChange, isLocked, showW
         )}
       </div>
     </div>
+  );
+}
+
+interface CollapsibleSectionProps {
+  title: string;
+  icon?: React.ReactNode;
+  colorClass?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+  badge?: React.ReactNode;
+}
+
+function CollapsibleSection({ title, icon, colorClass = "text-foreground", defaultOpen = true, children, badge }: CollapsibleSectionProps) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <Collapsible open={isOpen} onOpenChange={setIsOpen}>
+      <CollapsibleTrigger className="w-full">
+        <div className={cn(
+          "flex items-center justify-between w-full px-4 py-2.5 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer",
+          isOpen && "bg-muted/30"
+        )}>
+          <div className={cn("flex items-center gap-2 font-semibold text-sm", colorClass)}>
+            {icon}
+            {title}
+          </div>
+          <div className="flex items-center gap-3">
+            {badge}
+            {isOpen ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground transition-transform" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform" />
+            )}
+          </div>
+        </div>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="data-[state=open]:animate-collapsible-down data-[state=closed]:animate-collapsible-up">
+        <div className="pt-2">
+          {children}
+        </div>
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
 
@@ -416,228 +462,273 @@ export default function QuoteBudgetTrackingTab({
             <span className="text-right">差異 (Variance)</span>
           </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-2">
           {/* [支出項 A] 直接成本 */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-blue-700 dark:text-blue-400">
-              <div className="w-1 h-4 bg-blue-500 rounded" />
-              A. 直接成本
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Info className="h-4 w-4 text-muted-foreground cursor-help" />
-                  </TooltipTrigger>
-                  <TooltipContent side="top" className="max-w-[220px]">
-                    <p className="text-xs">直接投入生產的成本，包含工程費用、模組與逆變器。</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-            
-            <div className="pl-4 space-y-1 border-l-2 border-blue-200 dark:border-blue-800">
-              <CostCompareRow
-                label="工程費用"
-                budget={pureEngineeringCost}
-                actual={actualCosts.actualEngineeringCost}
-                onActualChange={(v) => updateActualCost("actualEngineeringCost", v)}
-                isLocked={isFinalized}
-              />
-              <CostCompareRow
-                label="PV 模組"
-                budget={modulesTotal}
-                actual={actualCosts.actualModulesCost}
-                onActualChange={(v) => updateActualCost("actualModulesCost", v)}
-                isLocked={isFinalized}
-              />
-              <CostCompareRow
-                label="逆變器"
-                budget={invertersTotal}
-                actual={actualCosts.actualInvertersCost}
-                onActualChange={(v) => updateActualCost("actualInvertersCost", v)}
-                isLocked={isFinalized}
-              />
-            </div>
-            
-            <div className="flex justify-between items-center pt-2 bg-blue-50 dark:bg-blue-950/50 rounded-lg px-4 py-2">
-              <span className="font-medium text-blue-700 dark:text-blue-400">直接成本小計</span>
-              <div className="flex gap-8 font-mono font-medium">
-                <span className="text-blue-700 dark:text-blue-400">{formatCurrency(directCost, 0)}</span>
-                <span className={actualDirectCost !== directCost ? (actualDirectCost > directCost ? "text-destructive" : "text-green-600") : "text-blue-700 dark:text-blue-400"}>
-                  {formatCurrency(actualDirectCost, 0)}
-                </span>
-                <span className={actualDirectCost - directCost > 0 ? "text-destructive" : actualDirectCost - directCost < 0 ? "text-green-600" : ""}>
-                  {actualDirectCost - directCost >= 0 ? "+" : ""}{formatCurrency(actualDirectCost - directCost, 0)}
-                </span>
+          <CollapsibleSection
+            title="A. 直接成本"
+            icon={<div className="w-1 h-4 bg-blue-500 rounded" />}
+            colorClass="text-blue-700 dark:text-blue-400"
+            badge={
+              <span className="text-xs font-mono text-muted-foreground">
+                {formatCurrency(directCost, 0)}
+              </span>
+            }
+          >
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 mb-2">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="h-4 w-4 text-muted-foreground cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[220px]">
+                      <p className="text-xs">直接投入生產的成本，包含工程費用、模組與逆變器。</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              
+              <div className="pl-4 space-y-1 border-l-2 border-blue-200 dark:border-blue-800">
+                <CostCompareRow
+                  label="工程費用"
+                  budget={pureEngineeringCost}
+                  actual={actualCosts.actualEngineeringCost}
+                  onActualChange={(v) => updateActualCost("actualEngineeringCost", v)}
+                  isLocked={isFinalized}
+                />
+                <CostCompareRow
+                  label="PV 模組"
+                  budget={modulesTotal}
+                  actual={actualCosts.actualModulesCost}
+                  onActualChange={(v) => updateActualCost("actualModulesCost", v)}
+                  isLocked={isFinalized}
+                />
+                <CostCompareRow
+                  label="逆變器"
+                  budget={invertersTotal}
+                  actual={actualCosts.actualInvertersCost}
+                  onActualChange={(v) => updateActualCost("actualInvertersCost", v)}
+                  isLocked={isFinalized}
+                />
+              </div>
+              
+              <div className="flex justify-between items-center pt-2 bg-blue-50 dark:bg-blue-950/50 rounded-lg px-4 py-2">
+                <span className="font-medium text-blue-700 dark:text-blue-400">直接成本小計</span>
+                <div className="flex gap-8 font-mono font-medium">
+                  <span className="text-blue-700 dark:text-blue-400">{formatCurrency(directCost, 0)}</span>
+                  <span className={actualDirectCost !== directCost ? (actualDirectCost > directCost ? "text-destructive" : "text-green-600") : "text-blue-700 dark:text-blue-400"}>
+                    {formatCurrency(actualDirectCost, 0)}
+                  </span>
+                  <span className={actualDirectCost - directCost > 0 ? "text-destructive" : actualDirectCost - directCost < 0 ? "text-green-600" : ""}>
+                    {actualDirectCost - directCost >= 0 ? "+" : ""}{formatCurrency(actualDirectCost - directCost, 0)}
+                  </span>
+                </div>
               </div>
             </div>
-          </div>
+          </CollapsibleSection>
 
           <Separator />
 
           {/* 案場毛利 */}
-          <div className="bg-blue-100/50 dark:bg-blue-900/30 rounded-lg p-4">
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-blue-800 dark:text-blue-300">一、案場毛利</span>
-              <div className="flex gap-8 font-mono font-bold">
-                <span className="text-muted-foreground">{formatCurrency(budgetSiteGrossProfit, 0)}</span>
-                <span className={actualSiteGrossProfit >= budgetSiteGrossProfit ? "text-green-600" : "text-destructive"}>
-                  {formatCurrency(actualSiteGrossProfit, 0)}
-                </span>
-                <span className={actualSiteGrossProfit - budgetSiteGrossProfit >= 0 ? "text-green-600" : "text-destructive"}>
-                  {actualSiteGrossProfit - budgetSiteGrossProfit >= 0 ? "+" : ""}{formatCurrency(actualSiteGrossProfit - budgetSiteGrossProfit, 0)}
-                </span>
+          <CollapsibleSection
+            title="一、案場毛利"
+            colorClass="text-blue-800 dark:text-blue-300"
+            badge={
+              <span className={`text-xs font-mono font-bold ${budgetSiteGrossProfit >= 0 ? "text-blue-700 dark:text-blue-400" : "text-destructive"}`}>
+                {formatCurrency(budgetSiteGrossProfit, 0)}
+              </span>
+            }
+          >
+            <div className="bg-blue-100/50 dark:bg-blue-900/30 rounded-lg p-4">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-blue-800 dark:text-blue-300">毛利金額</span>
+                <div className="flex gap-8 font-mono font-bold">
+                  <span className="text-muted-foreground">{formatCurrency(budgetSiteGrossProfit, 0)}</span>
+                  <span className={actualSiteGrossProfit >= budgetSiteGrossProfit ? "text-green-600" : "text-destructive"}>
+                    {formatCurrency(actualSiteGrossProfit, 0)}
+                  </span>
+                  <span className={actualSiteGrossProfit - budgetSiteGrossProfit >= 0 ? "text-green-600" : "text-destructive"}>
+                    {actualSiteGrossProfit - budgetSiteGrossProfit >= 0 ? "+" : ""}{formatCurrency(actualSiteGrossProfit - budgetSiteGrossProfit, 0)}
+                  </span>
+                </div>
+              </div>
+              <div className="flex justify-between mt-2 text-sm">
+                <span className="text-blue-600 dark:text-blue-400">毛利率</span>
+                <div className="flex gap-8 font-mono">
+                  <span>{budgetSiteGrossMargin.toFixed(1)}%</span>
+                  <span className={actualSiteGrossMargin >= budgetSiteGrossMargin ? "text-green-600" : "text-destructive"}>
+                    {actualSiteGrossMargin.toFixed(1)}%
+                  </span>
+                  <span className={actualSiteGrossMargin - budgetSiteGrossMargin >= 0 ? "text-green-600" : "text-destructive"}>
+                    {actualSiteGrossMargin - budgetSiteGrossMargin >= 0 ? "+" : ""}{(actualSiteGrossMargin - budgetSiteGrossMargin).toFixed(1)}%
+                  </span>
+                </div>
               </div>
             </div>
-            <div className="flex justify-between mt-2 text-sm">
-              <span className="text-blue-600 dark:text-blue-400">毛利率</span>
-              <div className="flex gap-8 font-mono">
-                <span>{budgetSiteGrossMargin.toFixed(1)}%</span>
-                <span className={actualSiteGrossMargin >= budgetSiteGrossMargin ? "text-green-600" : "text-destructive"}>
-                  {actualSiteGrossMargin.toFixed(1)}%
-                </span>
-                <span className={actualSiteGrossMargin - budgetSiteGrossMargin >= 0 ? "text-green-600" : "text-destructive"}>
-                  {actualSiteGrossMargin - budgetSiteGrossMargin >= 0 ? "+" : ""}{(actualSiteGrossMargin - budgetSiteGrossMargin).toFixed(1)}%
-                </span>
-              </div>
-            </div>
-          </div>
+          </CollapsibleSection>
 
           <Separator />
 
           {/* [支出項 B] 專案特定支出 */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-orange-700 dark:text-orange-400">
-              <div className="w-1 h-4 bg-orange-500 rounded" />
-              B. 專案特定支出
-            </div>
-            
-            <div className="pl-4 space-y-2 border-l-2 border-orange-200 dark:border-orange-800">
-              {/* 風險預留 with slider */}
-              <div className="bg-orange-50 dark:bg-orange-950/30 rounded-lg p-3 space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-orange-700 dark:text-orange-400">
-                    風險預留 ({riskReserveRate}%)
-                  </span>
-                  <div className="flex gap-8 font-mono text-sm text-orange-700 dark:text-orange-400">
-                    <span>{formatCurrency(riskReserve, 0)}</span>
-                    <span>{formatCurrency(actualRiskReserve, 0)}</span>
-                    <span>{formatCurrency(actualRiskReserve - riskReserve, 0)}</span>
+          <CollapsibleSection
+            title="B. 專案特定支出"
+            icon={<div className="w-1 h-4 bg-orange-500 rounded" />}
+            colorClass="text-orange-700 dark:text-orange-400"
+            badge={
+              <span className="text-xs font-mono text-muted-foreground">
+                {formatCurrency(projectSpecificExpenses, 0)}
+              </span>
+            }
+          >
+            <div className="space-y-2">
+              <div className="pl-4 space-y-2 border-l-2 border-orange-200 dark:border-orange-800">
+                {/* 風險預留 with slider */}
+                <div className="bg-orange-50 dark:bg-orange-950/30 rounded-lg p-3 space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium text-orange-700 dark:text-orange-400">
+                      風險預留 ({riskReserveRate}%)
+                    </span>
+                    <div className="flex gap-8 font-mono text-sm text-orange-700 dark:text-orange-400">
+                      <span>{formatCurrency(riskReserve, 0)}</span>
+                      <span>{formatCurrency(actualRiskReserve, 0)}</span>
+                      <span>{formatCurrency(actualRiskReserve - riskReserve, 0)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs text-orange-500 w-5">0%</span>
+                    <Slider
+                      value={[riskReserveRate]}
+                      onValueChange={(value) => setRiskReserveRate(value[0])}
+                      min={0}
+                      max={10}
+                      step={0.5}
+                      disabled={isFinalized}
+                      className="flex-1 [&_[role=slider]]:bg-orange-500 [&_[role=slider]]:border-orange-600"
+                    />
+                    <span className="text-xs text-orange-500 w-6">10%</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-orange-500 w-5">0%</span>
-                  <Slider
-                    value={[riskReserveRate]}
-                    onValueChange={(value) => setRiskReserveRate(value[0])}
-                    min={0}
-                    max={10}
-                    step={0.5}
-                    disabled={isFinalized}
-                    className="flex-1 [&_[role=slider]]:bg-orange-500 [&_[role=slider]]:border-orange-600"
-                  />
-                  <span className="text-xs text-orange-500 w-6">10%</span>
+
+                <CostCompareRow
+                  label="仲介/開發費"
+                  budget={brokerage}
+                  actual={actualCosts.actualBrokerageCost}
+                  onActualChange={(v) => updateActualCost("actualBrokerageCost", v)}
+                  isLocked={isFinalized}
+                  showWarning={brokerage === 0}
+                  warningText="尚未設定仲介費，請於工程項目中新增。"
+                />
+                <CostCompareRow
+                  label="維運準備金"
+                  budget={maintenanceReserve}
+                  actual={actualCosts.actualMaintenanceReserve}
+                  onActualChange={(v) => updateActualCost("actualMaintenanceReserve", v)}
+                  isLocked={isFinalized}
+                  showWarning={maintenanceReserve === 0}
+                  warningText="尚未設定維運準備金，請於工程項目中新增。"
+                />
+              </div>
+              
+              <div className="flex justify-between items-center pt-2 bg-orange-50 dark:bg-orange-950/50 rounded-lg px-4 py-2">
+                <span className="font-medium text-orange-700 dark:text-orange-400">專案支出小計</span>
+                <div className="flex gap-8 font-mono font-medium text-orange-700 dark:text-orange-400">
+                  <span>{formatCurrency(projectSpecificExpenses, 0)}</span>
+                  <span>{formatCurrency(actualProjectExpenses, 0)}</span>
+                  <span className={actualProjectExpenses - projectSpecificExpenses > 0 ? "text-destructive" : actualProjectExpenses - projectSpecificExpenses < 0 ? "text-green-600" : ""}>
+                    {actualProjectExpenses - projectSpecificExpenses >= 0 ? "+" : ""}{formatCurrency(actualProjectExpenses - projectSpecificExpenses, 0)}
+                  </span>
                 </div>
               </div>
-
-              <CostCompareRow
-                label="仲介/開發費"
-                budget={brokerage}
-                actual={actualCosts.actualBrokerageCost}
-                onActualChange={(v) => updateActualCost("actualBrokerageCost", v)}
-                isLocked={isFinalized}
-                showWarning={brokerage === 0}
-                warningText="尚未設定仲介費，請於工程項目中新增。"
-              />
-              <CostCompareRow
-                label="維運準備金"
-                budget={maintenanceReserve}
-                actual={actualCosts.actualMaintenanceReserve}
-                onActualChange={(v) => updateActualCost("actualMaintenanceReserve", v)}
-                isLocked={isFinalized}
-                showWarning={maintenanceReserve === 0}
-                warningText="尚未設定維運準備金，請於工程項目中新增。"
-              />
             </div>
-            
-            <div className="flex justify-between items-center pt-2 bg-orange-50 dark:bg-orange-950/50 rounded-lg px-4 py-2">
-              <span className="font-medium text-orange-700 dark:text-orange-400">專案支出小計</span>
-              <div className="flex gap-8 font-mono font-medium text-orange-700 dark:text-orange-400">
-                <span>{formatCurrency(projectSpecificExpenses, 0)}</span>
-                <span>{formatCurrency(actualProjectExpenses, 0)}</span>
-                <span className={actualProjectExpenses - projectSpecificExpenses > 0 ? "text-destructive" : actualProjectExpenses - projectSpecificExpenses < 0 ? "text-green-600" : ""}>
-                  {actualProjectExpenses - projectSpecificExpenses >= 0 ? "+" : ""}{formatCurrency(actualProjectExpenses - projectSpecificExpenses, 0)}
-                </span>
-              </div>
-            </div>
-          </div>
+          </CollapsibleSection>
 
           <Separator />
 
           {/* 營業利潤 */}
-          <div className="bg-purple-100/50 dark:bg-purple-900/30 rounded-lg p-4">
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-purple-800 dark:text-purple-300">二、營業利潤</span>
-              <div className="flex gap-8 font-mono font-bold">
-                <span className="text-muted-foreground">{formatCurrency(budgetOperatingProfit, 0)}</span>
-                <span className={actualOperatingProfit >= budgetOperatingProfit ? "text-green-600" : "text-destructive"}>
-                  {formatCurrency(actualOperatingProfit, 0)}
-                </span>
-                <span className={actualOperatingProfit - budgetOperatingProfit >= 0 ? "text-green-600" : "text-destructive"}>
-                  {actualOperatingProfit - budgetOperatingProfit >= 0 ? "+" : ""}{formatCurrency(actualOperatingProfit - budgetOperatingProfit, 0)}
-                </span>
+          <CollapsibleSection
+            title="二、營業利潤"
+            colorClass="text-purple-800 dark:text-purple-300"
+            badge={
+              <span className={`text-xs font-mono font-bold ${budgetOperatingProfit >= 0 ? "text-purple-700 dark:text-purple-400" : "text-destructive"}`}>
+                {formatCurrency(budgetOperatingProfit, 0)}
+              </span>
+            }
+          >
+            <div className="bg-purple-100/50 dark:bg-purple-900/30 rounded-lg p-4">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-purple-800 dark:text-purple-300">營業利潤金額</span>
+                <div className="flex gap-8 font-mono font-bold">
+                  <span className="text-muted-foreground">{formatCurrency(budgetOperatingProfit, 0)}</span>
+                  <span className={actualOperatingProfit >= budgetOperatingProfit ? "text-green-600" : "text-destructive"}>
+                    {formatCurrency(actualOperatingProfit, 0)}
+                  </span>
+                  <span className={actualOperatingProfit - budgetOperatingProfit >= 0 ? "text-green-600" : "text-destructive"}>
+                    {actualOperatingProfit - budgetOperatingProfit >= 0 ? "+" : ""}{formatCurrency(actualOperatingProfit - budgetOperatingProfit, 0)}
+                  </span>
+                </div>
+              </div>
+              <div className="flex justify-between mt-2 text-sm">
+                <span className="text-purple-600 dark:text-purple-400">營業利潤率</span>
+                <div className="flex gap-8 font-mono">
+                  <span>{budgetOperatingMargin.toFixed(1)}%</span>
+                  <span className={actualOperatingMargin >= budgetOperatingMargin ? "text-green-600" : "text-destructive"}>
+                    {actualOperatingMargin.toFixed(1)}%
+                  </span>
+                  <span className={actualOperatingMargin - budgetOperatingMargin >= 0 ? "text-green-600" : "text-destructive"}>
+                    {actualOperatingMargin - budgetOperatingMargin >= 0 ? "+" : ""}{(actualOperatingMargin - budgetOperatingMargin).toFixed(1)}%
+                  </span>
+                </div>
               </div>
             </div>
-            <div className="flex justify-between mt-2 text-sm">
-              <span className="text-purple-600 dark:text-purple-400">營業利潤率</span>
-              <div className="flex gap-8 font-mono">
-                <span>{budgetOperatingMargin.toFixed(1)}%</span>
-                <span className={actualOperatingMargin >= budgetOperatingMargin ? "text-green-600" : "text-destructive"}>
-                  {actualOperatingMargin.toFixed(1)}%
-                </span>
-                <span className={actualOperatingMargin - budgetOperatingMargin >= 0 ? "text-green-600" : "text-destructive"}>
-                  {actualOperatingMargin - budgetOperatingMargin >= 0 ? "+" : ""}{(actualOperatingMargin - budgetOperatingMargin).toFixed(1)}%
-                </span>
-              </div>
-            </div>
-          </div>
+          </CollapsibleSection>
 
           <Separator />
 
           {/* [支出項 C] 公司管銷 */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2 text-sm font-semibold text-red-700 dark:text-red-400">
-              <div className="w-1 h-4 bg-red-500 rounded" />
-              C. 公司管銷
-            </div>
-            
-            <div className="pl-4 space-y-1 border-l-2 border-red-200 dark:border-red-800">
-              <div className="grid grid-cols-4 gap-4 items-center py-2">
-                <span className="text-sm font-medium">印花稅 (0.1%)</span>
-                <div className="text-right font-mono text-sm">{formatCurrency(stampDuty, 0)}</div>
-                <div className="text-right font-mono text-sm text-muted-foreground">—</div>
-                <div className="text-right font-mono text-sm text-muted-foreground">—</div>
+          <CollapsibleSection
+            title="C. 公司管銷"
+            icon={<div className="w-1 h-4 bg-red-500 rounded" />}
+            colorClass="text-red-700 dark:text-red-400"
+            badge={
+              <span className="text-xs font-mono text-muted-foreground">
+                {formatCurrency(companyOverhead, 0)}
+              </span>
+            }
+          >
+            <div className="space-y-2">
+              <div className="pl-4 space-y-1 border-l-2 border-red-200 dark:border-red-800">
+                <div className="grid grid-cols-4 gap-4 items-center py-2">
+                  <span className="text-sm font-medium">印花稅 (0.1%)</span>
+                  <div className="text-right font-mono text-sm">{formatCurrency(stampDuty, 0)}</div>
+                  <div className="text-right font-mono text-sm text-muted-foreground">—</div>
+                  <div className="text-right font-mono text-sm text-muted-foreground">—</div>
+                </div>
+                <div className="grid grid-cols-4 gap-4 items-center py-2">
+                  <span className="text-sm font-medium">預扣營所稅 (2%)</span>
+                  <div className="text-right font-mono text-sm">{formatCurrency(corpTax, 0)}</div>
+                  <div className="text-right font-mono text-sm text-muted-foreground">—</div>
+                  <div className="text-right font-mono text-sm text-muted-foreground">—</div>
+                </div>
               </div>
-              <div className="grid grid-cols-4 gap-4 items-center py-2">
-                <span className="text-sm font-medium">預扣營所稅 (2%)</span>
-                <div className="text-right font-mono text-sm">{formatCurrency(corpTax, 0)}</div>
-                <div className="text-right font-mono text-sm text-muted-foreground">—</div>
-                <div className="text-right font-mono text-sm text-muted-foreground">—</div>
+              
+              <div className="flex justify-between items-center pt-2 bg-red-50 dark:bg-red-950/50 rounded-lg px-4 py-2">
+                <span className="font-medium text-red-700 dark:text-red-400">管銷費用小計</span>
+                <span className="font-mono font-semibold text-red-700 dark:text-red-400">{formatCurrency(companyOverhead, 0)}</span>
               </div>
             </div>
-            
-            <div className="flex justify-between items-center pt-2 bg-red-50 dark:bg-red-950/50 rounded-lg px-4 py-2">
-              <span className="font-medium text-red-700 dark:text-red-400">管銷費用小計</span>
-              <span className="font-mono font-semibold text-red-700 dark:text-red-400">{formatCurrency(companyOverhead, 0)}</span>
-            </div>
-          </div>
+          </CollapsibleSection>
 
           <Separator />
 
           {/* 最終淨利 - 雙欄對比 */}
-          <div className="bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-950/50 dark:to-emerald-950/50 rounded-lg p-6">
-            <div className="text-center mb-4">
-              <span className="text-lg font-bold text-green-800 dark:text-green-300 flex items-center justify-center gap-2">
-                三、最終預估淨利
+          <CollapsibleSection
+            title="三、最終預估淨利"
+            colorClass="text-green-800 dark:text-green-300"
+            badge={
+              <div className="flex items-center gap-2">
+                <span className={`text-xs font-mono font-bold ${budgetNetProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-destructive"}`}>
+                  {formatCurrency(budgetNetProfit, 0)}
+                </span>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -648,46 +739,48 @@ export default function QuoteBudgetTrackingTab({
                     </TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-6">
-              <div className="bg-white/60 dark:bg-black/20 rounded-xl p-4 text-center">
-                <div className="text-sm text-muted-foreground mb-2">預估淨利</div>
-                <div className={`text-2xl font-bold font-mono ${budgetNetProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-destructive"}`}>
-                  {formatCurrency(budgetNetProfit, 0)}
+              </div>
+            }
+          >
+            <div className="bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-950/50 dark:to-emerald-950/50 rounded-lg p-6">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="bg-white/60 dark:bg-black/20 rounded-xl p-4 text-center">
+                  <div className="text-sm text-muted-foreground mb-2">預估淨利</div>
+                  <div className={`text-2xl font-bold font-mono ${budgetNetProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-destructive"}`}>
+                    {formatCurrency(budgetNetProfit, 0)}
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-2">
+                    淨利率 {budgetNetMargin.toFixed(2)}%
+                  </div>
                 </div>
-                <div className="text-sm text-muted-foreground mt-2">
-                  淨利率 {budgetNetMargin.toFixed(2)}%
+                
+                <div className="bg-white/60 dark:bg-black/20 rounded-xl p-4 text-center border-2 border-green-400 dark:border-green-600">
+                  <div className="text-sm text-muted-foreground mb-2 flex items-center justify-center gap-1">
+                    目前實際淨利
+                    {hasAnyActual && (
+                      actualNetProfit >= budgetNetProfit 
+                        ? <TrendingDown className="h-4 w-4 text-green-600" />
+                        : <TrendingUp className="h-4 w-4 text-destructive" />
+                    )}
+                  </div>
+                  <div className={`text-2xl font-bold font-mono ${actualNetProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-destructive"}`}>
+                    {formatCurrency(actualNetProfit, 0)}
+                  </div>
+                  <div className="text-sm text-muted-foreground mt-2">
+                    淨利率 {actualNetMargin.toFixed(2)}%
+                  </div>
                 </div>
               </div>
               
-              <div className="bg-white/60 dark:bg-black/20 rounded-xl p-4 text-center border-2 border-green-400 dark:border-green-600">
-                <div className="text-sm text-muted-foreground mb-2 flex items-center justify-center gap-1">
-                  目前實際淨利
-                  {hasAnyActual && (
-                    actualNetProfit >= budgetNetProfit 
-                      ? <TrendingDown className="h-4 w-4 text-green-600" />
-                      : <TrendingUp className="h-4 w-4 text-destructive" />
-                  )}
-                </div>
-                <div className={`text-2xl font-bold font-mono ${actualNetProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-destructive"}`}>
-                  {formatCurrency(actualNetProfit, 0)}
-                </div>
-                <div className="text-sm text-muted-foreground mt-2">
-                  淨利率 {actualNetMargin.toFixed(2)}%
-                </div>
+              {/* Variance summary */}
+              <div className="mt-4 text-center">
+                <span className="text-sm text-muted-foreground">淨利差異：</span>
+                <span className={`ml-2 font-mono font-bold ${actualNetProfit - budgetNetProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
+                  {actualNetProfit - budgetNetProfit >= 0 ? "+" : ""}{formatCurrency(actualNetProfit - budgetNetProfit, 0)}
+                </span>
               </div>
             </div>
-            
-            {/* Variance summary */}
-            <div className="mt-4 text-center">
-              <span className="text-sm text-muted-foreground">淨利差異：</span>
-              <span className={`ml-2 font-mono font-bold ${actualNetProfit - budgetNetProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
-                {actualNetProfit - budgetNetProfit >= 0 ? "+" : ""}{formatCurrency(actualNetProfit - budgetNetProfit, 0)}
-              </span>
-            </div>
-          </div>
+          </CollapsibleSection>
 
           {/* 說明備註 */}
           <p className="text-xs text-muted-foreground leading-relaxed text-center pt-2">
