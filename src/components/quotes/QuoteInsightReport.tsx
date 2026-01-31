@@ -92,6 +92,15 @@ const FOCUS_AREAS: { id: FocusAreaType; label: string; description: string }[] =
   { id: "equipment", label: "設備分析", description: "模組與逆變器成本效益" },
 ];
 
+// Output format options
+type OutputFormatType = "narrative" | "table" | "mixed";
+
+const OUTPUT_FORMATS: { id: OutputFormatType; label: string; description: string }[] = [
+  { id: "narrative", label: "文字敘述", description: "詳細的段落式分析報告" },
+  { id: "table", label: "表格呈現", description: "結構化的表格比較資料" },
+  { id: "mixed", label: "圖文混合", description: "結合表格與文字的綜合報告" },
+];
+
 export default function QuoteInsightReport({
   capacityKwp,
   pricePerKwp,
@@ -109,6 +118,7 @@ export default function QuoteInsightReport({
   const [showFallbackDialog, setShowFallbackDialog] = useState(false);
   const [failedProviderInfo, setFailedProviderInfo] = useState<{ provider: string; error: string } | null>(null);
   const [selectedFocusAreas, setSelectedFocusAreas] = useState<FocusAreaType[]>([]);
+  const [selectedOutputFormat, setSelectedOutputFormat] = useState<OutputFormatType>("narrative");
 
   const { isChecking, results: healthResults, checkHealth, getStatusForProvider } = useAIHealthCheck();
   const { defaultProvider, geminiKey, openaiKey, isLoading: isLoadingSettings } = useAISettings();
@@ -196,6 +206,7 @@ export default function QuoteInsightReport({
           selectedProvider: provider,
           allowFallback: false, // Don't auto-fallback
           focusAreas: selectedFocusAreas, // Pass user-selected focus areas
+          outputFormat: selectedOutputFormat, // Pass user-selected output format
         },
       });
 
@@ -467,6 +478,35 @@ export default function QuoteInsightReport({
                     已選擇 {selectedFocusAreas.length} 項重點，AI 將優先分析這些面向
                   </p>
                 )}
+              </CardContent>
+            </Card>
+
+            {/* Output Format Selection */}
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">輸出格式</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-3 gap-2">
+                  {OUTPUT_FORMATS.map((format) => {
+                    const isSelected = selectedOutputFormat === format.id;
+                    return (
+                      <button
+                        key={format.id}
+                        type="button"
+                        onClick={() => setSelectedOutputFormat(format.id)}
+                        className={`flex flex-col items-center p-3 rounded-md border text-center transition-colors ${
+                          isSelected 
+                            ? 'border-primary bg-primary/10 text-primary' 
+                            : 'border-border hover:border-muted-foreground/50 hover:bg-muted/50'
+                        }`}
+                      >
+                        <span className="font-medium text-sm">{format.label}</span>
+                        <span className="text-xs text-muted-foreground mt-1">{format.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               </CardContent>
             </Card>
 

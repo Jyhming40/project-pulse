@@ -1,5 +1,6 @@
 import { ReactNode, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
+import GlobalAIAssistant from '@/components/GlobalAIAssistant';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAppSettingsRead } from '@/hooks/useAppSettings';
 import { usePermissions, MODULES } from '@/hooks/usePermissions';
@@ -366,6 +367,9 @@ export default function Layout({ children }: LayoutProps) {
           {children}
         </div>
       </main>
+
+      {/* Global AI Assistant */}
+      <GlobalAIAssistant />
     </div>
   );
 }
