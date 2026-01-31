@@ -18,6 +18,7 @@ import {
   calculateModulePrice,
   calculateInverterPrice,
 } from "@/hooks/useQuoteEngineering";
+import { useTieredPricing } from "@/hooks/useTieredPricing";
 import EngineeringCategoryCard from "./EngineeringCategoryCard";
 import EquipmentModulesCard from "./EquipmentModulesCard";
 import EquipmentInvertersCard from "./EquipmentInvertersCard";
@@ -63,6 +64,9 @@ export default function QuoteCostCalculatorTab({
 }: QuoteCostCalculatorTabProps) {
   const { templates, loading } = useEngineeringTemplates();
   const [hasInitialized, setHasInitialized] = useState(false);
+  
+  // 使用自訂階梯定價 hook，確保計算一致性
+  const { calculatePrice } = useTieredPricing();
 
   // 從範本初始化 - 只在新增模式且尚未初始化時執行
   useEffect(() => {
@@ -78,11 +82,12 @@ export default function QuoteCostCalculatorTab({
     const pricePerKwp = formData.pricePerKwp || 0;
     const taxRate = formData.taxRate || 0.05;
     
-    // 建立計費上下文
+    // 建立計費上下文（包含自訂階梯定價計算器，確保一致性）
     const billingContext: BillingContext = {
       capacityKwp,
       pricePerKwp,
       taxRate,
+      tieredPriceCalculator: calculatePrice,
     };
     
     // 工程項目總計
