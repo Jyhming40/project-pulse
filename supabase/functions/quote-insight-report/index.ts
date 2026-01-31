@@ -19,6 +19,11 @@ interface QuoteData {
   categories: Array<{
     categoryName: string;
     subtotal: number;
+    items?: Array<{
+      itemName: string;
+      billingMethod: string;
+      subtotal: number;
+    }>;
   }>;
   historicalQuotes?: Array<{
     capacityKwp: number;
@@ -288,11 +293,43 @@ serve(async (req) => {
     const modulesPercent = ((quoteData.modulesTotal / totalCost) * 100).toFixed(1);
     const invertersPercent = ((quoteData.invertersTotal / totalCost) * 100).toFixed(1);
     
-    // Category breakdown
+    // Category breakdown with item details
     const categoryBreakdown = quoteData.categories
       .filter(c => c.subtotal > 0)
-      .map(c => `- ${c.categoryName}: $${c.subtotal.toLocaleString()} (${((c.subtotal / totalCost) * 100).toFixed(1)}%)`)
+      .map(c => {
+        const categoryLine = `- ${c.categoryName}: $${c.subtotal.toLocaleString()} (${((c.subtotal / totalCost) * 100).toFixed(1)}%)`;
+        // 如果有項目明細，列出仲介費、印花稅、營所稅等特殊項目
+        if (c.items && c.items.length > 0) {
+          const specialItems = c.items.filter(item => 
+            ['brokerage', 'stamp_duty', 'corp_tax'].includes(item.billingMethod)
+          );
+          if (specialItems.length > 0) {
+            const itemDetails = specialItems.map(item => {
+              const methodLabel = item.billingMethod === 'brokerage' ? '仲介費' :
+                                  item.billingMethod === 'stamp_duty' ? '印花稅' :
+                                  item.billingMethod === 'corp_tax' ? '營所稅' : item.billingMethod;
+              return `    • ${item.itemName} (${methodLabel}): $${item.subtotal.toLocaleString()}`;
+            }).join('\n');
+            return `${categoryLine}\n${itemDetails}`;
+          }
+        }
+        return categoryLine;
+      })
       .join('\n');
+    
+    // 計算仲介費總額
+    let brokerageTotal = 0;
+    quoteData.categories.forEach(c => {
+      if (c.items) {
+        c.items.forEach(item => {
+          if (item.billingMethod === 'brokerage') {
+            brokerageTotal += item.subtotal;
+          }
+        });
+      }
+    });
+    const hasBrokerage = brokerageTotal > 0;
+    const brokeragePercent = hasBrokerage ? ((brokerageTotal / totalCost) * 100).toFixed(1) : null;
 
     // Historical comparison context
     let historyContext = "";
@@ -368,6 +405,12 @@ ${formatInstructions}
 
 工程明細：
 ${categoryBreakdown || '無明細資料'}
+${hasBrokerage ? `
+【仲介費資訊】
+- 仲介費總額：$${brokerageTotal.toLocaleString()} (佔總成本 ${brokeragePercent}%)
+- 備註：已在上方工程明細中標示仲介費項目` : `
+【仲介費資訊】
+- 本報價單未包含仲介費項目`}
 
 【利潤指標】
 - 毛利金額：$${quoteData.grossMargin.toLocaleString()}

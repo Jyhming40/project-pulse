@@ -174,11 +174,17 @@ export default function QuoteInsightReport({
         taxRate,
       };
       
+      // 傳送更詳細的類別資料，包含項目的計費方式以便 AI 識別仲介費等特殊項目
       const categoryData = categories.map(cat => ({
         categoryName: cat.categoryName,
         subtotal: cat.items.reduce((sum, item) => {
           return sum + calculateItemSubtotal(item, capacityKwp, billingContext);
         }, 0),
+        items: cat.items.map(item => ({
+          itemName: item.itemName,
+          billingMethod: item.billingMethod,
+          subtotal: calculateItemSubtotal(item, capacityKwp, billingContext),
+        })),
       }));
 
       const historicalData = historicalQuotes?.map(q => ({
