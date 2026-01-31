@@ -77,7 +77,7 @@ export default function QuoteCostCalculatorTab({
   }, [templates, loading, categories.length, skipTemplateInit, hasInitialized]);
 
   // 計算各項總計
-  const { totals, overheadBreakdown } = useMemo(() => {
+  const { totals, overheadBreakdown, projectExpenseBreakdown } = useMemo(() => {
     const capacityKwp = formData.capacityKwp || 0;
     const pricePerKwp = formData.pricePerKwp || 0;
     const taxRate = formData.taxRate || 0.05;
@@ -90,10 +90,12 @@ export default function QuoteCostCalculatorTab({
       tieredPriceCalculator: calculatePrice,
     };
     
-    // 工程項目總計 & 公司管銷費用分離
+    // 工程項目總計 & 費用分類
     let engineeringTotal = 0;
     let stampDuty = 0;
     let corpTax = 0;
+    let brokerage = 0;
+    let maintenanceReserve = 0;
     
     categories.forEach((cat) => {
       cat.items.forEach((item) => {
@@ -105,6 +107,18 @@ export default function QuoteCostCalculatorTab({
           stampDuty += subtotal;
         } else if (item.billingMethod === 'corp_tax') {
           corpTax += subtotal;
+        } else if (item.billingMethod === 'brokerage') {
+          // 仲介費/開發費
+          brokerage += subtotal;
+        }
+        
+        // 識別維運準備金 (透過項目名稱包含關鍵字)
+        const itemNameLower = item.itemName.toLowerCase();
+        if (itemNameLower.includes('維運') || 
+            itemNameLower.includes('準備金') || 
+            itemNameLower.includes('維護') ||
+            itemNameLower.includes('maintenance')) {
+          maintenanceReserve += subtotal;
         }
       });
     });
@@ -122,6 +136,7 @@ export default function QuoteCostCalculatorTab({
     return { 
       totals: { engineeringTotal, modulesTotal, invertersTotal },
       overheadBreakdown: { stampDuty, corpTax },
+      projectExpenseBreakdown: { brokerage, maintenanceReserve },
     };
   }, [categories, modules, inverters, exchangeRate, formData.capacityKwp, formData.pricePerKwp, formData.taxRate, calculatePrice]);
 
@@ -188,6 +203,7 @@ export default function QuoteCostCalculatorTab({
         sellingPrice={sellingPrice}
         taxRate={formData.taxRate}
         overheadBreakdown={overheadBreakdown}
+        projectExpenseBreakdown={projectExpenseBreakdown}
       />
 
       {/* 動作列 */}
