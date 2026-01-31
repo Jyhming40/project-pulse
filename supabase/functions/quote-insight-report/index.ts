@@ -164,16 +164,27 @@ async function callLovableGateway(systemPrompt: string, userPrompt: string): Pro
   return data.choices?.[0]?.message?.content || "無法生成洞察報告";
 }
 
+// Focus area definitions
+const FOCUS_AREA_PROMPTS: Record<string, string> = {
+  brokerage: "特別分析仲介費的合理性與佔比，比較市場行情，評估是否有議價空間",
+  margin: "深入分析毛利率健康度，與同類案場比較，指出利潤風險與改善建議",
+  pricing: "著重分析每kW單價的市場競爭力，與台灣當前市場行情比較定位",
+  cost_structure: "詳細分析各項成本結構佔比是否合理，找出可能的成本優化空間",
+  historical: "與歷史報價深度比較，分析價格與利潤趨勢變化",
+  equipment: "分析模組與逆變器的價格合理性，評估設備選型與成本效益",
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { quoteData, selectedProvider, allowFallback = false } = await req.json() as { 
+    const { quoteData, selectedProvider, allowFallback = false, focusAreas = [] } = await req.json() as { 
       quoteData: QuoteData;
       selectedProvider?: string;
       allowFallback?: boolean;
+      focusAreas?: string[];
     };
     
     // Create Supabase client with service role to read AI settings
@@ -222,6 +233,18 @@ serve(async (req) => {
     const pricePosition = quoteData.pricePerKwp < marketLowPrice ? "低於市場" : 
                          quoteData.pricePerKwp > marketHighPrice ? "高於市場" : "市場區間內";
 
+    // Build focus area instructions
+    let focusInstructions = "";
+    if (focusAreas && focusAreas.length > 0) {
+      const focusPrompts = focusAreas
+        .filter(area => FOCUS_AREA_PROMPTS[area])
+        .map(area => `- ${FOCUS_AREA_PROMPTS[area]}`);
+      
+      if (focusPrompts.length > 0) {
+        focusInstructions = `\n\n特別分析重點（請優先關注）：\n${focusPrompts.join('\n')}`;
+      }
+    }
+
     const systemPrompt = `你是一位資深太陽能光電產業報價分析師，專精於台灣市場的成本分析與投資評估。請根據提供的報價數據，提供簡潔專業的洞察報告。
 
 輸出格式要求：
@@ -230,7 +253,7 @@ serve(async (req) => {
 3. 每點用 emoji 開頭使報告易讀
 4. 洞察需具體、可執行，避免籠統建議
 5. 若發現異常指標，請明確指出風險等級（高/中/低）
-6. 最後總結一句報價合理性評估`;
+6. 最後總結一句報價合理性評估${focusInstructions}`;
 
     const userPrompt = `請分析以下太陽能光電專案報價：
 

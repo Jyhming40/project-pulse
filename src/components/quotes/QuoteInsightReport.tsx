@@ -80,6 +80,18 @@ const PROVIDER_LABELS: Record<ProviderType, string> = {
   lovable: "Lovable Cloud AI",
 };
 
+// Focus area options for user selection
+type FocusAreaType = "brokerage" | "margin" | "pricing" | "cost_structure" | "historical" | "equipment";
+
+const FOCUS_AREAS: { id: FocusAreaType; label: string; description: string }[] = [
+  { id: "brokerage", label: "仲介費分析", description: "仲介費合理性與議價空間" },
+  { id: "margin", label: "利潤健康度", description: "毛利率風險與改善建議" },
+  { id: "pricing", label: "價格競爭力", description: "每kW單價市場定位" },
+  { id: "cost_structure", label: "成本結構", description: "各項成本佔比優化" },
+  { id: "historical", label: "歷史比較", description: "與歷史報價趨勢比較" },
+  { id: "equipment", label: "設備分析", description: "模組與逆變器成本效益" },
+];
+
 export default function QuoteInsightReport({
   capacityKwp,
   pricePerKwp,
@@ -96,6 +108,7 @@ export default function QuoteInsightReport({
   const [selectedProvider, setSelectedProvider] = useState<ProviderType>("lovable");
   const [showFallbackDialog, setShowFallbackDialog] = useState(false);
   const [failedProviderInfo, setFailedProviderInfo] = useState<{ provider: string; error: string } | null>(null);
+  const [selectedFocusAreas, setSelectedFocusAreas] = useState<FocusAreaType[]>([]);
 
   const { isChecking, results: healthResults, checkHealth, getStatusForProvider } = useAIHealthCheck();
   const { defaultProvider, geminiKey, openaiKey, isLoading: isLoadingSettings } = useAISettings();
@@ -182,6 +195,7 @@ export default function QuoteInsightReport({
           },
           selectedProvider: provider,
           allowFallback: false, // Don't auto-fallback
+          focusAreas: selectedFocusAreas, // Pass user-selected focus areas
         },
       });
 
@@ -371,7 +385,7 @@ export default function QuoteInsightReport({
                   </SelectContent>
                 </Select>
 
-                {/* Health Status Display */}
+            {/* Health Status Display */}
                 <div className="grid grid-cols-3 gap-2 text-xs">
                   {(["gemini", "openai", "lovable"] as ProviderType[]).map((provider) => {
                     const health = getStatusForProvider(provider);
@@ -413,6 +427,46 @@ export default function QuoteInsightReport({
                     );
                   })}
                 </div>
+              </CardContent>
+            </Card>
+
+            {/* Focus Areas Selection */}
+            <Card>
+              <CardHeader className="py-3">
+                <CardTitle className="text-sm">分析重點選擇（可多選）</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  {FOCUS_AREAS.map((area) => {
+                    const isSelected = selectedFocusAreas.includes(area.id);
+                    return (
+                      <button
+                        key={area.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedFocusAreas(prev => 
+                            isSelected 
+                              ? prev.filter(a => a !== area.id)
+                              : [...prev, area.id]
+                          );
+                        }}
+                        className={`flex flex-col items-start p-2 rounded-md border text-left transition-colors ${
+                          isSelected 
+                            ? 'border-primary bg-primary/10 text-primary' 
+                            : 'border-border hover:border-muted-foreground/50 hover:bg-muted/50'
+                        }`}
+                      >
+                        <span className="font-medium text-sm">{area.label}</span>
+                        <span className="text-xs text-muted-foreground">{area.description}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {selectedFocusAreas.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    已選擇 {selectedFocusAreas.length} 項重點，AI 將優先分析這些面向
+                  </p>
+                )}
               </CardContent>
             </Card>
 
