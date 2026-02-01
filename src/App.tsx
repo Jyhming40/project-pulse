@@ -8,6 +8,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import Layout from "@/components/Layout";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
+import Hub from "./pages/Hub";
 import Projects from "./pages/Projects";
 import ProjectDetail from "./pages/ProjectDetail";
 import Investors from "./pages/Investors";
@@ -28,6 +29,16 @@ import ProjectComparison from "./pages/ProjectComparison";
 import Quotes from "./pages/Quotes";
 import QuoteWizard from "./pages/QuoteWizard";
 import NotFound from "./pages/NotFound";
+
+// Module pages
+import { 
+  SalesModule, 
+  ExecutionModule, 
+  GovernanceModule, 
+  FinanceModule, 
+  RiskModule 
+} from "./pages/modules";
+
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -42,11 +53,25 @@ const App = () => (
             <Route path="/change-password" element={<ChangePassword />} />
             <Route path="/pending-approval" element={<PendingApproval />} />
             
-            {/* 日常工作 */}
+            {/* Layer 1: 營運指揮中心 (Hub) */}
+            <Route path="/hub" element={<ProtectedRoute><Layout><Hub /></Layout></ProtectedRoute>} />
+            
+            {/* KPI 儀表板 (保留原有) */}
             <Route path="/" element={<ProtectedRoute><Layout><Dashboard /></Layout></ProtectedRoute>} />
+            
+            {/* Layer 2: 模組首頁 */}
+            <Route path="/modules/sales" element={<ProtectedRoute><Layout><SalesModule /></Layout></ProtectedRoute>} />
+            <Route path="/modules/execution" element={<ProtectedRoute><Layout><ExecutionModule /></Layout></ProtectedRoute>} />
+            <Route path="/modules/governance" element={<ProtectedRoute><Layout><GovernanceModule /></Layout></ProtectedRoute>} />
+            <Route path="/modules/finance" element={<ProtectedRoute><Layout><FinanceModule /></Layout></ProtectedRoute>} />
+            <Route path="/modules/risk" element={<ProtectedRoute><Layout><RiskModule /></Layout></ProtectedRoute>} />
+            
+            {/* Layer 3: 專案戰情室 */}
             <Route path="/projects" element={<ProtectedRoute><Layout><Projects /></Layout></ProtectedRoute>} />
             <Route path="/projects/compare" element={<ProtectedRoute><Layout><ProjectComparison /></Layout></ProtectedRoute>} />
             <Route path="/projects/:id" element={<ProtectedRoute><Layout><ProjectDetail /></Layout></ProtectedRoute>} />
+            
+            {/* 功能頁面 */}
             <Route path="/documents" element={<ProtectedRoute><Layout><Documents /></Layout></ProtectedRoute>} />
             <Route path="/import-batch" element={<ProtectedRoute><Layout><ImportBatch /></Layout></ProtectedRoute>} />
             <Route path="/investors" element={<ProtectedRoute><Layout><Investors /></Layout></ProtectedRoute>} />
@@ -66,7 +91,7 @@ const App = () => (
             <Route path="/recycle-bin" element={<ProtectedRoute adminOnly><Layout><RecycleBin /></Layout></ProtectedRoute>} />
             <Route path="/duplicate-scanner" element={<ProtectedRoute adminOnly><Layout><DuplicateScanner /></Layout></ProtectedRoute>} />
             
-            {/* Dev Tools (開發環境) */}
+            {/* Dev Tools */}
             <Route path="/dev/dashboard-audit" element={<ProtectedRoute><Layout><DashboardAudit /></Layout></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />

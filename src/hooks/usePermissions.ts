@@ -14,7 +14,22 @@ export const MODULES = {
   RECYCLE_BIN: 'recycle_bin',
   SETTINGS: 'settings',
   ENGINEERING: 'engineering',
+  // PULSE v3 模組權限預留
+  SALES: 'sales',
+  EXECUTION: 'execution',
+  GOVERNANCE: 'governance',
+  FINANCE: 'finance',
+  RISK: 'risk',
 } as const;
+
+// 預留角色類型（未來可擴充）
+export type FunctionalRole = 
+  | 'sales'      // 業務
+  | 'engineer'   // 工程
+  | 'admin'      // 行政
+  | 'finance'    // 財務
+  | 'legal'      // 法務
+  | 'owner';     // 負責人
 
 export type ModuleName = typeof MODULES[keyof typeof MODULES];
 
@@ -29,6 +44,12 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   [MODULES.RECYCLE_BIN]: '資源回收桶',
   [MODULES.SETTINGS]: '系統設定',
   [MODULES.ENGINEERING]: '工程介面',
+  // PULSE v3 模組
+  [MODULES.SALES]: '接案與報價',
+  [MODULES.EXECUTION]: '工程與行政',
+  [MODULES.GOVERNANCE]: '文件治理',
+  [MODULES.FINANCE]: '財務與投資',
+  [MODULES.RISK]: '風險與爭議',
 };
 
 export interface ModulePermission {
