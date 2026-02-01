@@ -7,3 +7,4 @@ export { SystemOptionsPanel } from './SystemOptionsPanel';
 export { default as TieredPricingPanel } from './TieredPricingPanel';
 export { QuotePresetsPanel } from './QuotePresetsPanel';
 export { default as FitRatesPanel } from './FitRatesPanel';
+export { NumberPrecisionPanel } from './NumberPrecisionPanel';

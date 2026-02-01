@@ -12,7 +12,8 @@ import {
   Users,
   Calculator,
   ClipboardList,
-  HardDrive
+  HardDrive,
+  Hash
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,6 +30,7 @@ import { StageResponsibilitiesPanel } from '@/components/settings/StageResponsib
 import { TieredPricingPanel, QuotePresetsPanel } from '@/components/settings';
 import FitRatesPanel from '@/components/settings/FitRatesPanel';
 import { SettingsBackupPanel } from '@/components/settings/SettingsBackupPanel';
+import { NumberPrecisionPanel } from '@/components/settings/NumberPrecisionPanel';
 
 export default function Settings() {
   const { isAdmin } = useAuth();
@@ -50,7 +52,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-11 max-w-6xl">
+        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-12 max-w-6xl">
           <TabsTrigger value="branding" className="flex items-center gap-2">
             <Palette className="w-4 h-4" />
             <span className="hidden sm:inline">公司</span>
@@ -86,6 +88,10 @@ export default function Settings() {
           <TabsTrigger value="quotePresets" className="flex items-center gap-2">
             <ClipboardList className="w-4 h-4" />
             <span className="hidden sm:inline">報價</span>
+          </TabsTrigger>
+          <TabsTrigger value="precision" className="flex items-center gap-2">
+            <Hash className="w-4 h-4" />
+            <span className="hidden sm:inline">精度</span>
           </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Wrench className="w-4 h-4" />
@@ -145,6 +151,10 @@ export default function Settings() {
 
         <TabsContent value="quotePresets" className="mt-6">
           <QuotePresetsPanel />
+        </TabsContent>
+
+        <TabsContent value="precision" className="mt-6">
+          <NumberPrecisionPanel />
         </TabsContent>
 
         <TabsContent value="users" className="mt-6 space-y-6">
