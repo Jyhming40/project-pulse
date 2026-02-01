@@ -1974,17 +1974,23 @@ export default function QuoteFinancialAnalysisTab({
                       <TableHead className="text-center w-20">保固費%</TableHead>
                       <TableHead className="text-right">每年保固費 (C)</TableHead>
                       <TableHead className="text-right">保險費用 (D)</TableHead>
-                      <TableHead className="text-right">期間現金流量<br/>(A-C-D)</TableHead>
+                      {financingMode === 'loan_financed' && (
+                        <TableHead className="text-right">貸款還款 (E)</TableHead>
+                      )}
+                      <TableHead className="text-right">期間現金流量<br/>{financingMode === 'loan_financed' ? '(A-C-D-E)' : '(A-C-D)'}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {/* 初期投資行 */}
                     <TableRow className="bg-muted/30 font-medium">
                       <TableCell className="text-center">0</TableCell>
-                      <TableCell colSpan={3} className="text-center text-muted-foreground">初期投資</TableCell>
+                      <TableCell colSpan={3} className="text-center text-muted-foreground">
+                        {financingMode === 'loan_financed' ? `初期自備款 (貸款 ${((summary as any).loanAmount || 0).toLocaleString()} 元)` : '初期投資'}
+                      </TableCell>
                       <TableCell colSpan={3}></TableCell>
+                      {financingMode === 'loan_financed' && <TableCell></TableCell>}
                       <TableCell className="text-right text-destructive font-mono">
-                        -{formatCurrency(summary.totalInvestment, 0)}
+                        -{formatCurrency(financingMode === 'loan_financed' ? ((summary as any).downPayment || summary.totalInvestment) : summary.totalInvestment, 0)}
                       </TableCell>
                     </TableRow>
                     
@@ -2009,6 +2015,11 @@ export default function QuoteFinancialAnalysisTab({
                         <TableCell className="text-right text-sm font-mono">
                           {formatCurrency(year.insuranceCost, 0)}
                         </TableCell>
+                        {financingMode === 'loan_financed' && (
+                          <TableCell className="text-right text-sm font-mono text-orange-600">
+                            {((year as any).loanPayment && (year as any).loanPayment > 0) ? formatCurrency((year as any).loanPayment, 0) : '-'}
+                          </TableCell>
+                        )}
                         <TableCell className={`text-right text-sm font-mono font-medium ${year.cumulativeCashFlow >= 0 ? "text-green-600" : "text-destructive"}`}>
                           {formatCurrency(year.cashFlow, 0)}
                         </TableCell>
@@ -2032,6 +2043,14 @@ export default function QuoteFinancialAnalysisTab({
                       <TableCell className="text-right font-mono">
                         {formatCurrency(summary.totalInsurance, 0)}
                       </TableCell>
+                      {financingMode === 'loan_financed' && (
+                        <TableCell className="text-right font-mono text-orange-600">
+                          {formatCurrency(((summary as any).loanAmount || 0) + ((summary as any).totalInterest || 0), 0)}
+                          <div className="text-[10px] text-muted-foreground font-normal">
+                            (本金 + 利息)
+                          </div>
+                        </TableCell>
+                      )}
                       <TableCell className={`text-right font-mono ${summary.netProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
                         {formatCurrency(summary.netProfit, 0)}
                       </TableCell>
