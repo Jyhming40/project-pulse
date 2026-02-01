@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { formatCurrency } from "@/lib/quoteCalculations";
+import { formatTWD } from "@/lib/formatNumber";
 
 interface QuoteCostSummaryCardProps {
   engineeringTotal: number;
@@ -39,15 +39,15 @@ export default function QuoteCostSummaryCard({
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">工程項目成本</span>
-            <span className="font-mono">{formatCurrency(engineeringTotal, 0)}</span>
+            <span className="font-mono">{formatTWD(engineeringTotal)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">PV 模組成本</span>
-            <span className="font-mono text-blue-600">{formatCurrency(modulesTotal, 0)}</span>
+            <span className="font-mono text-blue-600">{formatTWD(modulesTotal)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">逆變器成本</span>
-            <span className="font-mono text-amber-600">{formatCurrency(invertersTotal, 0)}</span>
+            <span className="font-mono text-amber-600">{formatTWD(invertersTotal)}</span>
           </div>
         </div>
 
@@ -57,11 +57,11 @@ export default function QuoteCostSummaryCard({
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">印花稅 (千分之一)</span>
-            <span className="font-mono">{formatCurrency(stampTax, 0)}</span>
+            <span className="font-mono">{formatTWD(stampTax)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">營所稅 (2%)</span>
-            <span className="font-mono">{formatCurrency(businessTax, 0)}</span>
+            <span className="font-mono">{formatTWD(businessTax)}</span>
           </div>
         </div>
 
@@ -71,16 +71,16 @@ export default function QuoteCostSummaryCard({
         <div className="space-y-3">
           <div className="flex justify-between">
             <span className="font-medium">總成本</span>
-            <span className="text-xl font-bold font-mono">{formatCurrency(grandTotal, 0)}</span>
+            <span className="text-xl font-bold font-mono">{formatTWD(grandTotal)}</span>
           </div>
           <div className="flex justify-between">
             <span className="font-medium">報價金額 (未稅)</span>
-            <span className="text-xl font-bold font-mono">{formatCurrency(sellingPrice, 0)}</span>
+            <span className="text-xl font-bold font-mono">{formatTWD(sellingPrice)}</span>
           </div>
           <div className="flex justify-between">
             <span className="font-medium">預估毛利</span>
             <span className={`text-xl font-bold font-mono ${grossProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
-              {formatCurrency(grossProfit, 0)}
+              {formatTWD(grossProfit)}
             </span>
           </div>
           <div className="flex justify-between">

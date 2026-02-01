@@ -37,7 +37,8 @@ import {
   Wallet,
   Landmark,
 } from "lucide-react";
-import { QuoteParams, formatCurrency, formatPercentage } from "@/lib/quoteCalculations";
+import { QuoteParams, formatPercentage } from "@/lib/quoteCalculations";
+import { formatTWD } from "@/lib/formatNumber";
 import { Plot } from "@/lib/plotly";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";

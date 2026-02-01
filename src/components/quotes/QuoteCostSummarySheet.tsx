@@ -10,7 +10,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Calculator, Info, AlertCircle } from "lucide-react";
-import { formatCurrency } from "@/lib/quoteCalculations";
+import { formatTWD } from "@/lib/formatNumber";
 import {
   Tooltip,
   TooltipContent,
@@ -111,7 +111,7 @@ export default function QuoteCostSummarySheet({
           <div className="bg-primary/5 rounded-lg p-3">
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">專案總收 (未稅)</span>
-              <span className="text-xl font-bold font-mono">{formatCurrency(sellingPrice, 0)}</span>
+              <span className="text-xl font-bold font-mono">{formatTWD(sellingPrice)}</span>
             </div>
           </div>
 
@@ -136,21 +136,21 @@ export default function QuoteCostSummarySheet({
             <div className="space-y-1.5 pl-2 border-l-2 border-blue-200 dark:border-blue-800">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">工程費用</span>
-                <span className="font-mono">{formatCurrency(engineeringTotal - companyOverhead - brokerage - maintenanceReserve, 0)}</span>
+                <span className="font-mono">{formatTWD(engineeringTotal - companyOverhead - brokerage - maintenanceReserve)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">PV 模組</span>
-                <span className="font-mono text-blue-600">{formatCurrency(modulesTotal, 0)}</span>
+                <span className="font-mono text-blue-600">{formatTWD(modulesTotal)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">逆變器</span>
-                <span className="font-mono text-amber-600">{formatCurrency(invertersTotal, 0)}</span>
+                <span className="font-mono text-amber-600">{formatTWD(invertersTotal)}</span>
               </div>
             </div>
             
             <div className="flex justify-between items-center pt-1 bg-slate-50 dark:bg-slate-900/50 rounded px-2 py-1.5">
               <span className="text-sm font-medium">直接成本小計</span>
-              <span className="font-mono font-semibold">{formatCurrency(directCost, 0)}</span>
+              <span className="font-mono font-semibold">{formatTWD(directCost)}</span>
             </div>
           </div>
 
@@ -159,7 +159,7 @@ export default function QuoteCostSummarySheet({
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-blue-700 dark:text-blue-400">一、案場毛利</span>
               <span className={`text-lg font-bold font-mono ${siteGrossProfit >= 0 ? "text-blue-700 dark:text-blue-400" : "text-destructive"}`}>
-                {formatCurrency(siteGrossProfit, 0)}
+                {formatTWD(siteGrossProfit)}
               </span>
             </div>
             <div className="flex justify-between items-center text-xs">
@@ -208,7 +208,7 @@ export default function QuoteCostSummarySheet({
                     </TooltipProvider>
                   </div>
                   <span className="font-mono text-sm font-medium text-orange-700 dark:text-orange-400">
-                    {formatCurrency(riskReserve, 0)}
+                    {formatTWD(riskReserve)}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -243,7 +243,7 @@ export default function QuoteCostSummarySheet({
                   )}
                 </div>
                 <span className={`font-mono ${hasMissingBrokerage ? "text-muted-foreground" : ""}`}>
-                  {formatCurrency(brokerage, 0)}
+                  {formatTWD(brokerage)}
                 </span>
               </div>
 
@@ -265,14 +265,14 @@ export default function QuoteCostSummarySheet({
                   )}
                 </div>
                 <span className={`font-mono ${hasMissingMaintenance ? "text-muted-foreground" : ""}`}>
-                  {formatCurrency(maintenanceReserve, 0)}
+                  {formatTWD(maintenanceReserve)}
                 </span>
               </div>
             </div>
             
             <div className="flex justify-between items-center pt-1 bg-orange-50/50 dark:bg-orange-900/20 rounded px-2 py-1.5">
               <span className="text-sm font-medium text-orange-700 dark:text-orange-400">專案支出小計</span>
-              <span className="font-mono font-semibold text-orange-700 dark:text-orange-400">{formatCurrency(projectSpecificExpenses, 0)}</span>
+              <span className="font-mono font-semibold text-orange-700 dark:text-orange-400">{formatTWD(projectSpecificExpenses)}</span>
             </div>
           </div>
 
@@ -281,7 +281,7 @@ export default function QuoteCostSummarySheet({
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium text-purple-700 dark:text-purple-400">二、營業利潤</span>
               <span className={`text-lg font-bold font-mono ${operatingProfit >= 0 ? "text-purple-700 dark:text-purple-400" : "text-destructive"}`}>
-                {formatCurrency(operatingProfit, 0)}
+                {formatTWD(operatingProfit)}
               </span>
             </div>
             <div className="flex justify-between items-center text-xs">
@@ -313,17 +313,17 @@ export default function QuoteCostSummarySheet({
             <div className="space-y-1.5 pl-2 border-l-2 border-red-200 dark:border-red-800">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">印花稅 (0.1%)</span>
-                <span className="font-mono text-red-600">{formatCurrency(stampDuty, 0)}</span>
+                <span className="font-mono text-red-600">{formatTWD(stampDuty)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">預扣營所稅 (2%)</span>
-                <span className="font-mono text-red-600">{formatCurrency(corpTax, 0)}</span>
+                <span className="font-mono text-red-600">{formatTWD(corpTax)}</span>
               </div>
             </div>
             
             <div className="flex justify-between items-center pt-1 bg-red-50/50 dark:bg-red-900/20 rounded px-2 py-1.5">
               <span className="text-sm font-medium text-red-700 dark:text-red-400">管銷費用小計</span>
-              <span className="font-mono font-semibold text-red-700 dark:text-red-400">{formatCurrency(companyOverhead, 0)}</span>
+              <span className="font-mono font-semibold text-red-700 dark:text-red-400">{formatTWD(companyOverhead)}</span>
             </div>
           </div>
 
@@ -344,7 +344,7 @@ export default function QuoteCostSummarySheet({
                 </TooltipProvider>
               </div>
               <span className={`text-xl font-bold font-mono ${netProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-destructive"}`}>
-                {formatCurrency(netProfit, 0)}
+                {formatTWD(netProfit)}
               </span>
             </div>
             <div className="flex justify-between items-center">

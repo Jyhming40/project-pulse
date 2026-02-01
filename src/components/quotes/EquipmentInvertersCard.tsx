@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Plus, Trash2, Zap, ChevronDown } from "lucide-react";
 import { InverterItem, generateId, calculateInverterPrice } from "@/hooks/useQuoteEngineering";
-import { formatCurrency } from "@/lib/quoteCalculations";
+import { formatTWD } from "@/lib/formatNumber";
 
 interface EquipmentInvertersCardProps {
   inverters: InverterItem[];
@@ -85,7 +85,7 @@ export default function EquipmentInvertersCard({
                   {totalCapacityKw.toFixed(1)} kW
                 </Badge>
                 <Badge className="font-mono text-sm bg-amber-500">
-                  {formatCurrency(totalPrice, 0)}
+                  {formatTWD(totalPrice)}
                 </Badge>
               </div>
             </div>
@@ -142,7 +142,7 @@ export default function EquipmentInvertersCard({
                         />
                       </TableCell>
                       <TableCell className="text-right font-medium font-mono text-sm text-amber-600">
-                        {formatCurrency(totalPriceNtd, 0)}
+                        {formatTWD(totalPriceNtd)}
                       </TableCell>
                       <TableCell>
                         <Button

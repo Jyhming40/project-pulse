@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { formatCurrency } from "@/lib/quoteCalculations";
+import { formatTWD } from "@/lib/formatNumber";
 import { Calculator, ChevronDown, TrendingUp, TrendingDown, Layers, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -86,7 +86,7 @@ export default function QuotePricingSummaryCard({
           <div className="space-y-2 p-3 rounded-lg bg-primary/10">
             <span className="text-sm font-medium text-foreground">報價總額 (未稅)</span>
             <p className="text-2xl font-bold font-mono text-primary">
-              {formatCurrency(totalPriceExcludingTax, 0)}
+              {formatTWD(totalPriceExcludingTax)}
             </p>
           </div>
 
@@ -94,7 +94,7 @@ export default function QuotePricingSummaryCard({
           <div className="space-y-2">
             <span className="text-sm font-medium text-foreground">總成本</span>
             <p className="text-2xl font-bold font-mono text-foreground">
-              {formatCurrency(grandTotal, 0)}
+              {formatTWD(grandTotal)}
             </p>
           </div>
 
@@ -142,16 +142,16 @@ export default function QuotePricingSummaryCard({
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground">每kW (含稅)</span>
-                  <p className="text-base font-semibold font-mono">{formatCurrency(pricePerKwpWithTax, 0)}</p>
+                  <p className="text-base font-semibold font-mono">{formatTWD(pricePerKwpWithTax)}</p>
                 </div>
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground">報價 (含稅)</span>
-                  <p className="text-base font-semibold font-mono">{formatCurrency(totalPriceIncludingTax, 0)}</p>
+                  <p className="text-base font-semibold font-mono">{formatTWD(totalPriceIncludingTax)}</p>
                 </div>
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground">預估毛利</span>
                   <p className={cn("text-lg font-bold font-mono", isPositive ? "text-green-600" : "text-destructive")}>
-                    {formatCurrency(grossProfit, 0)}
+                    {formatTWD(grossProfit)}
                   </p>
                 </div>
                 <div className="space-y-1">
@@ -171,15 +171,15 @@ export default function QuotePricingSummaryCard({
                 {/* 主要成本 */}
                 <div className="space-y-1 p-3 rounded-md bg-muted/50">
                   <span className="text-xs text-muted-foreground">工程項目</span>
-                  <p className="text-lg font-bold font-mono">{formatCurrency(engineeringTotal, 0)}</p>
+                  <p className="text-lg font-bold font-mono">{formatTWD(engineeringTotal)}</p>
                 </div>
                 <div className="space-y-1 p-3 rounded-md bg-blue-50 dark:bg-blue-950/30">
                   <span className="text-xs text-muted-foreground">PV 模組</span>
-                  <p className="text-lg font-bold font-mono text-blue-600">{formatCurrency(modulesTotal, 0)}</p>
+                  <p className="text-lg font-bold font-mono text-blue-600">{formatTWD(modulesTotal)}</p>
                 </div>
                 <div className="space-y-1 p-3 rounded-md bg-amber-50 dark:bg-amber-950/30">
                   <span className="text-xs text-muted-foreground">逆變器</span>
-                  <p className="text-lg font-bold font-mono text-amber-600">{formatCurrency(invertersTotal, 0)}</p>
+                  <p className="text-lg font-bold font-mono text-amber-600">{formatTWD(invertersTotal)}</p>
                 </div>
               </div>
               
@@ -188,11 +188,11 @@ export default function QuotePricingSummaryCard({
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground">印花稅 (千分之一)</span>
-                  <p className="text-base font-semibold font-mono">{formatCurrency(stampTax, 0)}</p>
+                  <p className="text-base font-semibold font-mono">{formatTWD(stampTax)}</p>
                 </div>
                 <div className="space-y-1">
                   <span className="text-xs text-muted-foreground">營所稅 (2%)</span>
-                  <p className="text-base font-semibold font-mono">{formatCurrency(businessTax, 0)}</p>
+                  <p className="text-base font-semibold font-mono">{formatTWD(businessTax)}</p>
                 </div>
               </div>
             </div>
