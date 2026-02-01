@@ -8,27 +8,23 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { 
   LayoutDashboard, 
   Building2, 
-  Users, 
-  FileText, 
   LogOut,
   Zap,
   ChevronLeft,
   ChevronDown,
   HardHat,
   Trash2,
-  TrendingUp,
   AlertTriangle,
   Activity,
-  Palette,
   UserCog,
   Settings2,
   Link2,
-  FolderOpen,
   Copy,
   Briefcase,
-  Scale,
+  FileText,
+  TrendingUp,
   Lock,
-  Receipt
+  Command
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -43,51 +39,44 @@ interface LayoutProps {
 }
 
 // ==========================================
-// 1. Dashboard（總覽）- 儀表板入口
+// 1. 營運中心（Hub）- 系統主入口
 // ==========================================
-const dashboardItems = [
-  { to: '/', icon: LayoutDashboard, label: '儀表板', module: null },
+const hubItems = [
+  { to: '/hub', icon: Command, label: '營運指揮中心', module: null },
+  { to: '/', icon: LayoutDashboard, label: 'KPI 儀表板', module: null },
 ];
 
 // ==========================================
-// 2. 案場管理 - 案場相關功能
+// 2. 五大模組入口
 // ==========================================
-const projectManagementItems = [
+const moduleItems = [
+  { to: '/modules/sales', icon: Briefcase, label: '接案與報價', module: MODULES.PROJECTS },
+  { to: '/modules/execution', icon: HardHat, label: '工程與行政', module: MODULES.PROJECTS },
+  { to: '/modules/governance', icon: FileText, label: '文件治理', module: MODULES.DOCUMENTS },
+  { to: '/modules/finance', icon: TrendingUp, label: '財務與投資', module: MODULES.INVESTORS },
+  { to: '/modules/risk', icon: AlertTriangle, label: '風險與爭議', module: MODULES.PROJECTS },
+];
+
+// ==========================================
+// 3. 案場快速入口
+// ==========================================
+const projectItems = [
   { to: '/projects', icon: Building2, label: '案場列表', module: MODULES.PROJECTS },
-  { to: '/projects/compare', icon: Scale, label: '案件進度比較', module: MODULES.PROJECTS },
-  { to: '/quotes', icon: Receipt, label: '報價管理', module: MODULES.PROJECTS },
-  { to: '/partners', icon: HardHat, label: '施工夥伴', module: MODULES.PARTNERS },
 ];
 
 // ==========================================
-// 3. 業務單位 - 業務單位與業主管理
-// ==========================================
-const investorItems = [
-  { to: '/investors', icon: Users, label: '業務單位 / 業主', module: MODULES.INVESTORS },
-];
-
-// ==========================================
-// 4. 文件與法規 - 文件管理與代碼參照
-// ==========================================
-const documentItems = [
-  { to: '/documents', icon: FileText, label: '文件管理', module: MODULES.DOCUMENTS },
-  { to: '/import-batch', icon: FolderOpen, label: '批次匯入', module: MODULES.DOCUMENTS },
-];
-
-// ==========================================
-// 5. 系統設定 - 管理員設定與系統治理
+// 4. 系統設定 (Admin only)
 // ==========================================
 const systemSettingsItems = [
-  // 人員管理
   { to: '/users', icon: UserCog, label: '使用者與角色', adminOnly: true },
   { to: '/permissions', icon: Lock, label: '權限設定', adminOnly: true },
-  // 統一設定中心
   { to: '/settings', icon: Settings2, label: '系統設定', adminOnly: true },
-  // 外部整合
   { to: '/integrations', icon: Link2, label: '外部整合', adminOnly: true },
 ];
 
-// 系統治理中心 - 僅限管理員，含高風險操作
+// ==========================================
+// 5. 系統治理中心 (Admin only)
+// ==========================================
 const systemGovernanceItems = [
   { to: '/engineering', icon: Activity, label: '系統狀態' },
   { to: '/duplicate-scanner', icon: Copy, label: '重複案件掃描' },
@@ -102,13 +91,7 @@ export default function Layout({ children }: LayoutProps) {
   const [collapsed, setCollapsed] = useState(false);
   
   // Auto-expand section if current route is within it
-  const isInProjects = projectManagementItems.some(item => 
-    location.pathname === item.to || location.pathname.startsWith(item.to + '/')
-  );
-  const isInInvestor = investorItems.some(item => 
-    location.pathname === item.to || location.pathname.startsWith(item.to + '/')
-  );
-  const isInDocuments = documentItems.some(item => 
+  const isInModules = moduleItems.some(item => 
     location.pathname === item.to || location.pathname.startsWith(item.to + '/')
   );
   const isInSettings = systemSettingsItems.some(item => 
@@ -119,9 +102,7 @@ export default function Layout({ children }: LayoutProps) {
   );
 
   // 展開狀態 - 預設展開當前所在分類
-  const [projectsOpen, setProjectsOpen] = useState(isInProjects);
-  const [investorOpen, setInvestorOpen] = useState(isInInvestor);
-  const [documentsOpen, setDocumentsOpen] = useState(isInDocuments);
+  const [modulesOpen, setModulesOpen] = useState(isInModules);
   const [settingsOpen, setSettingsOpen] = useState(isInSettings);
   const [governanceOpen, setGovernanceOpen] = useState(isInGovernance);
 
@@ -158,7 +139,7 @@ export default function Layout({ children }: LayoutProps) {
     if (!isModuleVisible(item)) return null;
 
     const isActive = location.pathname === item.to || 
-      (item.to !== '/' && location.pathname.startsWith(item.to));
+      (item.to !== '/' && item.to !== '/hub' && location.pathname.startsWith(item.to));
     return (
       <NavLink
         key={item.to}
@@ -184,8 +165,6 @@ export default function Layout({ children }: LayoutProps) {
     isWarning?: boolean
   ) => {
     if (!hasVisibleItems(items)) return null;
-
-    const Icon = icon;
 
     if (collapsed) {
       // Collapsed mode: show items directly with separator
@@ -263,45 +242,39 @@ export default function Layout({ children }: LayoutProps) {
 
         {/* Navigation */}
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {/* 1. Dashboard（總覽） */}
+          {/* 1. 營運中心入口 */}
           {!collapsed && (
             <div className="px-3 py-2">
-              <span className="text-xs font-medium text-sidebar-muted uppercase tracking-wider">總覽</span>
+              <span className="text-xs font-medium text-sidebar-muted uppercase tracking-wider">營運中心</span>
             </div>
           )}
-          {dashboardItems.map(renderNavItem)}
+          {hubItems.map(renderNavItem)}
 
-          {/* 2. 案場管理 */}
+          {/* 2. 五大作戰模組 */}
           {renderCollapsibleSection(
-            '案場管理',
-            projectManagementItems,
-            Building2,
-            projectsOpen,
-            setProjectsOpen,
-            isInProjects
+            '作戰模組',
+            moduleItems,
+            Command,
+            modulesOpen,
+            setModulesOpen,
+            isInModules
           )}
 
-          {/* 3. 業務單位 */}
-          {renderCollapsibleSection(
-            '業務單位',
-            investorItems,
-            Briefcase,
-            investorOpen,
-            setInvestorOpen,
-            isInInvestor
+          {/* 3. 案場快速入口 */}
+          {!collapsed && hasVisibleItems(projectItems) && (
+            <>
+              <div className="my-3 border-t border-sidebar-border" />
+              <div className="px-3 py-2">
+                <span className="text-xs font-medium text-sidebar-muted uppercase tracking-wider">快速存取</span>
+              </div>
+            </>
           )}
-
-          {/* 4. 文件與法規 */}
-          {renderCollapsibleSection(
-            '文件與法規',
-            documentItems,
-            FolderOpen,
-            documentsOpen,
-            setDocumentsOpen,
-            isInDocuments
+          {collapsed && hasVisibleItems(projectItems) && (
+            <div className="my-3 border-t border-sidebar-border" />
           )}
+          {projectItems.map(renderNavItem)}
 
-          {/* 5. 系統設定 (Admin only) */}
+          {/* 4. 系統設定 (Admin only) */}
           {isAdmin && renderCollapsibleSection(
             '系統設定',
             systemSettingsItems,
@@ -311,7 +284,7 @@ export default function Layout({ children }: LayoutProps) {
             isInSettings
           )}
 
-          {/* 系統治理中心 (Admin only, high-risk) */}
+          {/* 5. 系統治理中心 (Admin only, high-risk) */}
           {isAdmin && renderCollapsibleSection(
             '系統治理中心',
             systemGovernanceItems,
