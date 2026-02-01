@@ -34,6 +34,8 @@ import {
   PlugZap,
   TrendingDown,
   FileDown,
+  Wallet,
+  Landmark,
 } from "lucide-react";
 import { QuoteParams, formatCurrency, formatPercentage } from "@/lib/quoteCalculations";
 import { Plot } from "@/lib/plotly";
@@ -47,6 +49,9 @@ type RevenueMode = 'self_consumption' | 'feed_in_tariff';
 
 // 投資模式類型
 type InvestmentMode = 'self_owned' | 'rental_investment';
+
+// 資金來源類型
+type FinancingMode = 'self_funded' | 'loan_financed';
 
 // 併網類型
 type GridConnectionType = 'internal' | 'external';
@@ -270,6 +275,185 @@ function calculateIRR(cashFlows: number[], guess: number = 0.1): number {
   return rate;
 }
 
+// 計算月付本息 (本利平均攤還 - PMT 公式)
+function calculateMonthlyPayment(
+  principal: number,
+  annualRate: number,
+  termMonths: number
+): number {
+  if (principal === 0 || termMonths === 0) return 0;
+  const monthlyRate = annualRate / 12;
+  if (monthlyRate === 0) return principal / termMonths;
+  return principal * monthlyRate * Math.pow(1 + monthlyRate, termMonths) / 
+         (Math.pow(1 + monthlyRate, termMonths) - 1);
+}
+
+// 計算融資情境的 20 年預測
+interface FinancingYearData {
+  year: number;
+  generationKwh: number;
+  electricitySaving: number;
+  cumulativeSaving: number;
+  maintenanceRate: number;
+  maintenanceCost: number;
+  insuranceCost: number;
+  rentCost: number;
+  loanPayment: number;
+  principalPayment: number;
+  interestPayment: number;
+  loanBalance: number;
+  cashFlow: number;
+  cumulativeCashFlow: number;
+}
+
+function calculateFinancingProjection(
+  params: QuoteParams,
+  totalInvestment: number,
+  sunshineDays: number = 365,
+  isRentalMode: boolean = false,
+  rentalRatePercent: number = 0,
+  loanPercentage: number = 70,
+  loanTermYears: number = 15,
+  loanInterestRate: number = 2.45
+) {
+  const data: FinancingYearData[] = [];
+  
+  // 貸款金額與自備款
+  const loanAmount = totalInvestment * (loanPercentage / 100);
+  const downPayment = totalInvestment - loanAmount;
+  const termMonths = loanTermYears * 12;
+  const monthlyPayment = calculateMonthlyPayment(loanAmount, loanInterestRate / 100, termMonths);
+  const yearlyLoanPayment = monthlyPayment * 12;
+  
+  // 初始現金流 = -自備款（非全額）
+  const cashFlows: number[] = [-downPayment];
+  
+  let cumulativeSaving = 0;
+  let cumulativeCashFlow = -downPayment;
+  let totalMaintenance = 0;
+  let totalInsurance = 0;
+  let totalRent = 0;
+  let totalInterest = 0;
+  let paybackYear = 0;
+  
+  // 每年保險費
+  const yearlyInsurance = totalInvestment * (params.insuranceRate || 0.0055);
+  
+  // 計算貸款攤還表
+  let loanBalance = loanAmount;
+  const monthlyRate = (loanInterestRate / 100) / 12;
+  
+  for (let year = 1; year <= 20; year++) {
+    // 發電量（考慮衰減）
+    const baseGeneration = (params.capacityKwp || 0) * (params.sunshineHours || 3.2) * sunshineDays;
+    const degradation = Math.pow(1 - (params.annualDegradationRate || 0.01), year - 1);
+    const generationKwh = baseGeneration * degradation;
+    
+    // 節省電費
+    const electricitySaving = generationKwh * (params.tariffRate || 4.5);
+    cumulativeSaving += electricitySaving;
+    
+    // 保固費率
+    let maintenanceRate = 0;
+    if (year >= 6 && year <= 10) maintenanceRate = params.maintenanceRate6To10 || 6;
+    else if (year >= 11 && year <= 15) maintenanceRate = params.maintenanceRate11To15 || 7;
+    else if (year >= 16) maintenanceRate = params.maintenanceRate16To20 || 8;
+    
+    const maintenanceCost = electricitySaving * (maintenanceRate / 100);
+    totalMaintenance += maintenanceCost;
+    totalInsurance += yearlyInsurance;
+    
+    // 租金成本
+    const rentCost = isRentalMode ? electricitySaving * (rentalRatePercent / 100) : 0;
+    totalRent += rentCost;
+    
+    // 貸款還款（僅在貸款期間內）
+    let loanPayment = 0;
+    let principalPayment = 0;
+    let interestPayment = 0;
+    
+    if (year <= loanTermYears && loanBalance > 0) {
+      loanPayment = yearlyLoanPayment;
+      
+      // 計算本年度的本金與利息分配
+      for (let month = 1; month <= 12; month++) {
+        if (loanBalance <= 0) break;
+        const monthInterest = loanBalance * monthlyRate;
+        const monthPrincipal = monthlyPayment - monthInterest;
+        interestPayment += monthInterest;
+        principalPayment += Math.min(monthPrincipal, loanBalance);
+        loanBalance = Math.max(0, loanBalance - monthPrincipal);
+      }
+      totalInterest += interestPayment;
+    }
+    
+    // 年度現金流 = 收益 - 維運 - 保險 - 租金 - 貸款還款
+    const cashFlow = electricitySaving - maintenanceCost - yearlyInsurance - rentCost - loanPayment;
+    cumulativeCashFlow += cashFlow;
+    cashFlows.push(cashFlow);
+    
+    // 回收年限判斷
+    if (paybackYear === 0 && cumulativeCashFlow >= 0) {
+      paybackYear = year;
+    }
+    
+    data.push({
+      year,
+      generationKwh,
+      electricitySaving,
+      cumulativeSaving,
+      maintenanceRate,
+      maintenanceCost,
+      insuranceCost: yearlyInsurance,
+      rentCost,
+      loanPayment,
+      principalPayment,
+      interestPayment,
+      loanBalance,
+      cashFlow,
+      cumulativeCashFlow,
+    });
+  }
+  
+  // 計算 IRR
+  const irr = calculateIRR(cashFlows) * 100;
+  
+  // 計算總結
+  const totalCost = downPayment + totalMaintenance + totalInsurance + totalRent + totalInterest;
+  const totalSaving = cumulativeSaving;
+  const netProfit = totalSaving - totalCost - (loanAmount); // 減去還的本金
+  const totalRoi = (netProfit / downPayment) * 100; // 以自備款計算ROI
+  const annualRoi = totalRoi / 20;
+  const totalGeneration = data.reduce((sum, d) => sum + d.generationKwh, 0);
+  const costPerKwh = totalGeneration > 0 ? (totalCost + loanAmount) / totalGeneration : 0;
+  
+  return {
+    data,
+    summary: {
+      totalInvestment,
+      downPayment,
+      loanAmount,
+      loanTermYears,
+      loanInterestRate,
+      monthlyPayment,
+      yearlyPayment: yearlyLoanPayment,
+      totalInterest,
+      totalMaintenance,
+      totalInsurance,
+      totalRent,
+      totalCost: totalCost + loanAmount,
+      totalSaving,
+      netProfit,
+      irr,
+      totalRoi,
+      annualRoi,
+      paybackYear: paybackYear || 20,
+      totalGeneration,
+      costPerKwh,
+    },
+  };
+}
+
 export default function QuoteFinancialAnalysisTab({
   formData,
   projections,
@@ -282,6 +466,12 @@ export default function QuoteFinancialAnalysisTab({
   // 投資模式切換（自有 vs 租賃投資）
   const [investmentMode, setInvestmentMode] = useState<InvestmentMode>('self_owned');
   const [landRentalRate, setLandRentalRate] = useState(8); // 預設租金佔發電收益 8%
+  
+  // 資金來源切換（自投資 vs 融資）
+  const [financingMode, setFinancingMode] = useState<FinancingMode>('self_funded');
+  const [loanPercentage, setLoanPercentage] = useState(70); // 貸款比例 %
+  const [loanTermYears, setLoanTermYears] = useState(15); // 貸款年期
+  const [loanInterestRate, setLoanInterestRate] = useState(2.45); // 年利率 %
   
   // 收益模式切換
   const [revenueMode, setRevenueMode] = useState<RevenueMode>('self_consumption');
@@ -360,6 +550,20 @@ export default function QuoteFinancialAnalysisTab({
       landRentalRate
     );
   }, [adjustedParams, totalInvestment, sunshineDays, investmentMode, landRentalRate]);
+  
+  // 計算融資模式結果
+  const financingResult = useMemo(() => {
+    return calculateFinancingProjection(
+      adjustedParams as QuoteParams,
+      totalInvestment,
+      sunshineDays,
+      investmentMode === 'rental_investment',
+      landRentalRate,
+      loanPercentage,
+      loanTermYears,
+      loanInterestRate
+    );
+  }, [adjustedParams, totalInvestment, sunshineDays, investmentMode, landRentalRate, loanPercentage, loanTermYears, loanInterestRate]);
   
   // 屋頂出租評估
   const roofRentalResult = useMemo(() => {
@@ -647,10 +851,236 @@ export default function QuoteFinancialAnalysisTab({
                 )}
               </div>
             </div>
+            
+            <Separator />
+            
+            {/* 資金來源 */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Wallet className="h-5 w-5 text-primary" />
+                <div>
+                  <h3 className="font-semibold">資金來源</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {financingMode === 'self_funded' 
+                      ? '全額自有資金投資' 
+                      : `銀行融資 ${loanPercentage}%，自備款 ${100 - loanPercentage}%`}
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <ToggleGroup 
+                  type="single" 
+                  value={financingMode} 
+                  onValueChange={(v) => v && setFinancingMode(v as FinancingMode)}
+                  className="justify-start"
+                >
+                  <ToggleGroupItem 
+                    value="self_funded" 
+                    aria-label="全額自投"
+                    className="data-[state=on]:bg-emerald-600 data-[state=on]:text-white px-4"
+                  >
+                    <Wallet className="h-4 w-4 mr-2" />
+                    全額自投
+                  </ToggleGroupItem>
+                  <ToggleGroupItem 
+                    value="loan_financed" 
+                    aria-label="銀行融資"
+                    className="data-[state=on]:bg-blue-600 data-[state=on]:text-white px-4"
+                  >
+                    <Landmark className="h-4 w-4 mr-2" />
+                    銀行融資
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                
+                {/* 融資參數設定 - 僅融資模式顯示 */}
+                {financingMode === 'loan_financed' && (
+                  <div className="flex flex-wrap items-center gap-3 pl-2 border-l">
+                    <div className="flex items-center gap-1">
+                      <Label htmlFor="loanPercentage" className="text-xs text-muted-foreground whitespace-nowrap">
+                        貸款比例
+                      </Label>
+                      <Input
+                        id="loanPercentage"
+                        type="number"
+                        step="5"
+                        min="10"
+                        max="90"
+                        value={loanPercentage}
+                        onChange={(e) => setLoanPercentage(parseFloat(e.target.value) || 70)}
+                        className="h-8 w-16 text-right font-semibold"
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Label htmlFor="loanTermYears" className="text-xs text-muted-foreground whitespace-nowrap">
+                        年期
+                      </Label>
+                      <Input
+                        id="loanTermYears"
+                        type="number"
+                        step="1"
+                        min="5"
+                        max="20"
+                        value={loanTermYears}
+                        onChange={(e) => setLoanTermYears(parseInt(e.target.value) || 15)}
+                        className="h-8 w-14 text-right font-semibold"
+                      />
+                      <span className="text-xs text-muted-foreground">年</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Label htmlFor="loanInterestRate" className="text-xs text-muted-foreground whitespace-nowrap">
+                        年利率
+                      </Label>
+                      <Input
+                        id="loanInterestRate"
+                        type="number"
+                        step="0.05"
+                        min="1"
+                        max="10"
+                        value={loanInterestRate}
+                        onChange={(e) => setLoanInterestRate(parseFloat(e.target.value) || 2.45)}
+                        className="h-8 w-16 text-right font-semibold"
+                      />
+                      <span className="text-xs text-muted-foreground">%</span>
+                    </div>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-xs">太陽能專案貸款一般可融資 60-80%，年期 10-20 年，利率約 2.0-3.5%</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
-      {/* 條件設定 - 可編輯 */}
+      
+      {/* 融資模式 IRR 比較卡片 */}
+      {financingMode === 'loan_financed' && (
+        <Card className="border-2 border-blue-500/30 bg-blue-50/30 dark:bg-blue-950/20">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Landmark className="h-4 w-4 text-blue-600" />
+              融資情境分析
+              <Badge variant="outline" className="ml-2 text-xs bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                貸款 {loanPercentage}% / {loanTermYears}年 / {loanInterestRate}%
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
+              {/* 融資 IRR */}
+              <Card className="bg-blue-100/50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800">
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Percent className="w-4 h-4 text-blue-600" />
+                    <span className="text-xs text-muted-foreground">融資 IRR</span>
+                  </div>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {financingResult.summary.irr.toFixed(2)}%
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    以自備款 {formatCurrency(financingResult.summary.downPayment, 0)} 計算
+                  </p>
+                </CardContent>
+              </Card>
+              
+              {/* 自投 IRR 比較 */}
+              <Card className="bg-emerald-100/50 dark:bg-emerald-900/30 border-emerald-200 dark:border-emerald-800">
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Percent className="w-4 h-4 text-emerald-600" />
+                    <span className="text-xs text-muted-foreground">自投 IRR</span>
+                  </div>
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {summary.irr.toFixed(2)}%
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    全額投入 {formatCurrency(totalInvestment, 0)}
+                  </p>
+                </CardContent>
+              </Card>
+              
+              {/* IRR 差異 */}
+              <Card>
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">IRR 槓桿效益</span>
+                  </div>
+                  <p className={`text-2xl font-bold ${financingResult.summary.irr > summary.irr ? 'text-green-600' : 'text-red-600'}`}>
+                    {financingResult.summary.irr > summary.irr ? '+' : ''}{(financingResult.summary.irr - summary.irr).toFixed(2)}%
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    融資 vs 自投
+                  </p>
+                </CardContent>
+              </Card>
+              
+              {/* 自備款 */}
+              <Card>
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Wallet className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">自備款</span>
+                  </div>
+                  <p className="text-xl font-bold">
+                    {formatCurrency(financingResult.summary.downPayment, 0)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    佔總投資 {100 - loanPercentage}%
+                  </p>
+                </CardContent>
+              </Card>
+              
+              {/* 每月還款 */}
+              <Card>
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">每月還款</span>
+                  </div>
+                  <p className="text-xl font-bold">
+                    {formatCurrency(financingResult.summary.monthlyPayment, 0)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    共 {loanTermYears * 12} 期
+                  </p>
+                </CardContent>
+              </Card>
+              
+              {/* 利息總額 */}
+              <Card>
+                <CardContent className="pt-4 pb-3">
+                  <div className="flex items-center gap-2 mb-1">
+                    <DollarSign className="w-4 h-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">利息總額</span>
+                  </div>
+                  <p className="text-xl font-bold text-amber-600">
+                    {formatCurrency(financingResult.summary.totalInterest, 0)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {loanTermYears} 年期間
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+            
+            {/* 融資說明 */}
+            <div className="mt-4 p-3 bg-muted/50 rounded-lg text-xs text-muted-foreground space-y-1">
+              <p>• <strong>融資 IRR</strong>：以自備款為基準計算，反映槓桿效應對投資報酬的影響</p>
+              <p>• <strong>自投 IRR</strong>：以全額投資為基準計算，適用於不使用銀行貸款的情境</p>
+              <p>• 融資可提高 IRR，但需承擔利息成本與還款壓力；自投資金成本較低但需較多初始資金</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
       <Card className="bg-muted/30">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
