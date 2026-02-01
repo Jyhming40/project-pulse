@@ -40,6 +40,9 @@ import { useFitRates, SPECIAL_CONDITION_LABELS, type SpecialCondition } from "@/
 // 收益模式類型
 type RevenueMode = 'self_consumption' | 'feed_in_tariff';
 
+// 投資模式類型
+type InvestmentMode = 'self_owned' | 'rental_investment';
+
 interface QuoteFinancialAnalysisTabProps {
   formData: QuoteParams;
   projections: {
@@ -100,12 +103,19 @@ interface SelfInvestYearData {
   maintenanceRate: number;
   maintenanceCost: number;
   insuranceCost: number;
+  rentCost: number; // 租賃成本（租賃投資模式用）
   cashFlow: number;
   cumulativeCashFlow: number;
 }
 
-// 計算自投資模式的 20 年預測（支援自訂日照天數）
-function calculateSelfInvestProjectionWithDays(params: QuoteParams, totalInvestment: number, sunshineDays: number = 365) {
+// 計算投資模式的 20 年預測（支援自訂日照天數及租賃模式）
+function calculateInvestmentProjection(
+  params: QuoteParams, 
+  totalInvestment: number, 
+  sunshineDays: number = 365,
+  isRentalMode: boolean = false,
+  rentalRatePercent: number = 0 // 租金佔發電收益的百分比
+) {
   const data: SelfInvestYearData[] = [];
   const cashFlows: number[] = [-totalInvestment]; // 初始投資為負
   
@@ -113,6 +123,7 @@ function calculateSelfInvestProjectionWithDays(params: QuoteParams, totalInvestm
   let cumulativeCashFlow = -totalInvestment;
   let totalMaintenance = 0;
   let totalInsurance = 0;
+  let totalRent = 0;
   let paybackYear = 0;
   
   // 每年保險費 (總工程款 × 保險費率)
@@ -143,8 +154,12 @@ function calculateSelfInvestProjectionWithDays(params: QuoteParams, totalInvestm
     totalMaintenance += maintenanceCost;
     totalInsurance += yearlyInsurance;
     
-    // 年度現金流 = 節省電費 - 保固費 - 保險費
-    const cashFlow = electricitySaving - maintenanceCost - yearlyInsurance;
+    // 租金成本（租賃模式時計算）
+    const rentCost = isRentalMode ? electricitySaving * (rentalRatePercent / 100) : 0;
+    totalRent += rentCost;
+    
+    // 年度現金流 = 節省電費 - 保固費 - 保險費 - 租金
+    const cashFlow = electricitySaving - maintenanceCost - yearlyInsurance - rentCost;
     cumulativeCashFlow += cashFlow;
     cashFlows.push(cashFlow);
     
@@ -161,6 +176,7 @@ function calculateSelfInvestProjectionWithDays(params: QuoteParams, totalInvestm
       maintenanceRate,
       maintenanceCost,
       insuranceCost: yearlyInsurance,
+      rentCost,
       cashFlow,
       cumulativeCashFlow,
     });
@@ -171,7 +187,7 @@ function calculateSelfInvestProjectionWithDays(params: QuoteParams, totalInvestm
   
   // 計算總結
   const totalSaving = cumulativeSaving;
-  const totalCost = totalInvestment + totalMaintenance + totalInsurance;
+  const totalCost = totalInvestment + totalMaintenance + totalInsurance + totalRent;
   const netProfit = totalSaving - totalCost;
   const totalRoi = (netProfit / totalInvestment) * 100;
   const annualRoi = totalRoi / 20;
@@ -192,6 +208,7 @@ function calculateSelfInvestProjectionWithDays(params: QuoteParams, totalInvestm
       totalInvestment,
       totalMaintenance,
       totalInsurance,
+      totalRent,
       totalCost,
       totalSaving,
       netProfit,
@@ -242,6 +259,10 @@ export default function QuoteFinancialAnalysisTab({
 }: QuoteFinancialAnalysisTabProps) {
   const [showTable, setShowTable] = useState(true);
   const [roofRentalRate, setRoofRentalRate] = useState(12); // 預設 12%
+  
+  // 投資模式切換（自有 vs 租賃投資）
+  const [investmentMode, setInvestmentMode] = useState<InvestmentMode>('self_owned');
+  const [landRentalRate, setLandRentalRate] = useState(8); // 預設租金佔發電收益 8%
   
   // 收益模式切換
   const [revenueMode, setRevenueMode] = useState<RevenueMode>('self_consumption');
@@ -301,14 +322,20 @@ export default function QuoteFinancialAnalysisTab({
     insuranceRate: insuranceRate / 100,
   }), [formData, sunshineHours, effectiveRate, insuranceRate]);
   
-  // 計算自投資結果 - 考慮自定義的日照天數
-  const selfInvestResult = useMemo(() => {
-    return calculateSelfInvestProjectionWithDays(adjustedParams as QuoteParams, totalInvestment, sunshineDays);
-  }, [adjustedParams, totalInvestment, sunshineDays]);
+  // 計算投資結果 - 考慮自定義的日照天數與投資模式（自有或租賃）
+  const investmentResult = useMemo(() => {
+    return calculateInvestmentProjection(
+      adjustedParams as QuoteParams, 
+      totalInvestment, 
+      sunshineDays,
+      investmentMode === 'rental_investment',
+      landRentalRate
+    );
+  }, [adjustedParams, totalInvestment, sunshineDays, investmentMode, landRentalRate]);
   
   // 屋頂出租評估
   const roofRentalResult = useMemo(() => {
-    const { data, summary } = selfInvestResult;
+    const { data, summary } = investmentResult;
     // 年租金 = 年發電量 × 電價 × 租金比例
     const firstYearSaving = data[0]?.electricitySaving || 0;
     const yearlyRent = firstYearSaving * (roofRentalRate / 100);
@@ -321,7 +348,7 @@ export default function QuoteFinancialAnalysisTab({
       totalRent20Year,
       rentalRateOfGeneration: roofRentalRate,
     };
-  }, [selfInvestResult, roofRentalRate]);
+  }, [investmentResult, roofRentalRate]);
 
   if (!formData.capacityKwp || !formData.pricePerKwp) {
     return (
@@ -331,50 +358,126 @@ export default function QuoteFinancialAnalysisTab({
     );
   }
 
-  const { data, summary } = selfInvestResult;
+  const { data, summary } = investmentResult;
 
   // 準備圖表資料
   const years = data.map((p) => `第${p.year}年`);
   const savings = data.map((p) => p.electricitySaving);
   const cashFlows = data.map((p) => p.cashFlow);
   const cumulativeCashFlows = data.map((p) => p.cumulativeCashFlow);
+  const rentCosts = data.map((p) => p.rentCost);
 
   return (
     <div className="space-y-6">
-      {/* 收益模式切換 */}
+      {/* 收益模式與投資模式切換 */}
       <Card className="border-2 border-primary/20">
         <CardContent className="pt-4 pb-4">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <ToggleLeft className="h-5 w-5 text-primary" />
-              <div>
-                <h3 className="font-semibold">收益模式</h3>
-                <p className="text-sm text-muted-foreground">{labels.modeDescription}</p>
+          <div className="space-y-4">
+            {/* 收益模式 */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <ToggleLeft className="h-5 w-5 text-primary" />
+                <div>
+                  <h3 className="font-semibold">收益模式</h3>
+                  <p className="text-sm text-muted-foreground">{labels.modeDescription}</p>
+                </div>
+              </div>
+              <ToggleGroup 
+                type="single" 
+                value={revenueMode} 
+                onValueChange={(v) => v && setRevenueMode(v as RevenueMode)}
+                className="justify-start"
+              >
+                <ToggleGroupItem 
+                  value="self_consumption" 
+                  aria-label="自用節電模式"
+                  className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-4"
+                >
+                  <Zap className="h-4 w-4 mr-2" />
+                  自用節電
+                </ToggleGroupItem>
+                <ToggleGroupItem 
+                  value="feed_in_tariff" 
+                  aria-label="躉售電力模式"
+                  className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-4"
+                >
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  躉售電力
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            
+            <Separator />
+            
+            {/* 投資模式 */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Building2 className="h-5 w-5 text-primary" />
+                <div>
+                  <h3 className="font-semibold">投資模式</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {investmentMode === 'self_owned' 
+                      ? '自有建物或土地，無需支付租金' 
+                      : '向他人租賃屋頂或土地，需支付租金成本'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <ToggleGroup 
+                  type="single" 
+                  value={investmentMode} 
+                  onValueChange={(v) => v && setInvestmentMode(v as InvestmentMode)}
+                  className="justify-start"
+                >
+                  <ToggleGroupItem 
+                    value="self_owned" 
+                    aria-label="自有模式"
+                    className="data-[state=on]:bg-emerald-600 data-[state=on]:text-white px-4"
+                  >
+                    <Home className="h-4 w-4 mr-2" />
+                    自有場地
+                  </ToggleGroupItem>
+                  <ToggleGroupItem 
+                    value="rental_investment" 
+                    aria-label="租賃投資模式"
+                    className="data-[state=on]:bg-amber-600 data-[state=on]:text-white px-4"
+                  >
+                    <Building2 className="h-4 w-4 mr-2" />
+                    租賃投資
+                  </ToggleGroupItem>
+                </ToggleGroup>
+                
+                {/* 租金費率設定 - 僅租賃模式顯示 */}
+                {investmentMode === 'rental_investment' && (
+                  <div className="flex items-center gap-2 pl-2 border-l">
+                    <Label htmlFor="landRentalRate" className="text-xs text-muted-foreground whitespace-nowrap">
+                      租金費率
+                    </Label>
+                    <Input
+                      id="landRentalRate"
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="50"
+                      value={landRentalRate}
+                      onChange={(e) => setLandRentalRate(parseFloat(e.target.value) || 0)}
+                      className="h-8 w-16 text-right font-semibold"
+                    />
+                    <span className="text-xs text-muted-foreground">%</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-xs">租金佔發電收益的百分比，一般市場行情約 8%~15%</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                )}
               </div>
             </div>
-            <ToggleGroup 
-              type="single" 
-              value={revenueMode} 
-              onValueChange={(v) => v && setRevenueMode(v as RevenueMode)}
-              className="justify-start"
-            >
-              <ToggleGroupItem 
-                value="self_consumption" 
-                aria-label="自用節電模式"
-                className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-4"
-              >
-                <Zap className="h-4 w-4 mr-2" />
-                自用節電
-              </ToggleGroupItem>
-              <ToggleGroupItem 
-                value="feed_in_tariff" 
-                aria-label="躉售電力模式"
-                className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground px-4"
-              >
-                <DollarSign className="h-4 w-4 mr-2" />
-                躉售電力
-              </ToggleGroupItem>
-            </ToggleGroup>
           </div>
         </CardContent>
       </Card>
@@ -846,12 +949,17 @@ export default function QuoteFinancialAnalysisTab({
         </CardContent>
       </Card>
 
-      {/* 自投資評估說明 */}
-      <Card>
+      {/* 投資評估說明 - 根據模式動態顯示 */}
+      <Card className={investmentMode === 'rental_investment' ? 'border-amber-300 bg-amber-50/30 dark:bg-amber-950/10' : ''}>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Building2 className="h-4 w-4" />
-            自投資評估說明
+            {investmentMode === 'self_owned' ? '自投資評估說明' : '租賃投資評估說明'}
+            {investmentMode === 'rental_investment' && (
+              <Badge variant="outline" className="ml-2 text-amber-600 border-amber-300">
+                含租金成本
+              </Badge>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -876,6 +984,13 @@ export default function QuoteFinancialAnalysisTab({
                   <span>保險費用預估</span>
                   <span className="font-mono">{formatCurrency(summary.totalInsurance, 0)}</span>
                 </div>
+                {/* 租賃成本 - 僅租賃模式顯示 */}
+                {investmentMode === 'rental_investment' && (
+                  <div className="flex justify-between text-amber-600">
+                    <span>20年租賃成本 (發電收益 × {landRentalRate}%)</span>
+                    <span className="font-mono">{formatCurrency(summary.totalRent, 0)}</span>
+                  </div>
+                )}
                 <Separator />
                 <div className="flex justify-between font-medium">
                   <span>投資成本總計</span>
@@ -914,71 +1029,84 @@ export default function QuoteFinancialAnalysisTab({
               </div>
             </div>
           </div>
+          
+          {/* 租賃模式說明 */}
+          {investmentMode === 'rental_investment' && (
+            <div className="mt-4 p-3 bg-amber-100/50 dark:bg-amber-900/20 rounded-lg text-sm">
+              <p className="text-muted-foreground">
+                <strong className="text-foreground">租賃投資說明：</strong>
+                投資者向屋頂/土地擁有者租賃場地建置太陽光電系統，每年需支付發電收益的 <strong className="text-amber-600">{landRentalRate}%</strong> 作為租金。
+                相較自有場地，租賃模式會降低 IRR 與總報酬率，但適合無自有場地的投資者。
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* 屋頂出租評估說明 */}
-      <Card className="border-amber-200 bg-amber-50/30 dark:bg-amber-950/10">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Home className="h-4 w-4 text-amber-600" />
-            屋頂出租評估說明
-            <Badge variant="outline" className="ml-2 text-amber-600 border-amber-300">替代方案</Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-3 gap-6">
-            {/* 租金設定 */}
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="roofRentalRate" className="text-sm">預估為年發電量百分比</Label>
-                <div className="flex items-center gap-2 mt-1">
-                  <Input
-                    id="roofRentalRate"
-                    type="number"
-                    value={roofRentalRate}
-                    onChange={(e) => setRoofRentalRate(parseFloat(e.target.value) || 0)}
-                    className="w-24"
-                    step="0.5"
-                    min="0"
-                    max="100"
-                  />
-                  <span className="text-muted-foreground">%</span>
+      {/* 屋頂出租評估說明 - 僅自有模式顯示 */}
+      {investmentMode === 'self_owned' && (
+        <Card className="border-amber-200 bg-amber-50/30 dark:bg-amber-950/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Home className="h-4 w-4 text-amber-600" />
+              屋頂出租評估說明
+              <Badge variant="outline" className="ml-2 text-amber-600 border-amber-300">替代方案</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid md:grid-cols-3 gap-6">
+              {/* 租金設定 */}
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="roofRentalRate" className="text-sm">預估為年發電量百分比</Label>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Input
+                      id="roofRentalRate"
+                      type="number"
+                      value={roofRentalRate}
+                      onChange={(e) => setRoofRentalRate(parseFloat(e.target.value) || 0)}
+                      className="w-24"
+                      step="0.5"
+                      min="0"
+                      max="100"
+                    />
+                    <span className="text-muted-foreground">%</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    依市場行情，屋頂出租約為年發電收益的 8%~15%
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  依市場行情，屋頂出租約為年發電收益的 8%~15%
+              </div>
+              
+              {/* 租金預估 */}
+              <div className="space-y-3">
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">20年租金預估</span>
+                  <span className="font-mono font-semibold">{formatCurrency(roofRentalResult.totalRent20Year, 0)}</span>
+                </div>
+                <div className="flex justify-between py-2 border-b">
+                  <span className="text-muted-foreground">每年租金預估</span>
+                  <span className="font-mono">{formatCurrency(roofRentalResult.yearlyRent, 0)}</span>
+                </div>
+                <div className="flex justify-between py-2">
+                  <span className="text-muted-foreground">每月租金預估</span>
+                  <span className="font-mono">{formatCurrency(roofRentalResult.monthlyRent, 0)}</span>
+                </div>
+              </div>
+              
+              {/* 比較說明 */}
+              <div className="flex flex-col justify-center items-center bg-card border rounded-lg p-4">
+                <p className="text-sm text-muted-foreground mb-2">預估為年發電量</p>
+                <p className="text-3xl font-bold text-amber-600">{roofRentalRate.toFixed(1)}%</p>
+                <p className="text-xs text-muted-foreground mt-3 text-center">
+                  若選擇出租屋頂而非自投資，<br />
+                  可獲得穩定租金收入但報酬較低
                 </p>
               </div>
             </div>
-            
-            {/* 租金預估 */}
-            <div className="space-y-3">
-              <div className="flex justify-between py-2 border-b">
-                <span className="text-muted-foreground">20年租金預估</span>
-                <span className="font-mono font-semibold">{formatCurrency(roofRentalResult.totalRent20Year, 0)}</span>
-              </div>
-              <div className="flex justify-between py-2 border-b">
-                <span className="text-muted-foreground">每年租金預估</span>
-                <span className="font-mono">{formatCurrency(roofRentalResult.yearlyRent, 0)}</span>
-              </div>
-              <div className="flex justify-between py-2">
-                <span className="text-muted-foreground">每月租金預估</span>
-                <span className="font-mono">{formatCurrency(roofRentalResult.monthlyRent, 0)}</span>
-              </div>
-            </div>
-            
-            {/* 比較說明 */}
-            <div className="flex flex-col justify-center items-center bg-card border rounded-lg p-4">
-              <p className="text-sm text-muted-foreground mb-2">預估為年發電量</p>
-              <p className="text-3xl font-bold text-amber-600">{roofRentalRate.toFixed(1)}%</p>
-              <p className="text-xs text-muted-foreground mt-3 text-center">
-                若選擇出租屋頂而非自投資，<br />
-                可獲得穩定租金收入但報酬較低
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       {/* 現金流量圖 */}
       <Card>
