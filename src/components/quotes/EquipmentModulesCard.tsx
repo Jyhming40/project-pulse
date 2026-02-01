@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { Plus, Trash2, Cpu, ChevronDown, RefreshCw } from "lucide-react";
 import { ModuleItem, generateId, calculateModulePrice } from "@/hooks/useQuoteEngineering";
-import { formatCurrency } from "@/lib/quoteCalculations";
+import { formatTWD } from "@/lib/formatNumber";
 import { toast } from "sonner";
 
 interface EquipmentModulesCardProps {
@@ -158,7 +158,7 @@ export default function EquipmentModulesCard({
                   {totalCapacityKwp.toFixed(2)} kWp
                 </Badge>
                 <Badge className="font-mono text-sm bg-blue-500">
-                  {formatCurrency(totalPrice, 0)}
+                  {formatTWD(totalPrice)}
                 </Badge>
               </div>
             </div>
@@ -216,7 +216,7 @@ export default function EquipmentModulesCard({
                         />
                       </TableCell>
                       <TableCell className="text-right font-medium font-mono text-sm text-blue-600">
-                        {formatCurrency(priceNtd, 0)}
+                        {formatTWD(priceNtd)}
                       </TableCell>
                       <TableCell>
                         <Button

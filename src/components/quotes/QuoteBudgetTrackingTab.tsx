@@ -21,7 +21,7 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import { formatCurrency } from "@/lib/quoteCalculations";
+import { formatTWD } from "@/lib/formatNumber";
 import {
   Tooltip,
   TooltipContent,
@@ -94,7 +94,7 @@ function CostCompareRow({ label, budget, actual, onActualChange, isLocked, showW
           </TooltipProvider>
         )}
       </div>
-      <div className="text-right font-mono text-sm">{formatCurrency(budget, 0)}</div>
+      <div className="text-right font-mono text-sm">{formatTWD(budget)}</div>
       <div>
         <Input
           type="number"
@@ -114,7 +114,7 @@ function CostCompareRow({ label, budget, actual, onActualChange, isLocked, showW
             {isOverBudget && <TrendingUp className="h-4 w-4 text-destructive" />}
             {isUnderBudget && <TrendingDown className="h-4 w-4 text-green-600" />}
             <span className={`font-mono text-sm font-medium ${isOverBudget ? "text-destructive" : isUnderBudget ? "text-green-600" : ""}`}>
-              {difference >= 0 ? "+" : ""}{formatCurrency(difference, 0)}
+              {difference >= 0 ? "+" : ""}{formatTWD(difference)}
             </span>
           </>
         ) : (
@@ -401,7 +401,7 @@ export default function QuoteBudgetTrackingTab({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">{formatCurrency(sellingPrice, 0)}</div>
+            <div className="text-2xl font-bold font-mono">{formatTWD(sellingPrice)}</div>
           </CardContent>
         </Card>
         
@@ -414,7 +414,7 @@ export default function QuoteBudgetTrackingTab({
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold font-mono ${budgetSiteGrossProfit >= 0 ? "text-blue-700 dark:text-blue-400" : "text-destructive"}`}>
-              {formatCurrency(budgetSiteGrossProfit, 0)}
+              {formatTWD(budgetSiteGrossProfit)}
             </div>
             <div className="text-xs text-muted-foreground mt-1">毛利率 {budgetSiteGrossMargin.toFixed(1)}%</div>
           </CardContent>
@@ -429,7 +429,7 @@ export default function QuoteBudgetTrackingTab({
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold font-mono ${budgetOperatingProfit >= 0 ? "text-purple-700 dark:text-purple-400" : "text-destructive"}`}>
-              {formatCurrency(budgetOperatingProfit, 0)}
+              {formatTWD(budgetOperatingProfit)}
             </div>
             <div className="text-xs text-muted-foreground mt-1">營業利潤率 {budgetOperatingMargin.toFixed(1)}%</div>
           </CardContent>
@@ -444,7 +444,7 @@ export default function QuoteBudgetTrackingTab({
           </CardHeader>
           <CardContent>
             <div className={`text-2xl font-bold font-mono ${budgetNetProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-destructive"}`}>
-              {formatCurrency(budgetNetProfit, 0)}
+              {formatTWD(budgetNetProfit)}
             </div>
             <div className="text-xs text-muted-foreground mt-1">淨利率 {budgetNetMargin.toFixed(1)}%</div>
           </CardContent>
@@ -470,7 +470,7 @@ export default function QuoteBudgetTrackingTab({
             colorClass="text-blue-700 dark:text-blue-400"
             badge={
               <span className="text-xs font-mono text-muted-foreground">
-                {formatCurrency(directCost, 0)}
+                {formatTWD(directCost)}
               </span>
             }
           >
@@ -515,12 +515,12 @@ export default function QuoteBudgetTrackingTab({
               <div className="flex justify-between items-center pt-2 bg-blue-50 dark:bg-blue-950/50 rounded-lg px-4 py-2">
                 <span className="font-medium text-blue-700 dark:text-blue-400">直接成本小計</span>
                 <div className="flex gap-8 font-mono font-medium">
-                  <span className="text-blue-700 dark:text-blue-400">{formatCurrency(directCost, 0)}</span>
+                  <span className="text-blue-700 dark:text-blue-400">{formatTWD(directCost)}</span>
                   <span className={actualDirectCost !== directCost ? (actualDirectCost > directCost ? "text-destructive" : "text-green-600") : "text-blue-700 dark:text-blue-400"}>
-                    {formatCurrency(actualDirectCost, 0)}
+                    {formatTWD(actualDirectCost)}
                   </span>
                   <span className={actualDirectCost - directCost > 0 ? "text-destructive" : actualDirectCost - directCost < 0 ? "text-green-600" : ""}>
-                    {actualDirectCost - directCost >= 0 ? "+" : ""}{formatCurrency(actualDirectCost - directCost, 0)}
+                    {actualDirectCost - directCost >= 0 ? "+" : ""}{formatTWD(actualDirectCost - directCost)}
                   </span>
                 </div>
               </div>
@@ -535,7 +535,7 @@ export default function QuoteBudgetTrackingTab({
             colorClass="text-blue-800 dark:text-blue-300"
             badge={
               <span className={`text-xs font-mono font-bold ${budgetSiteGrossProfit >= 0 ? "text-blue-700 dark:text-blue-400" : "text-destructive"}`}>
-                {formatCurrency(budgetSiteGrossProfit, 0)}
+                {formatTWD(budgetSiteGrossProfit)}
               </span>
             }
           >
@@ -543,12 +543,12 @@ export default function QuoteBudgetTrackingTab({
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-blue-800 dark:text-blue-300">毛利金額</span>
                 <div className="flex gap-8 font-mono font-bold">
-                  <span className="text-muted-foreground">{formatCurrency(budgetSiteGrossProfit, 0)}</span>
+                  <span className="text-muted-foreground">{formatTWD(budgetSiteGrossProfit)}</span>
                   <span className={actualSiteGrossProfit >= budgetSiteGrossProfit ? "text-green-600" : "text-destructive"}>
-                    {formatCurrency(actualSiteGrossProfit, 0)}
+                    {formatTWD(actualSiteGrossProfit)}
                   </span>
                   <span className={actualSiteGrossProfit - budgetSiteGrossProfit >= 0 ? "text-green-600" : "text-destructive"}>
-                    {actualSiteGrossProfit - budgetSiteGrossProfit >= 0 ? "+" : ""}{formatCurrency(actualSiteGrossProfit - budgetSiteGrossProfit, 0)}
+                    {actualSiteGrossProfit - budgetSiteGrossProfit >= 0 ? "+" : ""}{formatTWD(actualSiteGrossProfit - budgetSiteGrossProfit)}
                   </span>
                 </div>
               </div>
@@ -576,7 +576,7 @@ export default function QuoteBudgetTrackingTab({
             colorClass="text-orange-700 dark:text-orange-400"
             badge={
               <span className="text-xs font-mono text-muted-foreground">
-                {formatCurrency(projectSpecificExpenses, 0)}
+                {formatTWD(projectSpecificExpenses)}
               </span>
             }
           >
@@ -589,9 +589,9 @@ export default function QuoteBudgetTrackingTab({
                       風險預留 ({riskReserveRate}%)
                     </span>
                     <div className="flex gap-8 font-mono text-sm text-orange-700 dark:text-orange-400">
-                      <span>{formatCurrency(riskReserve, 0)}</span>
-                      <span>{formatCurrency(actualRiskReserve, 0)}</span>
-                      <span>{formatCurrency(actualRiskReserve - riskReserve, 0)}</span>
+                      <span>{formatTWD(riskReserve)}</span>
+                      <span>{formatTWD(actualRiskReserve)}</span>
+                      <span>{formatTWD(actualRiskReserve - riskReserve)}</span>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -632,10 +632,10 @@ export default function QuoteBudgetTrackingTab({
               <div className="flex justify-between items-center pt-2 bg-orange-50 dark:bg-orange-950/50 rounded-lg px-4 py-2">
                 <span className="font-medium text-orange-700 dark:text-orange-400">專案支出小計</span>
                 <div className="flex gap-8 font-mono font-medium text-orange-700 dark:text-orange-400">
-                  <span>{formatCurrency(projectSpecificExpenses, 0)}</span>
-                  <span>{formatCurrency(actualProjectExpenses, 0)}</span>
+                  <span>{formatTWD(projectSpecificExpenses)}</span>
+                  <span>{formatTWD(actualProjectExpenses)}</span>
                   <span className={actualProjectExpenses - projectSpecificExpenses > 0 ? "text-destructive" : actualProjectExpenses - projectSpecificExpenses < 0 ? "text-green-600" : ""}>
-                    {actualProjectExpenses - projectSpecificExpenses >= 0 ? "+" : ""}{formatCurrency(actualProjectExpenses - projectSpecificExpenses, 0)}
+                    {actualProjectExpenses - projectSpecificExpenses >= 0 ? "+" : ""}{formatTWD(actualProjectExpenses - projectSpecificExpenses)}
                   </span>
                 </div>
               </div>
@@ -650,7 +650,7 @@ export default function QuoteBudgetTrackingTab({
             colorClass="text-purple-800 dark:text-purple-300"
             badge={
               <span className={`text-xs font-mono font-bold ${budgetOperatingProfit >= 0 ? "text-purple-700 dark:text-purple-400" : "text-destructive"}`}>
-                {formatCurrency(budgetOperatingProfit, 0)}
+                {formatTWD(budgetOperatingProfit)}
               </span>
             }
           >
@@ -658,12 +658,12 @@ export default function QuoteBudgetTrackingTab({
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-purple-800 dark:text-purple-300">營業利潤金額</span>
                 <div className="flex gap-8 font-mono font-bold">
-                  <span className="text-muted-foreground">{formatCurrency(budgetOperatingProfit, 0)}</span>
+                  <span className="text-muted-foreground">{formatTWD(budgetOperatingProfit)}</span>
                   <span className={actualOperatingProfit >= budgetOperatingProfit ? "text-green-600" : "text-destructive"}>
-                    {formatCurrency(actualOperatingProfit, 0)}
+                    {formatTWD(actualOperatingProfit)}
                   </span>
                   <span className={actualOperatingProfit - budgetOperatingProfit >= 0 ? "text-green-600" : "text-destructive"}>
-                    {actualOperatingProfit - budgetOperatingProfit >= 0 ? "+" : ""}{formatCurrency(actualOperatingProfit - budgetOperatingProfit, 0)}
+                    {actualOperatingProfit - budgetOperatingProfit >= 0 ? "+" : ""}{formatTWD(actualOperatingProfit - budgetOperatingProfit)}
                   </span>
                 </div>
               </div>
@@ -691,7 +691,7 @@ export default function QuoteBudgetTrackingTab({
             colorClass="text-red-700 dark:text-red-400"
             badge={
               <span className="text-xs font-mono text-muted-foreground">
-                {formatCurrency(companyOverhead, 0)}
+                {formatTWD(companyOverhead)}
               </span>
             }
           >
@@ -699,13 +699,13 @@ export default function QuoteBudgetTrackingTab({
               <div className="pl-4 space-y-1 border-l-2 border-red-200 dark:border-red-800">
                 <div className="grid grid-cols-4 gap-4 items-center py-2">
                   <span className="text-sm font-medium">印花稅 (0.1%)</span>
-                  <div className="text-right font-mono text-sm">{formatCurrency(stampDuty, 0)}</div>
+                  <div className="text-right font-mono text-sm">{formatTWD(stampDuty)}</div>
                   <div className="text-right font-mono text-sm text-muted-foreground">—</div>
                   <div className="text-right font-mono text-sm text-muted-foreground">—</div>
                 </div>
                 <div className="grid grid-cols-4 gap-4 items-center py-2">
                   <span className="text-sm font-medium">預扣營所稅 (2%)</span>
-                  <div className="text-right font-mono text-sm">{formatCurrency(corpTax, 0)}</div>
+                  <div className="text-right font-mono text-sm">{formatTWD(corpTax)}</div>
                   <div className="text-right font-mono text-sm text-muted-foreground">—</div>
                   <div className="text-right font-mono text-sm text-muted-foreground">—</div>
                 </div>
@@ -713,7 +713,7 @@ export default function QuoteBudgetTrackingTab({
               
               <div className="flex justify-between items-center pt-2 bg-red-50 dark:bg-red-950/50 rounded-lg px-4 py-2">
                 <span className="font-medium text-red-700 dark:text-red-400">管銷費用小計</span>
-                <span className="font-mono font-semibold text-red-700 dark:text-red-400">{formatCurrency(companyOverhead, 0)}</span>
+                <span className="font-mono font-semibold text-red-700 dark:text-red-400">{formatTWD(companyOverhead)}</span>
               </div>
             </div>
           </CollapsibleSection>
@@ -727,7 +727,7 @@ export default function QuoteBudgetTrackingTab({
             badge={
               <div className="flex items-center gap-2">
                 <span className={`text-xs font-mono font-bold ${budgetNetProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-destructive"}`}>
-                  {formatCurrency(budgetNetProfit, 0)}
+                  {formatTWD(budgetNetProfit)}
                 </span>
                 <TooltipProvider>
                   <Tooltip>
@@ -747,7 +747,7 @@ export default function QuoteBudgetTrackingTab({
                 <div className="bg-white/60 dark:bg-black/20 rounded-xl p-4 text-center">
                   <div className="text-sm text-muted-foreground mb-2">預估淨利</div>
                   <div className={`text-2xl font-bold font-mono ${budgetNetProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-destructive"}`}>
-                    {formatCurrency(budgetNetProfit, 0)}
+                    {formatTWD(budgetNetProfit)}
                   </div>
                   <div className="text-sm text-muted-foreground mt-2">
                     淨利率 {budgetNetMargin.toFixed(2)}%
@@ -764,7 +764,7 @@ export default function QuoteBudgetTrackingTab({
                     )}
                   </div>
                   <div className={`text-2xl font-bold font-mono ${actualNetProfit >= 0 ? "text-green-700 dark:text-green-400" : "text-destructive"}`}>
-                    {formatCurrency(actualNetProfit, 0)}
+                    {formatTWD(actualNetProfit)}
                   </div>
                   <div className="text-sm text-muted-foreground mt-2">
                     淨利率 {actualNetMargin.toFixed(2)}%
@@ -776,7 +776,7 @@ export default function QuoteBudgetTrackingTab({
               <div className="mt-4 text-center">
                 <span className="text-sm text-muted-foreground">淨利差異：</span>
                 <span className={`ml-2 font-mono font-bold ${actualNetProfit - budgetNetProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
-                  {actualNetProfit - budgetNetProfit >= 0 ? "+" : ""}{formatCurrency(actualNetProfit - budgetNetProfit, 0)}
+                  {actualNetProfit - budgetNetProfit >= 0 ? "+" : ""}{formatTWD(actualNetProfit - budgetNetProfit)}
                 </span>
               </div>
             </div>
