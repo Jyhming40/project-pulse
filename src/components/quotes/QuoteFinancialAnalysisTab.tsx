@@ -1008,7 +1008,7 @@ export default function QuoteFinancialAnalysisTab({
                     <span className="text-xs text-muted-foreground">自投 IRR</span>
                   </div>
                   <p className="text-2xl font-bold text-emerald-600">
-                    {summary.irr.toFixed(2)}%
+                    {investmentResult.summary.irr.toFixed(2)}%
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     全額投入 {formatTWD(totalInvestment)}
@@ -1023,8 +1023,8 @@ export default function QuoteFinancialAnalysisTab({
                     <TrendingUp className="w-4 h-4 text-muted-foreground" />
                     <span className="text-xs text-muted-foreground">IRR 槓桿效益</span>
                   </div>
-                  <p className={`text-2xl font-bold ${financingResult.summary.irr > summary.irr ? 'text-green-600' : 'text-red-600'}`}>
-                    {financingResult.summary.irr > summary.irr ? '+' : ''}{(financingResult.summary.irr - summary.irr).toFixed(2)}%
+                  <p className={`text-2xl font-bold ${financingResult.summary.irr > investmentResult.summary.irr ? 'text-green-600' : 'text-red-600'}`}>
+                    {financingResult.summary.irr > investmentResult.summary.irr ? '+' : ''}{(financingResult.summary.irr - investmentResult.summary.irr).toFixed(2)}%
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     融資 vs 自投
