@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,9 +12,9 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   FileDown,
   Sparkles,
@@ -25,11 +25,21 @@ import {
   Upload,
   X,
   Image as ImageIcon,
-  BarChart3,
+  Settings2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAppSettingsRead } from "@/hooks/useAppSettings";
+import ReportStylePanel from "./ReportStylePanel";
+import {
+  ReportStyleSettings,
+  ReportTextContent,
+  ReportTemplateType,
+  REPORT_TEMPLATES,
+  DEFAULT_REPORT_STYLE,
+  DEFAULT_REPORT_TEXT,
+  EngineeringSpec,
+} from "@/types/investmentReport";
 
 interface InvestmentReportExportProps {
   projectName: string;
@@ -70,6 +80,7 @@ interface InvestmentReportExportProps {
     irr: number;
     label: string;
   }>;
+  engineeringSpec?: EngineeringSpec;
   companyName?: string;
   companyLogo?: string;
   primaryColor?: string;
@@ -137,28 +148,28 @@ function ImageUploadSlot({
           <img
             src={image.dataUrl}
             alt={image.caption || label}
-            className="w-full h-32 object-cover rounded-lg border"
+            className="w-full h-24 object-cover rounded-lg border"
           />
           <button
             onClick={() => onRemove(id)}
-            className="absolute top-2 right-2 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-1 right-1 p-1 bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
           >
             <X className="h-3 w-3" />
           </button>
           <Input
-            placeholder="圖片說明（選填）"
+            placeholder="圖片說明"
             value={image.caption}
             onChange={(e) => onCaptionChange(id, e.target.value)}
-            className="mt-2 text-xs"
+            className="mt-1 text-xs h-7"
           />
         </div>
       ) : (
         <button
           onClick={handleClick}
-          className="w-full h-32 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
+          className="w-full h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center gap-1 text-muted-foreground hover:border-primary hover:text-primary transition-colors"
         >
-          <Upload className="h-6 w-6" />
-          <span className="text-xs">點擊上傳圖片</span>
+          <Upload className="h-5 w-5" />
+          <span className="text-xs">上傳</span>
         </button>
       )}
     </div>
@@ -182,6 +193,7 @@ export default function InvestmentReportExport({
   summary,
   trecEstimation,
   sensitivityAnalysis,
+  engineeringSpec,
   companyName: propCompanyName,
   companyLogo: propCompanyLogo,
   primaryColor: propPrimaryColor,
@@ -189,15 +201,24 @@ export default function InvestmentReportExport({
   const [isOpen, setIsOpen] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [includeAI, setIncludeAI] = useState(true);
-  const [includeTrec, setIncludeTrec] = useState(gridConnectionType === 'internal');
-  const [includeSensitivity, setIncludeSensitivity] = useState(true);
-  const [includeCharts, setIncludeCharts] = useState(true);
-  const [reportTitle, setReportTitle] = useState(
-    `${projectName || '太陽能發電系統'} - 投資報酬評估說明`
-  );
-  const [aiContent, setAiContent] = useState<AIContent | null>(null);
   const [generationStatus, setGenerationStatus] = useState<'idle' | 'generating' | 'ready' | 'error'>('idle');
+  
+  // Template & Style
+  const [selectedTemplate, setSelectedTemplate] = useState<ReportTemplateType>(() => {
+    if (revenueMode === 'feed_in_tariff') return 'feed_in_tariff';
+    if (investmentMode === 'rental_investment') return 'rental_investment';
+    return 'self_consumption';
+  });
+  
+  const [styleSettings, setStyleSettings] = useState<ReportStyleSettings>(() => ({
+    ...DEFAULT_REPORT_STYLE,
+    reportTitle: `${projectName || '太陽能發電系統'} - 投資報酬評估說明`,
+    showTrec: gridConnectionType === 'internal',
+    showGridFlexibility: gridConnectionType === 'internal',
+  }));
+  
+  const [textContent, setTextContent] = useState<ReportTextContent>(DEFAULT_REPORT_TEXT);
+  const [aiContent, setAiContent] = useState<AIContent | null>(null);
   
   // Custom image uploads
   const [uploadedImages, setUploadedImages] = useState<Record<string, UploadedImage>>({});
@@ -209,6 +230,27 @@ export default function InvestmentReportExport({
   const companyName = settings?.company_name_zh || propCompanyName || '太陽能科技';
   const companyLogo = settings?.logo_light_url || propCompanyLogo;
   const primaryColor = settings?.primary_color || propPrimaryColor || '#2563eb';
+
+  // Apply template defaults when template changes
+  const handleTemplateChange = useCallback((templateId: ReportTemplateType) => {
+    setSelectedTemplate(templateId);
+    const template = REPORT_TEMPLATES.find(t => t.id === templateId);
+    if (template) {
+      setStyleSettings(prev => ({
+        ...prev,
+        ...template.defaultStyle,
+      }));
+      setTextContent(prev => ({
+        ...prev,
+        ...template.defaultText,
+      }));
+    }
+  }, []);
+
+  // Initialize template on mount
+  useEffect(() => {
+    handleTemplateChange(selectedTemplate);
+  }, []);
 
   // Handle image upload
   const handleImageUpload = useCallback((id: string, file: File) => {
@@ -228,7 +270,6 @@ export default function InvestmentReportExport({
     reader.readAsDataURL(file);
   }, []);
 
-  // Handle image removal
   const handleImageRemove = useCallback((id: string) => {
     setUploadedImages(prev => {
       const updated = { ...prev };
@@ -237,18 +278,14 @@ export default function InvestmentReportExport({
     });
   }, []);
 
-  // Handle caption change
   const handleCaptionChange = useCallback((id: string, caption: string) => {
     setUploadedImages(prev => ({
       ...prev,
-      [id]: {
-        ...prev[id],
-        caption,
-      },
+      [id]: { ...prev[id], caption },
     }));
   }, []);
 
-  // Generate SVG chart for cash flow (inline in HTML)
+  // Generate SVG chart for cash flow
   const generateCashFlowChartSvg = useCallback(() => {
     const width = 600;
     const height = 250;
@@ -267,15 +304,11 @@ export default function InvestmentReportExport({
     const getY = (val: number) => padding.top + chartHeight - ((val - minVal) / range) * chartHeight;
     const getX = (idx: number) => padding.left + (idx / (years.length - 1)) * chartWidth;
 
-    // Zero line position
     const zeroY = getY(0);
-
-    // Cumulative line path
     const cumulativePath = cumulative
       .map((val, idx) => `${idx === 0 ? 'M' : 'L'} ${getX(idx)} ${getY(val)}`)
       .join(' ');
 
-    // Bar chart for annual
     const barWidth = chartWidth / years.length * 0.6;
     const bars = annual.map((val, idx) => {
       const x = getX(idx) - barWidth / 2;
@@ -285,16 +318,14 @@ export default function InvestmentReportExport({
       return `<rect x="${x}" y="${y}" width="${barWidth}" height="${h}" fill="${fill}" opacity="0.6" rx="2"/>`;
     }).join('');
 
-    // Y-axis labels
-    const yLabels = [minVal, minVal + range * 0.5, maxVal].map((val, idx) => {
+    const yLabels = [minVal, minVal + range * 0.5, maxVal].map((val) => {
       const y = getY(val);
       return `<text x="${padding.left - 10}" y="${y + 4}" text-anchor="end" font-size="10" fill="#6b7280">${(val / 10000).toFixed(0)}萬</text>`;
     }).join('');
 
-    // X-axis labels (every 5 years)
     const xLabels = years
       .filter((_, idx) => idx % 5 === 0 || idx === years.length - 1)
-      .map((year, idx, arr) => {
+      .map((year) => {
         const originalIdx = years.indexOf(year);
         const x = getX(originalIdx);
         return `<text x="${x}" y="${height - 10}" text-anchor="middle" font-size="10" fill="#6b7280">第${year}年</text>`;
@@ -308,19 +339,12 @@ export default function InvestmentReportExport({
             <stop offset="100%" style="stop-color:#22c55e;stop-opacity:1" />
           </linearGradient>
         </defs>
-        <!-- Grid lines -->
         <line x1="${padding.left}" y1="${zeroY}" x2="${width - padding.right}" y2="${zeroY}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="4"/>
-        <!-- Bars -->
         ${bars}
-        <!-- Cumulative line -->
         <path d="${cumulativePath}" fill="none" stroke="url(#lineGradient)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-        <!-- Data points -->
         ${cumulative.map((val, idx) => `<circle cx="${getX(idx)}" cy="${getY(val)}" r="4" fill="${val >= 0 ? '#22c55e' : '#dc2626'}" stroke="white" stroke-width="2"/>`).join('')}
-        <!-- Y axis labels -->
         ${yLabels}
-        <!-- X axis labels -->
         ${xLabels}
-        <!-- Legend -->
         <rect x="${width - 150}" y="10" width="12" height="12" fill="${primaryColor}" opacity="0.6" rx="2"/>
         <text x="${width - 132}" y="20" font-size="11" fill="#374151">年度現金流</text>
         <line x1="${width - 150}" y1="35" x2="${width - 138}" y2="35" stroke="url(#lineGradient)" stroke-width="3"/>
@@ -354,11 +378,7 @@ export default function InvestmentReportExport({
       `;
     }).join('');
 
-    return `
-      <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-        ${bars}
-      </svg>
-    `;
+    return `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">${bars}</svg>`;
   }, [sensitivityAnalysis]);
 
   const handleGenerateReport = async () => {
@@ -367,7 +387,6 @@ export default function InvestmentReportExport({
     setGenerationStatus('generating');
 
     try {
-      // Step 1: Generate AI content
       setProgress(20);
       
       const reportData = {
@@ -414,7 +433,7 @@ export default function InvestmentReportExport({
       const { data, error } = await supabase.functions.invoke('generate-investment-report', {
         body: {
           reportData,
-          includeAI,
+          includeAI: styleSettings.showAIContent,
         },
       });
 
@@ -423,7 +442,6 @@ export default function InvestmentReportExport({
       setProgress(60);
       setAiContent(data.content);
 
-      // Step 2: Generate and open print preview
       setProgress(80);
       generatePrintPreview(data.content);
 
@@ -442,6 +460,9 @@ export default function InvestmentReportExport({
   };
 
   const generatePrintPreview = (content: AIContent) => {
+    const s = styleSettings;
+    const t = textContent;
+    
     const modeLabels = {
       revenueMode: revenueMode === 'feed_in_tariff' ? '躉售電力' : '自用節電',
       gridType: gridConnectionType === 'internal' ? '併內線（可取得 T-REC）' : '併外線',
@@ -467,20 +488,74 @@ export default function InvestmentReportExport({
       })
       .join('');
 
-    // Generate charts
-    const cashFlowChart = includeCharts ? generateCashFlowChartSvg() : '';
-    const irrChart = includeCharts && sensitivityAnalysis ? generateIrrChartSvg() : '';
+    const cashFlowChart = s.showCharts ? generateCashFlowChartSvg() : '';
+    const irrChart = s.showCharts && sensitivityAnalysis ? generateIrrChartSvg() : '';
 
-    // Build T-REC section if applicable
+    // LCOE Section
+    let lcoeSection = '';
+    if (s.showLcoeCalculation) {
+      lcoeSection = `
+        <div style="margin-top: 24px; page-break-inside: avoid;">
+          <h3 style="color: ${primaryColor}; font-size: ${s.subtitleFontSize}px; margin-bottom: 12px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 4px;">
+            💡 建置太陽能發電系統，一度電的成本是多少?
+          </h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: ${s.tableFontSize}px;">
+            <tbody>
+              <tr>
+                <td style="padding: 10px; background: #f9fafb; width: 50%; font-weight: 500;">A. 20年預估發電度數 (kWh)</td>
+                <td style="padding: 10px; text-align: right;">${Math.round(summary.totalGeneration).toLocaleString()}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; background: #f9fafb; font-weight: 500;">B. 裝置金額 (未稅)</td>
+                <td style="padding: 10px; text-align: right;">${totalInvestment.toLocaleString()} 元</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; background: #f9fafb; font-weight: 500;">C. 20年維運費用預估</td>
+                <td style="padding: 10px; text-align: right;">${Math.round(summary.totalMaintenance).toLocaleString()} 元</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; background: #f9fafb; font-weight: 500;">D. 20年保險費用預估</td>
+                <td style="padding: 10px; text-align: right;">${Math.round(summary.totalInsurance).toLocaleString()} 元</td>
+              </tr>
+              <tr style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);">
+                <td style="padding: 10px; font-weight: 600;">E. 投資成本總計 (B+C+D)</td>
+                <td style="padding: 10px; text-align: right; font-weight: 600;">${Math.round(summary.totalCost).toLocaleString()} 元</td>
+              </tr>
+              <tr style="background: linear-gradient(135deg, ${primaryColor}15 0%, ${primaryColor}25 100%);">
+                <td style="padding: 10px; font-weight: 700; color: ${primaryColor};">F. 太陽光電每度電價格 (E÷A)</td>
+                <td style="padding: 10px; text-align: right; font-weight: 700; font-size: ${s.subtitleFontSize}px; color: ${primaryColor};">$${summary.costPerKwh.toFixed(2)} 元/度</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // Grid Flexibility Section
+    let gridFlexibilitySection = '';
+    if (s.showGridFlexibility && gridConnectionType === 'internal' && t.gridFlexibilityContent) {
+      gridFlexibilitySection = `
+        <div style="margin-top: 24px; page-break-inside: avoid;">
+          <h3 style="color: ${primaryColor}; font-size: ${s.subtitleFontSize}px; margin-bottom: 12px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 4px;">
+            ⚡ ${t.gridFlexibilityTitle || '併內線的靈活設計'}
+          </h3>
+          <div style="background: #f8fafc; border-left: 4px solid ${primaryColor}; padding: 16px 20px; border-radius: 0 12px 12px 0; font-size: ${s.bodyFontSize}px; line-height: 1.8; white-space: pre-line;">
+            ${t.gridFlexibilityContent}
+          </div>
+        </div>
+      `;
+    }
+
+    // T-REC Section
     let trecSection = '';
-    if (includeTrec && trecEstimation && gridConnectionType === 'internal') {
+    if (s.showTrec && trecEstimation && gridConnectionType === 'internal') {
       trecSection = `
         <div style="margin-top: 24px; page-break-inside: avoid;">
-          <h3 style="color: ${primaryColor}; font-size: 16px; margin-bottom: 12px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 4px;">
+          <h3 style="color: ${primaryColor}; font-size: ${s.subtitleFontSize}px; margin-bottom: 12px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 4px;">
             🌱 T-REC 綠能憑證估算
           </h3>
-          <p style="color: #6b7280; font-size: 13px; margin-bottom: 12px;">併內線系統可申請綠能憑證，為企業創造額外收益與碳中和效益。</p>
-          <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+          <p style="color: #6b7280; font-size: ${s.bodyFontSize}px; margin-bottom: 12px;">併內線系統可申請綠能憑證，為企業創造額外收益與碳中和效益。</p>
+          <table style="width: 100%; border-collapse: collapse; font-size: ${s.tableFontSize}px;">
             <thead>
               <tr style="background: #f0fdf4;">
                 <th style="padding: 8px; text-align: left; border-bottom: 2px solid #22c55e;">情境</th>
@@ -511,24 +586,24 @@ export default function InvestmentReportExport({
       `;
     }
 
-    // Build sensitivity analysis section with chart
+    // Sensitivity Section
     let sensitivitySection = '';
-    if (includeSensitivity && sensitivityAnalysis && sensitivityAnalysis.length > 0) {
-      const sensitivityRows = sensitivityAnalysis.map(s => `
+    if (s.showSensitivity && sensitivityAnalysis && sensitivityAnalysis.length > 0) {
+      const sensitivityRows = sensitivityAnalysis.map(sa => `
         <tr>
-          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${s.label}</td>
-          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600; color: ${s.irr >= 8 ? '#16a34a' : s.irr >= 5 ? '#ca8a04' : '#dc2626'};">${s.irr.toFixed(2)}%</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb;">${sa.label}</td>
+          <td style="padding: 8px; border-bottom: 1px solid #e5e7eb; text-align: right; font-weight: 600; color: ${sa.irr >= 8 ? '#16a34a' : sa.irr >= 5 ? '#ca8a04' : '#dc2626'};">${sa.irr.toFixed(2)}%</td>
         </tr>
       `).join('');
 
       sensitivitySection = `
         <div style="margin-top: 24px; page-break-inside: avoid;">
-          <h3 style="color: ${primaryColor}; font-size: 16px; margin-bottom: 12px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 4px;">
+          <h3 style="color: ${primaryColor}; font-size: ${s.subtitleFontSize}px; margin-bottom: 12px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 4px;">
             📈 電價敏感度分析
           </h3>
-          <p style="color: #6b7280; font-size: 13px; margin-bottom: 12px;">不同電價成長情境下的預估報酬率變化：</p>
+          <p style="color: #6b7280; font-size: ${s.bodyFontSize}px; margin-bottom: 12px;">不同電價成長情境下的預估報酬率變化：</p>
           <div style="display: flex; gap: 24px; align-items: flex-start;">
-            <table style="width: 40%; border-collapse: collapse; font-size: 13px;">
+            <table style="width: 40%; border-collapse: collapse; font-size: ${s.tableFontSize}px;">
               <thead>
                 <tr style="background: #f3f4f6;">
                   <th style="padding: 8px; text-align: left; border-bottom: 2px solid ${primaryColor};">情境</th>
@@ -539,16 +614,84 @@ export default function InvestmentReportExport({
                 ${sensitivityRows}
               </tbody>
             </table>
-            ${includeCharts && irrChart ? `<div style="flex: 1;">${irrChart}</div>` : ''}
+            ${s.showCharts && irrChart ? `<div style="flex: 1;">${irrChart}</div>` : ''}
           </div>
         </div>
       `;
     }
 
-    // Build custom images section
+    // Advantage & Risk Section
+    let advantageRiskSection = '';
+    if (s.showAdvantageRisk && (t.advantageItems.length > 0 || t.riskItems.length > 0)) {
+      const advantageList = t.advantageItems.length > 0 ? `
+        <div style="margin-bottom: 16px;">
+          <h4 style="font-size: ${s.bodyFontSize}px; font-weight: 600; color: #16a34a; margin-bottom: 8px;">✅ ${t.advantageTitle || '方案優勢'}</h4>
+          <ul style="margin: 0; padding-left: 20px; font-size: ${s.bodyFontSize}px; line-height: 1.8;">
+            ${t.advantageItems.map(item => `<li style="margin-bottom: 6px;">${item}</li>`).join('')}
+          </ul>
+        </div>
+      ` : '';
+
+      const riskList = t.riskItems.length > 0 ? `
+        <div>
+          <h4 style="font-size: ${s.bodyFontSize}px; font-weight: 600; color: #ca8a04; margin-bottom: 8px;">⚠️ ${t.riskTitle || '須留意事項'}</h4>
+          <ul style="margin: 0; padding-left: 20px; font-size: ${s.bodyFontSize}px; line-height: 1.8;">
+            ${t.riskItems.map(item => `<li style="margin-bottom: 6px;">${item}</li>`).join('')}
+          </ul>
+        </div>
+      ` : '';
+
+      advantageRiskSection = `
+        <div style="margin-top: 24px; page-break-inside: avoid;">
+          <h3 style="color: ${primaryColor}; font-size: ${s.subtitleFontSize}px; margin-bottom: 12px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 4px;">
+            📋 方案優勢與風險評估
+          </h3>
+          <div style="background: #f8fafc; padding: 16px 20px; border-radius: 12px;">
+            ${advantageList}
+            ${riskList}
+          </div>
+        </div>
+      `;
+    }
+
+    // Engineering Specs Section
+    let engineeringSection = '';
+    if (s.showEngineeringSpecs && engineeringSpec) {
+      engineeringSection = `
+        <div style="margin-top: 24px; page-break-inside: avoid;">
+          <h3 style="color: ${primaryColor}; font-size: ${s.subtitleFontSize}px; margin-bottom: 12px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 4px;">
+            🔧 工程概要規格
+          </h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: ${s.tableFontSize}px;">
+            <tbody>
+              <tr>
+                <td style="padding: 10px; background: #f9fafb; width: 25%; font-weight: 500;">太陽能模組</td>
+                <td style="padding: 10px;">${engineeringSpec.moduleBrand} ${engineeringSpec.moduleModel} (${engineeringSpec.moduleWattage}W)</td>
+                <td style="padding: 10px; background: #f9fafb; width: 20%; font-weight: 500;">數量</td>
+                <td style="padding: 10px;">${engineeringSpec.moduleCount} 片</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; background: #f9fafb; font-weight: 500;">逆變器</td>
+                <td style="padding: 10px;">${engineeringSpec.inverterBrand} ${engineeringSpec.inverterModel}</td>
+                <td style="padding: 10px; background: #f9fafb; font-weight: 500;">數量</td>
+                <td style="padding: 10px;">${engineeringSpec.inverterCount} 台</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px; background: #f9fafb; font-weight: 500;">支架類型</td>
+                <td style="padding: 10px;">${engineeringSpec.rackType}</td>
+                <td style="padding: 10px; background: #f9fafb; font-weight: 500;">併網類型</td>
+                <td style="padding: 10px;">${engineeringSpec.connectionType}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    // Custom Images Section
     let customImagesSection = '';
     const imageEntries = Object.values(uploadedImages);
-    if (imageEntries.length > 0) {
+    if (s.showCustomImages && imageEntries.length > 0) {
       const imageCards = imageEntries.map(img => `
         <div style="break-inside: avoid; margin-bottom: 16px;">
           <img src="${img.dataUrl}" alt="${img.caption || img.name}" style="width: 100%; max-height: 300px; object-fit: contain; border-radius: 8px; border: 1px solid #e5e7eb;"/>
@@ -558,11 +701,26 @@ export default function InvestmentReportExport({
 
       customImagesSection = `
         <div style="margin-top: 24px; page-break-inside: avoid;">
-          <h3 style="color: ${primaryColor}; font-size: 16px; margin-bottom: 12px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 4px;">
+          <h3 style="color: ${primaryColor}; font-size: ${s.subtitleFontSize}px; margin-bottom: 12px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 4px;">
             📷 專案附圖
           </h3>
           <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
             ${imageCards}
+          </div>
+        </div>
+      `;
+    }
+
+    // Conclusion Section
+    let conclusionSection = '';
+    if (t.conclusionContent) {
+      conclusionSection = `
+        <div style="margin-top: 24px; page-break-inside: avoid;">
+          <h3 style="color: ${primaryColor}; font-size: ${s.subtitleFontSize}px; margin-bottom: 12px; border-bottom: 2px solid ${primaryColor}; padding-bottom: 4px;">
+            📝 ${t.conclusionTitle || '結論'}
+          </h3>
+          <div style="background: linear-gradient(135deg, ${primaryColor}10 0%, ${primaryColor}05 100%); border: 1px solid ${primaryColor}30; padding: 16px 20px; border-radius: 12px; font-size: ${s.bodyFontSize}px; line-height: 1.8; white-space: pre-line;">
+            ${t.conclusionContent}
           </div>
         </div>
       `;
@@ -573,7 +731,7 @@ export default function InvestmentReportExport({
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>${reportTitle}</title>
+  <title>${s.reportTitle || projectName}</title>
   <style>
     @page {
       size: A4;
@@ -586,7 +744,7 @@ export default function InvestmentReportExport({
       max-width: 210mm;
       margin: 0 auto;
       padding: 20px;
-      font-size: 14px;
+      font-size: ${s.bodyFontSize}px;
     }
     .header {
       display: flex;
@@ -598,7 +756,7 @@ export default function InvestmentReportExport({
     }
     .header h1 {
       color: ${primaryColor};
-      font-size: 22px;
+      font-size: ${s.titleFontSize}px;
       margin: 0;
     }
     .header .company {
@@ -607,8 +765,8 @@ export default function InvestmentReportExport({
       color: #6b7280;
     }
     .header .company img {
-      max-height: 50px;
-      max-width: 150px;
+      max-height: ${s.logoSize}px;
+      max-width: 180px;
       object-fit: contain;
       margin-bottom: 8px;
     }
@@ -618,7 +776,7 @@ export default function InvestmentReportExport({
     }
     .section-title {
       color: ${primaryColor};
-      font-size: 16px;
+      font-size: ${s.subtitleFontSize}px;
       margin-bottom: 12px;
       border-bottom: 2px solid ${primaryColor};
       padding-bottom: 4px;
@@ -655,7 +813,7 @@ export default function InvestmentReportExport({
       margin: 16px 0;
       border-radius: 0 12px 12px 0;
       white-space: pre-line;
-      font-size: 13px;
+      font-size: ${s.bodyFontSize}px;
       line-height: 1.8;
     }
     table {
@@ -678,12 +836,6 @@ export default function InvestmentReportExport({
       margin: 16px 0;
       text-align: center;
     }
-    .chart-title {
-      font-size: 13px;
-      font-weight: 600;
-      color: #374151;
-      margin-bottom: 12px;
-    }
     .footer {
       margin-top: 40px;
       padding-top: 16px;
@@ -701,9 +853,9 @@ export default function InvestmentReportExport({
 <body>
   <div class="header">
     <div>
-      <h1>${reportTitle}</h1>
-      <p style="color: #6b7280; margin: 4px 0 0 0; font-size: 13px;">
-        ${projectLocation ? `📍 ${projectLocation}` : ''} | 裝置容量：${capacityKwp} kWp
+      <h1>${s.reportTitle || `${projectName} - 投資報酬評估說明`}</h1>
+      <p style="color: #6b7280; margin: 4px 0 0 0; font-size: ${s.subtitleFontSize}px;">
+        ${s.reportSubtitle || (projectLocation ? `📍 ${projectLocation} | 裝置容量：${capacityKwp} kWp` : `裝置容量：${capacityKwp} kWp`)}
       </p>
     </div>
     <div class="company">
@@ -713,14 +865,14 @@ export default function InvestmentReportExport({
     </div>
   </div>
 
-  <!-- AI Opening -->
+  ${s.showAIContent ? `
   <div class="section">
     <div class="ai-content">
       ${content.opening}
     </div>
   </div>
+  ` : ''}
 
-  <!-- Key Metrics -->
   <div class="section">
     <h3 class="section-title">📊 關鍵財務指標</h3>
     <div class="kpi-grid">
@@ -743,10 +895,9 @@ export default function InvestmentReportExport({
     </div>
   </div>
 
-  <!-- System Overview -->
   <div class="section">
     <h3 class="section-title">⚡ 系統規劃概要</h3>
-    <table style="font-size: 13px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+    <table style="font-size: ${s.tableFontSize}px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
       <tr>
         <td style="padding: 10px 12px; background: #f9fafb; width: 25%; font-weight: 500;">收益模式</td>
         <td style="padding: 10px 12px;">${modeLabels.revenueMode}</td>
@@ -768,8 +919,10 @@ export default function InvestmentReportExport({
     </table>
   </div>
 
-  <!-- Cash Flow Chart -->
-  ${includeCharts && cashFlowChart ? `
+  ${lcoeSection}
+  ${gridFlexibilitySection}
+
+  ${s.showCharts && cashFlowChart ? `
   <div class="section">
     <h3 class="section-title">📈 20年現金流預估圖</h3>
     <div class="chart-container">
@@ -778,10 +931,9 @@ export default function InvestmentReportExport({
   </div>
   ` : ''}
 
-  <!-- Cash Flow Summary -->
   <div class="section">
     <h3 class="section-title">💰 20年現金流量預估</h3>
-    <table style="font-size: 12px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
+    <table style="font-size: ${s.tableFontSize}px; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden;">
       <thead>
         <tr style="background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);">
           <th style="padding: 10px 8px; border-bottom: 2px solid ${primaryColor};">年度</th>
@@ -807,14 +959,17 @@ export default function InvestmentReportExport({
         </tr>
       </tfoot>
     </table>
-    <p style="font-size: 11px; color: #9ca3af; margin-top: 8px;">* 表格顯示第 1、5、10、15、20 年數據摘要。完整 20 年試算表請另行參閱。</p>
+    <p style="font-size: 11px; color: #9ca3af; margin-top: 8px;">* 表格顯示第 1、5、10、15、20 年數據摘要。</p>
   </div>
 
   ${trecSection}
   ${sensitivitySection}
+  ${advantageRiskSection}
+  ${engineeringSection}
   ${customImagesSection}
+  ${conclusionSection}
 
-  <!-- AI Summary & Risk -->
+  ${s.showAIContent ? `
   <div class="section" style="page-break-before: auto;">
     <h3 class="section-title">💡 投資建議</h3>
     <div class="ai-content">
@@ -828,6 +983,7 @@ export default function InvestmentReportExport({
       ${content.risk}
     </div>
   </div>
+  ` : ''}
 
   <div class="footer">
     <p>本報告僅供投資評估參考，實際收益可能因天候、設備效能、電價政策等因素而異。</p>
@@ -837,7 +993,6 @@ export default function InvestmentReportExport({
 </html>
     `;
 
-    // Open print window
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(htmlContent);
@@ -860,156 +1015,91 @@ export default function InvestmentReportExport({
           匯出投資報告
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5 text-primary" />
             產生投資報酬評估報告
           </DialogTitle>
           <DialogDescription>
-            生成專業的 PDF 投資報告，可搭配 AI 自動產生客製化內容
+            選擇報告範本並自訂樣式與內容
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {/* Report Title */}
-          <div className="space-y-2">
-            <Label htmlFor="reportTitle">報告標題</Label>
-            <Input
-              id="reportTitle"
-              value={reportTitle}
-              onChange={(e) => setReportTitle(e.target.value)}
-              placeholder="輸入報告標題"
-            />
-          </div>
+        <div className="py-4">
+          <Tabs defaultValue="settings" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="settings" className="gap-2">
+                <Settings2 className="h-4 w-4" />
+                報告設定
+              </TabsTrigger>
+              <TabsTrigger value="images" className="gap-2">
+                <ImageIcon className="h-4 w-4" />
+                圖片上傳
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Branding Preview */}
-          {companyLogo && (
-            <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg">
-              <img src={companyLogo} alt="Logo" className="h-10 object-contain" />
-              <div className="text-sm">
-                <div className="font-medium">{companyName}</div>
-                <div className="text-xs text-muted-foreground">將顯示於報告頁首</div>
-              </div>
-            </div>
-          )}
-
-          <Separator />
-
-          {/* Options */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="flex items-center gap-2">
-                  <Sparkles className="h-4 w-4 text-amber-500" />
-                  AI 客製化內容
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  自動生成開場白、投資建議與風險評估
-                </p>
-              </div>
-              <Switch
-                checked={includeAI}
-                onCheckedChange={setIncludeAI}
+            <TabsContent value="settings" className="mt-4">
+              <ReportStylePanel
+                style={styleSettings}
+                text={textContent}
+                selectedTemplate={selectedTemplate}
+                companyLogo={companyLogo}
+                onStyleChange={(updates) => setStyleSettings(prev => ({ ...prev, ...updates }))}
+                onTextChange={(updates) => setTextContent(prev => ({ ...prev, ...updates }))}
+                onTemplateChange={handleTemplateChange}
               />
-            </div>
+            </TabsContent>
 
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label className="flex items-center gap-2">
-                  <BarChart3 className="h-4 w-4 text-blue-500" />
-                  圖表視覺化
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  加入現金流折線圖與 IRR 比較圖
-                </p>
+            <TabsContent value="images" className="mt-4 space-y-4">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                <Label>自訂圖片（選填）</Label>
+                <Badge variant="outline" className="text-xs">最多 4 張</Badge>
               </div>
-              <Switch
-                checked={includeCharts}
-                onCheckedChange={setIncludeCharts}
-              />
-            </div>
-
-            {gridConnectionType === 'internal' && (
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>T-REC 綠能憑證估算</Label>
-                  <p className="text-xs text-muted-foreground">
-                    顯示三情境憑證收益試算
-                  </p>
-                </div>
-                <Switch
-                  checked={includeTrec}
-                  onCheckedChange={setIncludeTrec}
+              <p className="text-xs text-muted-foreground">
+                上傳場地照片、設備規劃圖或其他相關圖表
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <ImageUploadSlot
+                  id="img1"
+                  label="圖片 1"
+                  image={uploadedImages['img1'] || null}
+                  onUpload={handleImageUpload}
+                  onRemove={handleImageRemove}
+                  onCaptionChange={handleCaptionChange}
+                />
+                <ImageUploadSlot
+                  id="img2"
+                  label="圖片 2"
+                  image={uploadedImages['img2'] || null}
+                  onUpload={handleImageUpload}
+                  onRemove={handleImageRemove}
+                  onCaptionChange={handleCaptionChange}
+                />
+                <ImageUploadSlot
+                  id="img3"
+                  label="圖片 3"
+                  image={uploadedImages['img3'] || null}
+                  onUpload={handleImageUpload}
+                  onRemove={handleImageRemove}
+                  onCaptionChange={handleCaptionChange}
+                />
+                <ImageUploadSlot
+                  id="img4"
+                  label="圖片 4"
+                  image={uploadedImages['img4'] || null}
+                  onUpload={handleImageUpload}
+                  onRemove={handleImageRemove}
+                  onCaptionChange={handleCaptionChange}
                 />
               </div>
-            )}
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>電價敏感度分析</Label>
-                <p className="text-xs text-muted-foreground">
-                  顯示不同電價成長情境的 IRR 變化
-                </p>
-              </div>
-              <Switch
-                checked={includeSensitivity}
-                onCheckedChange={setIncludeSensitivity}
-              />
-            </div>
-          </div>
-
-          <Separator />
-
-          {/* Custom Image Uploads */}
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <ImageIcon className="h-4 w-4 text-muted-foreground" />
-              <Label>自訂圖片（選填）</Label>
-              <Badge variant="outline" className="text-xs">最多 4 張</Badge>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              上傳場地照片、設備規劃圖或其他相關圖表
-            </p>
-            <div className="grid grid-cols-2 gap-3">
-              <ImageUploadSlot
-                id="img1"
-                label="圖片 1"
-                image={uploadedImages['img1'] || null}
-                onUpload={handleImageUpload}
-                onRemove={handleImageRemove}
-                onCaptionChange={handleCaptionChange}
-              />
-              <ImageUploadSlot
-                id="img2"
-                label="圖片 2"
-                image={uploadedImages['img2'] || null}
-                onUpload={handleImageUpload}
-                onRemove={handleImageRemove}
-                onCaptionChange={handleCaptionChange}
-              />
-              <ImageUploadSlot
-                id="img3"
-                label="圖片 3"
-                image={uploadedImages['img3'] || null}
-                onUpload={handleImageUpload}
-                onRemove={handleImageRemove}
-                onCaptionChange={handleCaptionChange}
-              />
-              <ImageUploadSlot
-                id="img4"
-                label="圖片 4"
-                image={uploadedImages['img4'] || null}
-                onUpload={handleImageUpload}
-                onRemove={handleImageRemove}
-                onCaptionChange={handleCaptionChange}
-              />
-            </div>
-          </div>
+            </TabsContent>
+          </Tabs>
 
           {/* Progress */}
           {isGenerating && (
-            <div className="space-y-2">
+            <div className="space-y-2 mt-4">
               <Progress value={progress} className="h-2" />
               <p className="text-xs text-muted-foreground text-center">
                 {progress < 40 && '正在生成 AI 內容...'}
@@ -1021,14 +1111,14 @@ export default function InvestmentReportExport({
 
           {/* Status */}
           {generationStatus === 'ready' && (
-            <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg">
+            <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg mt-4">
               <CheckCircle className="h-4 w-4" />
               報告已生成完成！請在新視窗中列印或儲存為 PDF。
             </div>
           )}
 
           {generationStatus === 'error' && (
-            <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-3 rounded-lg">
+            <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 p-3 rounded-lg mt-4">
               <AlertCircle className="h-4 w-4" />
               報告生成失敗，請稍後再試。
             </div>
@@ -1051,7 +1141,7 @@ export default function InvestmentReportExport({
               </>
             ) : (
               <>
-                <FileDown className="h-4 w-4" />
+                <Sparkles className="h-4 w-4" />
                 生成報告
               </>
             )}
