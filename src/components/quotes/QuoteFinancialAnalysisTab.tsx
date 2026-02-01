@@ -427,6 +427,10 @@ function calculateFinancingProjection(
   const totalGeneration = data.reduce((sum, d) => sum + d.generationKwh, 0);
   const costPerKwh = totalGeneration > 0 ? (totalCost + loanAmount) / totalGeneration : 0;
   
+  // 與台電電價比較（與 investmentResult 一致）
+  const gridRate = params.tariffRate || 4.5;
+  const savingsVsGrid = gridRate > 0 ? (costPerKwh / gridRate) * 100 : 0;
+  
   return {
     data,
     summary: {
@@ -450,6 +454,8 @@ function calculateFinancingProjection(
       paybackYear: paybackYear || 20,
       totalGeneration,
       costPerKwh,
+      gridRate,
+      savingsVsGrid,
     },
   };
 }
@@ -669,7 +675,9 @@ export default function QuoteFinancialAnalysisTab({
     );
   }
 
-  const { data, summary } = investmentResult;
+  // 根據資金來源模式選擇對應的結果
+  const activeResult = financingMode === 'loan_financed' ? financingResult : investmentResult;
+  const { data, summary } = activeResult;
 
   // 準備圖表資料
   const years = data.map((p) => `第${p.year}年`);
