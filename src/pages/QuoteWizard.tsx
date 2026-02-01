@@ -688,6 +688,8 @@ export default function QuoteWizard() {
           <QuoteFinancialAnalysisTab
             formData={formData as QuoteParams}
             projections={projections}
+            projectName={relatedProject?.project_name || existingQuote?.quote_number || ''}
+            projectLocation={relatedProject?.address || ''}
           />
         );
       case "schedule":
