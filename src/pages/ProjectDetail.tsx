@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -84,7 +84,6 @@ import { useCancellationCheck } from '@/hooks/useCancellationCheck';
 import { CancellationWarningDialog } from '@/components/CancellationWarningDialog';
 import { ProjectStageIndicator } from '@/components/ProjectStageIndicator';
 import { ProjectIssuesPanel } from '@/components/ProjectIssuesPanel';
-import { ProjectCommandCenter } from '@/components/projects/ProjectCommandCenter';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 type DocType = Database['public']['Enums']['doc_type'];
@@ -162,7 +161,6 @@ export default function ProjectDetail() {
   const [isVerifyingFolder, setIsVerifyingFolder] = useState(false);
   const [isResettingFolder, setIsResettingFolder] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState('basic');
 
   // Cancellation check hook
   const cancellationCheck = useCancellationCheck(id);
@@ -572,39 +570,8 @@ export default function ProjectDetail() {
         </BreadcrumbList>
       </Breadcrumb>
 
-      {/* 專案指揮中心 - 五大模組狀態總覽 */}
-      <ProjectCommandCenter
-        projectId={id!}
-        project={{
-          status: project.status,
-          construction_status: (project as any).construction_status,
-          admin_progress: (project as any).admin_progress,
-          engineering_progress: (project as any).engineering_progress,
-          overall_progress: (project as any).overall_progress,
-        }}
-        onModuleClick={(module) => {
-          switch (module) {
-            case 'progress':
-              setActiveTab('admin-progress');
-              break;
-            case 'risk':
-              setActiveTab('admin-progress');
-              break;
-            case 'finance':
-              setActiveTab('financial');
-              break;
-            case 'documents':
-              setActiveTab('documents');
-              break;
-            case 'disputes':
-              setActiveTab('admin-progress');
-              break;
-          }
-        }}
-      />
-
       {/* Tabs - 重組為：基本資料、技術/設備資料、行政流程/進度、金流/投資資訊、關聯文件 */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs defaultValue="basic" className="w-full">
         <TabsList className="flex flex-wrap h-auto gap-1">
           <TabsTrigger value="basic">基本資料</TabsTrigger>
           <TabsTrigger value="technical">技術 / 設備資料</TabsTrigger>
