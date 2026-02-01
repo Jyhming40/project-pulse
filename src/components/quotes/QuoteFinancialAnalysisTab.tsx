@@ -30,6 +30,9 @@ import {
   ToggleLeft,
   RefreshCw,
   Database,
+  Leaf,
+  PlugZap,
+  TrendingDown,
 } from "lucide-react";
 import { QuoteParams, formatCurrency, formatPercentage } from "@/lib/quoteCalculations";
 import { Plot } from "@/lib/plotly";
@@ -42,6 +45,16 @@ type RevenueMode = 'self_consumption' | 'feed_in_tariff';
 
 // 投資模式類型
 type InvestmentMode = 'self_owned' | 'rental_investment';
+
+// 併網類型
+type GridConnectionType = 'internal' | 'external';
+
+// T-REC 憑證價格情境
+const TREC_SCENARIOS = {
+  conservative: { label: '保守', pricePerKwh: 3.0, color: 'text-muted-foreground' },
+  baseline: { label: '基準（模型採用）', pricePerKwh: 3.5, color: 'text-primary' },
+  optimistic: { label: '樂觀（近年高點）', pricePerKwh: 4.6, color: 'text-green-600' },
+} as const;
 
 interface QuoteFinancialAnalysisTabProps {
   formData: QuoteParams;
@@ -268,6 +281,15 @@ export default function QuoteFinancialAnalysisTab({
   const [revenueMode, setRevenueMode] = useState<RevenueMode>('self_consumption');
   const labels = getRevenueLabels(revenueMode);
   
+  // 併網類型（併內線 / 併外線）
+  const [gridConnectionType, setGridConnectionType] = useState<GridConnectionType>('internal');
+  
+  // T-REC 基準價格（可調整）
+  const [trecBaselinePrice, setTrecBaselinePrice] = useState(3.5);
+  
+  // 電價敏感度分析
+  const [electricityGrowthRate, setElectricityGrowthRate] = useState(1.5); // 年成長率 %
+  
   // 躉購費率查詢
   const { lookupRate, currentYear, currentPeriod, isLoading: isLoadingRates } = useFitRates();
   const [fitRateSource, setFitRateSource] = useState<'system' | 'manual'>('system');
@@ -349,6 +371,85 @@ export default function QuoteFinancialAnalysisTab({
       rentalRateOfGeneration: roofRentalRate,
     };
   }, [investmentResult, roofRentalRate]);
+  
+  // T-REC 綠能憑證收益估算
+  const trecEstimation = useMemo(() => {
+    const { summary } = investmentResult;
+    const totalGeneration = summary.totalGeneration;
+    const certificateCount = Math.floor(totalGeneration / 1000); // 每 1000 度 = 1 張
+    
+    const scenarios = {
+      conservative: {
+        ...TREC_SCENARIOS.conservative,
+        pricePerCert: TREC_SCENARIOS.conservative.pricePerKwh * 1000,
+        totalRevenue: certificateCount * TREC_SCENARIOS.conservative.pricePerKwh * 1000,
+      },
+      baseline: {
+        ...TREC_SCENARIOS.baseline,
+        pricePerKwh: trecBaselinePrice,
+        pricePerCert: trecBaselinePrice * 1000,
+        totalRevenue: certificateCount * trecBaselinePrice * 1000,
+      },
+      optimistic: {
+        ...TREC_SCENARIOS.optimistic,
+        pricePerCert: TREC_SCENARIOS.optimistic.pricePerKwh * 1000,
+        totalRevenue: certificateCount * TREC_SCENARIOS.optimistic.pricePerKwh * 1000,
+      },
+    };
+    
+    return {
+      totalGeneration,
+      certificateCount,
+      scenarios,
+    };
+  }, [investmentResult, trecBaselinePrice]);
+  
+  // 電價敏感度分析 - 考慮電價成長後的 IRR
+  const sensitivityAnalysis = useMemo(() => {
+    const growthScenarios = [0, 1, 1.5, 2, 3]; // 不同成長率情境
+    
+    return growthScenarios.map(growthRate => {
+      // 重新計算考慮電價成長的投資結果
+      const cashFlows: number[] = [-totalInvestment];
+      let totalSavings = 0;
+      
+      for (let year = 1; year <= 20; year++) {
+        // 發電量（考慮衰減）
+        const degradationFactor = Math.pow(1 - (formData.annualDegradationRate || 0.01), year - 1);
+        const generation = (formData.capacityKwp || 0) * sunshineHours * sunshineDays * degradationFactor;
+        
+        // 電價成長
+        const adjustedRate = electricityRate * Math.pow(1 + growthRate / 100, year - 1);
+        const savings = generation * adjustedRate;
+        
+        // 維運費用
+        let maintenanceRate = 0;
+        if (year > 5 && year <= 10) maintenanceRate = 6;
+        else if (year > 10 && year <= 15) maintenanceRate = 7;
+        else if (year > 15) maintenanceRate = 8;
+        const maintenanceCost = savings * (maintenanceRate / 100);
+        
+        // 保險費
+        const insurance = totalInvestment * (insuranceRate / 100);
+        
+        // 租金成本
+        const rentCost = investmentMode === 'rental_investment' ? savings * (landRentalRate / 100) : 0;
+        
+        const cashFlow = savings - maintenanceCost - insurance - rentCost;
+        cashFlows.push(cashFlow);
+        totalSavings += savings;
+      }
+      
+      const irr = calculateIRR(cashFlows) * 100;
+      
+      return {
+        growthRate,
+        irr,
+        totalSavings,
+        label: growthRate === 0 ? '固定電價' : `年漲 ${growthRate}%`,
+      };
+    });
+  }, [formData, totalInvestment, sunshineHours, sunshineDays, electricityRate, insuranceRate, investmentMode, landRentalRate]);
 
   if (!formData.capacityKwp || !formData.pricePerKwp) {
     return (
@@ -403,6 +504,46 @@ export default function QuoteFinancialAnalysisTab({
                 >
                   <DollarSign className="h-4 w-4 mr-2" />
                   躉售電力
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+            
+            <Separator />
+            
+            {/* 併網類型 */}
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <PlugZap className="h-5 w-5 text-primary" />
+                <div>
+                  <h3 className="font-semibold">併網類型</h3>
+                  <p className="text-sm text-muted-foreground">
+                    {gridConnectionType === 'internal' 
+                      ? '併內線：自發自用，可取得 T-REC 綠能憑證' 
+                      : '併外線：電力全數售予台電，無法取得 T-REC'}
+                  </p>
+                </div>
+              </div>
+              <ToggleGroup 
+                type="single" 
+                value={gridConnectionType} 
+                onValueChange={(v) => v && setGridConnectionType(v as GridConnectionType)}
+                className="justify-start"
+              >
+                <ToggleGroupItem 
+                  value="internal" 
+                  aria-label="併內線"
+                  className="data-[state=on]:bg-green-600 data-[state=on]:text-white px-4"
+                >
+                  <Leaf className="h-4 w-4 mr-2" />
+                  併內線
+                </ToggleGroupItem>
+                <ToggleGroupItem 
+                  value="external" 
+                  aria-label="併外線"
+                  className="data-[state=on]:bg-blue-600 data-[state=on]:text-white px-4"
+                >
+                  <PlugZap className="h-4 w-4 mr-2" />
+                  併外線
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
@@ -1109,6 +1250,170 @@ export default function QuoteFinancialAnalysisTab({
                   可獲得穩定租金收入但報酬較低
                 </p>
               </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* T-REC 綠能憑證估算 - 僅「自用節電」+「併內線」模式顯示 */}
+      {revenueMode === 'self_consumption' && gridConnectionType === 'internal' && (
+        <Card className="border-green-300/50 bg-gradient-to-br from-green-50/50 to-emerald-50/30 dark:from-green-950/20 dark:to-emerald-950/10">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Leaf className="h-4 w-4 text-green-600" />
+              潛在效益 - 綠能憑證 (T-REC)
+              <Badge variant="outline" className="ml-2 text-green-600 border-green-300">
+                額外收益
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* 說明文字 */}
+            <div className="text-sm text-muted-foreground">
+              <p>
+                本案裝置容量 <strong className="text-foreground">{(formData.capacityKwp || 0).toLocaleString()} kWp</strong>，
+                預估 20 年間可累積約 <strong className="text-green-600">{trecEstimation.certificateCount.toLocaleString()} 張 T-REC</strong>
+                （每 1,000 度核發 1 張）。憑證可用於：
+              </p>
+              <ul className="list-disc list-inside mt-2 space-y-1 text-xs">
+                <li>企業溫室氣體盤查 (GHG) 與 ESG 報告</li>
+                <li>RE100、SBTi 再生能源承諾</li>
+                <li>環保標章或政府綠色採購加分</li>
+              </ul>
+            </div>
+            
+            {/* 情境試算表 */}
+            <div className="rounded-lg border overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-green-100/50 dark:bg-green-900/20">
+                    <TableHead className="text-xs">情境</TableHead>
+                    <TableHead className="text-xs text-center">預估產生憑證<br/>每1000度一張</TableHead>
+                    <TableHead className="text-xs text-right">假設單價<br/>(NT$/kWh)</TableHead>
+                    <TableHead className="text-xs text-right">單張憑證單價<br/>(NT$)</TableHead>
+                    <TableHead className="text-xs text-right">預估 20 年總收益</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow>
+                    <TableCell className="text-xs text-muted-foreground">{TREC_SCENARIOS.conservative.label}</TableCell>
+                    <TableCell className="text-center font-mono text-xs" rowSpan={3}>
+                      {trecEstimation.certificateCount.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">${TREC_SCENARIOS.conservative.pricePerKwh.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">${trecEstimation.scenarios.conservative.pricePerCert.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{formatCurrency(trecEstimation.scenarios.conservative.totalRevenue, 0)}</TableCell>
+                  </TableRow>
+                  <TableRow className="bg-green-50/50 dark:bg-green-900/10">
+                    <TableCell className="text-xs font-medium text-green-700 dark:text-green-400">
+                      {TREC_SCENARIOS.baseline.label}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      <div className="flex items-center justify-end gap-1">
+                        <span>$</span>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          min="1"
+                          max="10"
+                          value={trecBaselinePrice}
+                          onChange={(e) => setTrecBaselinePrice(parseFloat(e.target.value) || 3.5)}
+                          className="h-6 w-16 text-right font-mono text-xs p-1"
+                        />
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs font-semibold text-green-700 dark:text-green-400">
+                      ${trecEstimation.scenarios.baseline.pricePerCert.toLocaleString()}
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs font-bold text-green-700 dark:text-green-400">
+                      {formatCurrency(trecEstimation.scenarios.baseline.totalRevenue, 0)}
+                    </TableCell>
+                  </TableRow>
+                  <TableRow>
+                    <TableCell className="text-xs text-muted-foreground">{TREC_SCENARIOS.optimistic.label}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">${TREC_SCENARIOS.optimistic.pricePerKwh.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">${trecEstimation.scenarios.optimistic.pricePerCert.toLocaleString()}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{formatCurrency(trecEstimation.scenarios.optimistic.totalRevenue, 0)}</TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
+            </div>
+            
+            {/* 注意事項 */}
+            <div className="text-[10px] text-muted-foreground space-y-1 p-2 bg-muted/30 rounded">
+              <p>• 目前市場 T-REC 成交價多落在 2.2~5.0 元/kWh；本案財務模型以 {trecBaselinePrice.toFixed(1)} 元/kWh 為基準。</p>
+              <p>• <strong className="text-foreground">躉售 (FIT) 與 T-REC 擇一</strong>：參與綠電交易後，即無法將電力以 FIT 價格全額售回台電。</p>
+              <p>• 實際單價將視政策與市場需求波動調整。</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 電價敏感度分析 - 僅自用節電模式顯示 */}
+      {revenueMode === 'self_consumption' && (
+        <Card className="border-blue-200/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-blue-600" />
+              電價敏感度分析
+              <Badge variant="outline" className="ml-2 text-blue-600 border-blue-300">
+                風險評估
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              <p>
+                若未來台電電價上漲，自發自用的節省效益將更為顯著。
+                以下模擬不同電價年成長率對投資報酬率 (IRR) 的影響：
+              </p>
+            </div>
+            
+            {/* 敏感度分析表格 */}
+            <div className="grid grid-cols-5 gap-2">
+              {sensitivityAnalysis.map((scenario) => (
+                <div 
+                  key={scenario.growthRate}
+                  className={`p-3 rounded-lg text-center border ${
+                    scenario.growthRate === electricityGrowthRate 
+                      ? 'bg-blue-100 dark:bg-blue-900/30 border-blue-300' 
+                      : 'bg-muted/30'
+                  }`}
+                >
+                  <p className="text-xs text-muted-foreground mb-1">{scenario.label}</p>
+                  <p className={`text-lg font-bold ${
+                    scenario.irr >= summary.irr 
+                      ? 'text-green-600' 
+                      : 'text-foreground'
+                  }`}>
+                    {scenario.irr.toFixed(2)}%
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">IRR</p>
+                </div>
+              ))}
+            </div>
+            
+            {/* 電價成長率調整 */}
+            <div className="flex items-center gap-4 p-3 bg-blue-50/50 dark:bg-blue-950/20 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="electricityGrowthRate" className="text-sm whitespace-nowrap">
+                  模擬電價年成長率
+                </Label>
+                <Input
+                  id="electricityGrowthRate"
+                  type="number"
+                  step="0.5"
+                  min="0"
+                  max="10"
+                  value={electricityGrowthRate}
+                  onChange={(e) => setElectricityGrowthRate(parseFloat(e.target.value) || 0)}
+                  className="h-8 w-20 text-right font-semibold"
+                />
+                <span className="text-sm text-muted-foreground">%</span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                根據歷史數據，台電電價近年平均調漲約 1%~3% / 年
+              </p>
             </div>
           </CardContent>
         </Card>
