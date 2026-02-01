@@ -965,23 +965,26 @@ export default function QuoteFinancialAnalysisTab({
         <CardContent>
           <div className="grid md:grid-cols-2 gap-6">
             {/* 投資資訊 */}
-            <div className="space-y-3">
-              <h4 className="font-medium text-sm text-muted-foreground">投資資訊</h4>
-              <div className="space-y-2">
+            <div className="space-y-3 p-4 bg-muted/30 rounded-lg border">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <div className="w-1 h-4 bg-primary rounded-full" />
+                投資資訊
+              </h4>
+              <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>裝置金額 (每 kWp 未稅)</span>
+                  <span className="text-muted-foreground">裝置金額 (每 kWp 未稅)</span>
                   <span className="font-mono">{formatCurrency(formData.pricePerKwp || 0, 0)}/kWp</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>裝置總金額 (未稅)</span>
+                  <span className="text-muted-foreground">裝置總金額 (未稅)</span>
                   <span className="font-mono font-semibold">{formatCurrency(summary.totalInvestment, 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>20年維運預估</span>
+                  <span className="text-muted-foreground">20年維運預估</span>
                   <span className="font-mono">{formatCurrency(summary.totalMaintenance, 0)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>保險費用預估</span>
+                  <span className="text-muted-foreground">保險費用預估</span>
                   <span className="font-mono">{formatCurrency(summary.totalInsurance, 0)}</span>
                 </div>
                 {/* 租賃成本 - 僅租賃模式顯示 */}
@@ -992,39 +995,42 @@ export default function QuoteFinancialAnalysisTab({
                   </div>
                 )}
                 <Separator />
-                <div className="flex justify-between font-medium">
+                <div className="flex justify-between font-medium pt-1">
                   <span>投資成本總計</span>
-                  <span className="font-mono">{formatCurrency(summary.totalCost, 0)}</span>
+                  <span className="font-mono text-base">{formatCurrency(summary.totalCost, 0)}</span>
                 </div>
               </div>
             </div>
             
             {/* 收益資訊 */}
-            <div className="space-y-3">
-              <h4 className="font-medium text-sm text-muted-foreground">收益資訊</h4>
-              <div className="space-y-2">
+            <div className="space-y-3 p-4 bg-green-50/50 dark:bg-green-950/20 rounded-lg border border-green-200/50 dark:border-green-800/30">
+              <h4 className="font-semibold text-sm flex items-center gap-2">
+                <div className="w-1 h-4 bg-green-500 rounded-full" />
+                收益資訊
+              </h4>
+              <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>{labels.netProfitLabel} ({labels.totalRevenue}-總持有成本)</span>
+                  <span className="text-muted-foreground">{labels.netProfitLabel}</span>
                   <span className={`font-mono font-semibold ${summary.netProfit >= 0 ? 'text-green-600' : 'text-destructive'}`}>
                     {formatCurrency(summary.netProfit, 0)}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span>20年總投資報酬率 (淨效益÷總持有成本)</span>
+                  <span className="text-muted-foreground">20年總投資報酬率</span>
                   <span className="font-mono">{summary.totalRoi.toFixed(2)}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>平均報酬率 (總投資報酬率÷20年)</span>
+                  <span className="text-muted-foreground">平均報酬率 (年)</span>
                   <span className="font-mono">{summary.annualRoi.toFixed(2)}%</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>年化內部報酬率 (IRR)</span>
-                  <span className="font-mono font-semibold text-primary">{summary.irr.toFixed(2)}%</span>
+                  <span className="text-muted-foreground">年化內部報酬率 (IRR)</span>
+                  <span className="font-mono font-semibold text-green-600">{summary.irr.toFixed(2)}%</span>
                 </div>
                 <Separator />
-                <div className="flex justify-between font-medium">
+                <div className="flex justify-between font-medium pt-1">
                   <span>回收期初</span>
-                  <span className="font-mono">約第 {summary.paybackYear} 年</span>
+                  <span className="font-mono text-base">約第 {summary.paybackYear} 年</span>
                 </div>
               </div>
             </div>
