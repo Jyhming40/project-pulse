@@ -995,7 +995,7 @@ export default function QuoteFinancialAnalysisTab({
                     {financingResult.summary.irr.toFixed(2)}%
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    以自備款 {formatCurrency(financingResult.summary.downPayment, 0)} 計算
+                    以自備款 {formatTWD(financingResult.summary.downPayment)} 計算
                   </p>
                 </CardContent>
               </Card>
@@ -1011,7 +1011,7 @@ export default function QuoteFinancialAnalysisTab({
                     {summary.irr.toFixed(2)}%
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    全額投入 {formatCurrency(totalInvestment, 0)}
+                    全額投入 {formatTWD(totalInvestment)}
                   </p>
                 </CardContent>
               </Card>
@@ -1040,7 +1040,7 @@ export default function QuoteFinancialAnalysisTab({
                     <span className="text-xs text-muted-foreground">自備款</span>
                   </div>
                   <p className="text-xl font-bold">
-                    {formatCurrency(financingResult.summary.downPayment, 0)}
+                    {formatTWD(financingResult.summary.downPayment)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     佔總投資 {100 - loanPercentage}%
@@ -1056,7 +1056,7 @@ export default function QuoteFinancialAnalysisTab({
                     <span className="text-xs text-muted-foreground">每月還款</span>
                   </div>
                   <p className="text-xl font-bold">
-                    {formatCurrency(financingResult.summary.monthlyPayment, 0)}
+                    {formatTWD(financingResult.summary.monthlyPayment)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     共 {loanTermYears * 12} 期
@@ -1072,7 +1072,7 @@ export default function QuoteFinancialAnalysisTab({
                     <span className="text-xs text-muted-foreground">利息總額</span>
                   </div>
                   <p className="text-xl font-bold text-amber-600">
-                    {formatCurrency(financingResult.summary.totalInterest, 0)}
+                    {formatTWD(financingResult.summary.totalInterest)}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
                     {loanTermYears} 年期間
@@ -1270,13 +1270,13 @@ export default function QuoteFinancialAnalysisTab({
             {/* 每 kWp 單價 - 只讀 */}
             <div>
               <Label className="text-muted-foreground text-xs">每 kWp 單價 (未稅)</Label>
-              <p className="font-semibold mt-1">{formatCurrency(formData.pricePerKwp || 0, 0)}</p>
+              <p className="font-semibold mt-1">{formatTWD(formData.pricePerKwp || 0)}</p>
             </div>
             
             {/* 總裝置金額 - 只讀 */}
             <div>
               <Label className="text-muted-foreground text-xs">總裝置金額 (未稅)</Label>
-              <p className="font-semibold text-lg mt-1">{formatCurrency(totalInvestment, 0)}</p>
+              <p className="font-semibold text-lg mt-1">{formatTWD(totalInvestment)}</p>
             </div>
           </div>
           
@@ -1451,7 +1451,7 @@ export default function QuoteFinancialAnalysisTab({
               <span className="text-sm text-muted-foreground">{labels.netProfitLabel}</span>
             </div>
             <p className={`text-2xl font-bold ${summary.netProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
-              {formatCurrency(summary.netProfit, 0)}
+              {formatTWD(summary.netProfit)}
             </p>
           </CardContent>
         </Card>
@@ -1482,7 +1482,7 @@ export default function QuoteFinancialAnalysisTab({
               <DollarSign className="w-4 h-4 text-muted-foreground" />
               <span className="text-sm text-muted-foreground">投資成本總計</span>
             </div>
-            <p className="text-xl font-bold">{formatCurrency(summary.totalCost, 0)}</p>
+            <p className="text-xl font-bold">{formatTWD(summary.totalCost)}</p>
           </CardContent>
         </Card>
       </div>
@@ -1507,19 +1507,19 @@ export default function QuoteFinancialAnalysisTab({
               </div>
               <div className="flex justify-between py-2 border-b">
                 <span className="text-muted-foreground">B. 裝置金額 (未稅)</span>
-                <span className="font-mono">{formatCurrency(summary.totalInvestment, 0)}</span>
+                <span className="font-mono">{formatTWD(summary.totalInvestment)}</span>
               </div>
               <div className="flex justify-between py-2 border-b">
                 <span className="text-muted-foreground">C. 20年維運預估</span>
-                <span className="font-mono">{formatCurrency(summary.totalMaintenance, 0)}</span>
+                <span className="font-mono">{formatTWD(summary.totalMaintenance)}</span>
               </div>
               <div className="flex justify-between py-2 border-b">
                 <span className="text-muted-foreground">D. 20年保險費用預估 (總工程費 × {((formData.insuranceRate || 0.0055) * 100).toFixed(2)}%)</span>
-                <span className="font-mono">{formatCurrency(summary.totalInsurance, 0)}</span>
+                <span className="font-mono">{formatTWD(summary.totalInsurance)}</span>
               </div>
               <div className="flex justify-between py-2 bg-muted/50 px-2 rounded">
                 <span className="font-medium">E. 投資成本總計 (B+C+D)</span>
-                <span className="font-mono font-bold">{formatCurrency(summary.totalCost, 0)}</span>
+                <span className="font-mono font-bold">{formatTWD(summary.totalCost)}</span>
               </div>
             </div>
             
@@ -1581,31 +1581,31 @@ export default function QuoteFinancialAnalysisTab({
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">裝置金額 (每 kWp 未稅)</span>
-                  <span className="font-mono">{formatCurrency(formData.pricePerKwp || 0, 0)}/kWp</span>
+                  <span className="font-mono">{formatTWD(formData.pricePerKwp || 0)}/kWp</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">裝置總金額 (未稅)</span>
-                  <span className="font-mono font-semibold">{formatCurrency(summary.totalInvestment, 0)}</span>
+                  <span className="font-mono font-semibold">{formatTWD(summary.totalInvestment)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">20年維運預估</span>
-                  <span className="font-mono">{formatCurrency(summary.totalMaintenance, 0)}</span>
+                  <span className="font-mono">{formatTWD(summary.totalMaintenance)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">保險費用預估</span>
-                  <span className="font-mono">{formatCurrency(summary.totalInsurance, 0)}</span>
+                  <span className="font-mono">{formatTWD(summary.totalInsurance)}</span>
                 </div>
                 {/* 租賃成本 - 僅租賃模式顯示 */}
                 {investmentMode === 'rental_investment' && (
                   <div className="flex justify-between text-amber-600">
                     <span>20年租賃成本 (發電收益 × {landRentalRate}%)</span>
-                    <span className="font-mono">{formatCurrency(summary.totalRent, 0)}</span>
+                    <span className="font-mono">{formatTWD(summary.totalRent)}</span>
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between font-medium pt-1">
                   <span>投資成本總計</span>
-                  <span className="font-mono text-base">{formatCurrency(summary.totalCost, 0)}</span>
+                  <span className="font-mono text-base">{formatTWD(summary.totalCost)}</span>
                 </div>
               </div>
             </div>
@@ -1620,7 +1620,7 @@ export default function QuoteFinancialAnalysisTab({
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{labels.netProfitLabel}</span>
                   <span className={`font-mono font-semibold ${summary.netProfit >= 0 ? 'text-green-600' : 'text-destructive'}`}>
-                    {formatCurrency(summary.netProfit, 0)}
+                    {formatTWD(summary.netProfit)}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -1696,15 +1696,15 @@ export default function QuoteFinancialAnalysisTab({
               <div className="space-y-3">
                 <div className="flex justify-between py-2 border-b">
                   <span className="text-muted-foreground">20年租金預估</span>
-                  <span className="font-mono font-semibold">{formatCurrency(roofRentalResult.totalRent20Year, 0)}</span>
+                  <span className="font-mono font-semibold">{formatTWD(roofRentalResult.totalRent20Year)}</span>
                 </div>
                 <div className="flex justify-between py-2 border-b">
                   <span className="text-muted-foreground">每年租金預估</span>
-                  <span className="font-mono">{formatCurrency(roofRentalResult.yearlyRent, 0)}</span>
+                  <span className="font-mono">{formatTWD(roofRentalResult.yearlyRent)}</span>
                 </div>
                 <div className="flex justify-between py-2">
                   <span className="text-muted-foreground">每月租金預估</span>
-                  <span className="font-mono">{formatCurrency(roofRentalResult.monthlyRent, 0)}</span>
+                  <span className="font-mono">{formatTWD(roofRentalResult.monthlyRent)}</span>
                 </div>
               </div>
               
@@ -1769,7 +1769,7 @@ export default function QuoteFinancialAnalysisTab({
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs">${TREC_SCENARIOS.conservative.pricePerKwh.toFixed(2)}</TableCell>
                     <TableCell className="text-right font-mono text-xs">${trecEstimation.scenarios.conservative.pricePerCert.toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-mono text-xs">{formatCurrency(trecEstimation.scenarios.conservative.totalRevenue, 0)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{formatTWD(trecEstimation.scenarios.conservative.totalRevenue)}</TableCell>
                   </TableRow>
                   <TableRow className="bg-green-50/50 dark:bg-green-900/10">
                     <TableCell className="text-xs font-medium text-green-700 dark:text-green-400">
@@ -1793,14 +1793,14 @@ export default function QuoteFinancialAnalysisTab({
                       ${trecEstimation.scenarios.baseline.pricePerCert.toLocaleString()}
                     </TableCell>
                     <TableCell className="text-right font-mono text-xs font-bold text-green-700 dark:text-green-400">
-                      {formatCurrency(trecEstimation.scenarios.baseline.totalRevenue, 0)}
+                      {formatTWD(trecEstimation.scenarios.baseline.totalRevenue)}
                     </TableCell>
                   </TableRow>
                   <TableRow>
                     <TableCell className="text-xs text-muted-foreground">{TREC_SCENARIOS.optimistic.label}</TableCell>
                     <TableCell className="text-right font-mono text-xs">${TREC_SCENARIOS.optimistic.pricePerKwh.toFixed(2)}</TableCell>
                     <TableCell className="text-right font-mono text-xs">${trecEstimation.scenarios.optimistic.pricePerCert.toLocaleString()}</TableCell>
-                    <TableCell className="text-right font-mono text-xs">{formatCurrency(trecEstimation.scenarios.optimistic.totalRevenue, 0)}</TableCell>
+                    <TableCell className="text-right font-mono text-xs">{formatTWD(trecEstimation.scenarios.optimistic.totalRevenue)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
@@ -1991,7 +1991,7 @@ export default function QuoteFinancialAnalysisTab({
                       <TableCell colSpan={3}></TableCell>
                       {financingMode === 'loan_financed' && <TableCell></TableCell>}
                       <TableCell className="text-right text-destructive font-mono">
-                        -{formatCurrency(financingMode === 'loan_financed' ? ((summary as any).downPayment || summary.totalInvestment) : summary.totalInvestment, 0)}
+                        -{formatTWD(financingMode === 'loan_financed' ? ((summary as any).downPayment || summary.totalInvestment) : summary.totalInvestment)}
                       </TableCell>
                     </TableRow>
                     
@@ -2002,27 +2002,27 @@ export default function QuoteFinancialAnalysisTab({
                           {year.generationKwh.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                         </TableCell>
                         <TableCell className="text-right text-sm font-mono">
-                          {formatCurrency(year.electricitySaving, 0)}
+                          {formatTWD(year.electricitySaving)}
                         </TableCell>
                         <TableCell className="text-right text-sm font-mono text-muted-foreground">
-                          {formatCurrency(year.cumulativeSaving, 0)}
+                          {formatTWD(year.cumulativeSaving)}
                         </TableCell>
                         <TableCell className="text-center text-sm">
                           {year.maintenanceRate > 0 ? `${year.maintenanceRate}%` : '-'}
                         </TableCell>
                         <TableCell className="text-right text-sm font-mono">
-                          {year.maintenanceCost > 0 ? formatCurrency(year.maintenanceCost, 0) : '-'}
+                          {year.maintenanceCost > 0 ? formatTWD(year.maintenanceCost) : '-'}
                         </TableCell>
                         <TableCell className="text-right text-sm font-mono">
-                          {formatCurrency(year.insuranceCost, 0)}
+                          {formatTWD(year.insuranceCost)}
                         </TableCell>
                         {financingMode === 'loan_financed' && (
                           <TableCell className="text-right text-sm font-mono text-orange-600">
-                            {((year as any).loanPayment && (year as any).loanPayment > 0) ? formatCurrency((year as any).loanPayment, 0) : '-'}
+                            {((year as any).loanPayment && (year as any).loanPayment > 0) ? formatTWD((year as any).loanPayment) : '-'}
                           </TableCell>
                         )}
                         <TableCell className={`text-right text-sm font-mono font-medium ${year.cumulativeCashFlow >= 0 ? "text-green-600" : "text-destructive"}`}>
-                          {formatCurrency(year.cashFlow, 0)}
+                          {formatTWD(year.cashFlow)}
                         </TableCell>
                       </TableRow>
                     ))}
@@ -2034,26 +2034,26 @@ export default function QuoteFinancialAnalysisTab({
                         {summary.totalGeneration.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(summary.totalSaving, 0)}
+                        {formatTWD(summary.totalSaving)}
                       </TableCell>
                       <TableCell></TableCell>
                       <TableCell></TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(summary.totalMaintenance, 0)}
+                        {formatTWD(summary.totalMaintenance)}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {formatCurrency(summary.totalInsurance, 0)}
+                        {formatTWD(summary.totalInsurance)}
                       </TableCell>
                       {financingMode === 'loan_financed' && (
                         <TableCell className="text-right font-mono text-orange-600">
-                          {formatCurrency(((summary as any).loanAmount || 0) + ((summary as any).totalInterest || 0), 0)}
+                          {formatTWD(((summary as any).loanAmount || 0) + ((summary as any).totalInterest || 0))}
                           <div className="text-[10px] text-muted-foreground font-normal">
                             (本金 + 利息)
                           </div>
                         </TableCell>
                       )}
                       <TableCell className={`text-right font-mono ${summary.netProfit >= 0 ? "text-green-600" : "text-destructive"}`}>
-                        {formatCurrency(summary.netProfit, 0)}
+                        {formatTWD(summary.netProfit)}
                       </TableCell>
                     </TableRow>
                   </TableBody>
