@@ -33,12 +33,14 @@ import {
   Leaf,
   PlugZap,
   TrendingDown,
+  FileDown,
 } from "lucide-react";
 import { QuoteParams, formatCurrency, formatPercentage } from "@/lib/quoteCalculations";
 import { Plot } from "@/lib/plotly";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useFitRates, SPECIAL_CONDITION_LABELS, type SpecialCondition } from "@/hooks/useFitRates";
+import InvestmentReportExport from "./InvestmentReportExport";
 
 // 收益模式類型
 type RevenueMode = 'self_consumption' | 'feed_in_tariff';
@@ -62,6 +64,8 @@ interface QuoteFinancialAnalysisTabProps {
     projections: any[];
     summary: any;
   } | null;
+  projectName?: string;
+  projectLocation?: string;
 }
 
 // 根據收益模式取得對應用語
@@ -269,6 +273,8 @@ function calculateIRR(cashFlows: number[], guess: number = 0.1): number {
 export default function QuoteFinancialAnalysisTab({
   formData,
   projections,
+  projectName = '',
+  projectLocation = '',
 }: QuoteFinancialAnalysisTabProps) {
   const [showTable, setShowTable] = useState(true);
   const [roofRentalRate, setRoofRentalRate] = useState(12); // 預設 12%
@@ -470,6 +476,28 @@ export default function QuoteFinancialAnalysisTab({
 
   return (
     <div className="space-y-6">
+      {/* 匯出報告按鈕 */}
+      <div className="flex justify-end">
+        <InvestmentReportExport
+          projectName={projectName || '太陽能發電系統'}
+          projectLocation={projectLocation}
+          capacityKwp={formData.capacityKwp || 0}
+          pricePerKwp={formData.pricePerKwp || 0}
+          totalInvestment={totalInvestment}
+          revenueMode={revenueMode}
+          gridConnectionType={gridConnectionType}
+          investmentMode={investmentMode}
+          tariffRate={effectiveRate}
+          sunshineHours={sunshineHours}
+          sunshineDays={sunshineDays}
+          insuranceRate={insuranceRate}
+          projections={data}
+          summary={summary}
+          trecEstimation={gridConnectionType === 'internal' ? trecEstimation : undefined}
+          sensitivityAnalysis={sensitivityAnalysis}
+        />
+      </div>
+      
       {/* 收益模式與投資模式切換 */}
       <Card className="border-2 border-primary/20">
         <CardContent className="pt-4 pb-4">
