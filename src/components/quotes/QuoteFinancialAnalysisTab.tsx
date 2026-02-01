@@ -879,7 +879,8 @@ export default function QuoteFinancialAnalysisTab({
         </Card>
       </div>
 
-      {/* 太陽光電每度電成本計算 - 重點區塊 */}
+      {/* 太陽光電每度電成本計算 - 重點區塊 (僅自用節電模式顯示) */}
+      {revenueMode === 'self_consumption' && (
       <Card className="border-2 border-primary/30 bg-gradient-to-br from-primary/5 to-yellow-500/5">
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
@@ -923,7 +924,7 @@ export default function QuoteFinancialAnalysisTab({
               <Separator className="w-full my-4" />
               <div className="text-center">
                 <p className="text-sm text-muted-foreground mb-1">
-                  相較{revenueMode === 'feed_in_tariff' ? '躉購費率' : '台電電價'} (${summary.gridRate.toFixed(3)}/度)
+                  相較台電電價 (${summary.gridRate.toFixed(3)}/度)
                 </p>
                 <div className="flex items-center justify-center gap-2">
                   <p className="text-4xl font-bold text-green-600">{summary.savingsVsGrid.toFixed(1)}%</p>
@@ -933,21 +934,20 @@ export default function QuoteFinancialAnalysisTab({
                         <Info className="h-4 w-4 text-muted-foreground" />
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>自發電成本僅為{revenueMode === 'feed_in_tariff' ? '躉購費率' : '台電電價'}的 {summary.savingsVsGrid.toFixed(1)}%</p>
+                        <p>自發電成本僅為台電電價的 {summary.savingsVsGrid.toFixed(1)}%</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
                 </div>
                 <p className="text-sm text-muted-foreground mt-2">
-                  {revenueMode === 'feed_in_tariff' 
-                    ? `每度電成本僅 ${summary.savingsVsGrid.toFixed(1)}%，獲利空間大` 
-                    : `節省 ${(100 - summary.savingsVsGrid).toFixed(1)}% 電費成本`}
+                  節省 {(100 - summary.savingsVsGrid).toFixed(1)}% 電費成本
                 </p>
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
+      )}
 
       {/* 投資評估說明 - 根據模式動態顯示 */}
       <Card className={investmentMode === 'rental_investment' ? 'border-amber-300 bg-amber-50/30 dark:bg-amber-950/10' : ''}>
