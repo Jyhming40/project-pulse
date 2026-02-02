@@ -32,6 +32,67 @@ interface LinkageResult {
   changes?: Record<string, unknown>;
 }
 
+// Helper function to complete a milestone
+// deno-lint-ignore no-explicit-any
+async function completeMilestone(
+  supabase: any,
+  projectId: string,
+  milestoneCode: string,
+  userId: string,
+  linkages: LinkageResult[],
+  docTypeName: string
+): Promise<void> {
+  try {
+    const { data: existingMilestone } = await supabase
+      .from('project_milestones')
+      .select('id, is_completed')
+      .eq('project_id', projectId)
+      .eq('milestone_code', milestoneCode)
+      .maybeSingle();
+
+    if (existingMilestone && !existingMilestone.is_completed) {
+      await supabase
+        .from('project_milestones')
+        .update({
+          is_completed: true,
+          completed_at: new Date().toISOString(),
+          completed_by: userId,
+        })
+        .eq('id', existingMilestone.id);
+
+      linkages.push({
+        rule: `${docTypeName} → 里程碑完成`,
+        success: true,
+        message: `${docTypeName}里程碑已標記完成`,
+        changes: { milestone: milestoneCode, is_completed: true },
+      });
+    } else if (!existingMilestone) {
+      await supabase.from('project_milestones').insert({
+        project_id: projectId,
+        milestone_code: milestoneCode,
+        is_completed: true,
+        completed_at: new Date().toISOString(),
+        completed_by: userId,
+      });
+
+      linkages.push({
+        rule: `${docTypeName} → 里程碑建立`,
+        success: true,
+        message: `${docTypeName}里程碑已建立並標記完成`,
+      });
+    }
+
+    console.log(`[SyncDocStatus] Milestone ${milestoneCode} completed`);
+  } catch (err) {
+    const error = err as Error;
+    linkages.push({
+      rule: `${docTypeName} → 里程碑`,
+      success: false,
+      message: error.message,
+    });
+  }
+}
+
 serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -137,58 +198,8 @@ serve(async (req: Request) => {
     }
 
     // Rule 2: 躉購合約 → 完成相關里程碑
-    if (effectiveCode === 'TPC_CONTRACT' || docType === '躉購合約' || docType === '台電躉售合約') {
-      try {
-        // Mark TPC_CONTRACT milestone as completed
-        const { data: existingMilestone } = await supabase
-          .from('project_milestones')
-          .select('id, is_completed')
-          .eq('project_id', projectId)
-          .eq('milestone_code', 'TPC_CONTRACT')
-          .single();
-
-        if (existingMilestone && !existingMilestone.is_completed) {
-          await supabase
-            .from('project_milestones')
-            .update({
-              is_completed: true,
-              completed_at: new Date().toISOString(),
-              completed_by: user.id,
-            })
-            .eq('id', existingMilestone.id);
-
-          linkages.push({
-            rule: '躉購合約 → 里程碑完成',
-            success: true,
-            message: '躉購合約里程碑已標記完成',
-            changes: { milestone: 'TPC_CONTRACT', is_completed: true },
-          });
-        } else if (!existingMilestone) {
-          // Create new milestone record
-          await supabase.from('project_milestones').insert({
-            project_id: projectId,
-            milestone_code: 'TPC_CONTRACT',
-            is_completed: true,
-            completed_at: new Date().toISOString(),
-            completed_by: user.id,
-          });
-
-          linkages.push({
-            rule: '躉購合約 → 里程碑建立',
-            success: true,
-            message: '躉購合約里程碑已建立並標記完成',
-          });
-        }
-
-        console.log(`[SyncDocStatus] Rule 2 applied: TPC_CONTRACT milestone`);
-      } catch (err) {
-        const error = err as Error;
-        linkages.push({
-          rule: '躉購合約 → 里程碑',
-          success: false,
-          message: error.message,
-        });
-      }
+    if (effectiveCode === 'TPC_CONTRACT' || docType === '躉購合約' || docType === '台電躉售合約' || docType === '躉售合約') {
+      await completeMilestone(supabase, projectId, 'TPC_CONTRACT', user.id, linkages, '躉購合約');
     }
 
     // Rule 3: 正式躉售 → 案場狀態「運維中」
@@ -243,6 +254,31 @@ serve(async (req: Request) => {
           message: error.message,
         });
       }
+    }
+
+    // Rule 4: 設備登記 → 完成里程碑
+    if (effectiveCode === 'MOEA_REGISTER' || docType === '設備登記') {
+      await completeMilestone(supabase, projectId, 'MOEA_REGISTER', user.id, linkages, '設備登記');
+    }
+
+    // Rule 5: 免雜項竣工 → 完成里程碑
+    if (effectiveCode === 'BUILD_EXEMPT_COMP' || docType === '免雜項竣工') {
+      await completeMilestone(supabase, projectId, 'BUILD_EXEMPT_COMP', user.id, linkages, '免雜項竣工');
+    }
+
+    // Rule 6: 結構技師簽證 → 完成里程碑
+    if (effectiveCode === 'ENG_STRUCTURAL' || docType === '結構技師簽證' || docType === '結構簽證') {
+      await completeMilestone(supabase, projectId, 'ENG_STRUCTURAL', user.id, linkages, '結構技師簽證');
+    }
+
+    // Rule 7: 電機技師簽證 → 完成里程碑
+    if (effectiveCode === 'ENG_ELECTRICAL' || docType === '電機技師簽證' || docType === '電機簽證') {
+      await completeMilestone(supabase, projectId, 'ENG_ELECTRICAL', user.id, linkages, '電機技師簽證');
+    }
+
+    // Rule 8: 報竣掛表 → 完成里程碑
+    if (effectiveCode === 'TPC_METER' || docType === '報竣掛表' || docType === '台電報竣掛表') {
+      await completeMilestone(supabase, projectId, 'TPC_METER', user.id, linkages, '報竣掛表');
     }
 
     // Trigger progress recalculation if any linkage was applied
