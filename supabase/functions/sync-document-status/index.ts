@@ -192,7 +192,7 @@ serve(async (req: Request) => {
     }
 
     // Rule 3: 正式躉售 → 案場狀態「運維中」
-    if (effectiveCode === 'TPC_OFFICIAL_FIT' || docType === '正式躉售' || docType === '台電正式躉售') {
+    if (effectiveCode === 'TPC_FORMAL_FIT' || docType === '正式躉售' || docType === '台電正式躉售') {
       try {
         const { error } = await supabase
           .from('projects')
@@ -220,7 +220,7 @@ serve(async (req: Request) => {
           actor_user_id: user.id,
           new_data: {
             trigger: 'document_status_sync',
-            rule: 'TPC_OFFICIAL_FIT_issued',
+            rule: 'TPC_FORMAL_FIT_issued',
             document_id: documentId,
             status: '運維中',
             construction_status: '已完工',
