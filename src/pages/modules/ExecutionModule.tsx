@@ -10,13 +10,16 @@ import {
 } from 'lucide-react';
 import { 
   KPICard, 
+  KPICardSkeleton,
   QuickActionCard, 
   WorkspaceHeader, 
   ActionRequiredCard 
 } from '@/components/workspace';
+import { useExecutionKPIs } from '@/hooks/useModuleKPIs';
 
 export default function ExecutionModule() {
   const navigate = useNavigate();
+  const { data: kpis, isLoading } = useExecutionKPIs();
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -31,30 +34,44 @@ export default function ExecutionModule() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard 
-          title="進行中案件" 
-          value="—" 
-          icon={Clock}
-          color="blue"
-        />
-        <KPICard 
-          title="本月完成" 
-          value="—" 
-          icon={CheckCircle2}
-          color="emerald"
-        />
-        <KPICard 
-          title="逾期警示" 
-          value="—" 
-          icon={AlertTriangle}
-          color="amber"
-        />
-        <KPICard 
-          title="平均週期" 
-          value="— 天" 
-          icon={Scale}
-          color="teal"
-        />
+        {isLoading ? (
+          <>
+            <KPICardSkeleton />
+            <KPICardSkeleton />
+            <KPICardSkeleton />
+            <KPICardSkeleton />
+          </>
+        ) : (
+          <>
+            <KPICard 
+              title="進行中案件" 
+              value={kpis?.inProgress ?? 0} 
+              icon={Clock}
+              color="blue"
+              onClick={() => navigate('/projects?status=active')}
+            />
+            <KPICard 
+              title="本月完成" 
+              value={kpis?.completedThisMonth ?? 0} 
+              icon={CheckCircle2}
+              color="emerald"
+              trend={kpis?.completedThisMonth && kpis.completedThisMonth > 0 ? 'up' : 'neutral'}
+            />
+            <KPICard 
+              title="逾期警示" 
+              value={kpis?.overdueWarnings ?? 0} 
+              icon={AlertTriangle}
+              color={kpis?.overdueWarnings && kpis.overdueWarnings > 0 ? 'amber' : 'emerald'}
+              onClick={() => navigate('/projects?risk=true')}
+            />
+            <KPICard 
+              title="平均週期" 
+              value={kpis?.avgCycleDays ? `${kpis.avgCycleDays} 天` : '— 天'} 
+              icon={Scale}
+              color="teal"
+            />
+          </>
+        )}
       </div>
 
       {/* Quick Actions */}
