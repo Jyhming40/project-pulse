@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useSoftDelete } from '@/hooks/useSoftDelete';
 import { deleteDriveFile } from '@/hooks/useDriveSync';
 import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
+import { useDocumentStatusSync } from '@/hooks/useDocumentStatusSync';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
@@ -203,6 +204,9 @@ export function DocumentDetailDialog({
 
   // Sync admin milestones hook
   const syncMilestones = useSyncAdminMilestones();
+  
+  // Document status linkage hook
+  const { triggerSync: triggerStatusSync } = useDocumentStatusSync();
 
   // Update mutation
   const updateMutation = useMutation({
@@ -286,10 +290,17 @@ export function DocumentDetailDialog({
         }
       }
 
-      // Return project_id for milestone sync
-      return document?.project_id;
+      // Return info needed for milestone sync and status linkage
+      return {
+        projectId: document?.project_id,
+        documentId,
+        docTypeCode: data.doc_type || document?.doc_type_code,
+        docType: document?.doc_type,
+        issuedAt: data.issued_at,
+        previousIssuedAt: document?.issued_at,
+      };
     },
-    onSuccess: (projectId) => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['document-detail', documentId] });
       queryClient.invalidateQueries({ queryKey: ['all-documents'] });
       queryClient.invalidateQueries({ queryKey: ['project-documents'] });
@@ -298,8 +309,20 @@ export function DocumentDetailDialog({
       setIsEditing(false);
 
       // Sync milestones based on updated document status (SSOT)
-      if (projectId) {
-        syncMilestones.mutate(projectId);
+      if (result?.projectId) {
+        syncMilestones.mutate(result.projectId);
+        
+        // Trigger document status linkage (e.g., 同意備案 → 運維中)
+        if (result.documentId && result.docType) {
+          triggerStatusSync({
+            documentId: result.documentId,
+            docTypeCode: result.docTypeCode || null,
+            docType: result.docType,
+            projectId: result.projectId,
+            issuedAt: result.issuedAt || null,
+            previousIssuedAt: result.previousIssuedAt || null,
+          });
+        }
       }
     },
     onError: (error: Error) => {

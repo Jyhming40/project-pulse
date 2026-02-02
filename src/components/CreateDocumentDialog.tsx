@@ -6,6 +6,7 @@ import { useDriveAuth } from '@/hooks/useDriveAuth';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
 import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
+import { useDocumentStatusSync } from '@/hooks/useDocumentStatusSync';
 import { generateDocumentDisplayName } from '@/lib/documentAgency';
 import { 
   docTypeCodeToEnum, 
@@ -66,6 +67,7 @@ export function CreateDocumentDialog({
   const { user } = useAuth();
   const { isAuthorized: isDriveAuthorized, authorize: authorizeDrive, isAuthorizing } = useDriveAuth();
   const syncMilestones = useSyncAdminMilestones();
+  const { triggerSync: triggerStatusSync } = useDocumentStatusSync();
   // Use doc_type_code as primary selection for governance (unified source: document_type_config)
   const { dropdownOptions: docTypeCodeOptions } = useDocTypeLabel();
   const { options: agencyCodeOptions } = useOptionsForCategory('agency');
@@ -320,6 +322,19 @@ export function CreateDocumentDialog({
       // Sync milestones based on new document status (SSOT)
       if (docData?.project_id) {
         syncMilestones.mutate(docData.project_id);
+        
+        // Trigger document status linkage (e.g., 同意備案 → 運維中)
+        // Only triggers if issuedAt is set during creation (new issuance)
+        if (issuedAt) {
+          triggerStatusSync({
+            documentId: docData.id,
+            docTypeCode: docTypeCode || null,
+            docType: docData.doc_type,
+            projectId: docData.project_id,
+            issuedAt,
+            previousIssuedAt: null, // New document, no previous value
+          });
+        }
       }
     },
     onError: (error: Error) => {
