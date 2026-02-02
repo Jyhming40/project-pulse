@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { hasLinkageEffect } from '@/lib/documentLinkageRules';
 
 interface DocumentStatusSyncInput {
   documentId: string;
@@ -85,14 +86,8 @@ export function useDocumentStatusSync() {
     if (input.previousIssuedAt) return;
 
     // Check if this document type has linkage rules
-    const linkedTypes = [
-      'MOEA_CONSENT', '同意備案',
-      'TPC_CONTRACT', '躉購合約', '台電躉售合約',
-      'TPC_FORMAL_FIT', '正式躉售', '台電正式躉售',
-    ];
-    
     const effectiveType = input.docTypeCode || input.docType;
-    if (!linkedTypes.includes(effectiveType)) return;
+    if (!hasLinkageEffect(effectiveType)) return;
 
     // Trigger background sync
     try {

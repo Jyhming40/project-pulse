@@ -1,12 +1,11 @@
 import { useState, useMemo } from 'react';
-import { Check, ChevronsUpDown, Search } from 'lucide-react';
+import { Check, ChevronsUpDown, Search, Link2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import {
   Command,
   CommandEmpty,
   CommandGroup,
-  CommandInput,
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
@@ -16,6 +15,12 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
   AGENCY_CODE_TO_LABEL,
   AGENCY_CODES,
   DOC_TYPE_DEFINITIONS,
@@ -23,6 +28,7 @@ import {
   getDocTypeLabelByCode,
   type AgencyCode,
 } from '@/lib/docTypeMapping';
+import { hasLinkageEffect, getLinkageEffectDescription } from '@/lib/documentLinkageRules';
 
 interface GroupedDocTypeSelectProps {
   value: string;
@@ -135,26 +141,47 @@ export function GroupedDocTypeSelect({
                     </span>
                   }
                 >
-                  {items.map(def => (
-                    <CommandItem
-                      key={def.code}
-                      value={def.code}
-                      onSelect={() => {
-                        onValueChange(def.code, def.agencyCode);
-                        setOpen(false);
-                        setSearchQuery('');
-                      }}
-                      className="cursor-pointer"
-                    >
-                      <Check
-                        className={cn(
-                          'mr-2 h-4 w-4',
-                          value === def.code ? 'opacity-100' : 'opacity-0'
+                  {items.map(def => {
+                    const isLinked = hasLinkageEffect(def.code);
+                    const linkageDesc = isLinked ? getLinkageEffectDescription(def.code) : null;
+                    
+                    return (
+                      <CommandItem
+                        key={def.code}
+                        value={def.code}
+                        onSelect={() => {
+                          onValueChange(def.code, def.agencyCode);
+                          setOpen(false);
+                          setSearchQuery('');
+                        }}
+                        className="cursor-pointer"
+                      >
+                        <Check
+                          className={cn(
+                            'mr-2 h-4 w-4 shrink-0',
+                            value === def.code ? 'opacity-100' : 'opacity-0'
+                          )}
+                        />
+                        <span className="flex-1">{def.label}</span>
+                        {isLinked && (
+                          <TooltipProvider delayDuration={300}>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Link2 className="ml-2 h-3.5 w-3.5 text-primary shrink-0" />
+                              </TooltipTrigger>
+                              <TooltipContent side="right" className="max-w-[200px]">
+                                <p className="text-xs">
+                                  <span className="font-medium">自動連動：</span>
+                                  <br />
+                                  {linkageDesc}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         )}
-                      />
-                      {def.label}
-                    </CommandItem>
-                  ))}
+                      </CommandItem>
+                    );
+                  })}
                 </CommandGroup>
               );
             })}
