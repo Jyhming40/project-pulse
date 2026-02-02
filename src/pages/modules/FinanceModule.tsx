@@ -10,13 +10,16 @@ import {
 } from 'lucide-react';
 import { 
   KPICard, 
+  KPICardSkeleton,
   QuickActionCard, 
   WorkspaceHeader, 
   ActionRequiredCard 
 } from '@/components/workspace';
+import { useFinanceKPIs, formatKPINumber } from '@/hooks/useModuleKPIs';
 
 export default function FinanceModule() {
   const navigate = useNavigate();
+  const { data: kpis, isLoading } = useFinanceKPIs();
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -31,30 +34,42 @@ export default function FinanceModule() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard 
-          title="總投資額" 
-          value="—" 
-          icon={DollarSign}
-          color="emerald"
-        />
-        <KPICard 
-          title="預期年收益" 
-          value="—" 
-          icon={TrendingUp}
-          color="blue"
-        />
-        <KPICard 
-          title="平均 IRR" 
-          value="—%" 
-          icon={BarChart3}
-          color="teal"
-        />
-        <KPICard 
-          title="待收款項" 
-          value="—" 
-          icon={PiggyBank}
-          color="amber"
-        />
+        {isLoading ? (
+          <>
+            <KPICardSkeleton />
+            <KPICardSkeleton />
+            <KPICardSkeleton />
+            <KPICardSkeleton />
+          </>
+        ) : (
+          <>
+            <KPICard 
+              title="總投資額" 
+              value={kpis?.totalInvestment ? formatKPINumber(kpis.totalInvestment) : '—'} 
+              icon={DollarSign}
+              color="emerald"
+              subtitle={kpis?.totalCapacity ? `${kpis.totalCapacity.toLocaleString()} kWp` : undefined}
+            />
+            <KPICard 
+              title="預期年收益" 
+              value={kpis?.expectedAnnualRevenue ? formatKPINumber(kpis.expectedAnnualRevenue) : '—'} 
+              icon={TrendingUp}
+              color="blue"
+            />
+            <KPICard 
+              title="平均 IRR" 
+              value={kpis?.avgIRR ? `${kpis.avgIRR}%` : '—%'} 
+              icon={BarChart3}
+              color="teal"
+            />
+            <KPICard 
+              title="待收款項" 
+              value={kpis?.pendingPayments ? formatKPINumber(kpis.pendingPayments) : '—'} 
+              icon={PiggyBank}
+              color="amber"
+            />
+          </>
+        )}
       </div>
 
       {/* Quick Actions */}

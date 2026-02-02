@@ -12,13 +12,16 @@ import {
 } from 'lucide-react';
 import { 
   KPICard, 
+  KPICardSkeleton,
   QuickActionCard, 
   WorkspaceHeader, 
   ActionRequiredCard 
 } from '@/components/workspace';
+import { useSalesKPIs } from '@/hooks/useModuleKPIs';
 
 export default function SalesModule() {
   const navigate = useNavigate();
+  const { data: kpis, isLoading } = useSalesKPIs();
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -39,31 +42,45 @@ export default function SalesModule() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <KPICard 
-          title="待報價案件" 
-          value="—" 
-          icon={Clock}
-          color="amber"
-        />
-        <KPICard 
-          title="報價中" 
-          value="—" 
-          icon={Receipt}
-          color="blue"
-        />
-        <KPICard 
-          title="本月成交" 
-          value="—" 
-          icon={TrendingUp}
-          color="emerald"
-          trend="up"
-        />
-        <KPICard 
-          title="成交率" 
-          value="—%" 
-          icon={Briefcase}
-          color="violet"
-        />
+        {isLoading ? (
+          <>
+            <KPICardSkeleton />
+            <KPICardSkeleton />
+            <KPICardSkeleton />
+            <KPICardSkeleton />
+          </>
+        ) : (
+          <>
+            <KPICard 
+              title="待報價案件" 
+              value={kpis?.pendingQuotes ?? 0} 
+              icon={Clock}
+              color="amber"
+              onClick={() => navigate('/quotes?status=draft')}
+            />
+            <KPICard 
+              title="報價中" 
+              value={kpis?.inProgressQuotes ?? 0} 
+              icon={Receipt}
+              color="blue"
+              onClick={() => navigate('/quotes?status=sent')}
+            />
+            <KPICard 
+              title="本月成交" 
+              value={kpis?.closedThisMonth ?? 0} 
+              icon={TrendingUp}
+              color="emerald"
+              trend={kpis?.closedThisMonth && kpis.closedThisMonth > 0 ? 'up' : 'neutral'}
+            />
+            <KPICard 
+              title="成交率" 
+              value={`${kpis?.conversionRate ?? 0}%`} 
+              icon={Briefcase}
+              color="violet"
+              subtitle={`共 ${kpis?.totalQuotes ?? 0} 份報價`}
+            />
+          </>
+        )}
       </div>
 
       {/* Quick Actions */}
