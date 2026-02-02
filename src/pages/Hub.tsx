@@ -43,8 +43,16 @@ export default function Hub() {
     <div className="min-h-[calc(100vh-4rem)] flex flex-col">
       {/* Header */}
       <div className="text-center py-12 px-4">
-        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-6">
-          <Zap className="w-8 h-8 text-primary" />
+        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-primary/10 mb-6 overflow-hidden">
+          {settings?.logo_light_url ? (
+            <img 
+              src={settings.logo_light_url} 
+              alt="Company Logo" 
+              className="w-12 h-12 object-contain"
+            />
+          ) : (
+            <Zap className="w-8 h-8 text-primary" />
+          )}
         </div>
         <h1 className="text-3xl md:text-4xl font-display font-bold text-foreground mb-3">
           {systemName} 營運指揮中心
