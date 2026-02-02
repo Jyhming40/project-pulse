@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      action_item_resolutions: {
+        Row: {
+          created_at: string
+          id: string
+          note: string | null
+          project_id: string
+          resolution_type: string
+          resolved_at: string
+          resolved_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          project_id: string
+          resolution_type: string
+          resolved_at?: string
+          resolved_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          note?: string | null
+          project_id?: string
+          resolution_type?: string
+          resolved_at?: string
+          resolved_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "action_item_resolutions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "action_item_resolutions_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_settings: {
         Row: {
           created_at: string | null
