@@ -59,12 +59,22 @@ export function useDocumentStatusSync() {
           queryClient.invalidateQueries({ queryKey: ['project', variables.projectId] });
           queryClient.invalidateQueries({ queryKey: ['projects'] });
           queryClient.invalidateQueries({ queryKey: ['project-milestones'] });
+          queryClient.invalidateQueries({ queryKey: ['linkage-pending-files'] });
           
-          // Show success message with all applied rules
+          // Show success message with reminder to upload document file
           const messages = successfulLinkages.map(l => l.message).join('、');
           toast.success('文件狀態已連動', {
             description: messages,
+            duration: 6000,
           });
+          
+          // Show reminder toast after a delay
+          setTimeout(() => {
+            toast.info('📎 請記得上傳文件檔案', {
+              description: '雖然狀態已自動連動，但建議上傳相關函文/文件檔案以完整留存記錄',
+              duration: 8000,
+            });
+          }, 1500);
         }
       }
     },

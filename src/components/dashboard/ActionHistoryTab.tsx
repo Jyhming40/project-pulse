@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ExternalLink, Undo2, Clock, FileWarning, AlertTriangle } from 'lucide-react';
+import { ExternalLink, Undo2, Clock, FileWarning, AlertTriangle, Paperclip } from 'lucide-react';
 import type { ActionItemResolution, ResolutionType } from '@/hooks/useActionItemResolutions';
 
 interface ActionHistoryTabProps {
@@ -28,6 +28,11 @@ const typeConfig: Record<ResolutionType, { label: string; icon: React.ReactNode;
     label: '超時未更新',
     icon: <Clock className="w-3 h-3" />,
     color: 'bg-warning/10 text-warning border-warning/20',
+  },
+  linkage_pending: {
+    label: '連動待補檔',
+    icon: <Paperclip className="w-3 h-3" />,
+    color: 'bg-info/10 text-info border-info/20',
   },
 };
 

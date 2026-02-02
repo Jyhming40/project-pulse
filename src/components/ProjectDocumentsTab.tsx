@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +8,7 @@ import { useSyncAdminMilestones } from '@/hooks/useSyncAdminMilestones';
 import { useOptionsForCategory } from '@/hooks/useSystemOptions';
 import { useDocTypeLabel } from '@/hooks/useDocTypeLabel';
 import { getDerivedDocStatus, getDerivedDocStatusColor } from '@/lib/documentStatus';
+import { useDocumentLinkageRules } from '@/hooks/useDocumentLinkageRules';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
 import { CreateDocumentDialog } from '@/components/CreateDocumentDialog';
@@ -33,6 +34,7 @@ import {
   Files,
   AlertTriangle,
   Star,
+  Paperclip,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -130,6 +132,12 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
 
   // Use unified doc type options from useDocTypeLabel (document_type_config)
   const { getLabel: getDocTypeLabel, dropdownOptions: docTypeOptions, getRequiredDocTypesForInstallationType, isRequired: isDocTypeRequired, labelCodeMap } = useDocTypeLabel();
+  
+  // Fetch linkage rules to know which doc types have automated effects
+  const { activeRules: linkageRules } = useDocumentLinkageRules();
+  const linkageDocTypeCodes = useMemo(() => {
+    return new Set(linkageRules.map(r => r.trigger_doc_type_code));
+  }, [linkageRules]);
   
   // Get required doc types filtered by installation type and revenue model
   const requiredDocTypesBase = getRequiredDocTypesForInstallationType(project.installation_type);
@@ -813,6 +821,21 @@ export function ProjectDocumentsTab({ projectId, project }: ProjectDocumentsTabP
                               <Star className="w-3.5 h-3.5 text-warning fill-warning" />
                             )}
                             <Badge variant="outline">{getDocTypeLabel(current.doc_type_code, current.doc_type)}</Badge>
+                            {/* Show linkage pending indicator: has linkage rule + has date + no files */}
+                            {(() => {
+                              const docCode = current.doc_type_code || '';
+                              const hasLinkage = linkageDocTypeCodes.has(docCode);
+                              const hasDate = !!(current as any).issued_at || !!(current as any).submitted_at;
+                              const hasFiles = (fileCountMap[current.id] || 0) > 0 || !!current.drive_file_id;
+                              if (hasLinkage && hasDate && !hasFiles) {
+                                return (
+                                  <span className="text-info" title="連動已觸發，請上傳文件檔案留存">
+                                    <Paperclip className="w-3.5 h-3.5" />
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
                           </div>
                         </TableCell>
                         <TableCell className="font-medium whitespace-nowrap">

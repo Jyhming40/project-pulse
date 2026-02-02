@@ -14,9 +14,11 @@ import {
   CheckCircle2,
   History,
   Check,
+  Paperclip,
 } from 'lucide-react';
 import type { ProjectAnalytics } from '@/hooks/useProjectAnalytics';
 import { useActionItemResolutions, type ResolutionType } from '@/hooks/useActionItemResolutions';
+import { useLinkagePendingFiles } from '@/hooks/useLinkagePendingFiles';
 import { ResolveActionDialog } from './ResolveActionDialog';
 import { ActionHistoryTab } from './ActionHistoryTab';
 
@@ -62,6 +64,9 @@ export function ActionRequiredSection({
     isUnresolving,
   } = useActionItemResolutions();
 
+  // Fetch linkage pending files
+  const { data: linkagePendingDocs = [] } = useLinkagePendingFiles();
+
   const [resolveDialog, setResolveDialog] = useState<ResolveDialogState>({
     open: false,
     projectId: '',
@@ -73,6 +78,7 @@ export function ActionRequiredSection({
   const resolvedRiskIds = resolvedProjectIds('risk');
   const resolvedPendingIds = resolvedProjectIds('pending');
   const resolvedStuckIds = resolvedProjectIds('stuck');
+  const resolvedLinkageIds = resolvedProjectIds('linkage_pending');
 
   // Filter out resolved projects from risk list
   const activeRiskProjects = useMemo(() => {
@@ -108,8 +114,16 @@ export function ActionRequiredSection({
       .slice(0, maxDisplayCount);
   }, [allProjects, stuckThresholdDays, maxDisplayCount, resolvedStuckIds]);
 
-  const totalActionItems = activeRiskProjects.length + pendingFixProjects.length + stuckProjects.length;
+  // 連動待補檔 - filtered by resolved
+  const activeLinkagePending = useMemo(() => {
+    return linkagePendingDocs
+      .filter(doc => !resolvedLinkageIds.has(doc.id))
+      .slice(0, maxDisplayCount);
+  }, [linkagePendingDocs, resolvedLinkageIds, maxDisplayCount]);
+
+  const totalActionItems = activeRiskProjects.length + pendingFixProjects.length + stuckProjects.length + activeLinkagePending.length;
   const historyCount = resolutions.length;
+
 
   const handleResolveClick = (projectId: string, projectName: string, type: ResolutionType) => {
     setResolveDialog({ open: true, projectId, projectName, type });
@@ -177,7 +191,7 @@ export function ActionRequiredSection({
         </CardHeader>
         <CardContent>
           <Tabs defaultValue={totalActionItems > 0 ? "risk" : "history"} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4 h-auto">
+            <TabsList className="grid w-full grid-cols-5 h-auto">
               <TabsTrigger value="risk" className="text-xs px-2 py-2 flex flex-col gap-1">
                 <div className="flex items-center gap-1">
                   <AlertTriangle className="w-3 h-3" />
@@ -203,6 +217,15 @@ export function ActionRequiredSection({
                 </div>
                 <Badge variant={stuckProjects.length > 0 ? "outline" : "secondary"} className={`text-xs ${stuckProjects.length > 0 ? 'border-warning text-warning' : ''}`}>
                   {stuckProjects.length}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="linkage" className="text-xs px-2 py-2 flex flex-col gap-1">
+                <div className="flex items-center gap-1">
+                  <Paperclip className="w-3 h-3" />
+                  <span>連動待補檔</span>
+                </div>
+                <Badge variant={activeLinkagePending.length > 0 ? "outline" : "secondary"} className={`text-xs ${activeLinkagePending.length > 0 ? 'border-info text-info' : ''}`}>
+                  {activeLinkagePending.length}
                 </Badge>
               </TabsTrigger>
               <TabsTrigger value="history" className="text-xs px-2 py-2 flex flex-col gap-1">
@@ -302,6 +325,68 @@ export function ActionRequiredSection({
                       onResolve={() => handleResolveClick(project.id, project.project_name, 'stuck')}
                     />
                   ))}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* 連動待補檔 */}
+            <TabsContent value="linkage" className="mt-4">
+              {activeLinkagePending.length === 0 ? (
+                <EmptyState message="所有連動文件都已上傳檔案" />
+              ) : (
+                <div className="space-y-2">
+                  {activeLinkagePending.map((doc) => (
+                    <div
+                      key={doc.id}
+                      className="flex items-start gap-3 p-3 rounded-lg border bg-info/5 border-info/20 hover:bg-info/10 transition-colors"
+                    >
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/projects/${doc.project_id}`)}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm truncate">{doc.project_code || doc.project_name}</span>
+                          <Badge variant="outline" className="text-xs shrink-0 border-info/50 text-info">
+                            {doc.doc_type}
+                          </Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {doc.investor_code || '-'} • {doc.issued_at ? `核發: ${doc.issued_at}` : `送件: ${doc.submitted_at}`}
+                        </p>
+                        <p className="text-xs text-info mt-1 flex items-center gap-1">
+                          <Paperclip className="w-3 h-3" />
+                          需上傳文件檔案
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => navigate(`/projects/${doc.project_id}`)}
+                          title="查看案場"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
+                          onClick={() => handleResolveClick(doc.id, `${doc.project_name} - ${doc.doc_type}`, 'linkage_pending')}
+                          title="標記已處理"
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {linkagePendingDocs.length > maxDisplayCount && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() => navigate('/documents?filter=linkage_pending')}
+                    >
+                      查看全部 {linkagePendingDocs.length} 項 <ArrowRight className="w-3 h-3 ml-1" />
+                    </Button>
+                  )}
                 </div>
               )}
             </TabsContent>
