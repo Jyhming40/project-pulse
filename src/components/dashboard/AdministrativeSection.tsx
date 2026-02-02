@@ -74,7 +74,8 @@ export function AdministrativeSection({
 
     return projects
       .filter(p => {
-        if (['暫停', '取消', '運維中'].includes(p.status)) return false;
+        // 排除不需追蹤的狀態：暫停、取消、運維中、已結案
+        if (['暫停', '取消', '運維中', '已結案'].includes(p.status)) return false;
         const updatedAt = new Date(p.updated_at);
         return updatedAt < thresholdDate;
       })
