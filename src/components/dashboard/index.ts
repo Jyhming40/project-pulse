@@ -12,3 +12,5 @@ export { PhaseOverviewSection } from './PhaseOverviewSection';
 export { FinancialOverviewSection } from './FinancialOverviewSection';
 export { Phase2TracksSection } from './Phase2TracksSection';
 export { IssuesSummarySection } from './IssuesSummarySection';
+export { ResolveActionDialog } from './ResolveActionDialog';
+export { ActionHistoryTab } from './ActionHistoryTab';
