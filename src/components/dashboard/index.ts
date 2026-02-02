@@ -14,3 +14,4 @@ export { Phase2TracksSection } from './Phase2TracksSection';
 export { IssuesSummarySection } from './IssuesSummarySection';
 export { ResolveActionDialog } from './ResolveActionDialog';
 export { ActionHistoryTab } from './ActionHistoryTab';
+export { TaskDrivenAlerts } from './TaskDrivenAlerts';
