@@ -84,6 +84,7 @@ import { useCancellationCheck } from '@/hooks/useCancellationCheck';
 import { CancellationWarningDialog } from '@/components/CancellationWarningDialog';
 import { ProjectStageIndicator } from '@/components/ProjectStageIndicator';
 import { ProjectIssuesPanel } from '@/components/ProjectIssuesPanel';
+import { ProjectFinancePanel } from '@/components/ProjectFinancePanel';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 type DocType = Database['public']['Enums']['doc_type'];
@@ -1102,20 +1103,13 @@ export default function ProjectDetail() {
             </CardContent>
           </Card>
 
-          {/* Placeholder for future financial info */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <FileText className="w-5 h-5 text-primary" />
-                財務資訊
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground text-center py-8">
-                金流與財務資訊將在後續版本中新增
-              </p>
-            </CardContent>
-          </Card>
+          {/* Financial Information Panel */}
+          <ProjectFinancePanel
+            projectId={id!}
+            projectCode={project.project_code}
+            investorId={project.investor_id || undefined}
+            capacityKwp={Number((project as any).capacity_kwp) || undefined}
+          />
         </TabsContent>
 
         {/* ========================================== */}
