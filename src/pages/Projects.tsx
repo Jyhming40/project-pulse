@@ -473,7 +473,7 @@ export default function Projects() {
       // Get old data for audit
       const { data: oldData } = await supabase
         .from('projects')
-        .select('id, status, construction_status, city, installation_type, grid_connection_type, power_voltage, pole_status')
+        .select('id, status, construction_status, city, installation_type, grid_connection_type, power_voltage, pole_status, investor_id')
         .in('id', selectedIds);
       
       // Perform update
@@ -550,6 +550,12 @@ export default function Projects() {
     },
   });
 
+  // Investor options for batch update
+  const investorOptions = useMemo(() => 
+    investors.map(inv => ({ value: inv.id, label: `${inv.company_name} (${inv.investor_code})` })),
+    [investors]
+  );
+
   // Batch update fields for projects
   const batchUpdateFields: BatchUpdateField[] = [
     {
@@ -565,6 +571,13 @@ export default function Projects() {
       type: 'select',
       options: constructionStatusOptions,
       placeholder: '選擇施工狀態',
+    },
+    {
+      key: 'investor_id',
+      label: '業務單位',
+      type: 'select',
+      options: investorOptions,
+      placeholder: '選擇業務單位',
     },
     {
       key: 'city',
