@@ -41,7 +41,7 @@ export interface AuditLog {
   };
 }
 
-// Table display name mapping
+// Table display name mapping - used by IntegrityCheckPanel and DeletionPolicyPanel
 export const tableDisplayNames: Record<string, string> = {
   // Core business
   projects: '案場',
@@ -49,6 +49,7 @@ export const tableDisplayNames: Record<string, string> = {
   document_files: '文件檔案',
   document_tags: '文件標籤',
   document_tag_assignments: '文件標籤關聯',
+  document_type_config: '文件類型設定',
   // Investors
   investors: '投資人',
   investor_contacts: '投資人聯絡人',
@@ -65,22 +66,47 @@ export const tableDisplayNames: Record<string, string> = {
   project_custom_fields: '專案自訂欄位',
   project_custom_field_values: '專案自訂欄位值',
   project_field_config: '專案欄位設定',
+  project_issues: '專案問題',
+  project_stages: '專案流程階段',
+  project_payments: '專案付款',
+  project_quotes: '專案報價',
   // Progress & milestones
   progress_milestones: '進度里程碑定義',
   progress_settings: '進度設定',
+  payment_milestones: '付款里程碑',
+  milestone_notification_settings: '里程碑通知設定',
+  milestone_notification_logs: '里程碑通知紀錄',
+  // Governance
+  departments: '部門',
+  process_stages: '流程階段',
+  stage_responsibilities: '階段責任設定',
+  // Quote system
+  quote_modules: '報價模組',
+  quote_inverters: '報價變流器',
+  quote_line_items: '報價細項',
+  quote_financial_projections: '報價財務預測',
+  quote_engineering_items: '報價工程項目',
+  quote_engineering_presets: '工程項目預設',
+  quote_engineering_templates: '工程項目範本',
+  quote_schedules: '報價時程',
   // Duplicate management
   duplicate_ignore_pairs: '重複忽略配對',
   duplicate_reviews: '重複審核記錄',
   // System config
   system_options: '系統選項',
+  system_tariff_rates: '躉購費率設定',
   deletion_policies: '刪除政策',
   app_settings: '系統設定',
+  ai_settings: 'AI 設定',
+  company_bank_accounts: '公司銀行帳戶',
   // User & permissions
   profiles: '使用者資料',
   user_roles: '使用者角色',
   user_security: '使用者安全設定',
   user_preferences: '使用者偏好設定',
   user_drive_tokens: 'Drive 憑證',
+  user_milestone_order: '使用者里程碑順序',
+  user_events: '使用者行為事件',
   module_permissions: '模組權限',
   // Audit
   audit_logs: '稽核日誌',

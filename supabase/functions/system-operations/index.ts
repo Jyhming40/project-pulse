@@ -203,17 +203,20 @@ async function handleGetTableStats(supabase: any, corsHeaders: Record<string, st
   );
 }
 
-// Check data integrity
+// Check data integrity - comprehensive checks for all major tables
 async function handleCheckIntegrity(supabase: any, corsHeaders: Record<string, string>) {
   const issues: Array<{ table: string; issue: string; count: number; severity: string }> = [];
 
+  // ========== 1. Core Business Data Checks ==========
+
   // Check for orphaned documents (documents without valid project_id)
-  const { data: orphanedDocs, error: orphanDocError } = await supabase
+  const { data: orphanedDocs } = await supabase
     .from("documents")
     .select("id, project_id")
-    .is("project_id", null);
+    .is("project_id", null)
+    .eq("is_deleted", false);
 
-  if (!orphanDocError && orphanedDocs?.length > 0) {
+  if (orphanedDocs?.length > 0) {
     issues.push({
       table: "documents",
       issue: "缺少 project_id 的文件",
@@ -222,17 +225,50 @@ async function handleCheckIntegrity(supabase: any, corsHeaders: Record<string, s
     });
   }
 
-  // Check for investor_contacts without valid investor
-  const { data: orphanedContacts } = await supabase
-    .from("investor_contacts")
-    .select("id, investor_id, investors!inner(id)")
-    .is("investor_id", null);
+  // Check for orphaned document_files (files without valid document)
+  const { count: orphanedFiles } = await supabase
+    .from("document_files")
+    .select("id, documents!inner(id)", { count: "exact", head: true })
+    .is("document_id", null)
+    .eq("is_deleted", false);
 
-  if (orphanedContacts?.length > 0) {
+  if (orphanedFiles && orphanedFiles > 0) {
+    issues.push({
+      table: "document_files",
+      issue: "缺少有效 document_id 的檔案",
+      count: orphanedFiles,
+      severity: "warning",
+    });
+  }
+
+  // Check for investor_contacts without valid investor
+  const { count: orphanedInvContacts } = await supabase
+    .from("investor_contacts")
+    .select("*", { count: "exact", head: true })
+    .is("investor_id", null)
+    .eq("is_deleted", false);
+
+  if (orphanedInvContacts && orphanedInvContacts > 0) {
     issues.push({
       table: "investor_contacts",
       issue: "缺少有效 investor_id 的聯絡人",
-      count: orphanedContacts.length,
+      count: orphanedInvContacts,
+      severity: "warning",
+    });
+  }
+
+  // Check for partner_contacts without valid partner
+  const { count: orphanedPartnerContacts } = await supabase
+    .from("partner_contacts")
+    .select("*", { count: "exact", head: true })
+    .is("partner_id", null)
+    .eq("is_deleted", false);
+
+  if (orphanedPartnerContacts && orphanedPartnerContacts > 0) {
+    issues.push({
+      table: "partner_contacts",
+      issue: "缺少有效 partner_id 的聯絡人",
+      count: orphanedPartnerContacts,
       severity: "warning",
     });
   }
@@ -253,11 +289,124 @@ async function handleCheckIntegrity(supabase: any, corsHeaders: Record<string, s
     });
   }
 
-  // Check for soft-deleted items past retention period (30 days default)
+  // ========== 2. Governance Layer Checks ==========
+
+  // Check for project_issues referencing non-existent projects
+  const { data: allIssues } = await supabase
+    .from("project_issues")
+    .select("id, project_id");
+  
+  if (allIssues?.length > 0) {
+    const { data: validProjects } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("is_deleted", false);
+    
+    const validProjectIds = new Set(validProjects?.map((p: any) => p.id) || []);
+    const orphanedIssues = allIssues.filter((i: any) => !validProjectIds.has(i.project_id));
+    
+    if (orphanedIssues.length > 0) {
+      issues.push({
+        table: "project_issues",
+        issue: "關聯至已刪除專案的問題記錄",
+        count: orphanedIssues.length,
+        severity: "warning",
+      });
+    }
+  }
+
+  // Check for stage_responsibilities referencing inactive departments or stages
+  const { data: responsibilities } = await supabase
+    .from("stage_responsibilities")
+    .select("id, department_id, stage_id");
+  
+  if (responsibilities?.length > 0) {
+    const { data: activeDepts } = await supabase
+      .from("departments")
+      .select("id")
+      .eq("is_active", true);
+    
+    const { data: activeStages } = await supabase
+      .from("process_stages")
+      .select("id")
+      .eq("is_active", true);
+    
+    const deptIds = new Set(activeDepts?.map((d: any) => d.id) || []);
+    const stageIds = new Set(activeStages?.map((s: any) => s.id) || []);
+    
+    const orphanedResp = responsibilities.filter(
+      (r: any) => !deptIds.has(r.department_id) || !stageIds.has(r.stage_id)
+    );
+    
+    if (orphanedResp.length > 0) {
+      issues.push({
+        table: "stage_responsibilities",
+        issue: "關聯至已停用部門或流程階段的責任設定",
+        count: orphanedResp.length,
+        severity: "warning",
+      });
+    }
+  }
+
+  // ========== 3. Quote System Checks ==========
+
+  // Check for orphaned quote_modules
+  const { data: quoteModules } = await supabase
+    .from("quote_modules")
+    .select("id, quote_id");
+  
+  if (quoteModules?.length > 0) {
+    const { data: validQuotes } = await supabase
+      .from("project_quotes")
+      .select("id");
+    
+    const validQuoteIds = new Set(validQuotes?.map((q: any) => q.id) || []);
+    const orphanedModules = quoteModules.filter((m: any) => !validQuoteIds.has(m.quote_id));
+    
+    if (orphanedModules.length > 0) {
+      issues.push({
+        table: "quote_modules",
+        issue: "關聯至已刪除報價的模組設備",
+        count: orphanedModules.length,
+        severity: "warning",
+      });
+    }
+  }
+
+  // Check for orphaned quote_inverters
+  const { data: quoteInverters } = await supabase
+    .from("quote_inverters")
+    .select("id, quote_id");
+  
+  if (quoteInverters?.length > 0) {
+    const { data: validQuotes } = await supabase
+      .from("project_quotes")
+      .select("id");
+    
+    const validQuoteIds = new Set(validQuotes?.map((q: any) => q.id) || []);
+    const orphanedInverters = quoteInverters.filter((i: any) => !validQuoteIds.has(i.quote_id));
+    
+    if (orphanedInverters.length > 0) {
+      issues.push({
+        table: "quote_inverters",
+        issue: "關聯至已刪除報價的變流器設備",
+        count: orphanedInverters.length,
+        severity: "warning",
+      });
+    }
+  }
+
+  // ========== 4. Soft-Delete Retention Checks ==========
+
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  const softDeleteTables = ["projects", "documents", "investors", "partners"];
+  const softDeleteTables = [
+    "projects", "documents", "document_files", 
+    "investors", "investor_contacts", "investor_payment_methods",
+    "partners", "partner_contacts", "project_construction_assignments"
+  ];
+  
   for (const table of softDeleteTables) {
     const { count } = await supabase
       .from(table)
@@ -268,12 +417,54 @@ async function handleCheckIntegrity(supabase: any, corsHeaders: Record<string, s
     if (count && count > 0) {
       issues.push({
         table,
-        issue: "超過保留期限的已刪除項目",
+        issue: "超過 30 天保留期限的已刪除項目",
         count,
         severity: "info",
       });
     }
   }
+
+  // ========== 5. User & Permission Checks ==========
+
+  // Check for profiles without user_roles
+  const { data: profiles } = await supabase
+    .from("profiles")
+    .select("id");
+  
+  if (profiles?.length > 0) {
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("user_id");
+    
+    const userIdsWithRoles = new Set(roles?.map((r: any) => r.user_id) || []);
+    const profilesWithoutRoles = profiles.filter((p: any) => !userIdsWithRoles.has(p.id));
+    
+    if (profilesWithoutRoles.length > 0) {
+      issues.push({
+        table: "profiles",
+        issue: "缺少角色設定的使用者",
+        count: profilesWithoutRoles.length,
+        severity: "warning",
+      });
+    }
+  }
+
+  // Check for pending users (not yet approved)
+  const { count: pendingUsers } = await supabase
+    .from("user_roles")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "pending");
+
+  if (pendingUsers && pendingUsers > 0) {
+    issues.push({
+      table: "user_roles",
+      issue: "待審核的使用者帳號",
+      count: pendingUsers,
+      severity: "info",
+    });
+  }
+
+  // ========== 6. Data Consistency Checks ==========
 
   // Check for duplicate investor codes
   const { data: investors } = await supabase
@@ -295,6 +486,78 @@ async function handleCheckIntegrity(supabase: any, corsHeaders: Record<string, s
         severity: "error",
       });
     }
+  }
+
+  // Check for duplicate department codes
+  const { data: departments } = await supabase
+    .from("departments")
+    .select("code")
+    .eq("is_active", true);
+
+  if (departments) {
+    const deptCodeCounts: Record<string, number> = {};
+    for (const dept of departments) {
+      deptCodeCounts[dept.code] = (deptCodeCounts[dept.code] || 0) + 1;
+    }
+    const deptDuplicates = Object.entries(deptCodeCounts).filter(([_, count]) => count > 1);
+    if (deptDuplicates.length > 0) {
+      issues.push({
+        table: "departments",
+        issue: `重複的部門代碼: ${deptDuplicates.map(([code]) => code).join(", ")}`,
+        count: deptDuplicates.length,
+        severity: "error",
+      });
+    }
+  }
+
+  // Check for duplicate process stage codes
+  const { data: stages } = await supabase
+    .from("process_stages")
+    .select("code")
+    .eq("is_active", true);
+
+  if (stages) {
+    const stageCodeCounts: Record<string, number> = {};
+    for (const stage of stages) {
+      stageCodeCounts[stage.code] = (stageCodeCounts[stage.code] || 0) + 1;
+    }
+    const stageDuplicates = Object.entries(stageCodeCounts).filter(([_, count]) => count > 1);
+    if (stageDuplicates.length > 0) {
+      issues.push({
+        table: "process_stages",
+        issue: `重複的流程階段代碼: ${stageDuplicates.map(([code]) => code).join(", ")}`,
+        count: stageDuplicates.length,
+        severity: "error",
+      });
+    }
+  }
+
+  // ========== 7. Telemetry Health Check ==========
+
+  // Check for excessive error events in the last 24 hours
+  const oneDayAgo = new Date();
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+
+  const { count: recentErrors } = await supabase
+    .from("user_events")
+    .select("*", { count: "exact", head: true })
+    .eq("event_type", "error")
+    .gte("created_at", oneDayAgo.toISOString());
+
+  if (recentErrors && recentErrors > 50) {
+    issues.push({
+      table: "user_events",
+      issue: "過去 24 小時內錯誤事件數量過多",
+      count: recentErrors,
+      severity: "warning",
+    });
+  } else if (recentErrors && recentErrors > 0) {
+    issues.push({
+      table: "user_events",
+      issue: "過去 24 小時內的錯誤事件",
+      count: recentErrors,
+      severity: "info",
+    });
   }
 
   return new Response(
