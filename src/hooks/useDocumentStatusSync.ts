@@ -88,7 +88,7 @@ export function useDocumentStatusSync() {
     const linkedTypes = [
       'MOEA_CONSENT', '同意備案',
       'TPC_CONTRACT', '躉購合約', '台電躉售合約',
-      'TPC_OFFICIAL_FIT', '正式躉售', '台電正式躉售',
+      'TPC_FORMAL_FIT', '正式躉售', '台電正式躉售',
     ];
     
     const effectiveType = input.docTypeCode || input.docType;
