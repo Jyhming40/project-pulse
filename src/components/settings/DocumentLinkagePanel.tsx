@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Link2, Plus, Trash2, Edit2, Power, PowerOff, Lock, AlertCircle } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { Link2, Plus, Trash2, Edit2, Lock, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -38,8 +39,10 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
+import { supabase } from '@/integrations/supabase/client';
 import { useDocumentLinkageRules, CreateLinkageRuleInput, DocumentLinkageRule } from '@/hooks/useDocumentLinkageRules';
-import { getDocTypeLabelByCode, DOC_TYPE_DEFINITIONS } from '@/lib/docTypeMapping';
+import { useCodebookOptions } from '@/hooks/useCodebook';
+import { getDocTypeLabelByCode } from '@/lib/docTypeMapping';
 import { GroupedDocTypeSelect } from '@/components/GroupedDocTypeSelect';
 
 const TARGET_TYPE_OPTIONS = [
@@ -65,8 +68,40 @@ const PROJECT_FIELD_OPTIONS = [
   { value: 'actual_meter_date', label: '實際掛表日期' },
 ];
 
+// Hook to fetch milestone codes from progress_milestones
+function useMilestoneCodes() {
+  return useQuery({
+    queryKey: ['milestone-codes-for-linkage'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('progress_milestones')
+        .select('milestone_code, milestone_name')
+        .order('sort_order', { ascending: true });
+      
+      if (error) throw error;
+      
+      // Deduplicate by milestone_code
+      const uniqueMap = new Map<string, { value: string; label: string }>();
+      data?.forEach(item => {
+        if (!uniqueMap.has(item.milestone_code)) {
+          uniqueMap.set(item.milestone_code, {
+            value: item.milestone_code,
+            label: `${item.milestone_name} (${item.milestone_code})`,
+          });
+        }
+      });
+      
+      return Array.from(uniqueMap.values());
+    },
+  });
+}
+
 export function DocumentLinkagePanel() {
   const { rules, isLoading, createRule, updateRule, deleteRule, toggleRule } = useDocumentLinkageRules();
+  const { options: projectStatusOptions } = useCodebookOptions('project_status');
+  const { options: constructionStatusOptions } = useCodebookOptions('construction_status');
+  const { data: milestoneOptions = [] } = useMilestoneCodes();
+  
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<DocumentLinkageRule | null>(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -425,17 +460,52 @@ export function DocumentLinkagePanel() {
                 <div className="space-y-2">
                   <Label>目標值</Label>
                   {formData.target_type === 'milestone' ? (
-                    <GroupedDocTypeSelect
+                    <Select
                       value={formData.target_value || ''}
-                      onValueChange={(code) => setFormData(prev => ({ ...prev, target_value: code }))}
-                      placeholder="選擇里程碑代碼"
-                      className="w-full"
-                    />
+                      onValueChange={(v) => setFormData(prev => ({ ...prev, target_value: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="選擇里程碑" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {milestoneOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : formData.target_type === 'project_status' ? (
+                    <Select
+                      value={formData.target_value || ''}
+                      onValueChange={(v) => setFormData(prev => ({ ...prev, target_value: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="選擇案場狀態" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {projectStatusOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : formData.target_type === 'construction_status' ? (
+                    <Select
+                      value={formData.target_value || ''}
+                      onValueChange={(v) => setFormData(prev => ({ ...prev, target_value: v }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="選擇工程狀態" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {constructionStatusOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   ) : (
                     <Input
                       value={formData.target_value}
                       onChange={(e) => setFormData(prev => ({ ...prev, target_value: e.target.value }))}
-                      placeholder={formData.target_type === 'project_status' ? '例如：同意備案' : '例如：已完工'}
+                      placeholder="輸入目標值"
                     />
                   )}
                 </div>
