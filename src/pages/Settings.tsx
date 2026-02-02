@@ -13,7 +13,8 @@ import {
   Calculator,
   ClipboardList,
   HardDrive,
-  Hash
+  Hash,
+  Link2
 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ import { TieredPricingPanel, QuotePresetsPanel } from '@/components/settings';
 import FitRatesPanel from '@/components/settings/FitRatesPanel';
 import { SettingsBackupPanel } from '@/components/settings/SettingsBackupPanel';
 import { NumberPrecisionPanel } from '@/components/settings/NumberPrecisionPanel';
+import { DocumentLinkagePanel } from '@/components/settings/DocumentLinkagePanel';
 
 export default function Settings() {
   const { isAdmin } = useAuth();
@@ -52,7 +54,7 @@ export default function Settings() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-12 max-w-6xl">
+        <TabsList className="grid w-full grid-cols-7 lg:grid-cols-13 max-w-7xl">
           <TabsTrigger value="branding" className="flex items-center gap-2">
             <Palette className="w-4 h-4" />
             <span className="hidden sm:inline">公司</span>
@@ -68,6 +70,10 @@ export default function Settings() {
           <TabsTrigger value="doctype" className="flex items-center gap-2">
             <FileText className="w-4 h-4" />
             <span className="hidden sm:inline">文件</span>
+          </TabsTrigger>
+          <TabsTrigger value="linkage" className="flex items-center gap-2">
+            <Link2 className="w-4 h-4" />
+            <span className="hidden sm:inline">連動</span>
           </TabsTrigger>
           <TabsTrigger value="departments" className="flex items-center gap-2">
             <Building2 className="w-4 h-4" />
@@ -130,6 +136,10 @@ export default function Settings() {
 
         <TabsContent value="doctype" className="mt-6">
           <DocumentTypePanel />
+        </TabsContent>
+
+        <TabsContent value="linkage" className="mt-6">
+          <DocumentLinkagePanel />
         </TabsContent>
 
         <TabsContent value="departments" className="mt-6">
