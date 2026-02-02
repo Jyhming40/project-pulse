@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
+import { TelemetryProvider } from "@/components/TelemetryProvider";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import PermissionGuard from "@/components/PermissionGuard";
 import Layout from "@/components/Layout";
@@ -52,6 +53,7 @@ const App = () => (
         <Sonner />
         <BrowserRouter>
           <WorkspaceProvider>
+            <TelemetryProvider>
             <Routes>
               {/* Public routes */}
               <Route path="/auth" element={<Auth />} />
@@ -170,6 +172,7 @@ const App = () => (
               
               <Route path="*" element={<NotFound />} />
             </Routes>
+            </TelemetryProvider>
           </WorkspaceProvider>
         </BrowserRouter>
       </AuthProvider>
