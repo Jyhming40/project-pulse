@@ -449,6 +449,81 @@ export type Database = {
           },
         ]
       }
+      document_linkage_rules: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_system: boolean | null
+          rule_name: string
+          sort_order: number | null
+          target_field: string | null
+          target_type: string
+          target_value: string | null
+          trigger_condition: string
+          trigger_doc_type_code: string
+          trigger_field: string
+          updated_at: string | null
+          updated_by: string | null
+          use_trigger_value: boolean | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          rule_name: string
+          sort_order?: number | null
+          target_field?: string | null
+          target_type: string
+          target_value?: string | null
+          trigger_condition?: string
+          trigger_doc_type_code: string
+          trigger_field?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          use_trigger_value?: boolean | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          rule_name?: string
+          sort_order?: number | null
+          target_field?: string | null
+          target_type?: string
+          target_value?: string | null
+          trigger_condition?: string
+          trigger_doc_type_code?: string
+          trigger_field?: string
+          updated_at?: string | null
+          updated_by?: string | null
+          use_trigger_value?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_linkage_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_linkage_rules_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_tag_assignments: {
         Row: {
           assigned_at: string
