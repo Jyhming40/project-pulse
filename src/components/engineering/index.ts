@@ -7,3 +7,4 @@ export { AuditLogsPanel } from './AuditLogsPanel';
 export { DeletionPolicyPanel } from './DeletionPolicyPanel';
 export { ProjectCustomExportPanel } from './ProjectCustomExportPanel';
 export { default as DriveConnectionPanel } from './DriveConnectionPanel';
+export { TelemetryLogsPanel } from './TelemetryLogsPanel';
