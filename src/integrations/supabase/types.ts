@@ -3158,6 +3158,42 @@ export type Database = {
         }
         Relationships: []
       }
+      user_events: {
+        Row: {
+          created_at: string
+          event_name: string
+          event_type: string
+          id: string
+          metadata: Json | null
+          path: string | null
+          session_id: string
+          user_id: string | null
+          workspace: string | null
+        }
+        Insert: {
+          created_at?: string
+          event_name: string
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          path?: string | null
+          session_id: string
+          user_id?: string | null
+          workspace?: string | null
+        }
+        Update: {
+          created_at?: string
+          event_name?: string
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          path?: string | null
+          session_id?: string
+          user_id?: string | null
+          workspace?: string | null
+        }
+        Relationships: []
+      }
       user_milestone_order: {
         Row: {
           created_at: string
