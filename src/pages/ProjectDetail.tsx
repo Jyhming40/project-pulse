@@ -85,6 +85,7 @@ import { CancellationWarningDialog } from '@/components/CancellationWarningDialo
 import { ProjectStageIndicator } from '@/components/ProjectStageIndicator';
 import { ProjectIssuesPanel } from '@/components/ProjectIssuesPanel';
 import { ProjectFinancePanel } from '@/components/ProjectFinancePanel';
+import { ProjectEditDialog } from '@/components/ProjectEditDialog';
 
 type ProjectStatus = Database['public']['Enums']['project_status'];
 type DocType = Database['public']['Enums']['doc_type'];
@@ -162,6 +163,7 @@ export default function ProjectDetail() {
   const [isVerifyingFolder, setIsVerifyingFolder] = useState(false);
   const [isResettingFolder, setIsResettingFolder] = useState(false);
   const [isCancelDialogOpen, setIsCancelDialogOpen] = useState(false);
+  const [isEditProjectOpen, setIsEditProjectOpen] = useState(false);
 
   // Cancellation check hook
   const cancellationCheck = useCancellationCheck(id);
@@ -543,10 +545,16 @@ export default function ProjectDetail() {
           </p>
         </div>
         {canEdit && (
-          <Button onClick={() => setIsAddStatusOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            變更狀態
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => setIsEditProjectOpen(true)}>
+              <Edit className="w-4 h-4 mr-2" />
+              編輯案場
+            </Button>
+            <Button onClick={() => setIsAddStatusOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              變更狀態
+            </Button>
+          </div>
         )}
       </div>
 
@@ -1415,6 +1423,13 @@ export default function ProjectDetail() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Project Edit Dialog */}
+      <ProjectEditDialog
+        project={project}
+        open={isEditProjectOpen}
+        onOpenChange={setIsEditProjectOpen}
+      />
     </div>
   );
 }
