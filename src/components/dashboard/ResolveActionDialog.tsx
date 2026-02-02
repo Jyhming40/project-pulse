@@ -26,6 +26,7 @@ const typeLabels: Record<ResolutionType, string> = {
   risk: '風險案場',
   pending: '待補件',
   stuck: '超時未更新',
+  linkage_pending: '連動待補檔',
 };
 
 export function ResolveActionDialog({
