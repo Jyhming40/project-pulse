@@ -1,5 +1,7 @@
 export { DepartmentsPanel } from './DepartmentsPanel';
 export { DocumentTypePanel } from './DocumentTypePanel';
+export { DocumentLinkageSettingsPanel } from './DocumentLinkageSettingsPanel';
+export { DocumentExpiryRulesPanel } from './DocumentExpiryRulesPanel';
 export { ProcessStagesPanel } from './ProcessStagesPanel';
 export { ProgressSettingsPanel } from './ProgressSettingsPanel';
 export { StageResponsibilitiesPanel } from './StageResponsibilitiesPanel';

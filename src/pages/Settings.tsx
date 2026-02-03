@@ -32,7 +32,7 @@ import { TieredPricingPanel, QuotePresetsPanel } from '@/components/settings';
 import FitRatesPanel from '@/components/settings/FitRatesPanel';
 import { SettingsBackupPanel } from '@/components/settings/SettingsBackupPanel';
 import { NumberPrecisionPanel } from '@/components/settings/NumberPrecisionPanel';
-import { DocumentLinkagePanel } from '@/components/settings/DocumentLinkagePanel';
+import { DocumentLinkageSettingsPanel } from '@/components/settings/DocumentLinkageSettingsPanel';
 
 export default function Settings() {
   const { isAdmin } = useAuth();
@@ -139,7 +139,7 @@ export default function Settings() {
         </TabsContent>
 
         <TabsContent value="linkage" className="mt-6">
-          <DocumentLinkagePanel />
+          <DocumentLinkageSettingsPanel />
         </TabsContent>
 
         <TabsContent value="departments" className="mt-6">
