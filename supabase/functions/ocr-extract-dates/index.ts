@@ -709,6 +709,9 @@ async function fetchDriveFile(
   }
 }
 
+// Maximum base64 size for AI API (approximately 20MB base64 = ~15MB original file)
+const MAX_BASE64_SIZE_FOR_AI = 20 * 1024 * 1024;
+
 // Use AI semantic understanding to extract dates directly
 async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitle?: string): Promise<AIExtractedResult> {
   const lovableApiKey = Deno.env.get('LOVABLE_API_KEY');
@@ -717,7 +720,15 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
     throw new Error('LOVABLE_API_KEY 未設定');
   }
 
-  console.log(`[OCR] Using AI semantic understanding for date extraction...`);
+  // Check base64 size before calling AI
+  if (imageBase64.length > MAX_BASE64_SIZE_FOR_AI) {
+    const sizeMB = (imageBase64.length / (1024 * 1024)).toFixed(1);
+    const maxMB = (MAX_BASE64_SIZE_FOR_AI / (1024 * 1024)).toFixed(0);
+    console.warn(`[OCR] Base64 size ${sizeMB}MB exceeds limit ${maxMB}MB, skipping AI processing`);
+    throw new Error(`檔案過大 (${sizeMB}MB)，無法進行 AI 辨識，請上傳較小的檔案`);
+  }
+
+  console.log(`[OCR] Using AI semantic understanding for date extraction, base64 size: ${(imageBase64.length / 1024 / 1024).toFixed(2)}MB`);
 
   const systemPrompt = `你是專門辨識台灣政府公文的 AI 助手。你的任務是分析公文圖片，理解文件內容，並提取重要的日期和資訊。
 
@@ -975,6 +986,24 @@ async function extractDatesWithAI(imageBase64: string, mimeType: string, docTitl
         }
         if (response.status === 402) {
           throw new Error('AI 服務額度不足');
+        }
+        if (response.status === 400) {
+          // Parse error message for more specific feedback
+          try {
+            const errorData = JSON.parse(errorText);
+            const errorMessage = errorData?.error?.message || errorData?.message || errorText;
+            if (errorMessage.toLowerCase().includes('payload') || 
+                errorMessage.toLowerCase().includes('size') || 
+                errorMessage.toLowerCase().includes('large') ||
+                errorMessage.toLowerCase().includes('limit')) {
+              throw new Error('檔案過大，AI 無法處理，請上傳較小的檔案');
+            }
+            console.error('[OCR] AI 400 error details:', errorMessage);
+          } catch (parseError) {
+            // Not JSON, use raw error text
+            console.error('[OCR] AI 400 raw error:', errorText);
+          }
+          throw new Error('AI 處理失敗：請求格式錯誤或檔案過大');
         }
         
         if ([502, 503, 504].includes(response.status) && attempt < maxRetries) {
