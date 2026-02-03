@@ -110,7 +110,7 @@ export function TaskDrivenAlerts({
         icon: <FileWarning className="w-5 h-5" />,
         color: 'warning',
         projects: pendingFix,
-        navigateUrl: '/projects?status=台電審查',
+        navigateUrl: '/projects?alert=pending_fix',
       },
       {
         id: 'admin-stuck',
@@ -119,7 +119,7 @@ export function TaskDrivenAlerts({
         icon: <Clock className="w-5 h-5" />,
         color: 'destructive',
         projects: adminStuck,
-        navigateUrl: '/projects?stuck=true',
+        navigateUrl: '/projects?alert=admin_stuck',
       },
       {
         id: 'construction-delay',
@@ -128,7 +128,7 @@ export function TaskDrivenAlerts({
         icon: <PlayCircle className="w-5 h-5" />,
         color: 'info',
         projects: constructionDelay,
-        navigateUrl: '/projects?construction=已開工',
+        navigateUrl: '/projects?alert=construction_delay',
       },
       {
         id: 'long-term-stagnant',
@@ -137,7 +137,7 @@ export function TaskDrivenAlerts({
         icon: <TrendingDown className="w-5 h-5" />,
         color: 'muted',
         projects: longTermStagnant,
-        navigateUrl: '/projects',
+        navigateUrl: '/projects?alert=long_term_stagnant',
       },
     ];
   }, [projects]);
