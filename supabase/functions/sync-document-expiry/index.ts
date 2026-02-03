@@ -246,7 +246,53 @@ Deno.serve(async (req: Request): Promise<Response> => {
               }
             }
           } else {
-            console.log(`No target document found for ${rule.target_doc_type_code} in project ${triggerDoc.project_id}`);
+            // Auto-create target document if it doesn't exist
+            console.log(`Auto-creating target document ${rule.target_doc_type_code} for project ${triggerDoc.project_id}`);
+            
+            // Get the doc_type label from document_type_config
+            const { data: typeConfig } = await supabase
+              .from("document_type_config")
+              .select("label, agency_code")
+              .eq("code", rule.target_doc_type_code)
+              .single();
+
+            const docTypeLabel = typeConfig?.label || rule.target_doc_type_code;
+            const agencyCode = typeConfig?.agency_code || null;
+
+            if (!dryRun) {
+              const { data: newDoc, error: createError } = await supabase
+                .from("documents")
+                .insert({
+                  project_id: triggerDoc.project_id,
+                  doc_type: docTypeLabel,
+                  doc_type_code: rule.target_doc_type_code,
+                  agency_code: agencyCode,
+                  doc_status: "pending",
+                  due_at: newDueAt,
+                  note: `由 ${triggerDoc.doc_type_code} 自動建立待辦`,
+                })
+                .select("id")
+                .single();
+
+              if (createError) {
+                console.error(`Error creating target document:`, createError);
+              } else {
+                console.log(`Created target document ${newDoc?.id} with due_at = ${newDueAt}`);
+                updates.push({
+                  docId: newDoc?.id || "new",
+                  oldDueAt: null,
+                  newDueAt,
+                  reason: `自動建立 ${rule.target_doc_type_code}，${rule.default_validity_days} 天期限`,
+                });
+              }
+            } else {
+              updates.push({
+                docId: "will-create",
+                oldDueAt: null,
+                newDueAt,
+                reason: `將自動建立 ${rule.target_doc_type_code}，${rule.default_validity_days} 天期限`,
+              });
+            }
           }
         }
       }
