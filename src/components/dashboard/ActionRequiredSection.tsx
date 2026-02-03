@@ -353,16 +353,19 @@ export function ActionRequiredSection({
                       key={doc.id}
                       className="flex items-start gap-3 p-3 rounded-lg border bg-info/5 border-info/20 hover:bg-info/10 transition-colors"
                     >
-                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/projects/${doc.project_id}`)}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-sm truncate">{doc.project_code || doc.project_name}</span>
-                          <Badge variant="outline" className="text-xs shrink-0 border-info/50 text-info">
-                            {doc.doc_type}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {doc.investor_code || '-'} • {doc.issued_at ? `核發: ${doc.issued_at}` : `送件: ${doc.submitted_at}`}
-                        </p>
+                    <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/projects/${doc.project_id}`)}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm truncate">{doc.project_code || doc.project_name}</span>
+                        <Badge variant="outline" className="text-xs shrink-0 border-info/50 text-info">
+                          {doc.doc_type}
+                        </Badge>
+                      </div>
+                      {doc.project_code && doc.project_name && (
+                        <p className="text-xs text-foreground/80 truncate mb-0.5">{doc.project_name}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground truncate">
+                        {doc.investor_code || '-'} • {doc.issued_at ? `核發: ${doc.issued_at}` : `送件: ${doc.submitted_at}`}
+                      </p>
                         <p className="text-xs text-info mt-1 flex items-center gap-1">
                           <Paperclip className="w-3 h-3" />
                           需上傳文件檔案
