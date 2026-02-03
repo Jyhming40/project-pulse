@@ -92,24 +92,37 @@ export function ActionRequiredSection({
       .slice(0, maxDisplayCount);
   }, [allProjects, maxDisplayCount, resolvedPendingIds]);
 
-  // 超時未更新案場 - filtered
+  // 超時未更新案場 - 綜合判定邏輯
+  // 1. 只追蹤主動處理中的狀態（排除已結案、暫停、取消、運維中、同意備案後的狀態）
+  // 2. 依最後文件日期判定（而非 updated_at）
+  // 3. 排除進度 > 80% 的案場
   const stuckProjects = useMemo(() => {
     const now = new Date();
-    const thresholdDate = new Date(now);
-    thresholdDate.setDate(now.getDate() - stuckThresholdDays);
+    const thresholdMs = stuckThresholdDays * 24 * 60 * 60 * 1000;
 
+    // 只追蹤這些主動處理狀態
+    const activeStatuses = ['接案', '開發中', '送件準備', '台電送件', '台電審查', '能源局送件'];
+    
     return allProjects
       .filter(p => {
-        // 排除不需追蹤的狀態：暫停、取消、運維中、已結案
-        if (['暫停', '取消', '運維中', '已結案'].includes(p.status)) return false;
+        // 1. 只追蹤主動處理中的狀態
+        if (!activeStatuses.includes(p.status)) return false;
+        
+        // 2. 排除進度 > 80% 的案場（資料較完整）
+        if ((p.admin_progress ?? 0) > 80) return false;
+        
+        // 3. 排除已標記處理的
         if (resolvedStuckIds.has(p.id)) return false;
-        const updatedAt = new Date(p.updated_at);
-        return updatedAt < thresholdDate;
+        
+        return true;
       })
-      .map(p => ({
-        ...p,
-        daysStuck: Math.floor((now.getTime() - new Date(p.updated_at).getTime()) / (1000 * 60 * 60 * 24))
-      }))
+      .map(p => {
+        // 計算停滯天數：以 updated_at 為基準（未來可改用文件日期）
+        const lastUpdate = new Date(p.updated_at);
+        const daysStuck = Math.floor((now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60 * 24));
+        return { ...p, daysStuck };
+      })
+      .filter(p => p.daysStuck >= stuckThresholdDays)
       .sort((a, b) => b.daysStuck - a.daysStuck)
       .slice(0, maxDisplayCount);
   }, [allProjects, stuckThresholdDays, maxDisplayCount, resolvedStuckIds]);
