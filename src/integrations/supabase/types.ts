@@ -389,6 +389,81 @@ export type Database = {
         }
         Relationships: []
       }
+      document_expiry_rules: {
+        Row: {
+          base_field: string
+          created_at: string | null
+          created_by: string | null
+          default_validity_days: number | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          is_system: boolean | null
+          rule_name: string
+          sort_order: number | null
+          source_doc_type_code: string
+          supersede_action: string | null
+          supersede_days: number | null
+          supersede_doc_type_code: string | null
+          supersede_field: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          base_field?: string
+          created_at?: string | null
+          created_by?: string | null
+          default_validity_days?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          rule_name: string
+          sort_order?: number | null
+          source_doc_type_code: string
+          supersede_action?: string | null
+          supersede_days?: number | null
+          supersede_doc_type_code?: string | null
+          supersede_field?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          base_field?: string
+          created_at?: string | null
+          created_by?: string | null
+          default_validity_days?: number | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_system?: boolean | null
+          rule_name?: string
+          sort_order?: number | null
+          source_doc_type_code?: string
+          supersede_action?: string | null
+          supersede_days?: number | null
+          supersede_doc_type_code?: string | null
+          supersede_field?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_expiry_rules_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_expiry_rules_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_files: {
         Row: {
           delete_reason: string | null
