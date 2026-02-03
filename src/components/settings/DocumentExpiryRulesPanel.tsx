@@ -41,6 +41,11 @@ import { useDocumentExpiryRules, CreateExpiryRuleInput, DocumentExpiryRule } fro
 import { getDocTypeLabelByCode } from '@/lib/docTypeMapping';
 import { GroupedDocTypeSelect } from '@/components/GroupedDocTypeSelect';
 
+const RULE_TYPE_OPTIONS = [
+  { value: 'self_expiry', label: '自身效期', description: '設定來源文件本身的到期日' },
+  { value: 'trigger_downstream', label: '觸發下游', description: '當來源文件取得時，設定目標文件的到期日' },
+];
+
 const BASE_FIELD_OPTIONS = [
   { value: 'issued_at', label: '核發日期 (issued_at)' },
   { value: 'submitted_at', label: '送件日期 (submitted_at)' },
@@ -76,6 +81,8 @@ export function DocumentExpiryRulesPanel() {
     supersede_action: 'inherit_field',
     supersede_field: 'due_at',
     supersede_days: undefined,
+    target_doc_type_code: '',
+    rule_type: 'self_expiry',
     is_active: true,
     sort_order: 0,
   });
@@ -91,6 +98,8 @@ export function DocumentExpiryRulesPanel() {
       supersede_action: 'inherit_field',
       supersede_field: 'due_at',
       supersede_days: undefined,
+      target_doc_type_code: '',
+      rule_type: 'self_expiry',
       is_active: true,
       sort_order: rules.length + 1,
     });
@@ -114,6 +123,8 @@ export function DocumentExpiryRulesPanel() {
       supersede_action: rule.supersede_action || 'inherit_field',
       supersede_field: rule.supersede_field || 'due_at',
       supersede_days: rule.supersede_days || undefined,
+      target_doc_type_code: rule.target_doc_type_code || '',
+      rule_type: rule.rule_type || 'self_expiry',
       is_active: rule.is_active,
       sort_order: rule.sort_order,
     });
@@ -153,6 +164,15 @@ export function DocumentExpiryRulesPanel() {
   const getExpiryDescription = (rule: DocumentExpiryRule) => {
     const parts: string[] = [];
     
+    // 觸發下游類型
+    if (rule.rule_type === 'trigger_downstream') {
+      const targetLabel = rule.target_doc_type_code ? getDocTypeLabelByCode(rule.target_doc_type_code) : '目標文件';
+      const baseLabel = BASE_FIELD_OPTIONS.find(f => f.value === rule.base_field)?.label.split(' ')[0] || rule.base_field;
+      parts.push(`${baseLabel} → ${targetLabel} 需在 ${rule.default_validity_days} 天內取得`);
+      return parts.join(' / ');
+    }
+    
+    // 自身效期類型
     if (rule.default_validity_days) {
       const baseLabel = BASE_FIELD_OPTIONS.find(f => f.value === rule.base_field)?.label.split(' ')[0] || rule.base_field;
       parts.push(`${baseLabel} + ${rule.default_validity_days} 天`);
@@ -220,6 +240,7 @@ export function DocumentExpiryRulesPanel() {
                 <TableRow>
                   <TableHead className="w-[50px]">狀態</TableHead>
                   <TableHead>規則名稱</TableHead>
+                  <TableHead>類型</TableHead>
                   <TableHead>來源文件</TableHead>
                   <TableHead>效期邏輯</TableHead>
                   <TableHead className="w-[100px] text-right">操作</TableHead>
@@ -228,7 +249,7 @@ export function DocumentExpiryRulesPanel() {
               <TableBody>
                 {rules.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                       尚無效期規則
                     </TableCell>
                   </TableRow>
@@ -272,9 +293,19 @@ export function DocumentExpiryRulesPanel() {
                         )}
                       </TableCell>
                       <TableCell>
+                        <Badge variant={rule.rule_type === 'trigger_downstream' ? 'default' : 'secondary'}>
+                          {rule.rule_type === 'trigger_downstream' ? '觸發下游' : '自身效期'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
                         <Badge variant="outline">
                           {getDocTypeLabelByCode(rule.source_doc_type_code)}
                         </Badge>
+                        {rule.rule_type === 'trigger_downstream' && rule.target_doc_type_code && (
+                          <span className="ml-1 text-muted-foreground">
+                            → <Badge variant="outline">{getDocTypeLabelByCode(rule.target_doc_type_code)}</Badge>
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm">
@@ -330,7 +361,7 @@ export function DocumentExpiryRulesPanel() {
                 id="rule_name"
                 value={formData.rule_name}
                 onChange={(e) => setFormData(prev => ({ ...prev, rule_name: e.target.value }))}
-                placeholder="例如：台電審查意見書效期"
+                placeholder="例如：同備函→電機技師簽證期限"
               />
             </div>
 
@@ -346,14 +377,65 @@ export function DocumentExpiryRulesPanel() {
             </div>
 
             <div className="space-y-2">
-              <Label>來源文件類型 *</Label>
+              <Label>規則類型 *</Label>
+              <Select
+                value={formData.rule_type || 'self_expiry'}
+                onValueChange={(v) => setFormData(prev => ({ 
+                  ...prev, 
+                  rule_type: v as 'self_expiry' | 'trigger_downstream',
+                  // Reset irrelevant fields based on type
+                  ...(v === 'trigger_downstream' ? { 
+                    supersede_doc_type_code: '',
+                    supersede_action: undefined,
+                    supersede_field: undefined,
+                    supersede_days: undefined,
+                  } : {
+                    target_doc_type_code: '',
+                  }),
+                }))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RULE_TYPE_OPTIONS.map(opt => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      <div className="flex flex-col">
+                        <span>{opt.label}</span>
+                        <span className="text-xs text-muted-foreground">{opt.description}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>來源文件類型 *（觸發條件）</Label>
               <GroupedDocTypeSelect
                 value={formData.source_doc_type_code}
                 onValueChange={(code) => setFormData(prev => ({ ...prev, source_doc_type_code: code }))}
-                placeholder="選擇需要設定效期的文件類型"
+                placeholder="選擇觸發此規則的文件類型"
                 className="w-full"
               />
+              <p className="text-xs text-muted-foreground">
+                {formData.rule_type === 'trigger_downstream' 
+                  ? '當此文件取得時，會設定目標文件的到期日' 
+                  : '設定此文件本身的到期日'}
+              </p>
             </div>
+
+            {formData.rule_type === 'trigger_downstream' && (
+              <div className="space-y-2">
+                <Label>目標文件類型 *（需在期限內取得）</Label>
+                <GroupedDocTypeSelect
+                  value={formData.target_doc_type_code || ''}
+                  onValueChange={(code) => setFormData(prev => ({ ...prev, target_doc_type_code: code }))}
+                  placeholder="選擇需要在期限內取得的文件"
+                  className="w-full"
+                />
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -374,7 +456,7 @@ export function DocumentExpiryRulesPanel() {
               </div>
 
               <div className="space-y-2">
-                <Label>預設效期天數</Label>
+                <Label>{formData.rule_type === 'trigger_downstream' ? '期限天數' : '預設效期天數'}</Label>
                 <Input
                   type="number"
                   value={formData.default_validity_days || ''}
@@ -382,11 +464,12 @@ export function DocumentExpiryRulesPanel() {
                     ...prev, 
                     default_validity_days: e.target.value ? parseInt(e.target.value) : null 
                   }))}
-                  placeholder="例如：365"
+                  placeholder="例如：30"
                 />
               </div>
             </div>
 
+            {formData.rule_type !== 'trigger_downstream' && (
             <div className="border-t pt-4 space-y-4">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <ArrowRight className="w-4 h-4" />
@@ -464,6 +547,7 @@ export function DocumentExpiryRulesPanel() {
                 </>
               )}
             </div>
+            )}
           </div>
 
           <DialogFooter>

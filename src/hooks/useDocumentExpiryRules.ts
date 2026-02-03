@@ -13,6 +13,8 @@ export interface DocumentExpiryRule {
   supersede_action: 'clear' | 'inherit_field' | 'extend_days' | null;
   supersede_field: string | null;
   supersede_days: number | null;
+  target_doc_type_code: string | null;
+  rule_type: 'self_expiry' | 'trigger_downstream';
   is_active: boolean;
   is_system: boolean;
   sort_order: number;
@@ -30,6 +32,8 @@ export interface CreateExpiryRuleInput {
   supersede_action?: 'clear' | 'inherit_field' | 'extend_days';
   supersede_field?: string;
   supersede_days?: number;
+  target_doc_type_code?: string;
+  rule_type?: 'self_expiry' | 'trigger_downstream';
   is_active?: boolean;
   sort_order?: number;
 }
