@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   HardHat, 
   Building2, 
@@ -6,20 +8,51 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
-  Users
+  Users,
+  ExternalLink,
+  ChevronRight
 } from 'lucide-react';
 import { 
   KPICard, 
   KPICardSkeleton,
   QuickActionCard, 
   WorkspaceHeader, 
-  ActionRequiredCard 
+  ActionRequiredCard,
+  ActionItem
 } from '@/components/workspace';
 import { useExecutionKPIs } from '@/hooks/useModuleKPIs';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+
+// Hook to get risk projects for the action required section
+function useRiskProjects(limit = 5) {
+  return useQuery({
+    queryKey: ['execution-risk-projects', limit],
+    queryFn: async () => {
+      const activeStatuses = ['開發中', '台電送件', '台電審查', '同意備案', '設備登記'];
+      
+      const { data, error } = await supabase
+        .from('project_analytics_view')
+        .select('project_id, project_name, project_code, current_project_status, overall_progress_percent, has_risk, updated_at, investor_code')
+        .eq('has_risk', true)
+        .in('current_project_status', activeStatuses)
+        .order('updated_at', { ascending: true })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+}
 
 export default function ExecutionModule() {
   const navigate = useNavigate();
   const { data: kpis, isLoading } = useExecutionKPIs();
+  const { data: riskProjects = [], isLoading: isLoadingRisk } = useRiskProjects(5);
+
+  const totalRiskCount = kpis?.overdueWarnings ?? 0;
+  const remainingCount = Math.max(0, totalRiskCount - riskProjects.length);
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -106,7 +139,39 @@ export default function ExecutionModule() {
         icon={AlertTriangle}
         iconColor="text-amber-500"
         emptyMessage="目前沒有需關注的案件"
-      />
+      >
+        {isLoadingRisk ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-14 bg-muted/50 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : riskProjects.length > 0 ? (
+          <div className="space-y-2">
+            {riskProjects.map((project) => (
+              <ActionItem
+                key={project.project_id}
+                title={project.project_name}
+                subtitle={`${project.investor_code || '-'} · ${project.current_project_status} · ${(project.overall_progress_percent ?? 0).toFixed(0)}%`}
+                icon={AlertTriangle}
+                status="warning"
+                onClick={() => navigate(`/projects/${project.project_id}`)}
+              />
+            ))}
+            {remainingCount > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full mt-2 text-xs"
+                onClick={() => navigate('/projects?risk=true')}
+              >
+                查看其他 {remainingCount} 個風險案場
+                <ChevronRight className="w-3 h-3 ml-1" />
+              </Button>
+            )}
+          </div>
+        ) : null}
+      </ActionRequiredCard>
     </div>
   );
 }
