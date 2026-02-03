@@ -14,6 +14,7 @@ import { TablePagination } from '@/components/ui/table-pagination';
 import { BatchActionBar, BatchActionIcons } from '@/components/BatchActionBar';
 import { BatchUpdateDialog, BatchUpdateField } from '@/components/BatchUpdateDialog';
 import { BatchDeleteDialog } from '@/components/BatchDeleteDialog';
+import { BatchArchiveDialog } from '@/components/BatchArchiveDialog';
 import { CreateDocumentDialog } from '@/components/CreateDocumentDialog';
 import { DocumentDetailDialog } from '@/components/DocumentDetailDialog';
 import { BatchUploadVersionDialog } from '@/components/BatchUploadVersionDialog';
@@ -43,6 +44,7 @@ import {
   Loader2,
   Tag,
   ScanText,
+  Archive,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -102,6 +104,7 @@ export default function Documents() {
   const [isImportExportOpen, setIsImportExportOpen] = useState(false);
   const [isBatchUpdateOpen, setIsBatchUpdateOpen] = useState(false);
   const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
+  const [isBatchArchiveOpen, setIsBatchArchiveOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -367,6 +370,50 @@ export default function Documents() {
     },
     onError: (error: Error) => {
       toast.error('批次刪除失敗', { description: error.message });
+    },
+  });
+
+  // Batch archive mutation with audit logging
+  const batchArchiveMutation = useMutation({
+    mutationFn: async ({ reason }: { reason?: string }) => {
+      const selectedIds = Array.from(batchSelect.selectedIds);
+      
+      // Get old data for audit
+      const { data: oldData } = await supabase
+        .from('documents')
+        .select('id, doc_type, is_archived')
+        .in('id', selectedIds);
+      
+      const { error } = await supabase
+        .from('documents')
+        .update({
+          is_archived: true,
+          archived_at: new Date().toISOString(),
+          archive_reason: reason || null,
+        })
+        .in('id', selectedIds);
+      if (error) throw error;
+      
+      // Log batch archive to audit_logs
+      for (const id of selectedIds) {
+        const oldRecord = oldData?.find(r => r.id === id);
+        await supabase.rpc('log_audit_action', {
+          p_table_name: 'documents',
+          p_record_id: id,
+          p_action: 'UPDATE',
+          p_old_data: oldRecord || null,
+          p_new_data: { ...oldRecord, is_archived: true },
+          p_reason: reason || `批次歸檔 ${selectedIds.length} 筆文件`,
+        });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['all-documents'] });
+      toast.success('批次歸檔成功');
+      batchSelect.deselectAll();
+    },
+    onError: (error: Error) => {
+      toast.error('批次歸檔失敗', { description: error.message });
     },
   });
 
@@ -824,6 +871,12 @@ export default function Documents() {
               onClick: () => setIsBatchUploadOpen(true),
             },
             {
+              key: 'archive',
+              label: '批次歸檔',
+              icon: <Archive className="w-4 h-4" />,
+              onClick: () => setIsBatchArchiveOpen(true),
+            },
+            {
               key: 'edit',
               label: '批次修改',
               icon: BatchActionIcons.edit,
@@ -867,6 +920,18 @@ export default function Documents() {
         }}
         isLoading={batchDeleteMutation.isPending}
         driveFileCount={batchSelect.selectedItems.filter(d => d.drive_file_id).length}
+      />
+
+      {/* Batch Archive Dialog */}
+      <BatchArchiveDialog
+        open={isBatchArchiveOpen}
+        onOpenChange={setIsBatchArchiveOpen}
+        selectedCount={batchSelect.selectedCount}
+        itemLabel="筆文件"
+        onConfirm={async (reason) => {
+          await batchArchiveMutation.mutateAsync({ reason });
+        }}
+        isLoading={batchArchiveMutation.isPending}
       />
 
       {/* Create Document Dialog */}
