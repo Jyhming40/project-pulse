@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   TrendingUp, 
   Receipt, 
@@ -6,20 +8,83 @@ import {
   DollarSign,
   BarChart3,
   PiggyBank,
-  Info
+  Info,
+  ChevronRight,
+  FileText,
+  Clock,
+  CheckCircle2
 } from 'lucide-react';
 import { 
   KPICard, 
   KPICardSkeleton,
   QuickActionCard, 
   WorkspaceHeader, 
-  ActionRequiredCard 
+  ActionRequiredCard,
+  ActionItem
 } from '@/components/workspace';
 import { useFinanceKPIs, formatKPINumber } from '@/hooks/useModuleKPIs';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
+import { usePaymentSummary, usePaymentMilestones } from '@/hooks/usePaymentTracking';
+
+// Hook to get recent quotes with financial data
+function useRecentFinancialQuotes(limit = 5) {
+  return useQuery({
+    queryKey: ['finance-recent-quotes', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('project_quotes')
+        .select(`
+          id,
+          quote_number,
+          capacity_kwp,
+          total_price_with_tax,
+          irr_20_year,
+          payback_years,
+          is_finalized,
+          created_at,
+          project_id,
+          projects:project_id (
+            project_name,
+            investor_id,
+            investors:investor_id (company_name)
+          )
+        `)
+        .eq('quote_status', 'accepted')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+}
 
 export default function FinanceModule() {
   const navigate = useNavigate();
   const { data: kpis, isLoading } = useFinanceKPIs();
+  const { data: recentQuotes = [], isLoading: isLoadingQuotes } = useRecentFinancialQuotes(5);
+  const { data: paymentSummary, isLoading: isLoadingPayment } = usePaymentSummary();
+  const { data: milestones = [] } = usePaymentMilestones();
+
+  const formatCurrency = (amount: number) => {
+    if (amount >= 100000000) {
+      return `${(amount / 100000000).toFixed(1)}億`;
+    }
+    if (amount >= 10000000) {
+      return `${(amount / 10000000).toFixed(1)}千萬`;
+    }
+    if (amount >= 10000) {
+      return `${(amount / 10000).toFixed(0)}萬`;
+    }
+    return amount.toLocaleString();
+  };
+
+  const collectionRate = paymentSummary 
+    ? ((paymentSummary.totalPaid) / (paymentSummary.totalPending + paymentSummary.totalInvoiced + paymentSummary.totalPaid || 1) * 100)
+    : 0;
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -64,9 +129,10 @@ export default function FinanceModule() {
             />
             <KPICard 
               title="待收款項" 
-              value={kpis?.pendingPayments ? formatKPINumber(kpis.pendingPayments) : '—'} 
+              value={paymentSummary?.totalPending ? formatCurrency(paymentSummary.totalPending + paymentSummary.totalInvoiced) : '—'} 
               icon={PiggyBank}
               color="amber"
+              subtitle={paymentSummary ? `收款率 ${collectionRate.toFixed(0)}%` : undefined}
             />
           </>
         )}
@@ -97,14 +163,118 @@ export default function FinanceModule() {
         />
       </div>
 
-      {/* Summary Section */}
+      {/* Financial Summary Section */}
       <ActionRequiredCard
         title="財務摘要"
         description="投資組合整體表現"
         icon={Info}
         iconColor="text-info"
-        emptyMessage="財務摘要功能開發中"
-      />
+        emptyMessage="尚無財務數據"
+      >
+        {isLoadingQuotes || isLoadingPayment ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-14 bg-muted/50 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Payment Collection Status */}
+            {paymentSummary && (paymentSummary.pendingCount > 0 || paymentSummary.invoicedCount > 0) && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">收款狀態</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <Card className="bg-muted/30">
+                    <CardContent className="p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground">待請款</p>
+                          <p className="text-lg font-bold">{paymentSummary.pendingCount}</p>
+                          <p className="text-[10px] text-muted-foreground">{formatCurrency(paymentSummary.totalPending)}</p>
+                        </div>
+                        <Clock className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-info/5">
+                    <CardContent className="p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground">已開票</p>
+                          <p className="text-lg font-bold">{paymentSummary.invoicedCount}</p>
+                          <p className="text-[10px] text-muted-foreground">{formatCurrency(paymentSummary.totalInvoiced)}</p>
+                        </div>
+                        <FileText className="w-4 h-4 text-info" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="bg-success/5">
+                    <CardContent className="p-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground">已收款</p>
+                          <p className="text-lg font-bold">{paymentSummary.paidCount}</p>
+                          <p className="text-[10px] text-muted-foreground">{formatCurrency(paymentSummary.totalPaid)}</p>
+                        </div>
+                        <CheckCircle2 className="w-4 h-4 text-success" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
+            )}
+
+            {/* Recent Accepted Quotes */}
+            {recentQuotes.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">近期成交案件</p>
+                {recentQuotes.map((quote) => {
+                  const projectName = (quote.projects as any)?.project_name || '未指定案場';
+                  const investorName = (quote.projects as any)?.investors?.company_name;
+                  
+                  return (
+                    <ActionItem
+                      key={quote.id}
+                      title={`${projectName}`}
+                      subtitle={`${investorName ? investorName + ' · ' : ''}${quote.capacity_kwp} kWp · ${formatCurrency(quote.total_price_with_tax || 0)}${quote.irr_20_year ? ` · IRR ${quote.irr_20_year.toFixed(1)}%` : ''}`}
+                      icon={quote.is_finalized ? CheckCircle2 : Receipt}
+                      status={quote.is_finalized ? 'info' : 'warning'}
+                      onClick={() => navigate(`/quotes/${quote.id}`)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Quick Actions */}
+            {(paymentSummary?.pendingCount ?? 0) > 0 && (
+              <div className="flex gap-2 pt-2 border-t">
+                <Badge 
+                  variant="outline" 
+                  className="cursor-pointer hover:bg-accent"
+                  onClick={() => navigate('/projects?payment_status=pending')}
+                >
+                  待請款案場
+                </Badge>
+                <Badge 
+                  variant="outline" 
+                  className="cursor-pointer hover:bg-accent"
+                  onClick={() => navigate('/projects?payment_status=invoiced')}
+                >
+                  已開票未收款
+                </Badge>
+              </div>
+            )}
+
+            {/* Empty state fallback */}
+            {!paymentSummary && recentQuotes.length === 0 && (
+              <div className="text-center py-4 text-muted-foreground text-sm">
+                尚無財務數據
+              </div>
+            )}
+          </div>
+        )}
+      </ActionRequiredCard>
     </div>
   );
 }

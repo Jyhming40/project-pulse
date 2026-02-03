@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   AlertTriangle, 
   Shield, 
@@ -6,20 +8,95 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Scale
+  Scale,
+  ChevronRight
 } from 'lucide-react';
 import { 
   KPICard, 
   KPICardSkeleton,
   QuickActionCard, 
   WorkspaceHeader, 
-  ActionRequiredCard 
+  ActionRequiredCard,
+  ActionItem
 } from '@/components/workspace';
 import { useRiskKPIs } from '@/hooks/useModuleKPIs';
+import { Button } from '@/components/ui/button';
+
+// Hook to get risk projects with detailed info
+function useRiskProjectsDetail(limit = 5) {
+  return useQuery({
+    queryKey: ['risk-projects-detail', limit],
+    queryFn: async () => {
+      const activeStatuses = ['開發中', '台電送件', '台電審查', '同意備案', '設備登記', '工程施工', '報竣掛表'];
+      
+      const { data, error } = await supabase
+        .from('project_analytics_view')
+        .select('project_id, project_name, project_code, current_project_status, overall_progress_percent, has_risk, risk_reasons, updated_at, investor_code')
+        .eq('has_risk', true)
+        .in('current_project_status', activeStatuses)
+        .order('updated_at', { ascending: true })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+// Hook to get active disputes
+function useActiveDisputes(limit = 3) {
+  return useQuery({
+    queryKey: ['active-disputes', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('project_issues')
+        .select(`
+          id,
+          issue_type,
+          description,
+          severity,
+          start_date,
+          project_id,
+          projects:project_id (
+            project_name,
+            project_code
+          )
+        `)
+        .eq('issue_type', 'dispute')
+        .eq('is_resolved', false)
+        .order('start_date', { ascending: false })
+        .limit(limit);
+
+      if (error) throw error;
+      return data || [];
+    },
+    staleTime: 1000 * 60 * 5,
+  });
+}
 
 export default function RiskModule() {
   const navigate = useNavigate();
   const { data: kpis, isLoading } = useRiskKPIs();
+  const { data: riskProjects = [], isLoading: isLoadingRisk } = useRiskProjectsDetail(5);
+  const { data: disputes = [], isLoading: isLoadingDisputes } = useActiveDisputes(3);
+
+  const totalRiskCount = kpis?.riskProjects ?? 0;
+  const remainingRiskCount = Math.max(0, totalRiskCount - riskProjects.length);
+
+  const getSeverityLabel = (severity: string | null) => {
+    const labels: Record<string, string> = {
+      high: '高',
+      medium: '中',
+      low: '低',
+    };
+    return severity ? labels[severity] || severity : '未設定';
+  };
+
+  const formatRiskReasons = (reasons: string[] | null) => {
+    if (!reasons || reasons.length === 0) return '風險標記';
+    return reasons.slice(0, 2).join('、');
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -105,7 +182,66 @@ export default function RiskModule() {
         icon={Shield}
         iconColor="text-primary"
         emptyMessage="目前沒有標記為風險的案件"
-      />
+      >
+        {isLoadingRisk || isLoadingDisputes ? (
+          <div className="space-y-2">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-14 bg-muted/50 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : (riskProjects.length > 0 || disputes.length > 0) ? (
+          <div className="space-y-4">
+            {/* Risk Projects */}
+            {riskProjects.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">風險案件</p>
+                {riskProjects.map((project) => (
+                  <ActionItem
+                    key={project.project_id}
+                    title={project.project_name}
+                    subtitle={`${project.investor_code || '-'} · ${project.current_project_status} · ${(project.overall_progress_percent ?? 0).toFixed(0)}% · ${formatRiskReasons(project.risk_reasons)}`}
+                    icon={AlertTriangle}
+                    status="danger"
+                    onClick={() => navigate(`/projects/${project.project_id}`)}
+                  />
+                ))}
+                {remainingRiskCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full mt-1 text-xs"
+                    onClick={() => navigate('/projects?risk=true')}
+                  >
+                    查看其他 {remainingRiskCount} 個風險案場
+                    <ChevronRight className="w-3 h-3 ml-1" />
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Active Disputes */}
+            {disputes.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">進行中爭議</p>
+                {disputes.map((dispute) => {
+                  const projectName = (dispute.projects as any)?.project_name || '未指定案場';
+                  
+                  return (
+                    <ActionItem
+                      key={dispute.id}
+                      title={`${projectName}`}
+                      subtitle={`${dispute.description || '爭議案件'} · 嚴重程度: ${getSeverityLabel(dispute.severity)}`}
+                      icon={Scale}
+                      status="warning"
+                      onClick={() => navigate(`/projects/${dispute.project_id}`)}
+                    />
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ) : null}
+      </ActionRequiredCard>
     </div>
   );
 }
