@@ -49,6 +49,7 @@ const DEFAULT_FILTERS: FilterConfig[] = [
   { key: 'drive_status', urlParam: 'drive_status' },
   { key: 'risk', urlParam: 'risk' },
   { key: 'issue_type', urlParam: 'issue_type' },
+  { key: 'alert_type', urlParam: 'alert' }, // 智慧警示篩選：admin_stuck, pending_fix, construction_delay, long_term_stagnant
 ];
 
 export function useProjectFilters(options?: UseProjectFiltersOptions): UseProjectFiltersReturn {

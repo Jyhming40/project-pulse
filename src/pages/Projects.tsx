@@ -437,6 +437,41 @@ export default function Projects() {
             if (summary.design_change_count > 0) types.push('design_change');
             return types.length > 0 ? types.join(',') : 'none';
           }
+          case 'alert_type': {
+            // 智慧警示篩選：對應 TaskDrivenAlerts 的邏輯
+            const now = new Date();
+            const excludedStatuses = ['暫停', '取消', '運維中', '已結案'];
+            if (excludedStatuses.includes(item.status)) return 'excluded';
+            
+            const types: string[] = [];
+            
+            // 待補件: 審查中需要補件
+            if (item.status === '台電審查') {
+              types.push('pending_fix');
+            }
+            
+            // 行政卡關: 超過14天未更新
+            const daysSinceUpdate = Math.floor((now.getTime() - new Date(item.updated_at).getTime()) / (1000 * 60 * 60 * 24));
+            if (daysSinceUpdate >= 14) {
+              types.push('admin_stuck');
+            }
+            
+            // 施工延遲: 已開工但進度低
+            const constructionStatus = (item as any).construction_status;
+            const engineeringProgress = Number((item as any).engineering_progress) || 0;
+            if (constructionStatus === '已開工' && engineeringProgress < 50) {
+              types.push('construction_delay');
+            }
+            
+            // 長期停滯: 建檔超過6個月但進度低
+            const daysSinceCreated = Math.floor((now.getTime() - new Date(item.created_at).getTime()) / (1000 * 60 * 60 * 24));
+            const overallProgress = Number((item as any).overall_progress) || 0;
+            if (daysSinceCreated > 180 && overallProgress < 30) {
+              types.push('long_term_stagnant');
+            }
+            
+            return types.length > 0 ? types.join(',') : 'none';
+          }
           default:
             return null;
         }
