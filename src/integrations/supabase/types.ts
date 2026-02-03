@@ -400,12 +400,14 @@ export type Database = {
           is_active: boolean | null
           is_system: boolean | null
           rule_name: string
+          rule_type: string | null
           sort_order: number | null
           source_doc_type_code: string
           supersede_action: string | null
           supersede_days: number | null
           supersede_doc_type_code: string | null
           supersede_field: string | null
+          target_doc_type_code: string | null
           updated_at: string | null
           updated_by: string | null
         }
@@ -419,12 +421,14 @@ export type Database = {
           is_active?: boolean | null
           is_system?: boolean | null
           rule_name: string
+          rule_type?: string | null
           sort_order?: number | null
           source_doc_type_code: string
           supersede_action?: string | null
           supersede_days?: number | null
           supersede_doc_type_code?: string | null
           supersede_field?: string | null
+          target_doc_type_code?: string | null
           updated_at?: string | null
           updated_by?: string | null
         }
@@ -438,12 +442,14 @@ export type Database = {
           is_active?: boolean | null
           is_system?: boolean | null
           rule_name?: string
+          rule_type?: string | null
           sort_order?: number | null
           source_doc_type_code?: string
           supersede_action?: string | null
           supersede_days?: number | null
           supersede_doc_type_code?: string | null
           supersede_field?: string | null
+          target_doc_type_code?: string | null
           updated_at?: string | null
           updated_by?: string | null
         }
