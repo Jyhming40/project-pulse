@@ -45,7 +45,7 @@ export function useLinkagePendingFiles() {
       });
 
       // Find documents that match linkage rules and have issued_at or submitted_at set
-      // but don't have any files attached
+      // but don't have any files attached (check both document_files and drive_file_id)
       const { data: documents, error: docsError } = await supabase
         .from('documents')
         .select(`
@@ -56,6 +56,7 @@ export function useLinkagePendingFiles() {
           submitted_at,
           project_id,
           updated_at,
+          drive_file_id,
           projects!inner (
             project_name,
             project_code,
@@ -85,9 +86,10 @@ export function useLinkagePendingFiles() {
       // Create a set of document IDs that have files
       const docsWithFiles = new Set(fileCounts?.map(f => f.document_id) || []);
 
-      // Filter to only documents without files and map to our interface
+      // Filter to only documents without files (check both document_files AND drive_file_id)
+      // If document has drive_file_id, it means file was uploaded to Drive (even if document_files record missing)
       const pendingDocs: LinkagePendingDocument[] = documents
-        .filter(doc => !docsWithFiles.has(doc.id))
+        .filter(doc => !docsWithFiles.has(doc.id) && !doc.drive_file_id)
         .map(doc => {
           const project = doc.projects as any;
           return {
@@ -131,16 +133,25 @@ export function useDocumentLinkageFileStatus(documentId: string | null, docTypeC
 
       if (!rules || rules.length === 0) return null;
 
-      // Check if document has files
+      // Check if document has files (either in document_files or via drive_file_id)
       const { count } = await supabase
         .from('document_files')
         .select('*', { count: 'exact', head: true })
         .eq('document_id', documentId)
         .eq('is_deleted', false);
 
+      // Also check if document has drive_file_id
+      const { data: doc } = await supabase
+        .from('documents')
+        .select('drive_file_id')
+        .eq('id', documentId)
+        .single();
+
+      const hasFiles = (count || 0) > 0 || !!doc?.drive_file_id;
+
       return {
         hasLinkage: true,
-        hasFiles: (count || 0) > 0,
+        hasFiles,
         ruleName: rules[0].rule_name,
       };
     },
