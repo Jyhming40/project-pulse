@@ -110,6 +110,32 @@ Deno.serve(async (req: Request): Promise<Response> => {
         const baseDate = doc[rule.base_field as keyof Document] as string | null;
         if (!baseDate) continue;
 
+        // CRITICAL: If document already has issued_at, clear due_at (document is obtained)
+        if (doc.issued_at) {
+          if (doc.due_at !== null) {
+            updates.push({ 
+              docId: doc.id, 
+              oldDueAt: doc.due_at, 
+              newDueAt: null, 
+              reason: `已核發 (${doc.issued_at})，清除到期日` 
+            });
+
+            if (!dryRun) {
+              const { error: updateError } = await supabase
+                .from("documents")
+                .update({ due_at: null, updated_at: new Date().toISOString() })
+                .eq("id", doc.id);
+
+              if (updateError) {
+                console.error(`Error clearing due_at for issued document ${doc.id}:`, updateError);
+              } else {
+                console.log(`Cleared due_at for issued document ${doc.id}`);
+              }
+            }
+          }
+          continue; // Skip expiry calculation for issued documents
+        }
+
         let newDueAt: string | null = null;
         let reason = "";
 
