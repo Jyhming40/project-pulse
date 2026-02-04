@@ -13,7 +13,7 @@ export interface LinkageRule {
   trigger_doc_type_code: string;
   trigger_field: 'issued_at' | 'submitted_at';
   trigger_condition: 'set_new' | 'any_change';
-  target_type: 'project_status' | 'construction_status' | 'milestone' | 'project_field';
+  target_type: 'project_status' | 'construction_status' | 'milestone' | 'project_field' | 'document_field';
   target_value: string | null;
   target_field: string | null;
   use_trigger_value: boolean;
@@ -113,6 +113,8 @@ export function getLinkageEffectDescription(codeOrLabel: string, rules?: Linkage
       return `里程碑 ${rule.target_value} 標記完成`;
     } else if (rule.target_type === 'project_field') {
       return `設定 ${rule.target_field}`;
+    } else if (rule.target_type === 'document_field') {
+      return `設定 ${rule.target_value}`;
     }
     return rule.rule_name;
   }).join('、');
