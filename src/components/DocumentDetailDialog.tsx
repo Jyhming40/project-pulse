@@ -298,6 +298,8 @@ export function DocumentDetailDialog({
         docType: document?.doc_type,
         issuedAt: data.issued_at,
         previousIssuedAt: document?.issued_at,
+        submittedAt: data.submitted_at,
+        previousSubmittedAt: document?.submitted_at,
       };
     },
     onSuccess: (result) => {
@@ -320,7 +322,9 @@ export function DocumentDetailDialog({
             docType: result.docType,
             projectId: result.projectId,
             issuedAt: result.issuedAt || null,
+            submittedAt: result.submittedAt || null,
             previousIssuedAt: result.previousIssuedAt || null,
+            previousSubmittedAt: result.previousSubmittedAt || null,
           });
         }
       }

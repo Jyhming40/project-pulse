@@ -324,15 +324,17 @@ export function CreateDocumentDialog({
         syncMilestones.mutate(docData.project_id);
         
         // Trigger document status linkage (e.g., 同意備案 → 運維中)
-        // Only triggers if issuedAt is set during creation (new issuance)
-        if (issuedAt) {
+        // Triggers when issuedAt or submittedAt is set during creation
+        if (issuedAt || submittedAt) {
           triggerStatusSync({
             documentId: docData.id,
             docTypeCode: docTypeCode || null,
             docType: docData.doc_type,
             projectId: docData.project_id,
-            issuedAt,
+            issuedAt: issuedAt || null,
+            submittedAt: submittedAt || null,
             previousIssuedAt: null, // New document, no previous value
+            previousSubmittedAt: null, // New document, no previous value
           });
         }
       }

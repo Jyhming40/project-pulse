@@ -9,7 +9,9 @@ interface DocumentStatusSyncInput {
   docType: string;
   projectId: string;
   issuedAt: string | null;
+  submittedAt: string | null;
   previousIssuedAt?: string | null;
+  previousSubmittedAt?: string | null;
 }
 
 interface LinkageResult {
@@ -60,6 +62,7 @@ export function useDocumentStatusSync() {
           queryClient.invalidateQueries({ queryKey: ['projects'] });
           queryClient.invalidateQueries({ queryKey: ['project-milestones'] });
           queryClient.invalidateQueries({ queryKey: ['linkage-pending-files'] });
+          queryClient.invalidateQueries({ queryKey: ['documents', variables.projectId] });
           
           // Show success message with reminder to upload document file
           const messages = successfulLinkages.map(l => l.message).join('、');
@@ -85,19 +88,21 @@ export function useDocumentStatusSync() {
   });
 
   /**
-   * Trigger sync when a document's issued_at is updated
+   * Trigger sync when a document's issued_at or submitted_at is updated
    * Call this after successfully updating a document
    */
   const triggerSync = async (input: DocumentStatusSyncInput) => {
-    // Only trigger if issued_at is being set (not cleared)
-    if (!input.issuedAt) return;
-    
-    // Only trigger if this is a new issuance (previous was null)
-    if (input.previousIssuedAt) return;
-
-    // Check if this document type has linkage rules
     const effectiveType = input.docTypeCode || input.docType;
+    
+    // Check if this document type has linkage rules
     if (!hasLinkageEffect(effectiveType)) return;
+
+    // Check if there's a meaningful change to trigger
+    const issuedAtChanged = input.issuedAt && !input.previousIssuedAt;
+    const submittedAtChanged = input.submittedAt && !input.previousSubmittedAt;
+    
+    // Only trigger if either field was newly set
+    if (!issuedAtChanged && !submittedAtChanged) return;
 
     // Trigger background sync
     try {
