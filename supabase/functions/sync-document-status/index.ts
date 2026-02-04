@@ -29,11 +29,37 @@ interface LinkageRule {
   trigger_doc_type_code: string;
   trigger_field: 'issued_at' | 'submitted_at';
   trigger_condition: 'set_new' | 'any_change';
-  target_type: 'project_status' | 'construction_status' | 'milestone' | 'project_field';
+  target_type: 'project_status' | 'construction_status' | 'milestone' | 'project_field' | 'document_field';
   target_value: string | null;
   target_field: string | null;
   use_trigger_value: boolean;
   is_active: boolean;
+}
+
+/**
+ * Parse target_value for document_field type
+ * Format: "DOC_TYPE_CODE:+N" where N is days offset
+ * Example: "ENG_ELECTRICAL:+14" means set ENG_ELECTRICAL's field to trigger date + 14 days
+ */
+function parseDocumentFieldTarget(targetValue: string): { docTypeCode: string; daysOffset: number } | null {
+  if (!targetValue) return null;
+  
+  const match = targetValue.match(/^([A-Z_]+):([+-]?\d+)$/);
+  if (!match) return null;
+  
+  return {
+    docTypeCode: match[1],
+    daysOffset: parseInt(match[2], 10),
+  };
+}
+
+/**
+ * Calculate date with offset
+ */
+function addDays(dateStr: string, days: number): string {
+  const date = new Date(dateStr);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().split('T')[0];
 }
 
 interface LinkageResult {
@@ -208,6 +234,85 @@ async function applyRule(
           message: `欄位 ${fieldName} 已更新`,
           changes: { [fieldName]: fieldValue },
         });
+        break;
+      }
+
+      case 'document_field': {
+        // Update another document's field (e.g., set ENG_ELECTRICAL.submitted_at)
+        const targetField = rule.target_field;
+        if (!targetField || !rule.target_value) break;
+
+        const parsed = parseDocumentFieldTarget(rule.target_value);
+        if (!parsed) {
+          console.error(`[SyncDocStatus] Invalid document_field target: ${rule.target_value}`);
+          break;
+        }
+
+        const { docTypeCode, daysOffset } = parsed;
+        const calculatedValue = addDays(triggerValue, daysOffset);
+
+        // Find or create target document
+        const { data: targetDoc } = await supabase
+          .from('documents')
+          .select('id, ' + targetField)
+          .eq('project_id', projectId)
+          .eq('doc_type_code', docTypeCode)
+          .eq('is_deleted', false)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (targetDoc) {
+          // Update existing document
+          const updateData: Record<string, unknown> = {
+            [targetField]: calculatedValue,
+            updated_at: new Date().toISOString(),
+          };
+
+          const { error } = await supabase
+            .from('documents')
+            .update(updateData)
+            .eq('id', targetDoc.id);
+
+          if (error) throw error;
+
+          linkages.push({
+            rule: rule.rule_name,
+            success: true,
+            message: `${docTypeCode}.${targetField} 已設為 ${calculatedValue}`,
+            changes: { document: docTypeCode, [targetField]: calculatedValue },
+          });
+        } else {
+          // Create new document with the field set
+          const { data: typeConfig } = await supabase
+            .from('document_type_config')
+            .select('label, agency_code')
+            .eq('code', docTypeCode)
+            .maybeSingle();
+
+          const { data: newDoc, error: createError } = await supabase
+            .from('documents')
+            .insert({
+              project_id: projectId,
+              doc_type: typeConfig?.label || docTypeCode,
+              doc_type_code: docTypeCode,
+              agency_code: typeConfig?.agency_code || null,
+              doc_status: 'pending',
+              [targetField]: calculatedValue,
+              note: `由 ${rule.trigger_doc_type_code} 自動建立`,
+            })
+            .select('id')
+            .single();
+
+          if (createError) throw createError;
+
+          linkages.push({
+            rule: rule.rule_name,
+            success: true,
+            message: `已建立 ${docTypeCode}，${targetField} = ${calculatedValue}`,
+            changes: { document: docTypeCode, created: true, [targetField]: calculatedValue },
+          });
+        }
         break;
       }
     }
