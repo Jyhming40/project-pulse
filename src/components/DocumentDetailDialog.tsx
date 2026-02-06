@@ -722,42 +722,49 @@ export function DocumentDetailDialog({
                       </Select>
                     </div>
                     
-                    {/* Date Fields */}
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="submitted_at">送件日</Label>
-                        <Input
-                          id="submitted_at"
-                          type="date"
-                          value={editData.submitted_at}
-                          onChange={e =>
-                            setEditData(prev => ({ ...prev, submitted_at: e.target.value }))
-                          }
-                        />
+                    {/* Date Fields - Hidden for ENG_ELECTRICAL */}
+                    {editData.doc_type !== 'ENG_ELECTRICAL' && (
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="submitted_at">送件日</Label>
+                          <Input
+                            id="submitted_at"
+                            type="date"
+                            value={editData.submitted_at}
+                            onChange={e =>
+                              setEditData(prev => ({ ...prev, submitted_at: e.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="issued_at">核發日</Label>
+                          <Input
+                            id="issued_at"
+                            type="date"
+                            value={editData.issued_at}
+                            onChange={e =>
+                              setEditData(prev => ({ ...prev, issued_at: e.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="due_at">到期日</Label>
+                          <Input
+                            id="due_at"
+                            type="date"
+                            value={editData.due_at}
+                            onChange={e =>
+                              setEditData(prev => ({ ...prev, due_at: e.target.value }))
+                            }
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="issued_at">核發日</Label>
-                        <Input
-                          id="issued_at"
-                          type="date"
-                          value={editData.issued_at}
-                          onChange={e =>
-                            setEditData(prev => ({ ...prev, issued_at: e.target.value }))
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="due_at">到期日</Label>
-                        <Input
-                          id="due_at"
-                          type="date"
-                          value={editData.due_at}
-                          onChange={e =>
-                            setEditData(prev => ({ ...prev, due_at: e.target.value }))
-                          }
-                        />
-                      </div>
-                    </div>
+                    )}
+                    {editData.doc_type === 'ENG_ELECTRICAL' && (
+                      <p className="text-sm text-muted-foreground bg-muted border border-border p-3 rounded-lg">
+                        💡 電機技師簽證不追蹤送件日與核發日，里程碑由躉購合約核發時自動標記完成。
+                      </p>
+                    )}
                     <div className="space-y-2">
                       <Label htmlFor="note">備註</Label>
                       <Textarea
@@ -796,8 +803,8 @@ export function DocumentDetailDialog({
 
               <Separator />
 
-              {/* Key Dates */}
-              {!isEditing && (
+              {/* Key Dates - Hidden for ENG_ELECTRICAL */}
+              {!isEditing && document.doc_type_code !== 'ENG_ELECTRICAL' && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="space-y-1">
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
@@ -830,6 +837,24 @@ export function DocumentDetailDialog({
                       {document.due_at
                         ? format(new Date(document.due_at), 'yyyy/MM/dd')
                         : '-'}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1">
+                      <User className="w-3 h-3" />
+                      負責人
+                    </p>
+                    <p className="text-sm font-medium">
+                      {owner?.full_name || '-'}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {!isEditing && document.doc_type_code === 'ENG_ELECTRICAL' && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <p className="text-sm text-muted-foreground bg-muted border border-border p-3 rounded-lg">
+                      💡 電機技師簽證不追蹤送件日與核發日，里程碑由躉購合約核發時自動標記完成。
                     </p>
                   </div>
                   <div className="space-y-1">
