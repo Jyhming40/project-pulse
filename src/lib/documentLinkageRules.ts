@@ -68,7 +68,7 @@ export function hasLinkageEffect(codeOrLabel: string, rules?: LinkageRule[]): bo
     const knownLinkedCodes = [
       'MOEA_CONSENT', 'TPC_CONTRACT', 'TPC_FORMAL_FIT',
       'MOEA_REGISTER', 'BUILD_EXEMPT_COMP',
-      'ENG_STRUCTURAL', 'ENG_ELECTRICAL', 'TPC_METER',
+      'ENG_STRUCTURAL', 'TPC_METER',
     ];
     return knownLinkedCodes.includes(codeOrLabel);
   }
@@ -90,12 +90,11 @@ export function getLinkageEffectDescription(codeOrLabel: string, rules?: Linkage
     // Fallback descriptions for synchronous calls
     const descriptions: Record<string, string> = {
       'MOEA_CONSENT': '案場狀態 → 同意備案、設定核准日期',
-      'TPC_CONTRACT': '里程碑 TPC_CONTRACT 標記完成',
-      'TPC_FORMAL_FIT': '案場狀態 → 運維中、工程狀態 → 已完工',
+      'TPC_CONTRACT': '里程碑 TPC_CONTRACT、ENG_ELECTRICAL 標記完成',
+      'TPC_FORMAL_FIT': '案場狀態 → 已結案、工程狀態 → 已掛錶',
       'MOEA_REGISTER': '里程碑 MOEA_REGISTER 標記完成',
       'BUILD_EXEMPT_COMP': '里程碑 BUILD_EXEMPT_COMP 標記完成',
       'ENG_STRUCTURAL': '里程碑 ENG_STRUCTURAL 標記完成',
-      'ENG_ELECTRICAL': '里程碑 ENG_ELECTRICAL 標記完成',
       'TPC_METER': '里程碑 TPC_METER 標記完成',
     };
     return descriptions[codeOrLabel] || null;

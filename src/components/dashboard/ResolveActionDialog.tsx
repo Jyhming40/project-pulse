@@ -27,6 +27,7 @@ const typeLabels: Record<ResolutionType, string> = {
   pending: '待補件',
   stuck: '超時未更新',
   linkage_pending: '連動待補檔',
+  deadline: '期限提醒',
 };
 
 export function ResolveActionDialog({
