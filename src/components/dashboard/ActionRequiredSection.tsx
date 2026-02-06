@@ -15,10 +15,12 @@ import {
   History,
   Check,
   Paperclip,
+  CalendarClock,
 } from 'lucide-react';
 import type { ProjectAnalytics } from '@/hooks/useProjectAnalytics';
 import { useActionItemResolutions, type ResolutionType } from '@/hooks/useActionItemResolutions';
 import { useLinkagePendingFiles } from '@/hooks/useLinkagePendingFiles';
+import { useDeadlineReminders } from '@/hooks/useDeadlineReminders';
 import { ResolveActionDialog } from './ResolveActionDialog';
 import { ActionHistoryTab } from './ActionHistoryTab';
 
@@ -67,6 +69,9 @@ export function ActionRequiredSection({
   // Fetch linkage pending files
   const { data: linkagePendingDocs = [] } = useLinkagePendingFiles();
 
+  // Fetch deadline reminders
+  const { data: deadlineReminders = [] } = useDeadlineReminders();
+
   const [resolveDialog, setResolveDialog] = useState<ResolveDialogState>({
     open: false,
     projectId: '',
@@ -79,6 +84,7 @@ export function ActionRequiredSection({
   const resolvedPendingIds = resolvedProjectIds('pending');
   const resolvedStuckIds = resolvedProjectIds('stuck');
   const resolvedLinkageIds = resolvedProjectIds('linkage_pending');
+  const resolvedDeadlineIds = resolvedProjectIds('deadline');
 
   // Filter out resolved projects from risk list
   const activeRiskProjects = useMemo(() => {
@@ -134,7 +140,14 @@ export function ActionRequiredSection({
       .slice(0, maxDisplayCount);
   }, [linkagePendingDocs, resolvedLinkageIds, maxDisplayCount]);
 
-  const totalActionItems = activeRiskProjects.length + pendingFixProjects.length + stuckProjects.length + activeLinkagePending.length;
+  // 期限提醒 - filtered by resolved
+  const activeDeadlineReminders = useMemo(() => {
+    return deadlineReminders
+      .filter(reminder => !resolvedDeadlineIds.has(reminder.id))
+      .slice(0, maxDisplayCount);
+  }, [deadlineReminders, resolvedDeadlineIds, maxDisplayCount]);
+
+  const totalActionItems = activeRiskProjects.length + pendingFixProjects.length + stuckProjects.length + activeLinkagePending.length + activeDeadlineReminders.length;
   const historyCount = resolutions.length;
 
 
@@ -204,17 +217,26 @@ export function ActionRequiredSection({
         </CardHeader>
         <CardContent>
           <Tabs defaultValue={totalActionItems > 0 ? "risk" : "history"} className="space-y-4">
-            <TabsList className="grid w-full grid-cols-5 h-auto">
-              <TabsTrigger value="risk" className="text-xs px-2 py-2 flex flex-col gap-1">
+            <TabsList className="grid w-full grid-cols-6 h-auto">
+              <TabsTrigger value="risk" className="text-xs px-1 py-2 flex flex-col gap-1">
                 <div className="flex items-center gap-1">
                   <AlertTriangle className="w-3 h-3" />
-                  <span>風險案場</span>
+                  <span>風險</span>
                 </div>
                 <Badge variant={activeRiskProjects.length > 0 ? "destructive" : "secondary"} className="text-xs">
                   {activeRiskProjects.length}
                 </Badge>
               </TabsTrigger>
-              <TabsTrigger value="pending" className="text-xs px-2 py-2 flex flex-col gap-1">
+              <TabsTrigger value="deadline" className="text-xs px-1 py-2 flex flex-col gap-1">
+                <div className="flex items-center gap-1">
+                  <CalendarClock className="w-3 h-3" />
+                  <span>期限</span>
+                </div>
+                <Badge variant={activeDeadlineReminders.length > 0 ? "outline" : "secondary"} className={`text-xs ${activeDeadlineReminders.length > 0 ? 'border-primary text-primary' : ''}`}>
+                  {activeDeadlineReminders.length}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="pending" className="text-xs px-1 py-2 flex flex-col gap-1">
                 <div className="flex items-center gap-1">
                   <FileWarning className="w-3 h-3" />
                   <span>待補件</span>
@@ -223,28 +245,28 @@ export function ActionRequiredSection({
                   {pendingFixProjects.length}
                 </Badge>
               </TabsTrigger>
-              <TabsTrigger value="stuck" className="text-xs px-2 py-2 flex flex-col gap-1">
+              <TabsTrigger value="stuck" className="text-xs px-1 py-2 flex flex-col gap-1">
                 <div className="flex items-center gap-1">
                   <Clock className="w-3 h-3" />
-                  <span>超時未更新</span>
+                  <span>超時</span>
                 </div>
                 <Badge variant={stuckProjects.length > 0 ? "outline" : "secondary"} className={`text-xs ${stuckProjects.length > 0 ? 'border-warning text-warning' : ''}`}>
                   {stuckProjects.length}
                 </Badge>
               </TabsTrigger>
-              <TabsTrigger value="linkage" className="text-xs px-2 py-2 flex flex-col gap-1">
+              <TabsTrigger value="linkage" className="text-xs px-1 py-2 flex flex-col gap-1">
                 <div className="flex items-center gap-1">
                   <Paperclip className="w-3 h-3" />
-                  <span>連動待補檔</span>
+                  <span>待補檔</span>
                 </div>
                 <Badge variant={activeLinkagePending.length > 0 ? "outline" : "secondary"} className={`text-xs ${activeLinkagePending.length > 0 ? 'border-info text-info' : ''}`}>
                   {activeLinkagePending.length}
                 </Badge>
               </TabsTrigger>
-              <TabsTrigger value="history" className="text-xs px-2 py-2 flex flex-col gap-1">
+              <TabsTrigger value="history" className="text-xs px-1 py-2 flex flex-col gap-1">
                 <div className="flex items-center gap-1">
                   <History className="w-3 h-3" />
-                  <span>歷史記錄</span>
+                  <span>歷史</span>
                 </div>
                 <Badge variant="secondary" className="text-xs">
                   {historyCount}
@@ -401,6 +423,93 @@ export function ActionRequiredSection({
                       onClick={() => navigate('/documents?filter=linkage_pending')}
                     >
                       查看全部 {linkagePendingDocs.length} 項 <ArrowRight className="w-3 h-3 ml-1" />
+                    </Button>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+
+            {/* 期限提醒 */}
+            <TabsContent value="deadline" className="mt-4">
+              {activeDeadlineReminders.length === 0 ? (
+                <EmptyState message="目前沒有即將到期的項目" />
+              ) : (
+                <div className="space-y-2">
+                  {activeDeadlineReminders.map((reminder) => (
+                    <div
+                      key={reminder.id}
+                      className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+                        reminder.is_overdue 
+                          ? 'bg-destructive/5 border-destructive/20 hover:bg-destructive/10' 
+                          : 'bg-primary/5 border-primary/20 hover:bg-primary/10'
+                      }`}
+                    >
+                      <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/projects/${reminder.project_id}`)}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-sm truncate">{reminder.project_code || reminder.project_name}</span>
+                          <Badge 
+                            variant="outline" 
+                            className={`text-xs shrink-0 ${
+                              reminder.is_overdue 
+                                ? 'border-destructive/50 text-destructive' 
+                                : reminder.days_remaining <= 7 
+                                  ? 'border-warning/50 text-warning'
+                                  : 'border-primary/50 text-primary'
+                            }`}
+                          >
+                            {reminder.reminder_type === 'electrical_cert' ? '電機技師' : '躉售合約'}
+                          </Badge>
+                        </div>
+                        {reminder.project_code && reminder.project_name && (
+                          <p className="text-xs text-foreground/80 truncate mb-0.5">{reminder.project_name}</p>
+                        )}
+                        <p className="text-xs text-muted-foreground">
+                          {reminder.investor_code || '-'} • 同意備案: {reminder.consent_issued_at}
+                        </p>
+                        <p className={`text-xs mt-1 flex items-center gap-1 font-medium ${
+                          reminder.is_overdue 
+                            ? 'text-destructive' 
+                            : reminder.days_remaining <= 7 
+                              ? 'text-warning'
+                              : 'text-primary'
+                        }`}>
+                          <CalendarClock className="w-3 h-3" />
+                          {reminder.is_overdue 
+                            ? `已逾期 ${Math.abs(reminder.days_remaining)} 天`
+                            : `剩餘 ${reminder.days_remaining} 天 (${reminder.deadline})`
+                          }
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => navigate(`/projects/${reminder.project_id}`)}
+                          title="查看案場"
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
+                          onClick={() => handleResolveClick(reminder.id, `${reminder.project_name} - ${reminder.reminder_type === 'electrical_cert' ? '電機技師' : '躉售合約'}`, 'deadline')}
+                          title="標記已處理"
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  {deadlineReminders.length > maxDisplayCount && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-xs"
+                      onClick={() => navigate('/projects?filter=deadline')}
+                    >
+                      查看全部 {deadlineReminders.length} 項 <ArrowRight className="w-3 h-3 ml-1" />
                     </Button>
                   )}
                 </div>

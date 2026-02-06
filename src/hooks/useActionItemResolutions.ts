@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
-export type ResolutionType = 'risk' | 'pending' | 'stuck' | 'linkage_pending';
+export type ResolutionType = 'risk' | 'pending' | 'stuck' | 'linkage_pending' | 'deadline';
 
 export interface ActionItemResolution {
   id: string;
