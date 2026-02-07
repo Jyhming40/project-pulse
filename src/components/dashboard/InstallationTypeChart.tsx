@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Building2 } from 'lucide-react';
+import { Plot } from '@/lib/plotly';
 
 interface InstallationTypeChartProps {
   projects: Array<{
@@ -13,11 +13,11 @@ interface InstallationTypeChartProps {
 
 // 案場類型對應顏色
 const TYPE_COLORS: Record<string, string> = {
-  '畜牧舍': 'hsl(var(--chart-1))',
-  '農業設施': 'hsl(var(--chart-2))',
-  '農棚': 'hsl(var(--chart-3))',
-  '農舍': 'hsl(var(--chart-4))',
-  '住宅': 'hsl(var(--chart-5))',
+  '畜牧舍': 'hsl(221, 83%, 53%)',
+  '農業設施': 'hsl(142, 71%, 45%)',
+  '農棚': 'hsl(47, 96%, 53%)',
+  '農舍': 'hsl(262, 83%, 58%)',
+  '住宅': 'hsl(0, 84%, 60%)',
   '廠辦': 'hsl(210, 70%, 50%)',
   '其他設施': 'hsl(150, 60%, 45%)',
   '地面型': 'hsl(35, 90%, 50%)',
@@ -25,11 +25,11 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 const DEFAULT_COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
+  'hsl(221, 83%, 53%)',
+  'hsl(142, 71%, 45%)',
+  'hsl(47, 96%, 53%)',
+  'hsl(262, 83%, 58%)',
+  'hsl(0, 84%, 60%)',
   'hsl(210, 70%, 50%)',
   'hsl(150, 60%, 45%)',
   'hsl(35, 90%, 50%)',
@@ -47,13 +47,19 @@ export function InstallationTypeChart({
       distribution[type] = (distribution[type] || 0) + 1;
     });
 
-    return Object.entries(distribution)
+    const sorted = Object.entries(distribution)
       .map(([name, value]) => ({ name, value }))
       .sort((a, b) => b.value - a.value);
+
+    return {
+      labels: sorted.map(d => d.name),
+      values: sorted.map(d => d.value),
+      colors: sorted.map((d, i) => TYPE_COLORS[d.name] || DEFAULT_COLORS[i % DEFAULT_COLORS.length]),
+    };
   }, [projects]);
 
   const total = useMemo(() => 
-    chartData.reduce((sum, item) => sum + item.value, 0), 
+    chartData.values.reduce((sum, v) => sum + v, 0), 
     [chartData]
   );
 
@@ -72,7 +78,7 @@ export function InstallationTypeChart({
     );
   }
 
-  if (chartData.length === 0) {
+  if (chartData.labels.length === 0) {
     return (
       <Card>
         <CardHeader className="pb-3">
@@ -100,45 +106,45 @@ export function InstallationTypeChart({
       </CardHeader>
       <CardContent>
         <div className="h-[280px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={chartData}
-                cx="50%"
-                cy="45%"
-                innerRadius={50}
-                outerRadius={80}
-                paddingAngle={2}
-                dataKey="value"
-                label={({ name, percent }) => 
-                  percent > 0.05 ? `${(percent * 100).toFixed(0)}%` : ''
-                }
-                labelLine={false}
-              >
-                {chartData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={TYPE_COLORS[entry.name] || DEFAULT_COLORS[index % DEFAULT_COLORS.length]}
-                  />
-                ))}
-              </Pie>
-              <Tooltip 
-                formatter={(value: number) => [`${value} 件 (${((value / total) * 100).toFixed(1)}%)`, '']}
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--popover))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                }}
-                labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
-              />
-              <Legend 
-                layout="horizontal"
-                verticalAlign="bottom"
-                align="center"
-                formatter={(value) => <span className="text-xs text-foreground">{value}</span>}
-              />
-            </PieChart>
-          </ResponsiveContainer>
+          <Plot
+            data={[
+              {
+                type: 'pie',
+                labels: chartData.labels,
+                values: chartData.values,
+                marker: {
+                  colors: chartData.colors,
+                },
+                hole: 0.4,
+                textinfo: 'percent',
+                textposition: 'inside',
+                hovertemplate: '%{label}<br>%{value} 件 (%{percent})<extra></extra>',
+                textfont: {
+                  size: 12,
+                },
+              },
+            ]}
+            layout={{
+              autosize: true,
+              margin: { t: 10, b: 40, l: 10, r: 10 },
+              showlegend: true,
+              legend: {
+                orientation: 'h',
+                y: -0.1,
+                x: 0.5,
+                xanchor: 'center',
+                font: { size: 11 },
+              },
+              paper_bgcolor: 'transparent',
+              plot_bgcolor: 'transparent',
+            }}
+            config={{
+              displayModeBar: false,
+              responsive: true,
+            }}
+            useResizeHandler
+            style={{ width: '100%', height: '100%' }}
+          />
         </div>
       </CardContent>
     </Card>

@@ -1,17 +1,8 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  Legend
-} from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Layers } from 'lucide-react';
+import { Plot } from '@/lib/plotly';
 
 interface CapacityDistributionChartProps {
   projects: Array<{
@@ -33,11 +24,11 @@ const CAPACITY_BRACKETS = [
 ];
 
 const BRACKET_COLORS = [
-  'hsl(var(--chart-1))',
-  'hsl(var(--chart-2))',
-  'hsl(var(--chart-3))',
-  'hsl(var(--chart-4))',
-  'hsl(var(--chart-5))',
+  'hsl(221, 83%, 53%)',
+  'hsl(142, 71%, 45%)',
+  'hsl(47, 96%, 53%)',
+  'hsl(262, 83%, 58%)',
+  'hsl(0, 84%, 60%)',
   'hsl(210, 70%, 50%)',
 ];
 
@@ -70,12 +61,16 @@ export function CapacityDistributionChart({
       }
     });
 
-    return Object.entries(yearBrackets)
-      .map(([year, brackets]) => ({
-        year: parseInt(year),
-        ...brackets,
-      }))
-      .sort((a, b) => a.year - b.year);
+    const years = Object.keys(yearBrackets).map(Number).sort((a, b) => a - b);
+    
+    return {
+      years: years.map(y => y.toString()),
+      traces: CAPACITY_BRACKETS.map((bracket, index) => ({
+        key: bracket.key,
+        values: years.map(year => yearBrackets[year]?.[bracket.key] || 0),
+        color: BRACKET_COLORS[index],
+      })),
+    };
   }, [projects]);
 
   if (isLoading) {
@@ -91,7 +86,7 @@ export function CapacityDistributionChart({
     );
   }
 
-  if (chartData.length === 0) {
+  if (chartData.years.length === 0) {
     return (
       <Card>
         <CardHeader className="pb-3">
@@ -119,35 +114,44 @@ export function CapacityDistributionChart({
       </CardHeader>
       <CardContent>
         <div className="h-[280px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis 
-                dataKey="year" 
-                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <YAxis 
-                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--popover))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                }}
-                formatter={(value: number) => [`${value} 件`, '']}
-              />
-              <Legend />
-              {CAPACITY_BRACKETS.map((bracket, index) => (
-                <Bar
-                  key={bracket.key}
-                  dataKey={bracket.key}
-                  stackId="a"
-                  fill={BRACKET_COLORS[index]}
-                />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
+          <Plot
+            data={chartData.traces.map(trace => ({
+              type: 'bar' as const,
+              name: trace.key,
+              x: chartData.years,
+              y: trace.values,
+              marker: { color: trace.color },
+              hovertemplate: `%{x}年<br>${trace.key}: %{y} 件<extra></extra>`,
+            }))}
+            layout={{
+              autosize: true,
+              margin: { t: 10, b: 40, l: 40, r: 10 },
+              barmode: 'stack',
+              showlegend: true,
+              legend: {
+                orientation: 'h',
+                y: -0.15,
+                x: 0.5,
+                xanchor: 'center',
+                font: { size: 10 },
+              },
+              xaxis: {
+                tickfont: { size: 11 },
+              },
+              yaxis: {
+                title: { text: '案件數', font: { size: 11 } },
+                tickfont: { size: 11 },
+              },
+              paper_bgcolor: 'transparent',
+              plot_bgcolor: 'transparent',
+            }}
+            config={{
+              displayModeBar: false,
+              responsive: true,
+            }}
+            useResizeHandler
+            style={{ width: '100%', height: '100%' }}
+          />
         </div>
       </CardContent>
     </Card>
