@@ -1,17 +1,8 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  Cell
-} from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MapPin } from 'lucide-react';
+import { Plot } from '@/lib/plotly';
 
 interface RegionDistributionChartProps {
   projects: Array<{
@@ -53,11 +44,11 @@ const CITY_ALIAS: Record<string, string> = {
 };
 
 const REGION_COLORS: Record<string, string> = {
-  '北部': 'hsl(var(--chart-1))',
-  '中部': 'hsl(var(--chart-2))',
-  '南部': 'hsl(var(--chart-3))',
-  '東部': 'hsl(var(--chart-4))',
-  '離島': 'hsl(var(--chart-5))',
+  '北部': 'hsl(221, 83%, 53%)',
+  '中部': 'hsl(142, 71%, 45%)',
+  '南部': 'hsl(47, 96%, 53%)',
+  '東部': 'hsl(262, 83%, 58%)',
+  '離島': 'hsl(0, 84%, 60%)',
   '未設定': 'hsl(220, 10%, 70%)',
 };
 
@@ -79,7 +70,7 @@ export function RegionDistributionChart({
     });
 
     // 轉換為圖表數據，按數量排序取前 10
-    return Object.entries(cityCount)
+    const sorted = Object.entries(cityCount)
       .map(([city, count]) => {
         // 找出該城市所屬區域
         let region = '未設定';
@@ -92,7 +83,15 @@ export function RegionDistributionChart({
         return { city, count, region };
       })
       .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
+      .slice(0, 10)
+      .reverse(); // Reverse for horizontal bar chart (top items at top)
+
+    return {
+      cities: sorted.map(d => d.city),
+      counts: sorted.map(d => d.count),
+      regions: sorted.map(d => d.region),
+      colors: sorted.map(d => REGION_COLORS[d.region] || REGION_COLORS['未設定']),
+    };
   }, [projects]);
 
   if (isLoading) {
@@ -108,7 +107,7 @@ export function RegionDistributionChart({
     );
   }
 
-  if (chartData.length === 0) {
+  if (chartData.cities.length === 0) {
     return (
       <Card>
         <CardHeader className="pb-3">
@@ -136,44 +135,45 @@ export function RegionDistributionChart({
       </CardHeader>
       <CardContent>
         <div className="h-[280px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart 
-              data={chartData} 
-              layout="vertical"
-              margin={{ top: 10, right: 30, left: 60, bottom: 0 }}
-            >
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis 
-                type="number"
-                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <YAxis 
-                type="category"
-                dataKey="city"
-                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                width={50}
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--popover))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                }}
-                formatter={(value: number, name: string, props: any) => [
-                  `${value} 件 (${props.payload.region})`,
-                  ''
-                ]}
-              />
-              <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                {chartData.map((entry, index) => (
-                  <Cell 
-                    key={`cell-${index}`} 
-                    fill={REGION_COLORS[entry.region] || REGION_COLORS['未設定']}
-                  />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          <Plot
+            data={[
+              {
+                type: 'bar',
+                orientation: 'h',
+                y: chartData.cities,
+                x: chartData.counts,
+                marker: {
+                  color: chartData.colors,
+                },
+                text: chartData.counts.map(c => `${c} 件`),
+                textposition: 'outside',
+                hovertemplate: chartData.cities.map((city, i) => 
+                  `${city} (${chartData.regions[i]})<br>%{x} 件<extra></extra>`
+                ),
+              },
+            ]}
+            layout={{
+              autosize: true,
+              margin: { t: 10, b: 30, l: 70, r: 50 },
+              showlegend: false,
+              xaxis: {
+                title: { text: '案件數', font: { size: 11 } },
+                tickfont: { size: 11 },
+              },
+              yaxis: {
+                tickfont: { size: 11 },
+                automargin: true,
+              },
+              paper_bgcolor: 'transparent',
+              plot_bgcolor: 'transparent',
+            }}
+            config={{
+              displayModeBar: false,
+              responsive: true,
+            }}
+            useResizeHandler
+            style={{ width: '100%', height: '100%' }}
+          />
         </div>
       </CardContent>
     </Card>

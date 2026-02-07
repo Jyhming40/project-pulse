@@ -1,19 +1,8 @@
 import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer,
-  Legend,
-  Line,
-  ComposedChart
-} from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TrendingUp } from 'lucide-react';
+import { Plot } from '@/lib/plotly';
 
 interface YearlyTrendChartProps {
   projects: Array<{
@@ -70,7 +59,14 @@ export function YearlyTrendChart({
       stat.申請容量 = Math.round(stat.申請容量);
     });
 
-    return Object.values(yearStats).sort((a, b) => a.year - b.year);
+    const sorted = Object.values(yearStats).sort((a, b) => a.year - b.year);
+    
+    return {
+      years: sorted.map(s => s.year.toString()),
+      申請案件數: sorted.map(s => s.申請案件數),
+      成案案件數: sorted.map(s => s.成案案件數),
+      成案率: sorted.map(s => s.成案率),
+    };
   }, [projects]);
 
   if (isLoading) {
@@ -86,7 +82,7 @@ export function YearlyTrendChart({
     );
   }
 
-  if (chartData.length === 0) {
+  if (chartData.years.length === 0) {
     return (
       <Card>
         <CardHeader className="pb-3">
@@ -114,59 +110,76 @@ export function YearlyTrendChart({
       </CardHeader>
       <CardContent>
         <div className="h-[280px]">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis 
-                dataKey="year" 
-                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <YAxis 
-                yAxisId="left"
-                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-              />
-              <YAxis 
-                yAxisId="right" 
-                orientation="right"
-                domain={[0, 100]}
-                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                tickFormatter={(value) => `${value}%`}
-              />
-              <Tooltip 
-                contentStyle={{
-                  backgroundColor: 'hsl(var(--popover))',
-                  border: '1px solid hsl(var(--border))',
-                  borderRadius: '8px',
-                }}
-                formatter={(value: number, name: string) => {
-                  if (name === '成案率') return [`${value}%`, name];
-                  if (name === '申請容量') return [`${value.toLocaleString()} kWp`, name];
-                  return [value, name];
-                }}
-              />
-              <Legend />
-              <Bar 
-                yAxisId="left"
-                dataKey="申請案件數" 
-                fill="hsl(var(--chart-1))" 
-                radius={[4, 4, 0, 0]}
-              />
-              <Bar 
-                yAxisId="left"
-                dataKey="成案案件數" 
-                fill="hsl(var(--chart-2))" 
-                radius={[4, 4, 0, 0]}
-              />
-              <Line 
-                yAxisId="right"
-                type="monotone" 
-                dataKey="成案率" 
-                stroke="hsl(var(--chart-5))" 
-                strokeWidth={2}
-                dot={{ fill: 'hsl(var(--chart-5))' }}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
+          <Plot
+            data={[
+              {
+                type: 'bar',
+                name: '申請案件數',
+                x: chartData.years,
+                y: chartData.申請案件數,
+                marker: { color: 'hsl(221, 83%, 53%)' },
+                yaxis: 'y',
+                hovertemplate: '%{x}年<br>申請案件數: %{y} 件<extra></extra>',
+              },
+              {
+                type: 'bar',
+                name: '成案案件數',
+                x: chartData.years,
+                y: chartData.成案案件數,
+                marker: { color: 'hsl(142, 71%, 45%)' },
+                yaxis: 'y',
+                hovertemplate: '%{x}年<br>成案案件數: %{y} 件<extra></extra>',
+              },
+              {
+                type: 'scatter',
+                mode: 'lines+markers',
+                name: '成案率',
+                x: chartData.years,
+                y: chartData.成案率,
+                marker: { color: 'hsl(0, 84%, 60%)', size: 8 },
+                line: { color: 'hsl(0, 84%, 60%)', width: 2 },
+                yaxis: 'y2',
+                hovertemplate: '%{x}年<br>成案率: %{y}%<extra></extra>',
+              },
+            ]}
+            layout={{
+              autosize: true,
+              margin: { t: 10, b: 40, l: 50, r: 50 },
+              barmode: 'group',
+              showlegend: true,
+              legend: {
+                orientation: 'h',
+                y: -0.15,
+                x: 0.5,
+                xanchor: 'center',
+                font: { size: 11 },
+              },
+              xaxis: {
+                tickfont: { size: 11 },
+              },
+              yaxis: {
+                title: { text: '案件數', font: { size: 11 } },
+                tickfont: { size: 11 },
+                side: 'left',
+              },
+              yaxis2: {
+                title: { text: '成案率 (%)', font: { size: 11 } },
+                tickfont: { size: 11 },
+                overlaying: 'y',
+                side: 'right',
+                range: [0, 100],
+                ticksuffix: '%',
+              },
+              paper_bgcolor: 'transparent',
+              plot_bgcolor: 'transparent',
+            }}
+            config={{
+              displayModeBar: false,
+              responsive: true,
+            }}
+            useResizeHandler
+            style={{ width: '100%', height: '100%' }}
+          />
         </div>
       </CardContent>
     </Card>
