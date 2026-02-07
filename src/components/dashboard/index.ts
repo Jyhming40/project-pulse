@@ -15,3 +15,8 @@ export { IssuesSummarySection } from './IssuesSummarySection';
 export { ResolveActionDialog } from './ResolveActionDialog';
 export { ActionHistoryTab } from './ActionHistoryTab';
 export { TaskDrivenAlerts } from './TaskDrivenAlerts';
+export { InstallationTypeChart } from './InstallationTypeChart';
+export { YearlyTrendChart } from './YearlyTrendChart';
+export { CapacityDistributionChart } from './CapacityDistributionChart';
+export { RegionDistributionChart } from './RegionDistributionChart';
+export { ProcessEfficiencyKPIs } from './ProcessEfficiencyKPIs';

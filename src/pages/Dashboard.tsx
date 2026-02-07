@@ -12,6 +12,11 @@ import {
   Phase2TracksSection,
   IssuesSummarySection,
   TaskDrivenAlerts,
+  InstallationTypeChart,
+  YearlyTrendChart,
+  CapacityDistributionChart,
+  RegionDistributionChart,
+  ProcessEfficiencyKPIs,
 } from '@/components/dashboard';
 import { DashboardSettingsPanel } from '@/components/dashboard/DashboardSettingsPanel';
 import { useAnalyticsSummary, useRiskProjects } from '@/hooks/useProjectAnalytics';
@@ -25,13 +30,28 @@ export default function Dashboard() {
   const { data: riskProjects = [], isLoading: riskLoading } = useRiskProjects(10);
 
   // Fetch projects with investors
-  const { data: projects = [] } = useQuery({
+  const { data: projects = [], isLoading: projectsLoading } = useQuery({
     queryKey: ['dashboard-projects'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('projects')
         .select('*, investors(id, company_name, investor_code)')
         .eq('is_deleted', false);
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Fetch documents for process efficiency calculation
+  const { data: documents = [], isLoading: documentsLoading } = useQuery({
+    queryKey: ['dashboard-documents'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, project_id, doc_type_code, submitted_at, issued_at')
+        .eq('is_deleted', false)
+        .eq('is_archived', false)
+        .in('doc_type_code', ['TPC_REVIEW', 'LAND_PERMIT', 'MOEA_CONSENT']);
       if (error) throw error;
       return data;
     },
@@ -100,6 +120,40 @@ export default function Dashboard() {
             pendingFixCount={pendingFixCount}
             isLoading={summaryLoading}
           />
+        );
+      case 'process-efficiency':
+        return (
+          <ProcessEfficiencyKPIs
+            key={section.id}
+            projects={projects as any}
+            documents={documents}
+            isLoading={projectsLoading || documentsLoading}
+          />
+        );
+      case 'portfolio-analysis':
+        return (
+          <div key={section.id} className="space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <InstallationTypeChart 
+                projects={projects as any} 
+                isLoading={projectsLoading} 
+              />
+              <YearlyTrendChart 
+                projects={projects as any} 
+                isLoading={projectsLoading} 
+              />
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <CapacityDistributionChart 
+                projects={projects as any} 
+                isLoading={projectsLoading} 
+              />
+              <RegionDistributionChart 
+                projects={projects as any} 
+                isLoading={projectsLoading} 
+              />
+            </div>
+          </div>
         );
       case 'issues-summary':
         return <IssuesSummarySection key={section.id} />;
