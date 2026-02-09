@@ -18,6 +18,7 @@ import {
   RegionDistributionChart,
   ProcessEfficiencyKPIs,
 } from '@/components/dashboard';
+import { MemosSummaryWidget } from '@/components/dashboard/MemosSummaryWidget';
 import { DashboardSettingsPanel } from '@/components/dashboard/DashboardSettingsPanel';
 import { useAnalyticsSummary, useRiskProjects } from '@/hooks/useProjectAnalytics';
 import { useDashboardSettings, DashboardSection } from '@/hooks/useDashboardSettings';
@@ -167,6 +168,8 @@ export default function Dashboard() {
             maxDisplayCount={5}
           />
         );
+      case 'memos-summary':
+        return <MemosSummaryWidget key={section.id} />;
       case 'advanced-analysis':
         return (
           <div key={section.id} className="space-y-4">

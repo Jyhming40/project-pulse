@@ -34,7 +34,8 @@ export const DEFAULT_SECTIONS: DashboardSection[] = [
   { id: 'portfolio-analysis', label: '案場統計分析', visible: true, order: 4 },
   { id: 'issues-summary', label: '問題追蹤', visible: true, order: 5 },
   { id: 'action-required', label: '待處理事項', visible: true, order: 6 },
-  { id: 'advanced-analysis', label: '進階分析', visible: true, order: 7 },
+  { id: 'memos-summary', label: '備忘錄', visible: true, order: 7 },
+  { id: 'advanced-analysis', label: '進階分析', visible: true, order: 8 },
 ];
 
 // 預設篩選條件
