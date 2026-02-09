@@ -17,6 +17,7 @@ import {
   PiggyBank,
   ShieldAlert,
   Gavel,
+  StickyNote,
   LucideIcon,
 } from 'lucide-react';
 import { MODULES, ModuleName } from '@/hooks/usePermissions';
@@ -129,6 +130,7 @@ export const WORKSPACE_REGISTRY: Record<WorkspaceId, WorkspaceDefinition> = {
 export const COMMON_NAV_ITEMS: WorkspaceNavItem[] = [
   { to: '/hub', icon: Briefcase, label: '營運中心', description: '系統主入口' },
   { to: '/', icon: TrendingUp, label: 'KPI 儀表板', description: '總覽數據' },
+  { to: '/memos', icon: StickyNote, label: '備忘錄', description: '個人與團隊備忘' },
 ];
 
 // ==========================================
