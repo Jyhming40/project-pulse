@@ -2049,6 +2049,69 @@ export type Database = {
           },
         ]
       }
+      project_epc_financial_metrics: {
+        Row: {
+          contract_amount: number | null
+          created_at: string | null
+          created_by: string | null
+          direct_cost: number | null
+          gross_margin_rate: number | null
+          gross_profit: number | null
+          id: string
+          net_expected_profit: number | null
+          note: string | null
+          project_id: string
+          risk_reserve_amount: number | null
+          risk_reserve_percent: number
+          updated_at: string | null
+        }
+        Insert: {
+          contract_amount?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          direct_cost?: number | null
+          gross_margin_rate?: number | null
+          gross_profit?: number | null
+          id?: string
+          net_expected_profit?: number | null
+          note?: string | null
+          project_id: string
+          risk_reserve_amount?: number | null
+          risk_reserve_percent?: number
+          updated_at?: string | null
+        }
+        Update: {
+          contract_amount?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          direct_cost?: number | null
+          gross_margin_rate?: number | null
+          gross_profit?: number | null
+          id?: string
+          net_expected_profit?: number | null
+          note?: string | null
+          project_id?: string
+          risk_reserve_amount?: number | null
+          risk_reserve_percent?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_epc_financial_metrics_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "project_epc_financial_metrics_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: true
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_field_config: {
         Row: {
           created_at: string
