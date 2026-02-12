@@ -1239,6 +1239,106 @@ export type Database = {
         }
         Relationships: []
       }
+      memo_tags: {
+        Row: {
+          color: string
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+        }
+        Insert: {
+          color?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+        }
+        Update: {
+          color?: string
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
+      memos: {
+        Row: {
+          content: string | null
+          created_at: string | null
+          deleted_at: string | null
+          id: string
+          is_deleted: boolean | null
+          is_personal: boolean | null
+          is_pinned: boolean | null
+          project_id: string | null
+          reminder_at: string | null
+          tag_id: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          is_personal?: boolean | null
+          is_pinned?: boolean | null
+          project_id?: string | null
+          reminder_at?: string | null
+          tag_id?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string | null
+          deleted_at?: string | null
+          id?: string
+          is_deleted?: boolean | null
+          is_personal?: boolean | null
+          is_pinned?: boolean | null
+          project_id?: string | null
+          reminder_at?: string | null
+          tag_id?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "memos_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memos_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "memo_tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       milestone_notification_logs: {
         Row: {
           created_at: string | null
