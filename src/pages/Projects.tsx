@@ -773,19 +773,6 @@ export default function Projects() {
             key: 'status',
             label: '狀態',
             options: statusOptions,
-            hiddenValues: hiddenStatuses,
-            onToggleHidden: (value: string) => {
-              setHiddenStatuses(prev => {
-                const next = new Set(prev);
-                if (next.has(value)) {
-                  next.delete(value);
-                } else {
-                  next.add(value);
-                }
-                return next;
-              });
-            },
-            valueCounts: statusCounts,
           },
           {
             key: 'construction_status',
@@ -817,6 +804,22 @@ export default function Projects() {
           },
         ]}
         riskProjectCount={riskProjectIds.length}
+        hiddenStatusConfig={{
+          options: statusOptions,
+          hiddenValues: hiddenStatuses,
+          onToggleHidden: (value: string) => {
+            setHiddenStatuses(prev => {
+              const next = new Set(prev);
+              if (next.has(value)) {
+                next.delete(value);
+              } else {
+                next.add(value);
+              }
+              return next;
+            });
+          },
+          valueCounts: statusCounts,
+        }}
       />
 
       {/* Table */}

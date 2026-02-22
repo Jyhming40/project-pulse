@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Plus, ChevronDown, EyeOff, Eye } from 'lucide-react';
+import { X, Plus, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -22,13 +22,10 @@ interface FilterBadgeGroupProps {
   onRemove: (value: string) => void;
   onClear?: () => void;
   className?: string;
+  // 是否顯示標籤
   showLabel?: boolean;
+  // 是否可多選
   multiSelect?: boolean;
-  // 隱藏功能
-  hiddenValues?: Set<string>;
-  onToggleHidden?: (value: string) => void;
-  /** Per-value counts for hidden badge display */
-  valueCounts?: Record<string, number>;
 }
 
 export function FilterBadgeGroup({
@@ -41,12 +38,8 @@ export function FilterBadgeGroup({
   className,
   showLabel = true,
   multiSelect = true,
-  hiddenValues,
-  onToggleHidden,
-  valueCounts,
 }: FilterBadgeGroupProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isHideOpen, setIsHideOpen] = useState(false);
   
   // 過濾出未選中的選項
   const availableOptions = options.filter(opt => !selectedValues.includes(opt.value));
@@ -62,8 +55,6 @@ export function FilterBadgeGroup({
       setIsOpen(false);
     }
   };
-
-  const hiddenCount = hiddenValues?.size || 0;
 
   return (
     <div className={cn("flex items-center gap-2 flex-wrap", className)}>
@@ -91,32 +82,11 @@ export function FilterBadgeGroup({
           </button>
         </Badge>
       ))}
-
-      {/* 已隱藏的 Badge */}
-      {hiddenValues && hiddenValues.size > 0 && Array.from(hiddenValues).map(value => (
-        <Badge
-          key={`hidden-${value}`}
-          variant="outline"
-          className="gap-1 pr-1 text-muted-foreground line-through opacity-60 cursor-pointer hover:opacity-100 transition-opacity"
-          onClick={() => onToggleHidden?.(value)}
-          title={`點擊顯示「${getLabel(value)}」`}
-        >
-          <EyeOff className="w-3 h-3" />
-          <span>{getLabel(value)}{valueCounts && valueCounts[value] !== undefined ? ` (${valueCounts[value]})` : ''}</span>
-        </Badge>
-      ))}
       
-      {/* 無選中且無隱藏時顯示「全部」 */}
-      {selectedValues.length === 0 && hiddenCount === 0 && (
+      {/* 無選中時顯示「全部」 */}
+      {selectedValues.length === 0 && (
         <Badge variant="outline" className="text-muted-foreground">
           全部
-        </Badge>
-      )}
-
-      {/* 無選中但有隱藏時顯示計數 */}
-      {selectedValues.length === 0 && hiddenCount > 0 && (
-        <Badge variant="outline" className="text-muted-foreground">
-          全部 (隱藏 {hiddenCount})
         </Badge>
       )}
       
@@ -145,56 +115,6 @@ export function FilterBadgeGroup({
                   {opt.label}
                 </button>
               ))}
-            </div>
-          </PopoverContent>
-        </Popover>
-      )}
-
-      {/* 隱藏選項 Popover */}
-      {onToggleHidden && options.length > 0 && (
-        <Popover open={isHideOpen} onOpenChange={setIsHideOpen}>
-          <PopoverTrigger asChild>
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <EyeOff className="w-3 h-3 mr-1" />
-              隱藏
-              <ChevronDown className="w-3 h-3 ml-1" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-52 p-1" align="start">
-            <div className="max-h-60 overflow-y-auto">
-              {options.map(opt => {
-                const isHidden = hiddenValues?.has(opt.value) || false;
-                const count = valueCounts?.[opt.value];
-                return (
-                  <button
-                    key={opt.value}
-                    onClick={() => {
-                      onToggleHidden(opt.value);
-                    }}
-                    className={cn(
-                      "w-full text-left px-3 py-1.5 text-sm rounded hover:bg-muted transition-colors flex items-center justify-between",
-                      isHidden && "text-muted-foreground"
-                    )}
-                  >
-                    <span className="flex items-center gap-2">
-                      {isHidden ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      {opt.label}
-                    </span>
-                    <span className="flex items-center gap-1.5">
-                      {count !== undefined && (
-                        <span className="text-xs text-muted-foreground">{count}</span>
-                      )}
-                      {isHidden && (
-                        <Badge variant="secondary" className="text-[10px] px-1 h-4">隱藏中</Badge>
-                      )}
-                    </span>
-                  </button>
-                );
-              })}
             </div>
           </PopoverContent>
         </Popover>
