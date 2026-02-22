@@ -10,6 +10,10 @@ interface FilterGroupConfig {
   key: string;
   label: string;
   options: FilterOption[];
+  // 隱藏功能：只有指定的 group 才啟用
+  hiddenValues?: Set<string>;
+  onToggleHidden?: (value: string) => void;
+  valueCounts?: Record<string, number>;
 }
 
 interface ProjectFilterBarProps {
@@ -112,6 +116,9 @@ export function ProjectFilterBar({
             onAdd={(value) => addFilter(group.key, value)}
             onRemove={(value) => removeFilter(group.key, value)}
             onClear={() => clearFilter(group.key)}
+            hiddenValues={group.hiddenValues}
+            onToggleHidden={group.onToggleHidden}
+            valueCounts={group.valueCounts}
           />
         ))}
       </div>
