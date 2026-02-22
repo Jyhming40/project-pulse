@@ -490,11 +490,6 @@ export default function Projects() {
     return counts;
   }, [projectsWithDocProgress]);
 
-  // Statuses that can be toggled for hiding (typically terminal/inactive statuses)
-  const toggleableStatuses = useMemo(() => {
-    const candidateStatuses = ['取消', '暫停', '已結案', '運維中'];
-    return candidateStatuses.filter(s => (statusCounts[s] || 0) > 0);
-  }, [statusCounts]);
 
   // Sorting (multi-column support)
   const { sortedData: sortedProjects, sortConfig, handleSort, getSortInfo } = useTableSort(filteredProjects, {
@@ -778,6 +773,19 @@ export default function Projects() {
             key: 'status',
             label: '狀態',
             options: statusOptions,
+            hiddenValues: hiddenStatuses,
+            onToggleHidden: (value: string) => {
+              setHiddenStatuses(prev => {
+                const next = new Set(prev);
+                if (next.has(value)) {
+                  next.delete(value);
+                } else {
+                  next.add(value);
+                }
+                return next;
+              });
+            },
+            valueCounts: statusCounts,
           },
           {
             key: 'construction_status',
@@ -810,43 +818,6 @@ export default function Projects() {
         ]}
         riskProjectCount={riskProjectIds.length}
       />
-
-      {/* Status Visibility Toggles */}
-      {toggleableStatuses.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">顯示/隱藏：</span>
-          {toggleableStatuses.map(status => {
-            const isHidden = hiddenStatuses.has(status);
-            const count = statusCounts[status] || 0;
-            return (
-              <Button
-                key={status}
-                variant={isHidden ? 'ghost' : 'secondary'}
-                size="sm"
-                onClick={() => {
-                  setHiddenStatuses(prev => {
-                    const next = new Set(prev);
-                    if (next.has(status)) {
-                      next.delete(status);
-                    } else {
-                      next.add(status);
-                    }
-                    return next;
-                  });
-                }}
-                className="text-xs"
-              >
-                {isHidden ? (
-                  <EyeOff className="w-3.5 h-3.5 mr-1.5" />
-                ) : (
-                  <Eye className="w-3.5 h-3.5 mr-1.5" />
-                )}
-                {status} ({count})
-              </Button>
-            );
-          })}
-        </div>
-      )}
 
       {/* Table */}
       <div className="border rounded-lg bg-card overflow-hidden">
