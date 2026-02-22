@@ -202,8 +202,8 @@ export default function Projects() {
   // Data Enrichment Mode (Admin only)
   const [isEnrichmentMode, setIsEnrichmentMode] = useState(false);
   
-  // Show cancelled projects toggle
-  const [showCancelled, setShowCancelled] = useState(false);
+  // Hidden statuses toggle (default: hide cancelled)
+  const [hiddenStatuses, setHiddenStatuses] = useState<Set<string>>(new Set(['取消']));
   
   // Batch Drive Folder Dialog
   const [isBatchDriveFolderOpen, setIsBatchDriveFolderOpen] = useState(false);
@@ -392,8 +392,8 @@ export default function Projects() {
     const searchLower = filters.search.toLowerCase();
     
     return projectsWithDocProgress.filter(project => {
-      // Filter out cancelled projects unless showCancelled is true
-      if (!showCancelled && project.status === '取消') {
+      // Filter out projects with hidden statuses
+      if (hiddenStatuses.has(project.status)) {
         return false;
       }
       
@@ -479,13 +479,22 @@ export default function Projects() {
       
       return matchesFilters;
     });
-  }, [projectsWithDocProgress, filters.search, filters.filterStates, riskProjectIds, showCancelled, issueSummaryMap]);
+  }, [projectsWithDocProgress, filters.search, filters.filterStates, riskProjectIds, hiddenStatuses, issueSummaryMap]);
 
-  // Count cancelled projects for toggle display
-  const cancelledCount = useMemo(() => 
-    projectsWithDocProgress.filter(p => p.status === '取消').length,
-    [projectsWithDocProgress]
-  );
+  // Count projects per status for toggle display
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    projectsWithDocProgress.forEach(p => {
+      counts[p.status] = (counts[p.status] || 0) + 1;
+    });
+    return counts;
+  }, [projectsWithDocProgress]);
+
+  // Statuses that can be toggled for hiding (typically terminal/inactive statuses)
+  const toggleableStatuses = useMemo(() => {
+    const candidateStatuses = ['取消', '暫停', '已結案', '運維中'];
+    return candidateStatuses.filter(s => (statusCounts[s] || 0) > 0);
+  }, [statusCounts]);
 
   // Sorting (multi-column support)
   const { sortedData: sortedProjects, sortConfig, handleSort, getSortInfo } = useTableSort(filteredProjects, {
@@ -802,22 +811,40 @@ export default function Projects() {
         riskProjectCount={riskProjectIds.length}
       />
 
-      {/* Show Cancelled Toggle */}
-      {cancelledCount > 0 && (
-        <div className="flex items-center gap-2">
-          <Button
-            variant={showCancelled ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setShowCancelled(!showCancelled)}
-            className="text-xs"
-          >
-            {showCancelled ? (
-              <EyeOff className="w-3.5 h-3.5 mr-1.5" />
-            ) : (
-              <Eye className="w-3.5 h-3.5 mr-1.5" />
-            )}
-            {showCancelled ? '隱藏' : '顯示'}已取消 ({cancelledCount})
-          </Button>
+      {/* Status Visibility Toggles */}
+      {toggleableStatuses.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground">顯示/隱藏：</span>
+          {toggleableStatuses.map(status => {
+            const isHidden = hiddenStatuses.has(status);
+            const count = statusCounts[status] || 0;
+            return (
+              <Button
+                key={status}
+                variant={isHidden ? 'ghost' : 'secondary'}
+                size="sm"
+                onClick={() => {
+                  setHiddenStatuses(prev => {
+                    const next = new Set(prev);
+                    if (next.has(status)) {
+                      next.delete(status);
+                    } else {
+                      next.add(status);
+                    }
+                    return next;
+                  });
+                }}
+                className="text-xs"
+              >
+                {isHidden ? (
+                  <EyeOff className="w-3.5 h-3.5 mr-1.5" />
+                ) : (
+                  <Eye className="w-3.5 h-3.5 mr-1.5" />
+                )}
+                {status} ({count})
+              </Button>
+            );
+          })}
         </div>
       )}
 
