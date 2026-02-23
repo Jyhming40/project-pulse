@@ -497,7 +497,7 @@ export default function ProjectCustomExport() {
                 </Button>
               </div>
             </div>
-            <ScrollArea className="flex-1 border rounded-md" style={{ maxHeight: 'calc(100vh - 380px)' }}>
+            <ScrollArea className="border rounded-md" style={{ height: 'calc(100vh - 420px)', minHeight: '300px' }}>
               <div className="p-2 space-y-2">
                 {Object.entries(FIELD_CATEGORIES).map(([catKey, cat]) => {
                   const Icon = cat.icon;
