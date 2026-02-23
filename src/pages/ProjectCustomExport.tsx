@@ -334,36 +334,52 @@ export default function ProjectCustomExport() {
     const companyName = settings?.company_name_zh || settings?.system_name_zh || '案件列表';
     const timestamp = new Date().toISOString().slice(0, 10);
     const colCount = selectedFieldList.length;
-    const colWidth = `${Math.floor(100 / colCount)}%`;
+    const isLandscape = colCount > 6;
+
+    // Smart column width allocation based on field content type
+    const NARROW_FIELDS = new Set(['row_number', 'capacity_kwp', 'actual_installed_capacity', 'overall_progress', 'doc_total_count', 'doc_completed_count', 'doc_pending_count', 'fiscal_year', 'intake_year']);
+    const WIDE_FIELDS = new Set(['address', 'project_name', 'note', 'investor_name', 'land_owner', 'coordinates']);
+    const DATE_FIELDS = new Set(['initial_survey_date', 'contract_signed_at', 'doc_審查意見書_issued', 'doc_同意備案_issued', 'structural_cert_date', 'doc_免雜項申請_issued', 'doc_躉售合約_issued', 'electrical_cert_date', 'construction_start_date', 'actual_meter_date', 'doc_設備登記_issued', 'approval_date', 'created_at', 'updated_at']);
+
+    const getWeight = (key: string) => {
+      if (NARROW_FIELDS.has(key)) return 1;
+      if (DATE_FIELDS.has(key)) return 1.8;
+      if (WIDE_FIELDS.has(key)) return 3;
+      return 2;
+    };
+    const totalWeight = selectedFieldList.reduce((sum, f) => sum + getWeight(f.key), 0);
+    const colWidths = selectedFieldList.map(f => `${((getWeight(f.key) / totalWeight) * 100).toFixed(2)}%`);
+
+    // Scale font size based on column count
+    const baseFontSize = colCount <= 6 ? 7 : colCount <= 10 ? 6 : colCount <= 14 ? 5.5 : 5;
+    const headerFontSize = baseFontSize - 0.5;
 
     const pdfStyles = StyleSheet.create({
-      page: { padding: 20, fontFamily: 'NotoSansTC', fontSize: 7 },
+      page: { padding: 20, fontFamily: 'NotoSansTC', fontSize: baseFontSize },
       title: { fontSize: 14, textAlign: 'center', marginBottom: 4 },
       subtitle: { fontSize: 8, textAlign: 'center', marginBottom: 10, color: '#666' },
       table: { width: '100%' },
-      headerRow: { flexDirection: 'row', backgroundColor: '#2563eb', minHeight: 18 },
-      headerCell: { width: colWidth, padding: 3, color: '#ffffff', fontSize: 6.5, fontWeight: 700, borderRight: '0.5px solid #93c5fd' },
-      row: { flexDirection: 'row', minHeight: 16, borderBottom: '0.5px solid #e5e7eb' },
-      rowAlt: { flexDirection: 'row', minHeight: 16, borderBottom: '0.5px solid #e5e7eb', backgroundColor: '#f8fafc' },
-      cell: { width: colWidth, padding: 3, fontSize: 6, borderRight: '0.5px solid #e5e7eb' },
+      headerRow: { flexDirection: 'row', backgroundColor: '#2563eb', minHeight: 16 },
+      row: { flexDirection: 'row', minHeight: 14, borderBottom: '0.5px solid #e5e7eb' },
+      rowAlt: { flexDirection: 'row', minHeight: 14, borderBottom: '0.5px solid #e5e7eb', backgroundColor: '#f8fafc' },
       footer: { position: 'absolute', bottom: 15, left: 20, right: 20, flexDirection: 'row', justifyContent: 'space-between', fontSize: 6, color: '#999' },
     });
 
     const PdfDoc = (
       <Document>
-        <Page size="A4" orientation={colCount > 8 ? 'landscape' : 'portrait'} style={pdfStyles.page}>
+        <Page size="A4" orientation={isLandscape ? 'landscape' : 'portrait'} style={pdfStyles.page}>
           <Text style={pdfStyles.title}>{companyName} - 申請案件列表</Text>
           <Text style={pdfStyles.subtitle}>匯出日期：{timestamp}　共 {rows.length} 筆</Text>
           <View style={pdfStyles.table}>
             <View style={pdfStyles.headerRow}>
               {selectedFieldList.map((f, i) => (
-                <Text key={i} style={pdfStyles.headerCell}>{f.label}</Text>
+                <Text key={i} style={{ width: colWidths[i], padding: 2, color: '#ffffff', fontSize: headerFontSize, fontWeight: 700, borderRight: '0.5px solid #93c5fd' }}>{f.label}</Text>
               ))}
             </View>
             {rows.map((row, rIdx) => (
               <View key={rIdx} style={rIdx % 2 === 0 ? pdfStyles.row : pdfStyles.rowAlt} wrap={false}>
                 {selectedFieldList.map((f, cIdx) => (
-                  <Text key={cIdx} style={pdfStyles.cell}>
+                  <Text key={cIdx} style={{ width: colWidths[cIdx], padding: 2, fontSize: baseFontSize, borderRight: '0.5px solid #e5e7eb' }}>
                     {row[f.label] !== undefined && row[f.label] !== null ? String(row[f.label]) : ''}
                   </Text>
                 ))}
