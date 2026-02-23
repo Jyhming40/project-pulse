@@ -373,13 +373,13 @@ export default function ProjectCustomExport() {
           <View style={pdfStyles.table}>
             <View style={pdfStyles.headerRow}>
               {selectedFieldList.map((f, i) => (
-                <Text key={i} style={{ width: colWidths[i], padding: 2, color: '#ffffff', fontSize: headerFontSize, fontWeight: 700, borderRight: '0.5px solid #93c5fd' }}>{f.label}</Text>
+                <Text key={i} style={{ width: colWidths[i], padding: 2, color: '#ffffff', fontSize: headerFontSize, fontWeight: 700, borderRight: '0.5px solid #93c5fd', overflow: 'hidden' }}>{f.label}</Text>
               ))}
             </View>
             {rows.map((row, rIdx) => (
               <View key={rIdx} style={rIdx % 2 === 0 ? pdfStyles.row : pdfStyles.rowAlt} wrap={false}>
                 {selectedFieldList.map((f, cIdx) => (
-                  <Text key={cIdx} style={{ width: colWidths[cIdx], padding: 2, fontSize: baseFontSize, borderRight: '0.5px solid #e5e7eb' }}>
+                  <Text key={cIdx} style={{ width: colWidths[cIdx], padding: 2, fontSize: baseFontSize, borderRight: '0.5px solid #e5e7eb', overflow: 'hidden' }}>
                     {row[f.label] !== undefined && row[f.label] !== null ? String(row[f.label]) : ''}
                   </Text>
                 ))}
