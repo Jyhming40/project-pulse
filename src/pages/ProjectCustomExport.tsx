@@ -1,21 +1,17 @@
-import { useState, useMemo, useCallback, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState, useMemo, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Download,
   Loader2,
-  Search,
   FileSpreadsheet,
   FileText,
   ChevronDown,
@@ -186,55 +182,20 @@ export default function ProjectCustomExport() {
   const [searchParams] = useSearchParams();
   const { settings } = useAppSettings();
   const [selectedFields, setSelectedFields] = useState<Set<string>>(new Set(PDF_PRESET_FIELDS));
-  const [selectedProjects, setSelectedProjects] = useState<Set<string>>(new Set());
-  const [searchQuery, setSearchQuery] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const [exportFormat, setExportFormat] = useState<ExportFormat>('xlsx');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(Object.keys(FIELD_CATEGORIES))
   );
 
-  // Get filtered IDs from URL params
-  const filteredProjectIds = useMemo(() => {
+  // Get selected IDs from URL params
+  const selectedProjects = useMemo(() => {
     const ids = searchParams.get('ids');
-    return ids ? ids.split(',') : null;
+    return ids ? new Set(ids.split(',')) : new Set<string>();
   }, [searchParams]);
 
-  // Fetch projects — only filtered ones if provided
-  const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ['projects-for-custom-export', filteredProjectIds],
-    queryFn: async () => {
-      let query = supabase
-        .from('projects')
-        .select(`id, project_code, project_name, status, city, district, capacity_kwp, investors(investor_code, company_name)`)
-        .eq('is_deleted', false)
-        .order('project_code', { ascending: true });
-      if (filteredProjectIds && filteredProjectIds.length > 0) {
-        query = query.in('id', filteredProjectIds);
-      }
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
-    },
-  });
-
-  // Auto-select filtered projects on load
-  useEffect(() => {
-    if (filteredProjectIds && filteredProjectIds.length > 0 && projects.length > 0) {
-      setSelectedProjects(new Set(filteredProjectIds));
-    }
-  }, [filteredProjectIds, projects]);
-
-  const filteredProjects = useMemo(() => {
-    if (!searchQuery.trim()) return projects;
-    const q = searchQuery.toLowerCase();
-    return projects.filter(
-      (p) =>
-        p.project_code?.toLowerCase().includes(q) ||
-        p.project_name?.toLowerCase().includes(q) ||
-        p.investors?.company_name?.toLowerCase().includes(q)
-    );
-  }, [projects, searchQuery]);
+  // Project count for display
+  const projectCount = selectedProjects.size;
 
   const toggleCategory = useCallback((cat: string) => {
     setExpandedCategories((prev) => {
@@ -266,20 +227,6 @@ export default function ProjectCustomExport() {
     },
     [selectedFields]
   );
-
-  const toggleProject = useCallback((id: string) => {
-    setSelectedProjects((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-  }, []);
-
-  const toggleAllProjects = useCallback(() => {
-    setSelectedProjects((prev) =>
-      prev.size === filteredProjects.length ? new Set() : new Set(filteredProjects.map((p) => p.id))
-    );
-  }, [filteredProjects]);
 
   const toggleAllFields = useCallback(() => {
     setSelectedFields((prev) =>
@@ -443,7 +390,7 @@ export default function ProjectCustomExport() {
   };
 
   const handleExport = async () => {
-    if (selectedProjects.size === 0) { toast.error('請至少選擇一個案件'); return; }
+    if (projectCount === 0) { toast.error('請先在案場管理頁面選擇案件'); return; }
     if (selectedFields.size === 0) { toast.error('請至少選擇一個欄位'); return; }
 
     setIsExporting(true);
@@ -453,7 +400,7 @@ export default function ProjectCustomExport() {
       } else {
         await exportPdf();
       }
-      toast.success(`成功匯出 ${selectedProjects.size} 筆案件（${exportFormat === 'xlsx' ? 'Excel' : 'PDF'}）`);
+      toast.success(`成功匯出 ${projectCount} 筆案件（${exportFormat === 'xlsx' ? 'Excel' : 'PDF'}）`);
     } catch (error) {
       console.error('Export error:', error);
       toast.error('匯出失敗：' + (error as Error).message);
@@ -475,14 +422,14 @@ export default function ProjectCustomExport() {
               <FileSpreadsheet className="w-6 h-6" />
               自訂欄位匯出
             </h1>
-            <p className="text-sm text-muted-foreground">選擇案件與欄位，匯出 Excel 或 PDF 報表</p>
+            <p className="text-sm text-muted-foreground">已從案場管理選取 {projectCount} 筆案件，選擇欄位後匯出</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <p className="text-sm text-muted-foreground">
-            {selectedProjects.size} 筆案件 × {selectedFields.size} 個欄位
+            {projectCount} 筆案件 × {selectedFields.size} 個欄位
           </p>
-          <Button onClick={handleExport} disabled={isExporting || selectedProjects.size === 0 || selectedFields.size === 0} size="lg">
+          <Button onClick={handleExport} disabled={isExporting || projectCount === 0 || selectedFields.size === 0} size="lg">
             {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
             {isExporting ? '匯出中...' : exportFormat === 'xlsx' ? '匯出 Excel' : '匯出 PDF'}
           </Button>
@@ -512,51 +459,8 @@ export default function ProjectCustomExport() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Project Selection */}
-        <Card className="flex flex-col">
-          <CardContent className="pt-6 flex-1 flex flex-col min-h-0">
-            <div className="flex items-center justify-between mb-3">
-              <Label className="text-sm font-medium">
-                選擇案件
-                <Badge variant="secondary" className="ml-2">{selectedProjects.size}/{projects.length}</Badge>
-              </Label>
-              <Button variant="ghost" size="sm" onClick={toggleAllProjects} className="h-7 text-xs">
-                {selectedProjects.size === filteredProjects.length ? (
-                  <><Square className="w-3 h-3 mr-1" />取消全選</>
-                ) : (
-                  <><CheckSquare className="w-3 h-3 mr-1" />全選</>
-                )}
-              </Button>
-            </div>
-            <div className="relative mb-3">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="搜尋案件編號、名稱..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-8" />
-            </div>
-            <ScrollArea className="flex-1 border rounded-md" style={{ maxHeight: 'calc(100vh - 380px)' }}>
-              <div className="p-2 space-y-1">
-                {projectsLoading ? (
-                  <div className="flex items-center justify-center py-8"><Loader2 className="w-4 h-4 animate-spin" /></div>
-                ) : filteredProjects.length === 0 ? (
-                  <p className="text-sm text-muted-foreground text-center py-8">無符合條件的案件</p>
-                ) : (
-                  filteredProjects.map((project) => (
-                    <div key={project.id} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50 cursor-pointer" onClick={() => toggleProject(project.id)}>
-                      <Checkbox checked={selectedProjects.has(project.id)} onCheckedChange={() => toggleProject(project.id)} />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{project.project_code} - {project.project_name}</p>
-                        <p className="text-xs text-muted-foreground truncate">{project.investors?.company_name || '—'} • {project.city} {project.district}</p>
-                      </div>
-                      <Badge variant="outline" className="shrink-0 text-xs">{project.status}</Badge>
-                    </div>
-                  ))
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        {/* Field Selection */}
+      <div>
+        {/* Field Selection - full width */}
         <Card className="flex flex-col">
           <CardContent className="pt-6 flex-1 flex flex-col min-h-0">
             <div className="flex items-center justify-between mb-3">
