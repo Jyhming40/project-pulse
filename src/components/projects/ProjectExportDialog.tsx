@@ -197,15 +197,19 @@ export function ProjectExportDialog({ open, onOpenChange, filteredProjectIds }: 
     new Set(Object.keys(FIELD_CATEGORIES))
   );
 
-  // Fetch all projects for selection
+  // Fetch projects for selection — only filtered ones if provided
   const { data: projects = [], isLoading: projectsLoading } = useQuery({
-    queryKey: ['projects-for-custom-export'],
+    queryKey: ['projects-for-custom-export', filteredProjectIds],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('projects')
         .select(`id, project_code, project_name, status, city, district, capacity_kwp, investors(investor_code, company_name)`)
         .eq('is_deleted', false)
         .order('project_code', { ascending: true });
+      if (filteredProjectIds && filteredProjectIds.length > 0) {
+        query = query.in('id', filteredProjectIds);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },
@@ -488,7 +492,8 @@ export function ProjectExportDialog({ open, onOpenChange, filteredProjectIds }: 
           </SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-hidden flex flex-col gap-4 py-4">
+        <ScrollArea className="flex-1 min-h-0">
+        <div className="flex flex-col gap-4 py-4 pr-3">
           {/* Format Selection */}
           <div className="space-y-2">
             <Label className="text-sm font-medium">匯出格式</Label>
@@ -556,7 +561,7 @@ export function ProjectExportDialog({ open, onOpenChange, filteredProjectIds }: 
           <Separator />
 
           {/* Field Selection */}
-          <div className="space-y-2 flex-1 min-h-0 flex flex-col">
+          <div className="space-y-2">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">
                 選擇欄位
@@ -575,7 +580,7 @@ export function ProjectExportDialog({ open, onOpenChange, filteredProjectIds }: 
                 </Button>
               </div>
             </div>
-            <ScrollArea className="flex-1 border rounded-md">
+            <div className="border rounded-md">
               <div className="p-2 space-y-2">
                 {Object.entries(FIELD_CATEGORIES).map(([catKey, cat]) => {
                   const Icon = cat.icon;
@@ -613,9 +618,10 @@ export function ProjectExportDialog({ open, onOpenChange, filteredProjectIds }: 
                   );
                 })}
               </div>
-            </ScrollArea>
+            </div>
           </div>
         </div>
+        </ScrollArea>
 
         <SheetFooter className="border-t pt-4">
           <div className="flex items-center justify-between w-full gap-3">
