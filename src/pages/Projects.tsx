@@ -1534,6 +1534,15 @@ export default function Projects() {
               icon: BatchActionIcons.edit,
               onClick: () => setIsBatchUpdateOpen(true),
             },
+            {
+              key: 'custom-export',
+              label: '自訂匯出',
+              icon: BatchActionIcons.export,
+              onClick: () => {
+                const ids = Array.from(batchSelect.selectedIds).join(',');
+                navigate(`/projects/export?ids=${ids}`);
+              },
+            },
             ...(isDriveConnected ? [{
               key: 'drive',
               label: '管理 Drive 資料夾',
