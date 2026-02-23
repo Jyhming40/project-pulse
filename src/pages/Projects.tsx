@@ -54,8 +54,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ImportExportDialog } from '@/components/ImportExportDialog';
 import { ProjectBackupDialog } from '@/components/ProjectBackupDialog';
-import { ProjectExportDialog } from '@/components/projects/ProjectExportDialog';
-import { 
+import {
   Select, 
   SelectContent, 
   SelectItem, 
@@ -210,8 +209,7 @@ export default function Projects() {
   // Batch Drive Folder Dialog
   const [isBatchDriveFolderOpen, setIsBatchDriveFolderOpen] = useState(false);
   
-  // Custom Export Dialog
-  const [isCustomExportOpen, setIsCustomExportOpen] = useState(false);
+  
   
   // Drive auth check
   const { isAuthorized: isDriveConnected } = useDriveAuth();
@@ -755,7 +753,10 @@ export default function Projects() {
                 完整備份
               </Button>
             </PermissionGate>
-            <Button variant="outline" onClick={() => setIsCustomExportOpen(true)}>
+            <Button variant="outline" onClick={() => {
+              const ids = filteredProjects.map(p => p.id).join(',');
+              navigate(`/projects/export?ids=${ids}`);
+            }}>
               <FileSpreadsheet className="w-4 h-4 mr-2" />
               自訂匯出
             </Button>
@@ -1590,12 +1591,7 @@ export default function Projects() {
         </DialogContent>
       </Dialog>
 
-      {/* Custom Export Dialog */}
-      <ProjectExportDialog
-        open={isCustomExportOpen}
-        onOpenChange={setIsCustomExportOpen}
-        filteredProjectIds={filteredProjects.map(p => p.id)}
-      />
+
 
       {/* Project Detail Drawer */}
       <ProjectDetailDrawer

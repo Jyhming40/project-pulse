@@ -14,6 +14,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Hub from "./pages/Hub";
 import Projects from "./pages/Projects";
+import ProjectCustomExport from "./pages/ProjectCustomExport";
 import ProjectDetail from "./pages/ProjectDetail";
 import Investors from "./pages/Investors";
 import Documents from "./pages/Documents";
@@ -113,6 +114,7 @@ const App = () => (
               
               {/* Layer 3: 專案戰情室 */}
               <Route path="/projects" element={<ProtectedRoute><Layout><Projects /></Layout></ProtectedRoute>} />
+              <Route path="/projects/export" element={<ProtectedRoute><Layout><ProjectCustomExport /></Layout></ProtectedRoute>} />
               <Route path="/projects/compare" element={<ProtectedRoute><Layout><ProjectComparison /></Layout></ProtectedRoute>} />
               <Route path="/projects/:id" element={<ProtectedRoute><Layout><ProjectDetail /></Layout></ProtectedRoute>} />
               
