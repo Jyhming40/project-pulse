@@ -43,13 +43,19 @@ const AVAILABLE_FORMS = [
     description: '進場申請與核准紀錄',
     status: 'ready' as const,
   },
+  {
+    to: '/om/incident-report',
+    icon: AlertTriangle,
+    label: '表 3-6：電廠異常處理單',
+    description: '異常通報、處理追蹤與結案紀錄',
+    status: 'ready' as const,
+  },
 ];
 
 const UPCOMING_FORMS = [
   { icon: FileText, label: '表 3-2：維護保養檢查表', description: '11 大檢查區塊季度巡檢' },
   { icon: Zap, label: '表 3-3：DC 開路電壓測試', description: 'DC 端測試數據' },
   { icon: Zap, label: '表 3-4：AC 測試檢查表', description: 'AC 端測試數據' },
-  { icon: AlertTriangle, label: '表 3-6：電廠異常處理單', description: '異常通報與追蹤' },
 ];
 
 export default function OmHub() {
