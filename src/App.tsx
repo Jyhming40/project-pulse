@@ -43,6 +43,7 @@ import SiteAccessForm from "./pages/om/SiteAccessForm";
 import IncidentReportForm from "./pages/om/IncidentReportForm";
 import DcTestForm from "./pages/om/DcTestForm";
 import AcTestForm from "./pages/om/AcTestForm";
+import InspectionForm from "./pages/om/InspectionForm";
 
 // Workspace Module pages
 import { 
@@ -145,6 +146,7 @@ const App = () => (
               <Route path="/om/incident-report" element={<ProtectedRoute><Layout><IncidentReportForm /></Layout></ProtectedRoute>} />
               <Route path="/om/dc-test" element={<ProtectedRoute><Layout><DcTestForm /></Layout></ProtectedRoute>} />
               <Route path="/om/ac-test" element={<ProtectedRoute><Layout><AcTestForm /></Layout></ProtectedRoute>} />
+              <Route path="/om/inspection" element={<ProtectedRoute><Layout><InspectionForm /></Layout></ProtectedRoute>} />
               
               {/* 管理與設定 (Admin) */}
               <Route path="/users" element={

@@ -30,9 +30,8 @@ export const OM_NAV_ITEMS: OmNavItem[] = [
   { to: '/om/incident-report', icon: AlertTriangle, label: '表 3-6 異常處理' },
   { to: '/om/dc-test', icon: Zap, label: '表 3-3 DC 測試' },
   { to: '/om/ac-test', icon: Zap, label: '表 3-4 AC 測試' },
-];
-
-// 未來擴充的表格（Phase 2+）
-export const OM_NAV_ITEMS_FUTURE: OmNavItem[] = [
   { to: '/om/inspection', icon: FileText, label: '表 3-2 巡檢紀錄' },
 ];
+
+// 未來擴充（Phase 2+）
+export const OM_NAV_ITEMS_FUTURE: OmNavItem[] = [];
