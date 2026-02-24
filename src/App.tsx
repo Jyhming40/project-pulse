@@ -40,6 +40,7 @@ import OmHub from "./pages/om/OmHub";
 import PersonnelRosterForm from "./pages/om/PersonnelRosterForm";
 import ToolboxMeetingForm from "./pages/om/ToolboxMeetingForm";
 import SiteAccessForm from "./pages/om/SiteAccessForm";
+import IncidentReportForm from "./pages/om/IncidentReportForm";
 
 // Workspace Module pages
 import { 
@@ -139,6 +140,7 @@ const App = () => (
               <Route path="/om/personnel-roster" element={<ProtectedRoute><Layout><PersonnelRosterForm /></Layout></ProtectedRoute>} />
               <Route path="/om/toolbox-meeting" element={<ProtectedRoute><Layout><ToolboxMeetingForm /></Layout></ProtectedRoute>} />
               <Route path="/om/site-access" element={<ProtectedRoute><Layout><SiteAccessForm /></Layout></ProtectedRoute>} />
+              <Route path="/om/incident-report" element={<ProtectedRoute><Layout><IncidentReportForm /></Layout></ProtectedRoute>} />
               
               {/* 管理與設定 (Admin) */}
               <Route path="/users" element={
