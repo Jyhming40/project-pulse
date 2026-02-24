@@ -36,6 +36,13 @@ const AVAILABLE_FORMS = [
     description: '勤前教育、危害告知與安全宣導',
     status: 'ready' as const,
   },
+  {
+    to: '/om/site-access',
+    icon: Shield,
+    label: '表 3-7：工程進場施作申請單',
+    description: '進場申請與核准紀錄',
+    status: 'ready' as const,
+  },
 ];
 
 const UPCOMING_FORMS = [
@@ -43,7 +50,6 @@ const UPCOMING_FORMS = [
   { icon: Zap, label: '表 3-3：DC 開路電壓測試', description: 'DC 端測試數據' },
   { icon: Zap, label: '表 3-4：AC 測試檢查表', description: 'AC 端測試數據' },
   { icon: AlertTriangle, label: '表 3-6：電廠異常處理單', description: '異常通報與追蹤' },
-  { icon: Shield, label: '表 3-7：工程進場施作申請單', description: '進場申請與核准' },
 ];
 
 export default function OmHub() {

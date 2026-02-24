@@ -26,6 +26,7 @@ export const OM_NAV_ITEMS: OmNavItem[] = [
   { to: '/om/cleaning-report', icon: ClipboardList, label: '表 3-5 清洗報告' },
   { to: '/om/personnel-roster', icon: Users, label: '表 3-8 人員名冊' },
   { to: '/om/toolbox-meeting', icon: HardHat, label: '表 3-9 工具箱會議' },
+  { to: '/om/site-access', icon: Shield, label: '表 3-7 進場申請' },
 ];
 
 // 未來擴充的表格（Phase 2+）
