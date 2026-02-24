@@ -36,6 +36,9 @@ import QuoteWizard from "./pages/QuoteWizard";
 import Memos from "./pages/Memos";
 import NotFound from "./pages/NotFound";
 import CleaningReportForm from "./pages/om/CleaningReportForm";
+import OmHub from "./pages/om/OmHub";
+import PersonnelRosterForm from "./pages/om/PersonnelRosterForm";
+import ToolboxMeetingForm from "./pages/om/ToolboxMeetingForm";
 
 // Workspace Module pages
 import { 
@@ -129,8 +132,11 @@ const App = () => (
               <Route path="/quotes/:id" element={<ProtectedRoute><Layout><QuoteWizard /></Layout></ProtectedRoute>} />
               <Route path="/memos" element={<ProtectedRoute><Layout><Memos /></Layout></ProtectedRoute>} />
               
-              {/* 維運表單 (O&M Forms) */}
+              {/* 維運表單 (O&M Module) */}
+              <Route path="/om" element={<ProtectedRoute><Layout><OmHub /></Layout></ProtectedRoute>} />
               <Route path="/om/cleaning-report" element={<ProtectedRoute><Layout><CleaningReportForm /></Layout></ProtectedRoute>} />
+              <Route path="/om/personnel-roster" element={<ProtectedRoute><Layout><PersonnelRosterForm /></Layout></ProtectedRoute>} />
+              <Route path="/om/toolbox-meeting" element={<ProtectedRoute><Layout><ToolboxMeetingForm /></Layout></ProtectedRoute>} />
               
               {/* 管理與設定 (Admin) */}
               <Route path="/users" element={

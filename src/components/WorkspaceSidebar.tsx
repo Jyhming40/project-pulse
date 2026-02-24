@@ -13,6 +13,7 @@ import {
   getWorkspaceById,
   WorkspaceNavItem,
 } from '@/config/moduleRegistry';
+import { OM_NAV_ITEMS } from '@/config/omNavItems';
 import {
   Collapsible,
   CollapsibleContent,
@@ -60,6 +61,7 @@ export default function WorkspaceSidebar({ collapsed }: WorkspaceSidebarProps) {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [governanceOpen, setGovernanceOpen] = useState(false);
+  const [omOpen, setOmOpen] = useState(false);
 
   const handleSignOut = async () => {
     await signOut();
@@ -264,6 +266,14 @@ export default function WorkspaceSidebar({ collapsed }: WorkspaceSidebarProps) {
             )}
             {workspaceDef.navItems.map(renderNavItem)}
           </>
+        )}
+
+        {/* O&M Section */}
+        {renderCollapsibleSection(
+          '維運 O&M',
+          OM_NAV_ITEMS,
+          omOpen,
+          setOmOpen
         )}
 
         {/* Admin Sections */}
