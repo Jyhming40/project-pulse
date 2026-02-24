@@ -41,6 +41,8 @@ import PersonnelRosterForm from "./pages/om/PersonnelRosterForm";
 import ToolboxMeetingForm from "./pages/om/ToolboxMeetingForm";
 import SiteAccessForm from "./pages/om/SiteAccessForm";
 import IncidentReportForm from "./pages/om/IncidentReportForm";
+import DcTestForm from "./pages/om/DcTestForm";
+import AcTestForm from "./pages/om/AcTestForm";
 
 // Workspace Module pages
 import { 
@@ -141,6 +143,8 @@ const App = () => (
               <Route path="/om/toolbox-meeting" element={<ProtectedRoute><Layout><ToolboxMeetingForm /></Layout></ProtectedRoute>} />
               <Route path="/om/site-access" element={<ProtectedRoute><Layout><SiteAccessForm /></Layout></ProtectedRoute>} />
               <Route path="/om/incident-report" element={<ProtectedRoute><Layout><IncidentReportForm /></Layout></ProtectedRoute>} />
+              <Route path="/om/dc-test" element={<ProtectedRoute><Layout><DcTestForm /></Layout></ProtectedRoute>} />
+              <Route path="/om/ac-test" element={<ProtectedRoute><Layout><AcTestForm /></Layout></ProtectedRoute>} />
               
               {/* 管理與設定 (Admin) */}
               <Route path="/users" element={

@@ -50,12 +50,24 @@ const AVAILABLE_FORMS = [
     description: '異常通報、處理追蹤與結案紀錄',
     status: 'ready' as const,
   },
+  {
+    to: '/om/dc-test',
+    icon: Zap,
+    label: '表 3-3：DC 開路電壓測試自主檢查表',
+    description: 'DC 端串列開路電壓測試數據',
+    status: 'ready' as const,
+  },
+  {
+    to: '/om/ac-test',
+    icon: Zap,
+    label: '表 3-4：AC 測試自主檢查表',
+    description: 'AC 端電壓、電流、頻率、接地及絕緣測試',
+    status: 'ready' as const,
+  },
 ];
 
 const UPCOMING_FORMS = [
   { icon: FileText, label: '表 3-2：維護保養檢查表', description: '11 大檢查區塊季度巡檢' },
-  { icon: Zap, label: '表 3-3：DC 開路電壓測試', description: 'DC 端測試數據' },
-  { icon: Zap, label: '表 3-4：AC 測試檢查表', description: 'AC 端測試數據' },
 ];
 
 export default function OmHub() {
