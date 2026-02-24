@@ -64,11 +64,16 @@ const AVAILABLE_FORMS = [
     description: 'AC 端電壓、電流、頻率、接地及絕緣測試',
     status: 'ready' as const,
   },
+  {
+    to: '/om/inspection',
+    icon: FileText,
+    label: '表 3-2：維護保養檢查表',
+    description: '太陽光電系統 11 大檢查區塊巡檢紀錄',
+    status: 'ready' as const,
+  },
 ];
 
-const UPCOMING_FORMS = [
-  { icon: FileText, label: '表 3-2：維護保養檢查表', description: '11 大檢查區塊季度巡檢' },
-];
+const UPCOMING_FORMS: { icon: typeof FileText; label: string; description: string }[] = [];
 
 export default function OmHub() {
   const navigate = useNavigate();
