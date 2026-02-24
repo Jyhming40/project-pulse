@@ -20,6 +20,8 @@ export const MODULES = {
   GOVERNANCE: 'governance',
   FINANCE: 'finance',
   RISK: 'risk',
+  // 維運模組
+  OM: 'om',
 } as const;
 
 // 預留角色類型（未來可擴充）
@@ -50,6 +52,8 @@ export const MODULE_LABELS: Record<ModuleName, string> = {
   [MODULES.GOVERNANCE]: '文件治理',
   [MODULES.FINANCE]: '財務與投資',
   [MODULES.RISK]: '風險與爭議',
+  // 維運模組
+  [MODULES.OM]: '維運管理',
 };
 
 export interface ModulePermission {
