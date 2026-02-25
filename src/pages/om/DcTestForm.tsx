@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Download, Loader2, Zap, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateDcTestPdf, type DcTestData, type DcTestRow } from '@/lib/dcTestPdf';
+import { useOmFormPersistence } from '@/hooks/useOmFormPersistence';
+import { OmSaveLoadBar } from '@/components/om/OmSaveLoadBar';
 
 const emptyRow = (): DcTestRow => ({ stringId: '', moduleCount: 0, expectedVoc: 0, measuredVoc: 0, result: '', note: '' });
 
@@ -20,10 +22,37 @@ const INITIAL_DATA: DcTestData = {
   reviewerName: '', note: '',
 };
 
+const toRow = (d: DcTestData) => ({
+  project_name: d.projectName, site_location: d.siteLocation,
+  inverter_model: d.inverterModel, inverter_id: d.inverterId,
+  test_date: d.testDate || null, tester_name: d.testerName,
+  weather_condition: d.weatherCondition, ambient_temp: d.ambientTemp,
+  irradiance: d.irradiance, rows: d.rows,
+  reviewer_name: d.reviewerName, note: d.note,
+});
+
+const fromRow = (r: Record<string, unknown>): DcTestData => ({
+  projectName: (r.project_name as string) || '',
+  siteLocation: (r.site_location as string) || '',
+  inverterModel: (r.inverter_model as string) || '',
+  inverterId: (r.inverter_id as string) || '',
+  testDate: (r.test_date as string) || '',
+  testerName: (r.tester_name as string) || '',
+  weatherCondition: (r.weather_condition as string) || '',
+  ambientTemp: (r.ambient_temp as string) || '',
+  irradiance: (r.irradiance as string) || '',
+  rows: (r.rows as DcTestRow[]) || [],
+  reviewerName: (r.reviewer_name as string) || '',
+  note: (r.note as string) || '',
+});
+
 export default function DcTestForm() {
   const navigate = useNavigate();
   const [data, setData] = useState<DcTestData>(INITIAL_DATA);
   const [isExporting, setIsExporting] = useState(false);
+  const persistence = useOmFormPersistence<DcTestData>({ table: 'om_dc_tests', toRow, fromRow });
+
+  useEffect(() => { persistence.fetchList('project_name', 'test_date'); }, []);
 
   const update = useCallback(<K extends keyof DcTestData>(field: K, value: DcTestData[K]) => {
     setData((prev) => ({ ...prev, [field]: value }));
@@ -48,6 +77,9 @@ export default function DcTestForm() {
     finally { setIsExporting(false); }
   };
 
+  const handleLoad = async (id: string) => { const loaded = await persistence.loadRecord(id); if (loaded) setData(loaded); };
+  const handleNew = () => { setData(INITIAL_DATA); persistence.resetRecord(); };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -64,6 +96,9 @@ export default function DcTestForm() {
         </Button>
       </div>
 
+      <OmSaveLoadBar recordId={persistence.recordId} isSaving={persistence.isSaving} isLoading={persistence.isLoading}
+        savedRecords={persistence.savedRecords} onSave={() => persistence.save(data)} onLoad={handleLoad} onNew={handleNew} />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader><CardTitle className="text-base">基本資訊</CardTitle></CardHeader>
@@ -79,7 +114,6 @@ export default function DcTestForm() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader><CardTitle className="text-base">測試條件</CardTitle></CardHeader>
           <CardContent className="space-y-4">
@@ -96,7 +130,6 @@ export default function DcTestForm() {
         </Card>
       </div>
 
-      {/* Test Data Table */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle className="text-base">串列測試數據</CardTitle>

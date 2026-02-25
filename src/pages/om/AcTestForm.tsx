@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,6 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Download, Loader2, Zap, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateAcTestPdf, getDefaultAcRows, type AcTestData, type AcTestRow } from '@/lib/acTestPdf';
+import { useOmFormPersistence } from '@/hooks/useOmFormPersistence';
+import { OmSaveLoadBar } from '@/components/om/OmSaveLoadBar';
 
 const INITIAL_DATA: AcTestData = {
   projectName: '', siteLocation: '', inverterModel: '', inverterId: '',
@@ -18,10 +20,37 @@ const INITIAL_DATA: AcTestData = {
   reviewerName: '', note: '',
 };
 
+const toRow = (d: AcTestData) => ({
+  project_name: d.projectName, site_location: d.siteLocation,
+  inverter_model: d.inverterModel, inverter_id: d.inverterId,
+  test_date: d.testDate || null, tester_name: d.testerName,
+  meter_number: d.meterNumber, grid_voltage: d.gridVoltage,
+  grid_frequency: d.gridFrequency, rows: d.rows,
+  reviewer_name: d.reviewerName, note: d.note,
+});
+
+const fromRow = (r: Record<string, unknown>): AcTestData => ({
+  projectName: (r.project_name as string) || '',
+  siteLocation: (r.site_location as string) || '',
+  inverterModel: (r.inverter_model as string) || '',
+  inverterId: (r.inverter_id as string) || '',
+  testDate: (r.test_date as string) || '',
+  testerName: (r.tester_name as string) || '',
+  meterNumber: (r.meter_number as string) || '',
+  gridVoltage: (r.grid_voltage as string) || '',
+  gridFrequency: (r.grid_frequency as string) || '',
+  rows: (r.rows as AcTestRow[]) || getDefaultAcRows(),
+  reviewerName: (r.reviewer_name as string) || '',
+  note: (r.note as string) || '',
+});
+
 export default function AcTestForm() {
   const navigate = useNavigate();
   const [data, setData] = useState<AcTestData>(INITIAL_DATA);
   const [isExporting, setIsExporting] = useState(false);
+  const persistence = useOmFormPersistence<AcTestData>({ table: 'om_ac_tests', toRow, fromRow });
+
+  useEffect(() => { persistence.fetchList('project_name', 'test_date'); }, []);
 
   const update = useCallback(<K extends keyof AcTestData>(field: K, value: AcTestData[K]) => {
     setData((prev) => ({ ...prev, [field]: value }));
@@ -36,10 +65,8 @@ export default function AcTestForm() {
   }, []);
 
   const addRow = useCallback(() => setData((prev) => ({
-    ...prev,
-    rows: [...prev.rows, { itemId: String(prev.rows.length + 1), testItem: '', standard: '', measuredValue: '', result: '', note: '' }],
+    ...prev, rows: [...prev.rows, { itemId: String(prev.rows.length + 1), testItem: '', standard: '', measuredValue: '', result: '', note: '' }],
   })), []);
-
   const removeRow = useCallback((idx: number) => setData((prev) => ({ ...prev, rows: prev.rows.filter((_, i) => i !== idx) })), []);
 
   const handleExport = async () => {
@@ -49,6 +76,9 @@ export default function AcTestForm() {
     catch (err) { console.error(err); toast.error('PDF 產生失敗：' + (err as Error).message); }
     finally { setIsExporting(false); }
   };
+
+  const handleLoad = async (id: string) => { const loaded = await persistence.loadRecord(id); if (loaded) setData(loaded); };
+  const handleNew = () => { setData({ ...INITIAL_DATA, rows: getDefaultAcRows() }); persistence.resetRecord(); };
 
   return (
     <div className="space-y-6">
@@ -66,6 +96,9 @@ export default function AcTestForm() {
         </Button>
       </div>
 
+      <OmSaveLoadBar recordId={persistence.recordId} isSaving={persistence.isSaving} isLoading={persistence.isLoading}
+        savedRecords={persistence.savedRecords} onSave={() => persistence.save(data)} onLoad={handleLoad} onNew={handleNew} />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader><CardTitle className="text-base">基本資訊</CardTitle></CardHeader>
@@ -81,7 +114,6 @@ export default function AcTestForm() {
             </div>
           </CardContent>
         </Card>
-
         <Card>
           <CardHeader><CardTitle className="text-base">電網與設備</CardTitle></CardHeader>
           <CardContent className="space-y-4">
