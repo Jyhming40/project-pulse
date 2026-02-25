@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { ArrowLeft, Download, Loader2, FileText, CheckCircle2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { generateInspectionPdf, DEFAULT_SECTIONS, type InspectionData, type InspectionSection } from '@/lib/inspectionPdf';
+import { useOmFormPersistence } from '@/hooks/useOmFormPersistence';
+import { OmSaveLoadBar } from '@/components/om/OmSaveLoadBar';
 
 function deepCloneSections(): InspectionSection[] {
   return DEFAULT_SECTIONS.map(sec => ({
@@ -28,10 +30,35 @@ const INITIAL_DATA: InspectionData = {
   overallNote: '', reviewerName: '',
 };
 
+const toRow = (d: InspectionData) => ({
+  project_name: d.projectName, site_location: d.siteLocation, capacity_kw: d.capacityKw,
+  inspection_date: d.inspectionDate || null, inspection_type: d.inspectionType,
+  inspector_name: d.inspectorName, weather_condition: d.weatherCondition,
+  ambient_temp: d.ambientTemp, sections: JSON.parse(JSON.stringify(d.sections)),
+  overall_note: d.overallNote, reviewer_name: d.reviewerName,
+});
+
+const fromRow = (r: Record<string, unknown>): InspectionData => ({
+  projectName: (r.project_name as string) || '',
+  siteLocation: (r.site_location as string) || '',
+  capacityKw: (r.capacity_kw as string) || '',
+  inspectionDate: (r.inspection_date as string) || '',
+  inspectionType: (r.inspection_type as InspectionData['inspectionType']) || 'quarterly',
+  inspectorName: (r.inspector_name as string) || '',
+  weatherCondition: (r.weather_condition as string) || '',
+  ambientTemp: (r.ambient_temp as string) || '',
+  sections: (r.sections as InspectionSection[]) || deepCloneSections(),
+  overallNote: (r.overall_note as string) || '',
+  reviewerName: (r.reviewer_name as string) || '',
+});
+
 export default function InspectionForm() {
   const navigate = useNavigate();
   const [data, setData] = useState<InspectionData>(INITIAL_DATA);
   const [isExporting, setIsExporting] = useState(false);
+  const persistence = useOmFormPersistence<InspectionData>({ table: 'om_inspections', toRow, fromRow });
+
+  useEffect(() => { persistence.fetchList('project_name', 'inspection_date'); }, []);
 
   const update = useCallback(<K extends keyof InspectionData>(field: K, value: InspectionData[K]) => {
     setData((prev) => ({ ...prev, [field]: value }));
@@ -41,10 +68,7 @@ export default function InspectionForm() {
     setData((prev) => {
       const sections = prev.sections.map((sec, si) => {
         if (si !== secIdx) return sec;
-        return {
-          ...sec,
-          items: sec.items.map((item, ii) => ii === itemIdx ? { ...item, [field]: value } : item),
-        };
+        return { ...sec, items: sec.items.map((item, ii) => ii === itemIdx ? { ...item, [field]: value } : item) };
       });
       return { ...prev, sections };
     });
@@ -68,6 +92,16 @@ export default function InspectionForm() {
     finally { setIsExporting(false); }
   };
 
+  const handleLoad = async (id: string) => {
+    const loaded = await persistence.loadRecord(id);
+    if (loaded) setData(loaded);
+  };
+
+  const handleNew = () => {
+    setData({ ...INITIAL_DATA, sections: deepCloneSections() });
+    persistence.resetRecord();
+  };
+
   const totalItems = data.sections.reduce((s, sec) => s + sec.items.length, 0);
   const normalCount = data.sections.reduce((s, sec) => s + sec.items.filter(i => i.result === 'normal').length, 0);
   const abnormalCount = data.sections.reduce((s, sec) => s + sec.items.filter(i => i.result === 'abnormal').length, 0);
@@ -82,11 +116,23 @@ export default function InspectionForm() {
             <p className="text-sm text-muted-foreground">太陽光電系統 11 大檢查區塊巡檢紀錄</p>
           </div>
         </div>
-        <Button onClick={handleExport} disabled={isExporting} size="lg">
-          {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-          {isExporting ? '產生中...' : '產生 PDF'}
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button onClick={handleExport} disabled={isExporting} size="lg">
+            {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+            {isExporting ? '產生中...' : '產生 PDF'}
+          </Button>
+        </div>
       </div>
+
+      <OmSaveLoadBar
+        recordId={persistence.recordId}
+        isSaving={persistence.isSaving}
+        isLoading={persistence.isLoading}
+        savedRecords={persistence.savedRecords}
+        onSave={() => persistence.save(data)}
+        onLoad={handleLoad}
+        onNew={handleNew}
+      />
 
       {/* Summary badges */}
       <div className="flex items-center gap-3 flex-wrap">
