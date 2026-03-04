@@ -1479,6 +1479,725 @@ export type Database = {
           },
         ]
       }
+      om_ac_tests: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          grid_frequency: string | null
+          grid_voltage: string | null
+          id: string
+          inverter_id: string | null
+          inverter_model: string | null
+          meter_number: string | null
+          note: string | null
+          project_id: string | null
+          project_name: string
+          reviewer_name: string | null
+          rows: Json
+          site_location: string | null
+          test_date: string
+          tester_name: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          grid_frequency?: string | null
+          grid_voltage?: string | null
+          id?: string
+          inverter_id?: string | null
+          inverter_model?: string | null
+          meter_number?: string | null
+          note?: string | null
+          project_id?: string | null
+          project_name: string
+          reviewer_name?: string | null
+          rows?: Json
+          site_location?: string | null
+          test_date?: string
+          tester_name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          grid_frequency?: string | null
+          grid_voltage?: string | null
+          id?: string
+          inverter_id?: string | null
+          inverter_model?: string | null
+          meter_number?: string | null
+          note?: string | null
+          project_id?: string | null
+          project_name?: string
+          reviewer_name?: string | null
+          rows?: Json
+          site_location?: string | null
+          test_date?: string
+          tester_name?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "om_ac_tests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "om_ac_tests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "om_ac_tests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      om_cleaning_reports: {
+        Row: {
+          contractor: string | null
+          contractor_sign_name: string | null
+          created_at: string
+          created_by: string | null
+          damaged_count: string | null
+          description: string | null
+          handler_name: string | null
+          id: string
+          inspection_date: string
+          manager_name: string | null
+          module_count: string | null
+          module_damage: string | null
+          owner_inspector: string | null
+          project_id: string | null
+          roof_leak: string | null
+          site_code: string | null
+          site_location: string | null
+          site_name: string
+          updated_at: string
+          workers: string | null
+        }
+        Insert: {
+          contractor?: string | null
+          contractor_sign_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          damaged_count?: string | null
+          description?: string | null
+          handler_name?: string | null
+          id?: string
+          inspection_date?: string
+          manager_name?: string | null
+          module_count?: string | null
+          module_damage?: string | null
+          owner_inspector?: string | null
+          project_id?: string | null
+          roof_leak?: string | null
+          site_code?: string | null
+          site_location?: string | null
+          site_name: string
+          updated_at?: string
+          workers?: string | null
+        }
+        Update: {
+          contractor?: string | null
+          contractor_sign_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          damaged_count?: string | null
+          description?: string | null
+          handler_name?: string | null
+          id?: string
+          inspection_date?: string
+          manager_name?: string | null
+          module_count?: string | null
+          module_damage?: string | null
+          owner_inspector?: string | null
+          project_id?: string | null
+          roof_leak?: string | null
+          site_code?: string | null
+          site_location?: string | null
+          site_name?: string
+          updated_at?: string
+          workers?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "om_cleaning_reports_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "om_cleaning_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "om_cleaning_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      om_dc_tests: {
+        Row: {
+          ambient_temp: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          inverter_id: string | null
+          inverter_model: string | null
+          irradiance: string | null
+          note: string | null
+          project_id: string | null
+          project_name: string
+          reviewer_name: string | null
+          rows: Json
+          site_location: string | null
+          test_date: string
+          tester_name: string | null
+          updated_at: string
+          weather_condition: string | null
+        }
+        Insert: {
+          ambient_temp?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inverter_id?: string | null
+          inverter_model?: string | null
+          irradiance?: string | null
+          note?: string | null
+          project_id?: string | null
+          project_name: string
+          reviewer_name?: string | null
+          rows?: Json
+          site_location?: string | null
+          test_date?: string
+          tester_name?: string | null
+          updated_at?: string
+          weather_condition?: string | null
+        }
+        Update: {
+          ambient_temp?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inverter_id?: string | null
+          inverter_model?: string | null
+          irradiance?: string | null
+          note?: string | null
+          project_id?: string | null
+          project_name?: string
+          reviewer_name?: string | null
+          rows?: Json
+          site_location?: string | null
+          test_date?: string
+          tester_name?: string | null
+          updated_at?: string
+          weather_condition?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "om_dc_tests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "om_dc_tests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "om_dc_tests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      om_incident_reports: {
+        Row: {
+          affected_capacity_kw: number | null
+          arrival_date: string | null
+          arrival_time: string | null
+          categories: string[] | null
+          created_at: string
+          created_by: string | null
+          discovered_by: string | null
+          estimated_loss_kwh: number | null
+          id: string
+          immediate_action: string | null
+          incident_date: string | null
+          incident_description: string | null
+          incident_time: string | null
+          note: string | null
+          other_category: string | null
+          parts_replaced: string | null
+          preventive_measures: string | null
+          project_id: string | null
+          project_name: string
+          repair_date: string | null
+          repair_description: string | null
+          repair_result: string | null
+          repair_time: string | null
+          report_date: string
+          report_number: string | null
+          reporter_name: string | null
+          reporter_phone: string | null
+          reviewer_name: string | null
+          reviewer_title: string | null
+          severity: string | null
+          site_location: string | null
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          affected_capacity_kw?: number | null
+          arrival_date?: string | null
+          arrival_time?: string | null
+          categories?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          discovered_by?: string | null
+          estimated_loss_kwh?: number | null
+          id?: string
+          immediate_action?: string | null
+          incident_date?: string | null
+          incident_description?: string | null
+          incident_time?: string | null
+          note?: string | null
+          other_category?: string | null
+          parts_replaced?: string | null
+          preventive_measures?: string | null
+          project_id?: string | null
+          project_name: string
+          repair_date?: string | null
+          repair_description?: string | null
+          repair_result?: string | null
+          repair_time?: string | null
+          report_date?: string
+          report_number?: string | null
+          reporter_name?: string | null
+          reporter_phone?: string | null
+          reviewer_name?: string | null
+          reviewer_title?: string | null
+          severity?: string | null
+          site_location?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          affected_capacity_kw?: number | null
+          arrival_date?: string | null
+          arrival_time?: string | null
+          categories?: string[] | null
+          created_at?: string
+          created_by?: string | null
+          discovered_by?: string | null
+          estimated_loss_kwh?: number | null
+          id?: string
+          immediate_action?: string | null
+          incident_date?: string | null
+          incident_description?: string | null
+          incident_time?: string | null
+          note?: string | null
+          other_category?: string | null
+          parts_replaced?: string | null
+          preventive_measures?: string | null
+          project_id?: string | null
+          project_name?: string
+          repair_date?: string | null
+          repair_description?: string | null
+          repair_result?: string | null
+          repair_time?: string | null
+          report_date?: string
+          report_number?: string | null
+          reporter_name?: string | null
+          reporter_phone?: string | null
+          reviewer_name?: string | null
+          reviewer_title?: string | null
+          severity?: string | null
+          site_location?: string | null
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "om_incident_reports_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "om_incident_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "om_incident_reports_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      om_inspections: {
+        Row: {
+          ambient_temp: string | null
+          capacity_kw: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          inspection_date: string
+          inspection_type: string
+          inspector_name: string | null
+          overall_note: string | null
+          project_id: string | null
+          project_name: string
+          reviewer_name: string | null
+          sections: Json
+          site_location: string | null
+          updated_at: string
+          weather_condition: string | null
+        }
+        Insert: {
+          ambient_temp?: string | null
+          capacity_kw?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inspection_date?: string
+          inspection_type?: string
+          inspector_name?: string | null
+          overall_note?: string | null
+          project_id?: string | null
+          project_name: string
+          reviewer_name?: string | null
+          sections?: Json
+          site_location?: string | null
+          updated_at?: string
+          weather_condition?: string | null
+        }
+        Update: {
+          ambient_temp?: string | null
+          capacity_kw?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          inspection_date?: string
+          inspection_type?: string
+          inspector_name?: string | null
+          overall_note?: string | null
+          project_id?: string | null
+          project_name?: string
+          reviewer_name?: string | null
+          sections?: Json
+          site_location?: string | null
+          updated_at?: string
+          weather_condition?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "om_inspections_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "om_inspections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "om_inspections_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      om_personnel_rosters: {
+        Row: {
+          construction_date: string
+          contractor: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          personnel: Json
+          project_id: string | null
+          project_name: string
+          updated_at: string
+        }
+        Insert: {
+          construction_date?: string
+          contractor?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          personnel?: Json
+          project_id?: string | null
+          project_name: string
+          updated_at?: string
+        }
+        Update: {
+          construction_date?: string
+          contractor?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          personnel?: Json
+          project_id?: string | null
+          project_name?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "om_personnel_rosters_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "om_personnel_rosters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "om_personnel_rosters_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      om_site_access_requests: {
+        Row: {
+          applicant_company: string | null
+          applicant_email: string | null
+          applicant_name: string | null
+          applicant_phone: string | null
+          apply_date: string
+          approval_status: string | null
+          approver_name: string | null
+          approver_title: string | null
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          insurance_coverage: string | null
+          insurance_expiry: string | null
+          note: string | null
+          personnel_count: number | null
+          project_id: string | null
+          project_name: string
+          safety_measures: string | null
+          site_location: string | null
+          start_date: string | null
+          tools_equipment: string | null
+          updated_at: string
+          vehicle_count: number | null
+          vehicle_details: string | null
+          work_content: string | null
+          work_purpose: string | null
+        }
+        Insert: {
+          applicant_company?: string | null
+          applicant_email?: string | null
+          applicant_name?: string | null
+          applicant_phone?: string | null
+          apply_date?: string
+          approval_status?: string | null
+          approver_name?: string | null
+          approver_title?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          insurance_coverage?: string | null
+          insurance_expiry?: string | null
+          note?: string | null
+          personnel_count?: number | null
+          project_id?: string | null
+          project_name: string
+          safety_measures?: string | null
+          site_location?: string | null
+          start_date?: string | null
+          tools_equipment?: string | null
+          updated_at?: string
+          vehicle_count?: number | null
+          vehicle_details?: string | null
+          work_content?: string | null
+          work_purpose?: string | null
+        }
+        Update: {
+          applicant_company?: string | null
+          applicant_email?: string | null
+          applicant_name?: string | null
+          applicant_phone?: string | null
+          apply_date?: string
+          approval_status?: string | null
+          approver_name?: string | null
+          approver_title?: string | null
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          insurance_coverage?: string | null
+          insurance_expiry?: string | null
+          note?: string | null
+          personnel_count?: number | null
+          project_id?: string | null
+          project_name?: string
+          safety_measures?: string | null
+          site_location?: string | null
+          start_date?: string | null
+          tools_equipment?: string | null
+          updated_at?: string
+          vehicle_count?: number | null
+          vehicle_details?: string | null
+          work_content?: string | null
+          work_purpose?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "om_site_access_requests_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "om_site_access_requests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "om_site_access_requests_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      om_toolbox_meetings: {
+        Row: {
+          attendees: string[] | null
+          contractor: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          notify_date: string
+          other_hazard: string | null
+          other_notes: string | null
+          project_id: string | null
+          project_name: string
+          selected_hazards: string[] | null
+          selected_work_locations: string[] | null
+          selected_work_types: string[] | null
+          sub_contractor: string | null
+          supervisor_name: string | null
+          updated_at: string
+          work_description: string | null
+          work_location: string | null
+        }
+        Insert: {
+          attendees?: string[] | null
+          contractor?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notify_date?: string
+          other_hazard?: string | null
+          other_notes?: string | null
+          project_id?: string | null
+          project_name: string
+          selected_hazards?: string[] | null
+          selected_work_locations?: string[] | null
+          selected_work_types?: string[] | null
+          sub_contractor?: string | null
+          supervisor_name?: string | null
+          updated_at?: string
+          work_description?: string | null
+          work_location?: string | null
+        }
+        Update: {
+          attendees?: string[] | null
+          contractor?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          notify_date?: string
+          other_hazard?: string | null
+          other_notes?: string | null
+          project_id?: string | null
+          project_name?: string
+          selected_hazards?: string[] | null
+          selected_work_locations?: string[] | null
+          selected_work_types?: string[] | null
+          sub_contractor?: string | null
+          supervisor_name?: string | null
+          updated_at?: string
+          work_description?: string | null
+          work_location?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "om_toolbox_meetings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "om_toolbox_meetings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "project_analytics_view"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "om_toolbox_meetings_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       partner_contacts: {
         Row: {
           contact_name: string

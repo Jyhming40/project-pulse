@@ -95,3 +95,6 @@ verify_jwt = true
 
 [functions.generate-investment-report]
 verify_jwt = true
+
+[functions.export-schema-sql]
+verify_jwt = false
