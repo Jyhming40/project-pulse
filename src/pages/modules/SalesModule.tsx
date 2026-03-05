@@ -11,7 +11,8 @@ import {
   TrendingUp,
   AlertCircle,
   Building2,
-  ChevronRight
+  ChevronRight,
+  Presentation,
 } from 'lucide-react';
 import { 
   KPICard, 
@@ -187,6 +188,13 @@ export default function SalesModule() {
           icon={Building2}
           color="teal"
           onClick={() => navigate('/projects')}
+        />
+        <QuickActionCard
+          title="業務簡報"
+          description="產生含 KPI 圖表與 AI 摘要的簡報"
+          icon={Presentation}
+          color="amber"
+          onClick={() => navigate('/sales/presentation')}
         />
       </div>
 
