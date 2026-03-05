@@ -33,6 +33,7 @@ import DashboardAudit from "./pages/DashboardAudit";
 import ProjectComparison from "./pages/ProjectComparison";
 import Quotes from "./pages/Quotes";
 import QuoteWizard from "./pages/QuoteWizard";
+import SalesPresentation from "./pages/SalesPresentation";
 import Memos from "./pages/Memos";
 import NotFound from "./pages/NotFound";
 import CleaningReportForm from "./pages/om/CleaningReportForm";
@@ -135,6 +136,7 @@ const App = () => (
               <Route path="/quotes" element={<ProtectedRoute><Layout><Quotes /></Layout></ProtectedRoute>} />
               <Route path="/quotes/new" element={<ProtectedRoute><Layout><QuoteWizard /></Layout></ProtectedRoute>} />
               <Route path="/quotes/:id" element={<ProtectedRoute><Layout><QuoteWizard /></Layout></ProtectedRoute>} />
+              <Route path="/sales/presentation" element={<ProtectedRoute><Layout><SalesPresentation /></Layout></ProtectedRoute>} />
               <Route path="/memos" element={<ProtectedRoute><Layout><Memos /></Layout></ProtectedRoute>} />
               
               {/* 維運表單 (O&M Module) */}
