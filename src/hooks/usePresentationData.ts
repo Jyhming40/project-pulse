@@ -6,10 +6,10 @@ export function usePresentationData() {
   return useQuery({
     queryKey: ['presentation-data'],
     queryFn: async () => {
-      // Fetch projects
-      const { data: projects = [] } = await supabase
+      // Fetch projects (expanded fields for milestones)
+      const { data: projects = [] } = await (supabase as any)
         .from('projects')
-        .select('id, project_name, project_code, capacity_kwp, actual_installed_capacity, status, installation_type, city, district, intake_year, fiscal_year, overall_progress, investor_id, is_deleted, created_at')
+        .select('id, project_name, project_code, capacity_kwp, actual_installed_capacity, status, installation_type, city, district, intake_year, fiscal_year, overall_progress, admin_progress, investor_id, is_deleted, created_at, initial_survey_date, contract_signed_at, construction_start_date, actual_meter_date, construction_status')
         .eq('is_deleted', false);
 
       // Fetch investors
@@ -22,6 +22,33 @@ export function usePresentationData() {
       const { data: quotes = [] } = await supabase
         .from('project_quotes')
         .select('id, quote_number, quote_status, total_price_with_tax, capacity_kwp, project_id, created_at');
+
+      // Fetch documents (aggregated stats)
+      const { data: documents = [] } = await supabase
+        .from('documents')
+        .select('id, project_id, doc_status, doc_type, is_deleted')
+        .eq('is_deleted', false);
+
+      // Fetch EPC financial metrics
+      const { data: epcMetrics = [] } = await (supabase as any)
+        .from('project_epc_financial_metrics')
+        .select('project_id, contract_amount, direct_cost, gross_profit, gross_margin_rate, net_expected_profit');
+
+      // Fetch payments
+      const { data: payments = [] } = await supabase
+        .from('project_payments')
+        .select('project_id, payment_status, invoiced_amount, paid_amount');
+
+      // Fetch departments
+      const { data: departments = [] } = await supabase
+        .from('departments')
+        .select('id, name, code')
+        .eq('is_active', true);
+
+      // Fetch project issues
+      const { data: issues = [] } = await supabase
+        .from('project_issues')
+        .select('id, project_id, status, severity, created_at');
 
       // Type distribution
       const typeDistribution: Record<string, number> = {};
@@ -94,15 +121,86 @@ export function usePresentationData() {
         return age > 180 && (p.overall_progress || 0) < 25;
       }).length;
 
-      // Conversion rate: closed / total (including cancelled/paused as denominator)
       const projectConversionRate = projects.length > 0
         ? Math.round((closedProjects.length / projects.length) * 100)
         : 0;
+
+      // === Financial summary ===
+      const totalContractAmount = epcMetrics.reduce((s: number, m: any) => s + (m.contract_amount || 0), 0);
+      const totalDirectCost = epcMetrics.reduce((s: number, m: any) => s + (m.direct_cost || 0), 0);
+      const totalGrossProfit = epcMetrics.reduce((s: number, m: any) => s + (m.gross_profit || 0), 0);
+      const avgGrossMargin = epcMetrics.length > 0
+        ? Math.round(epcMetrics.reduce((s: number, m: any) => s + (m.gross_margin_rate || 0), 0) / epcMetrics.length * 10) / 10
+        : 0;
+
+      const totalInvoiced = payments.reduce((s: number, p: any) => s + (p.invoiced_amount || 0), 0);
+      const totalPaid = payments.reduce((s: number, p: any) => s + (p.paid_amount || 0), 0);
+      const collectionRate = totalInvoiced > 0 ? Math.round((totalPaid / totalInvoiced) * 100) : 0;
+
+      // Per-kW average price from quotes
+      const quotesWithCap = quotes.filter(q => q.capacity_kwp && q.capacity_kwp > 0 && q.total_price_with_tax);
+      const avgPricePerKw = quotesWithCap.length > 0
+        ? Math.round(quotesWithCap.reduce((s, q) => s + (q.total_price_with_tax || 0) / q.capacity_kwp!, 0) / quotesWithCap.length)
+        : 0;
+
+      // === Document progress ===
+      const totalDocs = documents.length;
+      const completedDocs = documents.filter(d => d.doc_status === '已核准' || d.doc_status === '已發文').length;
+      const docCompletionRate = totalDocs > 0 ? Math.round((completedDocs / totalDocs) * 100) : 0;
+
+      // Doc status distribution
+      const docStatusDist: Record<string, number> = {};
+      documents.forEach(d => {
+        const s = d.doc_status || '未知';
+        docStatusDist[s] = (docStatusDist[s] || 0) + 1;
+      });
+
+      // === Department performance (based on project_stages ownership) ===
+      const deptProjectMap: Record<string, Set<string>> = {};
+      // We don't have department_id on projects, so we'll just provide department list
+      const deptStats: Record<string, { name: string; projectCount: number; totalCapacity: number; completedCount: number }> = {};
+      departments.forEach(d => {
+        deptStats[d.id] = {
+          name: d.name,
+          projectCount: 0,
+          totalCapacity: 0,
+          completedCount: 0,
+        };
+      });
+
+      // === Milestone timeline stats ===
+      const milestoneDurations = {
+        surveyToContract: [] as number[],
+        contractToMeter: [] as number[],
+        constructionToMeter: [] as number[],
+      };
+      activeProjects.forEach(p => {
+        const survey = p.initial_survey_date ? new Date(p.initial_survey_date).getTime() : null;
+        const contract = p.contract_signed_at ? new Date(p.contract_signed_at).getTime() : null;
+        const conStart = p.construction_start_date ? new Date(p.construction_start_date).getTime() : null;
+        const meter = p.actual_meter_date ? new Date(p.actual_meter_date).getTime() : null;
+        const DAY = 1000 * 60 * 60 * 24;
+
+        if (survey && contract) milestoneDurations.surveyToContract.push(Math.round((contract - survey) / DAY));
+        if (contract && meter) milestoneDurations.contractToMeter.push(Math.round((meter - contract) / DAY));
+        if (conStart && meter) milestoneDurations.constructionToMeter.push(Math.round((meter - conStart) / DAY));
+      });
+
+      const avg = (arr: number[]) => arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
+
+      // Issue summary
+      const openIssues = issues.filter((i: any) => i.status !== 'resolved' && i.status !== 'closed').length;
+      const criticalIssues = issues.filter((i: any) => i.severity === 'critical' || i.severity === 'high').length;
 
       return {
         projects,
         investors,
         quotes,
+        documents,
+        epcMetrics,
+        payments,
+        departments,
+        issues,
         summary: {
           totalProjects: projects.length,
           completedCapacity: Math.round(completedCapacity),
@@ -122,6 +220,29 @@ export function usePresentationData() {
           regionDistribution,
           yearlyTrend,
           capacityDistribution,
+          // Financial
+          totalContractAmount,
+          totalDirectCost,
+          totalGrossProfit,
+          avgGrossMargin,
+          avgPricePerKw,
+          totalInvoiced,
+          totalPaid,
+          collectionRate,
+          // Documents
+          totalDocs,
+          completedDocs,
+          docCompletionRate,
+          docStatusDist,
+          // Departments
+          deptStats,
+          // Milestones
+          avgSurveyToContract: avg(milestoneDurations.surveyToContract),
+          avgContractToMeter: avg(milestoneDurations.contractToMeter),
+          avgConstructionToMeter: avg(milestoneDurations.constructionToMeter),
+          // Issues
+          openIssues,
+          criticalIssues,
         },
       };
     },
