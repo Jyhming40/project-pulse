@@ -41,7 +41,7 @@ export interface AuditLog {
   };
 }
 
-// Table display name mapping - used by IntegrityCheckPanel and DeletionPolicyPanel
+// Table display name mapping — complete list covering all 70+ tables
 export const tableDisplayNames: Record<string, string> = {
   // Core business
   projects: '案場',
@@ -50,6 +50,8 @@ export const tableDisplayNames: Record<string, string> = {
   document_tags: '文件標籤',
   document_tag_assignments: '文件標籤關聯',
   document_type_config: '文件類型設定',
+  document_linkage_rules: '文件連動規則',
+  document_expiry_rules: '文件效期規則',
   // Investors
   investors: '投資人',
   investor_contacts: '投資人聯絡人',
@@ -63,32 +65,46 @@ export const tableDisplayNames: Record<string, string> = {
   project_status_history: '案場狀態歷程',
   construction_status_history: '施工狀態歷程',
   project_milestones: '案場里程碑',
+  project_stages: '專案流程階段',
+  project_issues: '專案問題',
+  project_payments: '專案付款',
   project_custom_fields: '專案自訂欄位',
   project_custom_field_values: '專案自訂欄位值',
   project_field_config: '專案欄位設定',
-  project_issues: '專案問題',
-  project_stages: '專案流程階段',
-  project_payments: '專案付款',
+  project_epc_financial_metrics: 'EPC 財務指標',
+  // Quotes
   project_quotes: '專案報價',
-  // Progress & milestones
+  quote_modules: '報價模組',
+  quote_inverters: '報價變流器',
+  quote_engineering_items: '報價工程項目',
+  quote_engineering_presets: '工程項目預設',
+  quote_engineering_templates: '工程項目範本',
+  quote_line_items: '報價細項',
+  quote_financial_projections: '報價財務預測',
+  quote_schedules: '報價時程',
+  // Payments & milestones
+  payment_milestones: '付款里程碑',
   progress_milestones: '進度里程碑定義',
   progress_settings: '進度設定',
-  payment_milestones: '付款里程碑',
   milestone_notification_settings: '里程碑通知設定',
   milestone_notification_logs: '里程碑通知紀錄',
+  // Memos
+  memos: '備忘錄',
+  memo_tags: '備忘錄標籤',
+  // O&M
+  om_ac_tests: 'AC 測試',
+  om_dc_tests: 'DC 測試',
+  om_cleaning_reports: '清潔報告',
+  om_incident_reports: '事件報告',
+  om_inspections: '巡檢紀錄',
+  om_personnel_rosters: '人員名冊',
+  om_site_access_requests: '入場申請',
+  om_toolbox_meetings: '工具箱會議',
   // Governance
   departments: '部門',
   process_stages: '流程階段',
   stage_responsibilities: '階段責任設定',
-  // Quote system
-  quote_modules: '報價模組',
-  quote_inverters: '報價變流器',
-  quote_line_items: '報價細項',
-  quote_financial_projections: '報價財務預測',
-  quote_engineering_items: '報價工程項目',
-  quote_engineering_presets: '工程項目預設',
-  quote_engineering_templates: '工程項目範本',
-  quote_schedules: '報價時程',
+  action_item_resolutions: '待辦處理紀錄',
   // Duplicate management
   duplicate_ignore_pairs: '重複忽略配對',
   duplicate_reviews: '重複審核記錄',
@@ -112,6 +128,9 @@ export const tableDisplayNames: Record<string, string> = {
   audit_logs: '稽核日誌',
 };
 
+// All table names for audit log filtering
+export const allTableNames = Object.keys(tableDisplayNames);
+
 // Tables that support soft delete (only tables with is_deleted column)
 export const softDeleteTables = [
   'projects',
@@ -123,6 +142,7 @@ export const softDeleteTables = [
   'investor_contacts',
   'investor_payment_methods',
   'project_construction_assignments',
+  'memos',
 ] as const;
 
 // Tables that support archive
@@ -163,7 +183,6 @@ export function useEffectivePolicy(tableName: string) {
         .maybeSingle();
       
       if (error || !data) {
-        // Return default policy if not found
         return {
           softDeleteEnabled: true,
           retentionDays: 30,
@@ -219,7 +238,6 @@ export function useLogAudit() {
     _newData?: Record<string, unknown>
   ) => {
     try {
-      // Use direct insert instead of RPC to avoid type issues
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       await (supabase as any)
         .from('audit_logs')

@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Loader2, RefreshCw, Trash2, RotateCcw, Archive, ArchiveRestore, Database, Edit, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { zhTW } from 'date-fns/locale';
-import { tableDisplayNames, softDeleteTables } from '@/hooks/useDeletionPolicy';
+import { tableDisplayNames, allTableNames } from '@/hooks/useDeletionPolicy';
 
 type AuditAction = 'DELETE' | 'RESTORE' | 'PURGE' | 'ARCHIVE' | 'UNARCHIVE' | 'CREATE' | 'UPDATE' | 'DB_RESET' | 'DB_EXPORT' | 'DB_IMPORT';
 
@@ -65,7 +65,8 @@ export function AuditLogsPanel() {
     },
   });
 
-  const allTables = ['system', ...softDeleteTables];
+  // Use complete table list + 'system' for audit log filtering
+  const filterTables = ['system', ...allTableNames];
 
   return (
     <div className="space-y-6">
@@ -106,7 +107,7 @@ export function AuditLogsPanel() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">所有類型</SelectItem>
-              {allTables.map((table) => (
+              {filterTables.map((table) => (
                 <SelectItem key={table} value={table}>
                   {tableDisplayNames[table] || table}
                 </SelectItem>
