@@ -9,47 +9,158 @@ const corsHeaders = {
 // Reset scope configurations - whitelist approach
 const RESET_SCOPES: Record<string, string[]> = {
   demo: [
+    // Quote子表（先刪子表）
+    "quote_financial_projections",
+    "quote_engineering_items",
+    "quote_line_items",
+    "quote_schedules",
+    "quote_modules",
+    "quote_inverters",
+    // Payment
+    "project_payments",
+    // Documents子表
+    "document_tag_assignments",
     "document_files",
     "documents",
+    // Project子表
     "project_construction_assignments",
+    "project_milestones",
+    "project_stages",
+    "project_issues",
+    "project_custom_field_values",
+    "project_epc_financial_metrics",
+    "action_item_resolutions",
     "construction_status_history",
     "project_status_history",
-    "project_milestones",
+    "milestone_notification_logs",
+    // Memos
+    "memos",
+    // O&M
+    "om_ac_tests",
+    "om_dc_tests",
+    "om_cleaning_reports",
+    "om_incident_reports",
+    "om_inspections",
+    "om_personnel_rosters",
+    "om_site_access_requests",
+    "om_toolbox_meetings",
+    // Quote主表
+    "project_quotes",
+    // Project主表
     "projects",
   ],
   business: [
+    // Quote子表
+    "quote_financial_projections",
+    "quote_engineering_items",
+    "quote_line_items",
+    "quote_schedules",
+    "quote_modules",
+    "quote_inverters",
+    // Payment
+    "project_payments",
+    // Documents子表
+    "document_tag_assignments",
     "document_files",
     "documents",
+    // Project子表
     "project_construction_assignments",
+    "project_milestones",
+    "project_stages",
+    "project_issues",
+    "project_custom_field_values",
+    "project_epc_financial_metrics",
+    "action_item_resolutions",
     "construction_status_history",
     "project_status_history",
-    "project_milestones",
+    "milestone_notification_logs",
+    // Memos
+    "memos",
+    // O&M
+    "om_ac_tests",
+    "om_dc_tests",
+    "om_cleaning_reports",
+    "om_incident_reports",
+    "om_inspections",
+    "om_personnel_rosters",
+    "om_site_access_requests",
+    "om_toolbox_meetings",
+    // Duplicate
+    "duplicate_ignore_pairs",
+    "duplicate_reviews",
+    // Quote主表
+    "project_quotes",
+    // Project主表
     "projects",
+    // Investor
     "investor_contacts",
     "investor_payment_methods",
     "investors",
+    "investor_year_counters",
+    // Partner
     "partner_contacts",
     "partners",
-    "investor_year_counters",
   ],
   factory: [
+    // Quote子表
+    "quote_financial_projections",
+    "quote_engineering_items",
+    "quote_line_items",
+    "quote_schedules",
+    "quote_modules",
+    "quote_inverters",
+    // Payment
+    "project_payments",
+    // Documents子表
+    "document_tag_assignments",
     "document_files",
     "documents",
+    // Project子表
     "project_construction_assignments",
+    "project_milestones",
+    "project_stages",
+    "project_issues",
+    "project_custom_field_values",
+    "project_epc_financial_metrics",
+    "action_item_resolutions",
     "construction_status_history",
     "project_status_history",
-    "project_milestones",
+    "milestone_notification_logs",
+    // Memos
+    "memos",
+    "memo_tags",
+    // O&M
+    "om_ac_tests",
+    "om_dc_tests",
+    "om_cleaning_reports",
+    "om_incident_reports",
+    "om_inspections",
+    "om_personnel_rosters",
+    "om_site_access_requests",
+    "om_toolbox_meetings",
+    // Duplicate
+    "duplicate_ignore_pairs",
+    "duplicate_reviews",
+    // Quote主表
+    "project_quotes",
+    // Project主表
     "projects",
+    // Investor
     "investor_contacts",
     "investor_payment_methods",
     "investors",
+    "investor_year_counters",
+    // Partner
     "partner_contacts",
     "partners",
-    "investor_year_counters",
+    // Audit & system
     "audit_logs",
     "module_permissions",
     "progress_milestones",
     "progress_settings",
+    // User events
+    "user_events",
+    "user_milestone_order",
   ],
 };
 
@@ -143,47 +254,114 @@ serve(async (req) => {
   }
 });
 
-// Get table statistics
+// Get table statistics — covers ALL tables
 async function handleGetTableStats(supabase: any, corsHeaders: Record<string, string>) {
   const tables = [
+    // Core business
     "projects",
     "documents",
     "document_files",
+    "document_tags",
+    "document_tag_assignments",
+    "document_type_config",
+    "document_linkage_rules",
+    "document_expiry_rules",
+    // Investors
     "investors",
     "investor_contacts",
     "investor_payment_methods",
+    "investor_year_counters",
+    // Partners
     "partners",
     "partner_contacts",
+    // Project sub-tables
     "project_construction_assignments",
+    "project_milestones",
+    "project_stages",
+    "project_issues",
+    "project_payments",
+    "project_custom_fields",
+    "project_custom_field_values",
+    "project_field_config",
+    "project_epc_financial_metrics",
     "project_status_history",
     "construction_status_history",
-    "project_milestones",
+    // Quotes
+    "project_quotes",
+    "quote_modules",
+    "quote_inverters",
+    "quote_engineering_items",
+    "quote_engineering_presets",
+    "quote_engineering_templates",
+    "quote_line_items",
+    "quote_financial_projections",
+    "quote_schedules",
+    // Payments & milestones
+    "payment_milestones",
     "progress_milestones",
     "progress_settings",
+    "milestone_notification_settings",
+    "milestone_notification_logs",
+    // Memos
+    "memos",
+    "memo_tags",
+    // O&M
+    "om_ac_tests",
+    "om_dc_tests",
+    "om_cleaning_reports",
+    "om_incident_reports",
+    "om_inspections",
+    "om_personnel_rosters",
+    "om_site_access_requests",
+    "om_toolbox_meetings",
+    // Governance
+    "departments",
+    "process_stages",
+    "stage_responsibilities",
+    "action_item_resolutions",
+    // Duplicate management
+    "duplicate_ignore_pairs",
+    "duplicate_reviews",
+    // System config
     "system_options",
+    "system_tariff_rates",
     "deletion_policies",
-    "audit_logs",
+    "app_settings",
+    "ai_settings",
+    "company_bank_accounts",
+    // User & permissions
     "profiles",
     "user_roles",
-    "module_permissions",
+    "user_security",
     "user_preferences",
+    "user_drive_tokens",
+    "user_milestone_order",
+    "user_events",
+    "module_permissions",
+    // Audit
+    "audit_logs",
   ];
+
+  // Tables with soft-delete (is_deleted column)
+  const softDeleteTables = new Set([
+    "projects", "documents", "document_files",
+    "investors", "investor_contacts", "investor_payment_methods",
+    "partners", "partner_contacts",
+    "project_construction_assignments",
+    "memos",
+  ]);
 
   const stats: Record<string, { count: number; deletedCount?: number }> = {};
 
   for (const table of tables) {
     try {
-      // Get total count
       const { count } = await supabase
         .from(table)
         .select("*", { count: "exact", head: true });
 
       stats[table] = { count: count || 0 };
 
-      // For soft-delete tables, get deleted count
-      if (["projects", "documents", "document_files", "investors", "investor_contacts", 
-           "investor_payment_methods", "partners", "partner_contacts", 
-           "project_construction_assignments"].includes(table)) {
+      if (softDeleteTables.has(table)) {
         const { count: deletedCount } = await supabase
           .from(table)
           .select("*", { count: "exact", head: true })
@@ -350,53 +528,130 @@ async function handleCheckIntegrity(supabase: any, corsHeaders: Record<string, s
 
   // ========== 3. Quote System Checks ==========
 
-  // Check for orphaned quote_modules
-  const { data: quoteModules } = await supabase
-    .from("quote_modules")
-    .select("id, quote_id");
-  
-  if (quoteModules?.length > 0) {
-    const { data: validQuotes } = await supabase
-      .from("project_quotes")
-      .select("id");
-    
-    const validQuoteIds = new Set(validQuotes?.map((q: any) => q.id) || []);
-    const orphanedModules = quoteModules.filter((m: any) => !validQuoteIds.has(m.quote_id));
-    
-    if (orphanedModules.length > 0) {
+  // Get valid quote IDs once for all quote sub-table checks
+  const { data: validQuotes } = await supabase
+    .from("project_quotes")
+    .select("id");
+  const validQuoteIds = new Set(validQuotes?.map((q: any) => q.id) || []);
+
+  const quoteSubTables = [
+    { table: "quote_modules", label: "模組設備" },
+    { table: "quote_inverters", label: "變流器設備" },
+    { table: "quote_engineering_items", label: "工程項目" },
+    { table: "quote_line_items", label: "報價細項" },
+    { table: "quote_financial_projections", label: "財務預測" },
+    { table: "quote_schedules", label: "時程安排" },
+  ];
+
+  for (const { table, label } of quoteSubTables) {
+    const { data: rows } = await supabase.from(table).select("id, quote_id");
+    if (rows?.length > 0) {
+      const orphaned = rows.filter((r: any) => !validQuoteIds.has(r.quote_id));
+      if (orphaned.length > 0) {
+        issues.push({
+          table,
+          issue: `關聯至已刪除報價的${label}`,
+          count: orphaned.length,
+          severity: "warning",
+        });
+      }
+    }
+  }
+
+  // ========== 4. Payment & Milestone Checks ==========
+
+  // Check for project_payments referencing deleted projects
+  const { data: payments } = await supabase
+    .from("project_payments")
+    .select("id, project_id");
+  if (payments?.length > 0) {
+    const { data: vp } = await supabase.from("projects").select("id").eq("is_deleted", false);
+    const vpIds = new Set(vp?.map((p: any) => p.id) || []);
+    const orphanedPayments = payments.filter((p: any) => !vpIds.has(p.project_id));
+    if (orphanedPayments.length > 0) {
       issues.push({
-        table: "quote_modules",
-        issue: "關聯至已刪除報價的模組設備",
-        count: orphanedModules.length,
+        table: "project_payments",
+        issue: "關聯至已刪除專案的付款記錄",
+        count: orphanedPayments.length,
         severity: "warning",
       });
     }
   }
 
-  // Check for orphaned quote_inverters
-  const { data: quoteInverters } = await supabase
-    .from("quote_inverters")
-    .select("id, quote_id");
-  
-  if (quoteInverters?.length > 0) {
-    const { data: validQuotes } = await supabase
-      .from("project_quotes")
-      .select("id");
-    
-    const validQuoteIds = new Set(validQuotes?.map((q: any) => q.id) || []);
-    const orphanedInverters = quoteInverters.filter((i: any) => !validQuoteIds.has(i.quote_id));
-    
-    if (orphanedInverters.length > 0) {
+  // Check for action_item_resolutions referencing deleted projects
+  const { data: resolutions } = await supabase
+    .from("action_item_resolutions")
+    .select("id, project_id");
+  if (resolutions?.length > 0) {
+    const { data: vp } = await supabase.from("projects").select("id").eq("is_deleted", false);
+    const vpIds = new Set(vp?.map((p: any) => p.id) || []);
+    const orphanedRes = resolutions.filter((r: any) => !vpIds.has(r.project_id));
+    if (orphanedRes.length > 0) {
       issues.push({
-        table: "quote_inverters",
-        issue: "關聯至已刪除報價的變流器設備",
-        count: orphanedInverters.length,
+        table: "action_item_resolutions",
+        issue: "關聯至已刪除專案的處理紀錄",
+        count: orphanedRes.length,
         severity: "warning",
       });
     }
   }
 
-  // ========== 4. Soft-Delete Retention Checks ==========
+  // ========== 5. O&M Checks ==========
+
+  const omTables = [
+    { table: "om_ac_tests", label: "AC 測試" },
+    { table: "om_dc_tests", label: "DC 測試" },
+    { table: "om_cleaning_reports", label: "清潔報告" },
+    { table: "om_incident_reports", label: "事件報告" },
+    { table: "om_inspections", label: "巡檢紀錄" },
+    { table: "om_personnel_rosters", label: "人員名冊" },
+    { table: "om_site_access_requests", label: "入場申請" },
+    { table: "om_toolbox_meetings", label: "工具箱會議" },
+  ];
+
+  for (const { table, label } of omTables) {
+    const { data: rows } = await supabase.from(table).select("id, project_id");
+    if (rows?.length > 0) {
+      const withProject = rows.filter((r: any) => r.project_id);
+      if (withProject.length > 0) {
+        const { data: vp } = await supabase.from("projects").select("id").eq("is_deleted", false);
+        const vpIds = new Set(vp?.map((p: any) => p.id) || []);
+        const orphaned = withProject.filter((r: any) => !vpIds.has(r.project_id));
+        if (orphaned.length > 0) {
+          issues.push({
+            table,
+            issue: `關聯至已刪除專案的${label}`,
+            count: orphaned.length,
+            severity: "warning",
+          });
+        }
+      }
+    }
+  }
+
+  // ========== 6. Memo Checks ==========
+
+  const { data: allMemos } = await supabase
+    .from("memos")
+    .select("id, project_id")
+    .eq("is_deleted", false)
+    .not("project_id", "is", null);
+
+  if (allMemos?.length > 0) {
+    const { data: vp } = await supabase.from("projects").select("id").eq("is_deleted", false);
+    const vpIds = new Set(vp?.map((p: any) => p.id) || []);
+    const orphanedMemos = allMemos.filter((m: any) => !vpIds.has(m.project_id));
+    if (orphanedMemos.length > 0) {
+      issues.push({
+        table: "memos",
+        issue: "關聯至已刪除專案的備忘錄",
+        count: orphanedMemos.length,
+        severity: "warning",
+      });
+    }
+  }
+
+  // ========== 7. Soft-Delete Retention Checks ==========
 
   const thirtyDaysAgo = new Date();
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -404,7 +659,8 @@ async function handleCheckIntegrity(supabase: any, corsHeaders: Record<string, s
   const softDeleteTables = [
     "projects", "documents", "document_files", 
     "investors", "investor_contacts", "investor_payment_methods",
-    "partners", "partner_contacts", "project_construction_assignments"
+    "partners", "partner_contacts", "project_construction_assignments",
+    "memos",
   ];
   
   for (const table of softDeleteTables) {
@@ -424,7 +680,7 @@ async function handleCheckIntegrity(supabase: any, corsHeaders: Record<string, s
     }
   }
 
-  // ========== 5. User & Permission Checks ==========
+  // ========== 8. User & Permission Checks ==========
 
   // Check for profiles without user_roles
   const { data: profiles } = await supabase
@@ -464,7 +720,7 @@ async function handleCheckIntegrity(supabase: any, corsHeaders: Record<string, s
     });
   }
 
-  // ========== 6. Data Consistency Checks ==========
+  // ========== 9. Data Consistency Checks ==========
 
   // Check for duplicate investor codes
   const { data: investors } = await supabase
@@ -532,9 +788,8 @@ async function handleCheckIntegrity(supabase: any, corsHeaders: Record<string, s
     }
   }
 
-  // ========== 7. Telemetry Health Check ==========
+  // ========== 10. Telemetry Health Check ==========
 
-  // Check for excessive error events in the last 24 hours
   const oneDayAgo = new Date();
   oneDayAgo.setDate(oneDayAgo.getDate() - 1);
 
@@ -574,7 +829,6 @@ async function handleCheckCooldown(
 ) {
   const { environment_id } = params;
 
-  // Check last reset time for this environment
   const { data: lastReset } = await supabase
     .from("audit_logs")
     .select("created_at")
@@ -686,16 +940,14 @@ async function handleDatabaseReset(
   // Delete in order (respects foreign key constraints)
   for (const table of tables) {
     try {
-      // Get count before deletion
       const { count: beforeCount } = await supabase
         .from(table)
         .select("*", { count: "exact", head: true });
 
-      // Delete all records
       const { error } = await supabase
         .from(table)
         .delete()
-        .neq("id", "00000000-0000-0000-0000-000000000000"); // Delete all
+        .neq("id", "00000000-0000-0000-0000-000000000000");
 
       if (error) {
         console.error(`[DB Reset] Error deleting from ${table}:`, error);
