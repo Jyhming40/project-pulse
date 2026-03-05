@@ -48,7 +48,7 @@ export function usePresentationData() {
       // Fetch project issues
       const { data: issues = [] } = await supabase
         .from('project_issues')
-        .select('id, project_id, status, severity, created_at');
+        .select('id, project_id, is_resolved, severity, created_at');
 
       // Type distribution
       const typeDistribution: Record<string, number> = {};
@@ -189,7 +189,7 @@ export function usePresentationData() {
       const avg = (arr: number[]) => arr.length > 0 ? Math.round(arr.reduce((a, b) => a + b, 0) / arr.length) : 0;
 
       // Issue summary
-      const openIssues = issues.filter((i: any) => i.status !== 'resolved' && i.status !== 'closed').length;
+      const openIssues = issues.filter((i: any) => !i.is_resolved).length;
       const criticalIssues = issues.filter((i: any) => i.severity === 'critical' || i.severity === 'high').length;
 
       return {
