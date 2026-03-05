@@ -6,14 +6,33 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { ArrowLeft, Printer, Sparkles, Building2, FileText, Users, MapPin, Loader2, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Printer, Sparkles, Building2, FileText, Users, MapPin, Loader2, RefreshCw, Settings2, DollarSign, FolderCheck, Clock, BarChart3 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAppSettingsRead } from '@/hooks/useAppSettings';
 import { usePresentationData } from '@/hooks/usePresentationData';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import Plotly from 'plotly.js-dist-min';
+
+interface SectionConfig {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  modes: PresentationMode[];
+}
+
+const SECTION_DEFS: SectionConfig[] = [
+  { key: 'kpi', label: '關鍵營運指標', icon: <BarChart3 className="w-4 h-4" />, modes: ['company', 'market'] },
+  { key: 'charts', label: '數據分析圖表', icon: <BarChart3 className="w-4 h-4" />, modes: ['company', 'market'] },
+  { key: 'financial', label: '財務與報價分析', icon: <DollarSign className="w-4 h-4" />, modes: ['company'] },
+  { key: 'documents', label: '文件管理績效', icon: <FolderCheck className="w-4 h-4" />, modes: ['company'] },
+  { key: 'milestones', label: '施工與里程碑時程', icon: <Clock className="w-4 h-4" />, modes: ['company'] },
+  { key: 'aiSummary', label: 'AI 執行摘要', icon: <Sparkles className="w-4 h-4" />, modes: ['company', 'project', 'investor', 'market'] },
+  { key: 'aiAnalysis', label: 'AI 數據分析 & 建議', icon: <Sparkles className="w-4 h-4" />, modes: ['company', 'project', 'investor', 'market'] },
+  { key: 'projectInfo', label: '案場基本資料', icon: <FileText className="w-4 h-4" />, modes: ['project'] },
+  { key: 'investorInfo', label: '投資人概況', icon: <Users className="w-4 h-4" />, modes: ['investor'] },
+];
 
 type PresentationMode = 'company' | 'project' | 'investor' | 'market';
 
@@ -69,6 +88,16 @@ export default function SalesPresentation() {
   const [isGeneratingCharts, setIsGeneratingCharts] = useState(false);
   const [showCharts, setShowCharts] = useState(true);
   const [showAI, setShowAI] = useState(true);
+  const [visibleSections, setVisibleSections] = useState<Record<string, boolean>>({
+    kpi: true, charts: true, financial: false, documents: false, milestones: false,
+    aiSummary: true, aiAnalysis: true, projectInfo: true, investorInfo: true,
+  });
+
+  const toggleSection = (key: string) => {
+    setVisibleSections(prev => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const availableSections = SECTION_DEFS.filter(s => s.modes.includes(mode));
 
   const companyName = appSettings?.company_name_zh || appSettings?.company_name_en || '太陽能公司';
   const logoUrl = appSettings?.logo_light_url;
@@ -350,14 +379,42 @@ export default function SalesPresentation() {
 
             <Separator orientation="vertical" className="h-8" />
 
-            <div className="flex items-center gap-2">
-              <Switch id="show-charts" checked={showCharts} onCheckedChange={setShowCharts} />
-              <Label htmlFor="show-charts" className="text-sm">圖表</Label>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch id="show-ai" checked={showAI} onCheckedChange={setShowAI} />
-              <Label htmlFor="show-ai" className="text-sm">AI 摘要</Label>
-            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Settings2 className="w-4 h-4 mr-2" />
+                  簡報項目 ({availableSections.filter(s => visibleSections[s.key]).length}/{availableSections.length})
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-64 p-3" align="end">
+                <p className="text-sm font-medium mb-2">選擇要呈現的項目</p>
+                <div className="space-y-2">
+                  {availableSections.map(s => (
+                    <label key={s.key} className="flex items-center gap-2 cursor-pointer text-sm hover:bg-muted rounded px-1 py-0.5">
+                      <Checkbox
+                        checked={visibleSections[s.key]}
+                        onCheckedChange={() => toggleSection(s.key)}
+                      />
+                      {s.icon}
+                      <span>{s.label}</span>
+                    </label>
+                  ))}
+                </div>
+                <Separator className="my-2" />
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" className="text-xs flex-1" onClick={() => setVisibleSections(prev => {
+                    const next = { ...prev };
+                    availableSections.forEach(s => next[s.key] = true);
+                    return next;
+                  })}>全選</Button>
+                  <Button variant="ghost" size="sm" className="text-xs flex-1" onClick={() => setVisibleSections(prev => {
+                    const next = { ...prev };
+                    availableSections.forEach(s => next[s.key] = false);
+                    return next;
+                  })}>全不選</Button>
+                </div>
+              </PopoverContent>
+            </Popover>
 
             <Separator orientation="vertical" className="h-8" />
 
@@ -407,7 +464,7 @@ export default function SalesPresentation() {
           <p className="text-gray-500 mb-8">報告日期：{today}</p>
 
           {/* AI Executive Summary */}
-          {showAI && aiContent && (
+          {visibleSections.aiSummary && aiContent && (
             <div className="mb-8">
               <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
                 <Sparkles className="w-5 h-5 text-amber-500 print:text-amber-600" />
@@ -431,7 +488,7 @@ export default function SalesPresentation() {
           )}
 
           {/* KPI Summary Cards */}
-          {(mode === 'company' || mode === 'market') && presData && (
+          {visibleSections.kpi && (mode === 'company' || mode === 'market') && presData && (
             <div className="mb-8">
               <h2 className="text-lg font-semibold text-gray-800 mb-3">關鍵營運指標</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -454,7 +511,73 @@ export default function SalesPresentation() {
             </div>
           )}
 
-          {mode === 'project' && selectedProject && (
+          {/* Financial Section */}
+          {visibleSections.financial && mode === 'company' && presData && (
+            <div className="mb-8 break-inside-avoid">
+              <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <DollarSign className="w-5 h-5" />
+                財務與報價分析
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <KPIBox label="合約總金額" value={`${(presData.summary.totalContractAmount / 1e6).toFixed(1)}`} unit="百萬" />
+                <KPIBox label="總毛利" value={`${(presData.summary.totalGrossProfit / 1e6).toFixed(1)}`} unit="百萬" highlight />
+                <KPIBox label="平均毛利率" value={`${presData.summary.avgGrossMargin}`} unit="%" />
+                <KPIBox label="平均每kW單價" value={`${presData.summary.avgPricePerKw?.toLocaleString() || 0}`} unit="元" />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                <KPIBox label="報價總數" value={`${presData.summary.totalQuotes}`} unit="份" />
+                <KPIBox label="已開票金額" value={`${(presData.summary.totalInvoiced / 1e6).toFixed(1)}`} unit="百萬" />
+                <KPIBox label="已收款金額" value={`${(presData.summary.totalPaid / 1e6).toFixed(1)}`} unit="百萬" />
+                <KPIBox label="收款率" value={`${presData.summary.collectionRate}`} unit="%" />
+              </div>
+            </div>
+          )}
+
+          {/* Document Progress Section */}
+          {visibleSections.documents && mode === 'company' && presData && (
+            <div className="mb-8 break-inside-avoid">
+              <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <FolderCheck className="w-5 h-5" />
+                文件管理績效
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <KPIBox label="文件總數" value={`${presData.summary.totalDocs}`} unit="份" />
+                <KPIBox label="已完成文件" value={`${presData.summary.completedDocs}`} unit="份" />
+                <KPIBox label="文件完成率" value={`${presData.summary.docCompletionRate}`} unit="%" highlight />
+                <KPIBox label="待處理議題" value={`${presData.summary.openIssues}`} unit="件" />
+              </div>
+              {presData.summary.docStatusDist && Object.keys(presData.summary.docStatusDist).length > 0 && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-gray-600 mb-2">文件狀態分佈</h3>
+                  <div className="flex flex-wrap gap-3 text-sm">
+                    {Object.entries(presData.summary.docStatusDist).sort((a, b) => b[1] - a[1]).map(([status, count]) => (
+                      <span key={status} className="bg-gray-100 rounded px-2 py-1 print:bg-gray-100">
+                        {status}：<strong>{count}</strong>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Milestone Timeline Section */}
+          {visibleSections.milestones && mode === 'company' && presData && (
+            <div className="mb-8 break-inside-avoid">
+              <h2 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                <Clock className="w-5 h-5" />
+                施工與里程碑時程
+              </h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <KPIBox label="現勘→簽約平均天數" value={`${presData.summary.avgSurveyToContract}`} unit="天" />
+                <KPIBox label="簽約→掛表平均天數" value={`${presData.summary.avgContractToMeter}`} unit="天" />
+                <KPIBox label="施工→掛表平均天數" value={`${presData.summary.avgConstructionToMeter}`} unit="天" />
+              </div>
+            </div>
+          )}
+
+          {/* Project Info */}
+          {visibleSections.projectInfo && mode === 'project' && selectedProject && (
             <div className="mb-8">
               <h2 className="text-lg font-semibold text-gray-800 mb-3">案場基本資料</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -468,7 +591,8 @@ export default function SalesPresentation() {
             </div>
           )}
 
-          {mode === 'investor' && selectedInvestor && (
+          {/* Investor Info */}
+          {visibleSections.investorInfo && mode === 'investor' && selectedInvestor && (
             <div className="mb-8">
               <h2 className="text-lg font-semibold text-gray-800 mb-3">投資人概況</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -507,7 +631,7 @@ export default function SalesPresentation() {
           )}
 
           {/* Charts */}
-          {showCharts && (mode === 'company' || mode === 'market') && (
+          {visibleSections.charts && (mode === 'company' || mode === 'market') && (
             <div className="mb-8">
               <h2 className="text-lg font-semibold text-gray-800 mb-4">數據分析圖表</h2>
 
@@ -548,7 +672,7 @@ export default function SalesPresentation() {
           )}
 
           {/* AI Analysis & Recommendation */}
-          {showAI && aiContent && (
+          {visibleSections.aiAnalysis && aiContent && (
             <>
               {aiContent.analysis && (
                 <div className="mb-8">
