@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { ArrowLeft, Printer, Sparkles, Building2, FileText, Users, MapPin, Loader2, RefreshCw, Settings2, DollarSign, FolderCheck, Clock, BarChart3 } from 'lucide-react';
+import { ArrowLeft, Printer, Sparkles, Building2, FileText, Users, MapPin, Loader2, RefreshCw, Settings2, DollarSign, FolderCheck, Clock, BarChart3, LayoutGrid, Rows3, Square } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAppSettingsRead } from '@/hooks/useAppSettings';
 import { usePresentationData } from '@/hooks/usePresentationData';
@@ -35,6 +35,13 @@ const SECTION_DEFS: SectionConfig[] = [
 ];
 
 type PresentationMode = 'company' | 'project' | 'investor' | 'market';
+type ChartLayout = '2col' | '1col' | 'large';
+
+const CHART_LAYOUT_OPTIONS = [
+  { value: '2col' as ChartLayout, label: '兩欄並排', icon: <LayoutGrid className="w-4 h-4" /> },
+  { value: '1col' as ChartLayout, label: '單欄直列', icon: <Rows3 className="w-4 h-4" /> },
+  { value: 'large' as ChartLayout, label: '大圖單張', icon: <Square className="w-4 h-4" /> },
+];
 
 interface AIContent {
   executive_summary: string;
@@ -93,6 +100,8 @@ export default function SalesPresentation() {
     aiSummary: true, aiAnalysis: true, projectInfo: true, investorInfo: true,
   });
 
+  const [chartLayout, setChartLayout] = useState<ChartLayout>('1col');
+
   const toggleSection = (key: string) => {
     setVisibleSections(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -125,6 +134,12 @@ export default function SalesPresentation() {
     const images: Record<string, string> = {};
     const projects = presData.projects;
 
+    // Use larger chart sizes for better print legibility
+    const chartW = chartLayout === '2col' ? 700 : 900;
+    const chartH = chartLayout === 'large' ? 500 : 400;
+    const fontSize = chartLayout === '2col' ? 12 : 14;
+    const legendFontSize = chartLayout === '2col' ? 11 : 13;
+
     try {
       // Type distribution (pie)
       const typeMap: Record<string, number> = {};
@@ -138,10 +153,11 @@ export default function SalesPresentation() {
           [{
             type: 'pie', labels: typeEntries.map(e => e[0]), values: typeEntries.map(e => e[1]),
             hole: 0.4, textinfo: 'label+percent' as const, textposition: 'inside',
-            textfont: { size: 11 },
+            textfont: { size: fontSize },
             marker: { colors: ['hsl(0,84%,60%)', 'hsl(221,83%,53%)', 'hsl(142,71%,45%)', 'hsl(47,96%,53%)', 'hsl(262,83%,58%)', 'hsl(210,70%,50%)', 'hsl(150,60%,45%)', 'hsl(35,90%,50%)'] }
           }],
-          { margin: { t: 20, b: 20, l: 20, r: 20 }, showlegend: true, legend: { orientation: 'h', y: -0.05, x: 0.5, xanchor: 'center', font: { size: 10 } } }
+          { margin: { t: 20, b: 30, l: 20, r: 20 }, showlegend: true, legend: { orientation: 'h', y: -0.08, x: 0.5, xanchor: 'center', font: { size: legendFontSize } } },
+          chartW, chartH
         );
       }
 
@@ -156,8 +172,10 @@ export default function SalesPresentation() {
             y: regionEntries.map(e => e[0]), x: regionEntries.map(e => e[1]),
             marker: { color: 'hsl(47,96%,53%)' },
             text: regionEntries.map(e => `${e[1]} 件`), textposition: 'outside',
+            textfont: { size: fontSize },
           }],
-          { margin: { t: 10, b: 30, l: 70, r: 50 }, showlegend: false, xaxis: { title: { text: '案件數', font: { size: 11 } } } }
+          { margin: { t: 10, b: 40, l: 80, r: 60 }, showlegend: false, xaxis: { title: { text: '案件數', font: { size: fontSize } }, tickfont: { size: fontSize - 1 } }, yaxis: { tickfont: { size: fontSize - 1 } } },
+          chartW, chartH
         );
       }
 
@@ -179,7 +197,8 @@ export default function SalesPresentation() {
             { type: 'bar', name: '成案案件數', x: years.map(String), y: years.map(y => yearMap[y].closed), marker: { color: 'hsl(142,71%,45%)' } },
             { type: 'scatter', mode: 'lines+markers', name: '成案率', x: years.map(String), y: rate, yaxis: 'y2', marker: { color: 'hsl(0,84%,60%)', size: 8 }, line: { color: 'hsl(0,84%,60%)', width: 2 } },
           ],
-          { margin: { t: 10, b: 40, l: 50, r: 50 }, barmode: 'group', showlegend: true, legend: { orientation: 'h', y: -0.15, x: 0.5, xanchor: 'center', font: { size: 10 } }, yaxis: { title: { text: '案件數', font: { size: 11 } } }, yaxis2: { overlaying: 'y', side: 'right', range: [0, 100], ticksuffix: '%', title: { text: '成案率', font: { size: 11 } } } }
+          { margin: { t: 10, b: 50, l: 60, r: 60 }, barmode: 'group', showlegend: true, legend: { orientation: 'h', y: -0.18, x: 0.5, xanchor: 'center', font: { size: legendFontSize } }, xaxis: { tickfont: { size: fontSize - 1 } }, yaxis: { title: { text: '案件數', font: { size: fontSize } }, tickfont: { size: fontSize - 1 } }, yaxis2: { overlaying: 'y', side: 'right', range: [0, 100], ticksuffix: '%', title: { text: '成案率', font: { size: fontSize } }, tickfont: { size: fontSize - 1 } } },
+          chartW, chartH
         );
       }
 
@@ -208,7 +227,8 @@ export default function SalesPresentation() {
             y: capYearsSorted.map(y => capYears[y]?.[b.key] || 0),
             marker: { color: bracketColors[i] },
           })),
-          { margin: { t: 10, b: 40, l: 40, r: 10 }, barmode: 'stack', showlegend: true, legend: { orientation: 'h', y: -0.15, x: 0.5, xanchor: 'center', font: { size: 10 } }, yaxis: { title: { text: '案件數', font: { size: 11 } } } }
+          { margin: { t: 10, b: 50, l: 50, r: 10 }, barmode: 'stack', showlegend: true, legend: { orientation: 'h', y: -0.18, x: 0.5, xanchor: 'center', font: { size: legendFontSize } }, xaxis: { tickfont: { size: fontSize - 1 } }, yaxis: { title: { text: '案件數', font: { size: fontSize } }, tickfont: { size: fontSize - 1 } } },
+          chartW, chartH
         );
       }
     } catch (e) {
@@ -218,7 +238,7 @@ export default function SalesPresentation() {
 
     setChartImages(images);
     setIsGeneratingCharts(false);
-  }, [presData]);
+  }, [presData, chartLayout]);
 
   // Generate AI summary
   const generateAISummary = useCallback(async () => {
@@ -415,6 +435,20 @@ export default function SalesPresentation() {
                 </div>
               </PopoverContent>
             </Popover>
+
+            {/* Chart layout selector */}
+            <Select value={chartLayout} onValueChange={(v) => { setChartLayout(v as ChartLayout); setChartImages({}); }}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {CHART_LAYOUT_OPTIONS.map(opt => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    <div className="flex items-center gap-2">{opt.icon}{opt.label}</div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
             <Separator orientation="vertical" className="h-8" />
 
@@ -641,27 +675,31 @@ export default function SalesPresentation() {
                   正在生成圖表...
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className={
+                  chartLayout === '2col'
+                    ? 'grid grid-cols-1 md:grid-cols-2 gap-6'
+                    : 'flex flex-col gap-6'
+                }>
                   {chartImages.type && (
-                    <div>
+                    <div className="break-inside-avoid">
                       <h3 className="text-sm font-medium text-gray-600 mb-2">案場類型分佈</h3>
                       <img src={chartImages.type} alt="案場類型分佈" className="w-full border rounded" />
                     </div>
                   )}
                   {chartImages.yearly && (
-                    <div>
+                    <div className="break-inside-avoid">
                       <h3 className="text-sm font-medium text-gray-600 mb-2">年度案件趨勢</h3>
                       <img src={chartImages.yearly} alt="年度案件趨勢" className="w-full border rounded" />
                     </div>
                   )}
                   {chartImages.capacity && (
-                    <div>
+                    <div className="break-inside-avoid">
                       <h3 className="text-sm font-medium text-gray-600 mb-2">容量級距分佈</h3>
                       <img src={chartImages.capacity} alt="容量級距分佈" className="w-full border rounded" />
                     </div>
                   )}
                   {chartImages.region && (
-                    <div>
+                    <div className="break-inside-avoid">
                       <h3 className="text-sm font-medium text-gray-600 mb-2">地區分佈 (Top 10)</h3>
                       <img src={chartImages.region} alt="地區分佈" className="w-full border rounded" />
                     </div>
