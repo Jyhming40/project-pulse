@@ -436,10 +436,21 @@ export default function SalesPresentation() {
               <h2 className="text-lg font-semibold text-gray-800 mb-3">關鍵營運指標</h2>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <KPIBox label="專案總數" value={`${presData.summary.totalProjects}`} unit="件" />
-                <KPIBox label="總裝置容量" value={`${(presData.summary.totalCapacity / 1000).toFixed(1)}`} unit="MWp" />
-                <KPIBox label="成交率" value={`${presData.summary.conversionRate}`} unit="%" />
-                <KPIBox label="平均進度" value={`${presData.summary.avgProgress}`} unit="%" />
+                <KPIBox label="已成案容量" value={`${(presData.summary.completedCapacity / 1000).toFixed(1)}`} unit="MWp" highlight />
+                <KPIBox label="進行中容量" value={`${(presData.summary.inProgressCapacity / 1000).toFixed(1)}`} unit="MWp" />
+                <KPIBox label="總申請容量" value={`${(presData.summary.totalAppliedCapacity / 1000).toFixed(1)}`} unit="MWp" />
               </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                <KPIBox label="成案率（案件）" value={`${presData.summary.projectConversionRate}`} unit="%" />
+                <KPIBox label="報價成交率" value={`${presData.summary.conversionRate}`} unit="%" />
+                <KPIBox label="平均進度" value={`${presData.summary.avgProgress}`} unit="%" />
+                <KPIBox label="風險案場" value={`${presData.summary.riskCount}`} unit="件" />
+              </div>
+              {presData.summary.cancelledCount > 0 && (
+                <p className="text-xs text-gray-400 mt-2">
+                  ※ 取消/暫停案件 {presData.summary.cancelledCount} 件（{(presData.summary.cancelledCapacity / 1000).toFixed(1)} MWp）已納入成案率分母，不計入容量統計
+                </p>
+              )}
             </div>
           )}
 
@@ -574,9 +585,9 @@ export default function SalesPresentation() {
 }
 
 // KPI display box
-function KPIBox({ label, value, unit }: { label: string; value: string; unit?: string }) {
+function KPIBox({ label, value, unit, highlight }: { label: string; value: string; unit?: string; highlight?: boolean }) {
   return (
-    <div className="border rounded-lg p-3 print:border">
+    <div className={`border rounded-lg p-3 print:border ${highlight ? 'border-green-300 bg-green-50 print:bg-green-50' : ''}`}>
       <p className="text-xs text-gray-500 mb-1">{label}</p>
       <p className="text-lg font-bold text-gray-900">
         {value}
