@@ -26,10 +26,11 @@ serve(async (req) => {
 你的回覆必須是一個 JSON 物件，包含以下欄位：
 - executive_summary: 執行摘要（2-3 段，每段 80-120 字）
 - highlights: 重點亮點陣列（3-5 項，每項 30-50 字）
-- analysis: 數據分析摘要（2-3 段，每段 60-100 字）
+- analysis: 數據分析摘要（2-3 段，每段 60-100 字），需涵蓋財務健康度、文件進度、里程碑效率分析
 - recommendation: 建議與展望（1-2 段，每段 60-100 字）
 
-確保內容專業、具說服力，適合向客戶或投資人簡報使用。`;
+確保內容專業、具說服力，適合向客戶或投資人簡報使用。
+如果數據中有財務、文件完成率、施工時程等資訊，請一併納入分析。`;
 
     let userPrompt = "";
 
@@ -59,7 +60,27 @@ serve(async (req) => {
 案場類型分佈：${JSON.stringify(data.typeDistribution || {})}
 地區分佈（前10）：${JSON.stringify(data.regionDistribution || {})}
 年度趨勢：${JSON.stringify(data.yearlyTrend || {})}
-容量級距：${JSON.stringify(data.capacityDistribution || {})}`;
+容量級距：${JSON.stringify(data.capacityDistribution || {})}
+
+財務數據：
+- 合約總金額：${data.totalContractAmount || 0} 元
+- 總毛利：${data.totalGrossProfit || 0} 元
+- 平均毛利率：${data.avgGrossMargin || 0}%
+- 平均每kW單價：${data.avgPricePerKw || 0} 元/kW
+- 已開票金額：${data.totalInvoiced || 0} 元
+- 已收款金額：${data.totalPaid || 0} 元
+- 收款率：${data.collectionRate || 0}%
+
+文件管理：
+- 文件總數：${data.totalDocs || 0} 份
+- 已完成文件：${data.completedDocs || 0} 份
+- 文件完成率：${data.docCompletionRate || 0}%
+
+施工時程效率：
+- 現勘到簽約平均天數：${data.avgSurveyToContract || 0} 天
+- 簽約到掛表平均天數：${data.avgContractToMeter || 0} 天
+- 施工到掛表平均天數：${data.avgConstructionToMeter || 0} 天
+- 待處理議題：${data.openIssues || 0} 件`;
         break;
 
       case "project":
