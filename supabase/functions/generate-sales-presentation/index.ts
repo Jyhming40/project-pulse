@@ -41,13 +41,19 @@ serve(async (req) => {
 
 營運概況：
 - 專案總數：${data.totalProjects || 0} 件
-- 總裝置容量：${data.totalCapacity || 0} kWp
+- 已成案容量：${data.completedCapacity || 0} kWp（已結案/運維中）
+- 進行中容量：${data.inProgressCapacity || 0} kWp
+- 總申請容量：${data.totalAppliedCapacity || 0} kWp
+- 已成案案件：${data.completedCount || 0} 件
+- 進行中案件：${data.inProgressCount || 0} 件
+- 取消/暫停案件：${data.cancelledCount || 0} 件（${data.cancelledCapacity || 0} kWp）
+- 案件成案率：${data.projectConversionRate || 0}%（已成案/全部含取消暫停）
 - 風險案場：${data.riskCount || 0} 件
 - 平均進度：${data.avgProgress || 0}%
 
 報價統計：
 - 報價總數：${data.totalQuotes || 0} 份
-- 成交率：${data.conversionRate || 0}%
+- 報價成交率：${data.conversionRate || 0}%
 - 本月成交：${data.closedThisMonth || 0} 件
 
 案場類型分佈：${JSON.stringify(data.typeDistribution || {})}

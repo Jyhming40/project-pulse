@@ -73,8 +73,19 @@ export function usePresentationData() {
         q.quote_status === 'accepted' && new Date(q.created_at) >= startOfMonth
       ).length;
 
-      const totalCapacity = projects.reduce((s, p) => s + (p.actual_installed_capacity || p.capacity_kwp || 0), 0);
-      const activeProjects = projects.filter(p => !['暫停', '取消'].includes(p.status || ''));
+      // Capacity breakdown by status category
+      const closedStatuses = ['已結案', '運維中'];
+      const excludedStatuses = ['取消', '暫停'];
+
+      const closedProjects = projects.filter(p => closedStatuses.includes(p.status || ''));
+      const inProgressProjects = projects.filter(p => !closedStatuses.includes(p.status || '') && !excludedStatuses.includes(p.status || ''));
+      const cancelledProjects = projects.filter(p => excludedStatuses.includes(p.status || ''));
+
+      const completedCapacity = closedProjects.reduce((s, p) => s + (p.actual_installed_capacity || p.capacity_kwp || 0), 0);
+      const inProgressCapacity = inProgressProjects.reduce((s, p) => s + (p.capacity_kwp || 0), 0);
+      const totalAppliedCapacity = projects.reduce((s, p) => s + (p.capacity_kwp || 0), 0);
+
+      const activeProjects = projects.filter(p => !excludedStatuses.includes(p.status || ''));
       const avgProgress = activeProjects.length > 0
         ? Math.round(activeProjects.reduce((s, p) => s + (p.overall_progress || 0), 0) / activeProjects.length)
         : 0;
@@ -83,17 +94,29 @@ export function usePresentationData() {
         return age > 180 && (p.overall_progress || 0) < 25;
       }).length;
 
+      // Conversion rate: closed / total (including cancelled/paused as denominator)
+      const projectConversionRate = projects.length > 0
+        ? Math.round((closedProjects.length / projects.length) * 100)
+        : 0;
+
       return {
         projects,
         investors,
         quotes,
         summary: {
           totalProjects: projects.length,
-          totalCapacity: Math.round(totalCapacity),
+          completedCapacity: Math.round(completedCapacity),
+          inProgressCapacity: Math.round(inProgressCapacity),
+          totalAppliedCapacity: Math.round(totalAppliedCapacity),
+          completedCount: closedProjects.length,
+          inProgressCount: inProgressProjects.length,
+          cancelledCount: cancelledProjects.length,
+          cancelledCapacity: Math.round(cancelledProjects.reduce((s, p) => s + (p.capacity_kwp || 0), 0)),
           avgProgress,
           riskCount,
           totalQuotes,
           conversionRate,
+          projectConversionRate,
           closedThisMonth,
           typeDistribution,
           regionDistribution,
