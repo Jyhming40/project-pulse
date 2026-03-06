@@ -25,6 +25,7 @@ import { DeleteConfirmDialog } from '@/components/DeleteConfirmDialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ProjectDetailDrawer } from '@/components/ProjectDetailDrawer';
 import { DataEnrichmentPanel } from '@/components/DataEnrichmentPanel';
+import { DocumentScanUpload } from '@/components/projects/DocumentScanUpload';
 import { BatchDriveFolderPanel } from '@/components/BatchDriveFolderPanel';
 import { 
   Plus, 
@@ -1066,6 +1067,14 @@ export default function Projects() {
               {editingProject ? '修改案場資料' : '填寫案場基本資訊'}
             </DialogDescription>
           </DialogHeader>
+
+          {/* Document Scan - only for new projects */}
+          {!editingProject && (
+            <DocumentScanUpload
+              onExtracted={(data) => setFormData(prev => ({ ...prev, ...data }))}
+              disabled={isCreating}
+            />
+          )}
 
           <div className="grid gap-4 py-4">
             {/* Basic Info Section */}
