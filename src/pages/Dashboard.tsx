@@ -21,11 +21,14 @@ import {
 } from '@/components/dashboard';
 import { MemosSummaryWidget } from '@/components/dashboard/MemosSummaryWidget';
 import { DashboardSettingsPanel } from '@/components/dashboard/DashboardSettingsPanel';
+import { PortfolioLayoutPanel } from '@/components/dashboard/PortfolioLayoutPanel';
 import { useAnalyticsSummary, useRiskProjects } from '@/hooks/useProjectAnalytics';
 import { useDashboardSettings, DashboardSection } from '@/hooks/useDashboardSettings';
+import { usePortfolioLayout } from '@/hooks/usePortfolioLayout';
 
 export default function Dashboard() {
   const { settings, isLoading: settingsLoading } = useDashboardSettings();
+  const { charts, visibleCharts, toggleVisibility, reorder, resetLayout } = usePortfolioLayout();
   
   // Analytics data
   const { data: summary, isLoading: summaryLoading } = useAnalyticsSummary();
@@ -99,6 +102,24 @@ export default function Dashboard() {
     .filter(s => s.visible)
     .sort((a, b) => a.order - b.order);
 
+  // Portfolio chart rendering map
+  const renderPortfolioChart = (chartId: string) => {
+    switch (chartId) {
+      case 'installation-type':
+        return <InstallationTypeChart projects={projects as any} isLoading={projectsLoading} />;
+      case 'installation-type-table':
+        return <InstallationTypeSummaryTable projects={projects as any} isLoading={projectsLoading} />;
+      case 'yearly-trend':
+        return <YearlyTrendChart projects={projects as any} isLoading={projectsLoading} />;
+      case 'capacity-distribution':
+        return <CapacityDistributionChart projects={projects as any} isLoading={projectsLoading} />;
+      case 'region-distribution':
+        return <RegionDistributionChart projects={projects as any} isLoading={projectsLoading} />;
+      default:
+        return null;
+    }
+  };
+
   // 區塊渲染映射
   const renderSection = (section: DashboardSection) => {
     switch (section.id) {
@@ -135,30 +156,30 @@ export default function Dashboard() {
       case 'portfolio-analysis':
         return (
           <div key={section.id} className="space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <InstallationTypeChart 
-                projects={projects as any} 
-                isLoading={projectsLoading} 
-              />
-              <InstallationTypeSummaryTable
-                projects={projects as any}
-                isLoading={projectsLoading}
-              />
-              <YearlyTrendChart 
-                projects={projects as any} 
-                isLoading={projectsLoading} 
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-medium text-muted-foreground">專案組合分析</h2>
+              <PortfolioLayoutPanel
+                charts={charts}
+                onToggle={toggleVisibility}
+                onReorder={reorder}
+                onReset={resetLayout}
               />
             </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <CapacityDistributionChart 
-                projects={projects as any} 
-                isLoading={projectsLoading} 
-              />
-              <RegionDistributionChart 
-                projects={projects as any} 
-                isLoading={projectsLoading} 
-              />
-            </div>
+            {visibleCharts.length === 0 ? (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground text-sm">
+                  所有圖表已隱藏，請點擊「版面配置」開啟圖表
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                {visibleCharts.map(chart => (
+                  <div key={chart.id}>
+                    {renderPortfolioChart(chart.id)}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       case 'issues-summary':
@@ -178,10 +199,7 @@ export default function Dashboard() {
       case 'advanced-analysis':
         return (
           <div key={section.id} className="space-y-4">
-            {/* Task-driven alerts - 任務導向警示 */}
             <TaskDrivenAlerts projects={projects as any} />
-            
-            {/* Distribution charts */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-medium flex items-center gap-2">
