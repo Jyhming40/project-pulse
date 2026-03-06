@@ -12,11 +12,13 @@ interface YearlyTrendChartProps {
     status?: string | null;
   }>;
   isLoading?: boolean;
+  chartHeight?: number;
 }
 
 export function YearlyTrendChart({ 
   projects, 
-  isLoading = false 
+  isLoading = false,
+  chartHeight = 280,
 }: YearlyTrendChartProps) {
   const chartData = useMemo(() => {
     const yearStats: Record<number, { 
@@ -76,7 +78,7 @@ export function YearlyTrendChart({
           <Skeleton className="h-5 w-32" />
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-[280px] w-full" />
+          <Skeleton style={{ height: chartHeight }} className="w-full" />
         </CardContent>
       </Card>
     );
@@ -92,7 +94,7 @@ export function YearlyTrendChart({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+          <div style={{ height: chartHeight }} className="flex items-center justify-center text-muted-foreground">
             暫無數據
           </div>
         </CardContent>
@@ -109,7 +111,7 @@ export function YearlyTrendChart({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[280px]">
+        <div style={{ height: chartHeight }}>
           <Plot
             data={[
               {
