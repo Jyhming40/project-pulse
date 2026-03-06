@@ -129,18 +129,25 @@ export default function Dashboard() {
     .sort((a, b) => a.order - b.order);
 
   // Portfolio chart rendering map
-  const renderPortfolioChart = (chartId: string) => {
+  const getChartHeight = (span: number) => {
+    if (span === 3) return 380;
+    if (span === 2) return 320;
+    return 280;
+  };
+
+  const renderPortfolioChart = (chartId: string, span: number) => {
+    const chartHeight = getChartHeight(span);
     switch (chartId) {
       case 'installation-type':
-        return <InstallationTypeChart projects={projects as any} isLoading={projectsLoading} />;
+        return <InstallationTypeChart projects={projects as any} isLoading={projectsLoading} chartHeight={chartHeight} />;
       case 'installation-type-table':
         return <InstallationTypeSummaryTable projects={projects as any} isLoading={projectsLoading} />;
       case 'yearly-trend':
-        return <YearlyTrendChart projects={projects as any} isLoading={projectsLoading} />;
+        return <YearlyTrendChart projects={projects as any} isLoading={projectsLoading} chartHeight={chartHeight} />;
       case 'capacity-distribution':
-        return <CapacityDistributionChart projects={projects as any} isLoading={projectsLoading} />;
+        return <CapacityDistributionChart projects={projects as any} isLoading={projectsLoading} chartHeight={chartHeight} />;
       case 'region-distribution':
-        return <RegionDistributionChart projects={projects as any} isLoading={projectsLoading} />;
+        return <RegionDistributionChart projects={projects as any} isLoading={projectsLoading} chartHeight={chartHeight} />;
       default:
         return null;
     }
@@ -204,7 +211,7 @@ export default function Dashboard() {
                   <div className="grid grid-cols-3 gap-4">
                     {visibleCharts.map(chart => (
                       <SortableChartCard key={chart.id} chart={chart}>
-                        {renderPortfolioChart(chart.id)}
+                        {renderPortfolioChart(chart.id, chart.span)}
                       </SortableChartCard>
                     ))}
                   </div>

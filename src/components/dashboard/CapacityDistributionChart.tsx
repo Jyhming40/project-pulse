@@ -11,6 +11,7 @@ interface CapacityDistributionChartProps {
     capacity_kwp?: number | null;
   }>;
   isLoading?: boolean;
+  chartHeight?: number;
 }
 
 // 容量級距定義
@@ -34,7 +35,8 @@ const BRACKET_COLORS = [
 
 export function CapacityDistributionChart({ 
   projects, 
-  isLoading = false 
+  isLoading = false,
+  chartHeight = 280,
 }: CapacityDistributionChartProps) {
   const chartData = useMemo(() => {
     const yearBrackets: Record<number, Record<string, number>> = {};
@@ -80,7 +82,7 @@ export function CapacityDistributionChart({
           <Skeleton className="h-5 w-32" />
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-[280px] w-full" />
+          <Skeleton style={{ height: chartHeight }} className="w-full" />
         </CardContent>
       </Card>
     );
@@ -96,7 +98,7 @@ export function CapacityDistributionChart({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+          <div style={{ height: chartHeight }} className="flex items-center justify-center text-muted-foreground">
             暫無數據
           </div>
         </CardContent>
@@ -113,7 +115,7 @@ export function CapacityDistributionChart({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[280px]">
+        <div style={{ height: chartHeight }}>
           <Plot
             data={chartData.traces.map(trace => ({
               type: 'bar' as const,

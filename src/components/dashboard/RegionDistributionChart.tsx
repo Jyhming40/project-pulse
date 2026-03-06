@@ -9,6 +9,7 @@ interface RegionDistributionChartProps {
     city?: string | null;
   }>;
   isLoading?: boolean;
+  chartHeight?: number;
 }
 
 // 區域分組定義
@@ -55,7 +56,8 @@ const REGION_COLORS: Record<string, string> = {
 
 export function RegionDistributionChart({ 
   projects, 
-  isLoading = false 
+  isLoading = false,
+  chartHeight = 280,
 }: RegionDistributionChartProps) {
   const chartData = useMemo(() => {
     const cityCount: Record<string, number> = {};
@@ -102,7 +104,7 @@ export function RegionDistributionChart({
           <Skeleton className="h-5 w-32" />
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-[280px] w-full" />
+          <Skeleton style={{ height: chartHeight }} className="w-full" />
         </CardContent>
       </Card>
     );
@@ -118,7 +120,7 @@ export function RegionDistributionChart({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+          <div style={{ height: chartHeight }} className="flex items-center justify-center text-muted-foreground">
             暫無數據
           </div>
         </CardContent>
@@ -135,7 +137,7 @@ export function RegionDistributionChart({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[280px]">
+        <div style={{ height: chartHeight }}>
           <Plot
             data={[
               {

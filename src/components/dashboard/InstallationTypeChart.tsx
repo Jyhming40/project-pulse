@@ -9,6 +9,7 @@ interface InstallationTypeChartProps {
     installation_type?: string | null;
   }>;
   isLoading?: boolean;
+  chartHeight?: number;
 }
 
 // 案場類型對應顏色
@@ -41,7 +42,8 @@ const DEFAULT_COLORS = [
 
 export function InstallationTypeChart({ 
   projects, 
-  isLoading = false 
+  isLoading = false,
+  chartHeight = 280,
 }: InstallationTypeChartProps) {
   const chartData = useMemo(() => {
     const distribution: Record<string, number> = {};
@@ -74,7 +76,7 @@ export function InstallationTypeChart({
           <Skeleton className="h-5 w-32" />
         </CardHeader>
         <CardContent>
-          <div className="h-[280px] flex items-center justify-center">
+          <div style={{ height: chartHeight }} className="flex items-center justify-center">
             <Skeleton className="h-40 w-40 rounded-full" />
           </div>
         </CardContent>
@@ -92,7 +94,7 @@ export function InstallationTypeChart({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[280px] flex items-center justify-center text-muted-foreground">
+          <div style={{ height: chartHeight }} className="flex items-center justify-center text-muted-foreground">
             暫無數據
           </div>
         </CardContent>
@@ -109,7 +111,7 @@ export function InstallationTypeChart({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="h-[280px]">
+        <div style={{ height: chartHeight }}>
           <Plot
             data={[
               {
