@@ -1,8 +1,22 @@
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+} from '@dnd-kit/sortable';
 import {
   QuickAccessCompact,
   StatusDistributionChart,
@@ -22,14 +36,26 @@ import {
 import { MemosSummaryWidget } from '@/components/dashboard/MemosSummaryWidget';
 import { DashboardSettingsPanel } from '@/components/dashboard/DashboardSettingsPanel';
 import { PortfolioLayoutPanel } from '@/components/dashboard/PortfolioLayoutPanel';
+import { SortableChartCard } from '@/components/dashboard/SortableChartCard';
 import { useAnalyticsSummary, useRiskProjects } from '@/hooks/useProjectAnalytics';
 import { useDashboardSettings, DashboardSection } from '@/hooks/useDashboardSettings';
 import { usePortfolioLayout } from '@/hooks/usePortfolioLayout';
 
 export default function Dashboard() {
   const { settings, isLoading: settingsLoading } = useDashboardSettings();
-  const { charts, visibleCharts, toggleVisibility, setSpan, reorder, resetLayout } = usePortfolioLayout();
-  
+  const { charts, visibleCharts, toggleVisibility, setSpan, reorder, reorderById, resetLayout } = usePortfolioLayout();
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    reorderById(active.id as string, over.id as string);
+  }, [reorderById]);
+
   // Analytics data
   const { data: summary, isLoading: summaryLoading } = useAnalyticsSummary();
   const { data: riskProjects = [], isLoading: riskLoading } = useRiskProjects(10);
@@ -173,20 +199,17 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-3 gap-4">
-                {visibleCharts.map(chart => (
-                  <div
-                    key={chart.id}
-                    className={
-                      chart.span === 3 ? 'col-span-3' :
-                      chart.span === 2 ? 'col-span-3 lg:col-span-2' :
-                      'col-span-3 lg:col-span-1'
-                    }
-                  >
-                    {renderPortfolioChart(chart.id)}
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+                <SortableContext items={visibleCharts.map(c => c.id)} strategy={rectSortingStrategy}>
+                  <div className="grid grid-cols-3 gap-4">
+                    {visibleCharts.map(chart => (
+                      <SortableChartCard key={chart.id} chart={chart}>
+                        {renderPortfolioChart(chart.id)}
+                      </SortableChartCard>
+                    ))}
                   </div>
-                ))}
-              </div>
+                </SortableContext>
+              </DndContext>
             )}
           </div>
         );
