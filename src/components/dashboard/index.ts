@@ -16,6 +16,7 @@ export { ResolveActionDialog } from './ResolveActionDialog';
 export { ActionHistoryTab } from './ActionHistoryTab';
 export { TaskDrivenAlerts } from './TaskDrivenAlerts';
 export { InstallationTypeChart } from './InstallationTypeChart';
+export { InstallationTypeSummaryTable } from './InstallationTypeSummaryTable';
 export { YearlyTrendChart } from './YearlyTrendChart';
 export { CapacityDistributionChart } from './CapacityDistributionChart';
 export { RegionDistributionChart } from './RegionDistributionChart';

@@ -20,7 +20,7 @@ const REGION_GROUPS: Record<string, string[]> = {
   '離島': ['澎湖縣', '金門縣', '連江縣'],
 };
 
-// 簡化的城市名稱對應
+// 簡化的城市名稱對應（含常見缺「市/縣」的輸入）
 const CITY_ALIAS: Record<string, string> = {
   '基隆': '基隆市',
   '台北': '台北市',
@@ -33,6 +33,7 @@ const CITY_ALIAS: Record<string, string> = {
   '南投': '南投縣',
   '雲林': '雲林縣',
   '嘉義': '嘉義縣',
+  '嘉義市': '嘉義縣', // 合併嘉義市/縣
   '台南': '台南市',
   '高雄': '高雄市',
   '屏東': '屏東縣',
