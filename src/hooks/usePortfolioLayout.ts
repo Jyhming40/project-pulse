@@ -62,11 +62,23 @@ export function usePortfolioLayout() {
     });
   }, []);
 
+  const reorderById = useCallback((activeId: string, overId: string) => {
+    setCharts(prev => {
+      const fromIndex = prev.findIndex(c => c.id === activeId);
+      const toIndex = prev.findIndex(c => c.id === overId);
+      if (fromIndex === -1 || toIndex === -1) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next.map((c, i) => ({ ...c, order: i }));
+    });
+  }, []);
+
   const resetLayout = useCallback(() => {
     setCharts(DEFAULT_CHARTS);
   }, []);
 
   const visibleCharts = charts.filter(c => c.visible).sort((a, b) => a.order - b.order);
 
-  return { charts, visibleCharts, toggleVisibility, setSpan, reorder, resetLayout };
+  return { charts, visibleCharts, toggleVisibility, setSpan, reorder, reorderById, resetLayout };
 }
