@@ -41,7 +41,7 @@ export function CapacityDistributionChart({
 
     // 統計各年度各級距的案件數
     projects.forEach(p => {
-      const year = p.intake_year || p.fiscal_year;
+      const year = p.fiscal_year || p.intake_year;
       const capacity = p.capacity_kwp || 0;
       if (!year) return;
 
