@@ -29,7 +29,7 @@ export function YearlyTrendChart({
 
     // 統計各年度資料
     projects.forEach(p => {
-      const year = p.intake_year || p.fiscal_year;
+      const year = p.fiscal_year || p.intake_year;
       if (!year) return;
 
       if (!yearStats[year]) {
