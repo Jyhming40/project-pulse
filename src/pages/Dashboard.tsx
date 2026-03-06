@@ -28,7 +28,7 @@ import { usePortfolioLayout } from '@/hooks/usePortfolioLayout';
 
 export default function Dashboard() {
   const { settings, isLoading: settingsLoading } = useDashboardSettings();
-  const { charts, visibleCharts, toggleVisibility, reorder, resetLayout } = usePortfolioLayout();
+  const { charts, visibleCharts, toggleVisibility, setSpan, reorder, resetLayout } = usePortfolioLayout();
   
   // Analytics data
   const { data: summary, isLoading: summaryLoading } = useAnalyticsSummary();
@@ -161,6 +161,7 @@ export default function Dashboard() {
               <PortfolioLayoutPanel
                 charts={charts}
                 onToggle={toggleVisibility}
+                onSetSpan={setSpan}
                 onReorder={reorder}
                 onReset={resetLayout}
               />
@@ -172,9 +173,16 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 {visibleCharts.map(chart => (
-                  <div key={chart.id}>
+                  <div
+                    key={chart.id}
+                    className={
+                      chart.span === 3 ? 'col-span-3' :
+                      chart.span === 2 ? 'col-span-3 lg:col-span-2' :
+                      'col-span-3 lg:col-span-1'
+                    }
+                  >
                     {renderPortfolioChart(chart.id)}
                   </div>
                 ))}
